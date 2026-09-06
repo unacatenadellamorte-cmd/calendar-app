@@ -2,9 +2,10 @@
 title: 'Story 1.2: メール+パスワードのアカウントとお試しモード'
 type: 'feature'
 created: '2026-09-06'
-status: 'ready-for-dev'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
+baseline_commit: 'a5390a82b1bcce9b613f41a2d601c13cf0af1404'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-1-context.md'
   - '{project-root}/_bmad-output/implementation-artifacts/spec-1-1-project-foundation-and-app-shell.md'
@@ -69,19 +70,18 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/data/result.ts` -- `Result<T, E>` 型(`ok` / `err`)と `AppError = { kind: string; messageKey: string }`、生成ヘルパ -- 規約「エラー形」の土台(1.4 以降も使う)
-- [ ] `src/data/auth.ts` -- supabase.auth の薄いラッパ。`signUpWithPassword` / `signInWithPassword` / `signOut` / `getSession` / `onAuthStateChange` / `signInAnonymously` / `upgradeToPassword`。すべて `Result` を返し、Supabase エラーを `AppError` に正規化 -- AD-9
-- [ ] `src/data/auth.errors.ts`(または auth.ts 内)-- Supabase の代表的な認証エラーを日本語 `messageKey` に対応づける表 -- UX-DR14
-- [ ] `src/app/AuthProvider.tsx` -- セッション取得 + `onAuthStateChange` 購読 + 初回の匿名サインイン試行。`AuthState`(`loading` / `guest` / `authenticated` / `unavailable`)を context に載せる。`useAuth()` エクスポート -- 認証状態の一元配布
-- [ ] `src/main.tsx` -- `<AuthProvider>` で `<AppRoutes />` をラップ -- 配線
-- [ ] `src/features/auth/ui/AuthScreen.tsx` -- メール / パスワードのフォーム、サインアップ↔ログイン切替、送信中状態、エラー表示。匿名セッション中なら「昇格」文言 -- FR16 / UX-DR14 / UX-DR15
-- [ ] `src/features/auth/model/useAuthForm.ts` -- フォーム状態と送信ロジック(`auth.ts` を呼ぶ)。バリデーション(メール形式、パスワード最小長)-- ロジック分離
-- [ ] `src/app/routes.tsx` -- `/auth` ルートを追加(タブ外、設定から遷移)-- 導線
-- [ ] `src/features/settings/ui/SettingsScreen.tsx` -- アカウント欄を追加(状態別の表示 + ログアウト + `/auth` への導線)-- 設定への露出
-- [ ] `src/features/settings/ui/AccountSection.tsx` -- 上記を独立コンポーネントに -- 見通し
-- [ ] `src/data/auth.test.ts` -- supabase クライアントをモックし、I/O マトリクスの各行(サインアップ成功 / ログイン失敗 / ログアウト / 匿名 / 昇格 / 未設定 / 状態変化)を検証 -- 回帰防止
-- [ ] `src/app/AuthProvider.test.tsx` -- `unavailable` と `guest` の初期化、`useAuth()` の値、認証状態変化の反映をテスト -- 回帰防止
-- [ ] `src/features/auth/model/useAuthForm.test.ts` -- バリデーションと送信結果の反映をテスト -- 回帰防止
+- [x] `src/data/result.ts` -- `Result<T, E>` 型(`ok` / `err`)と `AppError = { kind, messageKey, cause? }`、生成ヘルパ -- 規約「エラー形」の土台(1.4 以降も使う)
+- [x] `src/data/auth.ts` -- supabase.auth の薄いラッパ。`signUpWithPassword` / `signInWithPassword` / `signOut` / `getSession` / `onAuthStateChange` / `signInAnonymously` / `upgradeToPassword` / `isAuthAvailable` / `looksLikeEmail`。すべて `Result` を返す -- AD-9
+- [x] `src/data/auth.errors.ts` -- Supabase の認証エラーを `AppError` に正規化(`normalizeAuthError`)+ `messageKey` → 日本語文言(`authMessage` / `AUTH_MESSAGES`)-- UX-DR14
+- [x] `src/app/auth-context.ts` + `src/app/AuthProvider.tsx` -- context/hook を `auth-context.ts` に、Provider を `AuthProvider.tsx` に分離(fast-refresh 警告回避)。`AuthState`(`loading` / `guest` / `authenticated` / `unavailable`)、初回 + サインアウト後の匿名サインイン -- 認証状態の一元配布
+- [x] `src/main.tsx` -- `<AuthProvider>` で `<BrowserRouter>` をラップ -- 配線
+- [x] `src/features/auth/ui/AuthScreen.tsx` -- メール / パスワードのフォーム、サインアップ↔ログイン切替、送信中状態、エラー表示、匿名時「昇格」文言、`unavailable` 時は無効表示 -- FR16 / UX-DR14 / UX-DR15
+- [x] `src/features/auth/model/useAuthForm.ts` -- フォーム状態と送信ロジック。バリデーション(メール形式、パスワード6文字以上)-- ロジック分離
+- [x] `src/app/routes.tsx` -- `/auth` ルートを追加(タブ外)-- 導線
+- [x] `src/features/settings/ui/SettingsScreen.tsx` + `AccountSection.tsx` -- アカウント欄を独立コンポーネントで追加(状態別表示 + ログアウト + `/auth` 導線)-- 設定への露出
+- [x] `src/data/auth.test.ts`(11)/ `src/data/auth.errors.test.ts`(4)-- モックした supabase で I/O マトリクス各行を検証 -- 回帰防止
+- [x] `src/app/AuthProvider.test.tsx`(5)-- `unavailable` / `guest` 初期化、状態変化、サインアウト後の再匿名化 -- 回帰防止
+- [x] `src/features/auth/model/useAuthForm.test.ts`(6)-- バリデーションと送信結果 -- 回帰防止
 
 **Acceptance Criteria:**
 - Given Supabase をモックした環境, when サインアップ → ログアウト → ログイン, then `auth.ts` が対応する supabase.auth を1回ずつ呼び、`Result` の成否と `AuthState` 遷移が期待どおり
@@ -92,7 +92,13 @@ context:
 
 ## Implementation Notes
 
-<!-- 実装中に追記 -->
+- **匿名サインイン**: `supabase.auth.signInAnonymously()` を使用(supabase-js 2.115)。`AuthProvider` は初回に `getSession` → 無ければ `signInAnonymously`。`onAuthStateChange` で `session === null`(サインアウト等)になったら**匿名セッションを張り直す**(matrix「ログアウト → 再度 guest」)。多重発行は `anonInFlight` ref でガードし、解決後に false に戻す(Story 1.1 の一発 ref だと StrictMode の cancel 済み初期化が retry できない問題を修正)。
+- **context/hook の分離**: `useAuth` と `AuthContext` を `src/app/auth-context.ts` に、`AuthProvider` コンポーネントを `AuthProvider.tsx` に。同一ファイルで component と hook を両方 export すると react-refresh 警告が出るため(Story 1.1 の routes.tsx と同じ対処)。consumer は `@/app/auth-context` から `useAuth` を import。
+- **エラー正規化**: `normalizeAuthError` が Supabase の `code` / `status` / メッセージ文字列から `AppError` を作り、`messageKey`(`auth/*`)を返す。表示層は `authMessage(messageKey)` で日本語に。コード・英語メッセージ・感嘆符は出さない。
+- **`upgradeToPassword`**: `updateUser({ email, password })`。匿名ユーザーの `auth.uid()` は変わらないので、データ移行の別経路は作っていない(アーキ AD-1 と整合)。
+- **Supabase 未設定**: `supabase` が null のとき `isAuthAvailable()` が false → `AuthState = 'unavailable'`、非同期処理を一切走らせない。`AuthScreen` / `AccountSection` は無効表示。警告は Story 1.1 の supabase.ts の1行のみ。
+- **未検証**: 実際のサインアップ / ログイン / 匿名昇格フロー(Docker 未導入で Supabase ローカルが起動できない)。38 tests(8 ファイル)は supabase クライアントをモックして I/O マトリクス全行をカバー。build / typecheck / lint green。実フロー確認は Supabase 接続後にユーザーが実施。
+- **Supabase 側の設定が別途必要**: 匿名サインインの有効化(Authentication 設定)。プロジェクト作成時に .env.local へ URL / anon key。
 
 ## Verification
 
@@ -105,3 +111,17 @@ context:
 **Manual checks:**
 - Supabase 未設定で `npm run dev`: 設定画面のアカウント欄が「ローカル開発では認証は無効」表示、他画面は正常。
 - (Supabase 接続後)サインアップ → ログアウト → ログイン、匿名からの昇格を実機確認。
+
+## Review Triage Log
+
+*step-04 レビュー(blind-hunter / edge-case-hunter / verification-gap の3レンズをこのセッションで実施。バックグラウンドのサブエージェントを使えないため。finding floor N=4)。すべて patch 相当で、実装と同じパスで修正済み。loopback なし。*
+
+| 所見 | 検証 | 判定 | 対応 |
+| --- | --- | --- | --- |
+| サインアウトでセッションが null になった後、匿名セッションが張り直されず「session 無しの guest」状態で固まる。以降 `upgradeToPassword` が対象なしで失敗する(matrix「ログアウト → 再度 guest」に反する) | `AuthProvider` の初回 anon は一発 ref ガードで、`onAuthStateChange(null)` では再実行されなかった | high | patch: `onAuthStateChange` で `session===null` かつ auth 有効なら `ensureGuest()` を再実行。ガードを `anonInFlight` ref(解決後 false)に変更 |
+| StrictMode の二重 effect で、1回目の匿名サインインが cancel された場合、一発 ref のせいで2回目が retry せず state が `loading` のまま固まりうる | Story 1.1 の routes と同型。dev のみ | medium | patch: 上と同じ `anonInFlight` 化で解決(cancel 済みでも次回実行できる) |
+| `useAuth` と `AuthProvider` を同一ファイルで export → react-refresh 警告 | lint は exit 0 だが警告あり | low | patch: `src/app/auth-context.ts` に context/hook を分離。consumer は `@/app/auth-context` から import |
+| `authMessage`(messageKey → 日本語)が単体テストされていない | matrix「エラー文言表示」の一部が未カバー | low | patch: `src/data/auth.errors.test.ts` を追加(authMessage / normalizeAuthError) |
+| `getSession` がエラーを返したとき(null と区別されず)匿名サインインに流れ、エラーが握り潰される | `getSession` がエラーを返すのは稀。匿名化にフォールバックするのは実用上妥当 | low | reject(実害が薄く、分岐追加は複雑さに見合わない) |
+| ブラウザの `type="email"` / `required` バリデーションが `useAuthForm` の独自バリデーションより先に効き、`auth/invalid-email` 文言が出ないことがある | 独自バリデーションはフォールバックとして機能。二重に弾くだけで害はない | low | reject(冗長だが誤動作しない) |
+| `AuthScreen` コンポーネント自体のレンダリングテストが無い | ロジックは `useAuthForm`(テスト済み)にあり、表示は `authMessage`(テスト済み)。コンポーネントは薄い配線 | low | reject(仕様のタスク範囲外。ロジックは別途カバー済み) |

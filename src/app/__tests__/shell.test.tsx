@@ -3,12 +3,16 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AppRoutes } from '@/app/routes';
+import { AuthProvider } from '@/app/AuthProvider';
 
+// テスト環境では VITE_SUPABASE_URL が無いため AuthProvider は即 'unavailable'(非同期なし)。
 function renderApp(initialPath = '/') {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <AppRoutes />
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </AuthProvider>,
   );
 }
 

@@ -3,6 +3,7 @@ import { AppShell } from './AppShell';
 import { HomeScreen } from '@/features/home/ui/HomeScreen';
 import { CalendarScreen } from '@/features/calendar/ui/CalendarScreen';
 import { SettingsScreen } from '@/features/settings/ui/SettingsScreen';
+import { AuthScreen } from '@/features/auth/ui/AuthScreen';
 
 const routes: RouteObject[] = [
   {
@@ -12,6 +13,8 @@ const routes: RouteObject[] = [
       { index: true, element: <HomeScreen /> },
       { path: 'calendar', element: <CalendarScreen /> },
       { path: 'settings', element: <SettingsScreen /> },
+      // タブ外。設定のアカウント欄から遷移する。
+      { path: 'auth', element: <AuthScreen /> },
     ],
   },
 ];
