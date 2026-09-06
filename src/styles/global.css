@@ -1,0 +1,89 @@
+@import './tokens.css';
+@import 'tailwindcss';
+
+/*
+ * Tailwind 4 の CSS-first 設定。@theme でトークン変数を Tailwind に橋渡しし、
+ * bg-surface-base / text-ink-primary / rounded-md / p-4 などが使えるようにする。
+ */
+@theme inline {
+  --color-surface-base: var(--color-surface-base);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-ink-primary: var(--color-ink-primary);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-ink-disabled: var(--color-ink-disabled);
+  --color-accent: var(--color-accent);
+  --color-accent-weak: var(--color-accent-weak);
+  --color-on-accent: var(--color-on-accent);
+  --color-border-hairline: var(--color-border-hairline);
+  --color-danger: var(--color-danger);
+
+  --font-sans: var(--font-family-base);
+
+  --text-amount: var(--font-size-amount);
+  --text-title: var(--font-size-title);
+  --text-body: var(--font-size-body);
+  --text-meta: var(--font-size-meta);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --spacing: 4px;
+}
+
+/* --- リセット --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-primary);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+picture,
+svg {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* 数字は桁を揃える */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* フォーカスリングは消さない(アクセシビリティ) */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

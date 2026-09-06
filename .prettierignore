@@ -1,0 +1,7 @@
+dist
+packages/*/dist
+node_modules
+_bmad
+_bmad-output
+supabase/.temp
+package-lock.json

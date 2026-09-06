@@ -1,0 +1,59 @@
+{
+  "name": "calendar-app",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "優先度が表示に効くカレンダー集約アプリ (v1: Web / PWA)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build --workspace @calendar-app/core && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@calendar-app/core": "*",
+    "@supabase/supabase-js": "^2.45.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.20.0",
+    "eslint-import-resolver-typescript": "^3.7.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "jsdom": "^26.0.0",
+    "prettier": "^3.5.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.24.0",
+    "vite": "^7.0.0",
+    "vite-plugin-pwa": "^1.0.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "unrs-resolver@1.12.2": true
+  }
+}

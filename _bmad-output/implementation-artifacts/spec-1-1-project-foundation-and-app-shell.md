@@ -2,9 +2,10 @@
 title: 'Story 1.1: プロジェクト基盤とアプリシェル'
 type: 'feature'
 created: '2026-09-06'
-status: 'ready-for-dev'
+status: 'in-progress'
 route: 'dispatch'
 review_loop_iteration: 0
+baseline_commit: 'e7087cc5f39762703a7d1de152fdec65a9f6f910'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-1-context.md'
   - '{project-root}/_bmad-output/planning-artifacts/architecture/architecture-calendar-app-2026-09-06/ARCHITECTURE-SPINE.md'
@@ -57,25 +58,26 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `package.json`(ルート) -- npm workspaces(`packages/*`)、スクリプト `dev` / `build` / `preview` / `typecheck` / `lint` / `test` を定義 -- モノレポの起点
-- [ ] `packages/core/package.json`, `packages/core/src/index.ts`, `packages/core/tsconfig.json` -- 純粋ドメインパッケージの器(中身は最小のプレースホルダ export)-- 後続ストーリーが selection / priority / pay-calc を足す
-- [ ] `tsconfig.json`, `tsconfig.node.json` -- strict、path alias `@core` → `packages/core/src`、`@/*` → `src/*` -- AD-10 のレイヤ分離を型で支える土台
-- [ ] `vite.config.ts` -- React プラグイン、alias 解決、`vite-plugin-pwa` は入れるが `injectRegister: null` 相当で無効化(有効化は 1.6)-- ビルド設定
-- [ ] `index.html`, `src/main.tsx` -- エントリ。React 19 の `createRoot` -- 起動点
-- [ ] `src/styles/tokens.css` -- `DESIGN.md` の全トークンを CSS 変数で定義(light / dark / `[data-theme]`)-- UX-DR1
-- [ ] `src/styles/global.css` -- リセット、`body` に背景・フォント、Tailwind の読み込み、`@theme` でトークン変数を Tailwind に橋渡し -- UX-DR1
-- [ ] `tailwind.config.ts` もしくは CSS 内 `@theme` -- Tailwind 4 の CSS-first 設定でトークンを参照 -- UX-DR1
-- [ ] `src/app/AppShell.tsx`, `src/app/routes.tsx` -- React Router で3ルート、下タブバー、単一カラムのレイアウト、アクティブタブ強調(アクセント色)-- UX-DR12
-- [ ] `src/app/BottomTabs.tsx` -- タブバーコンポーネント。キーボード操作・フォーカス可視・44px ターゲット -- UX-DR12 / UX-DR15
-- [ ] `src/features/home/ui/HomeScreen.tsx`, `src/features/calendar/ui/CalendarScreen.tsx`, `src/features/settings/ui/SettingsScreen.tsx` -- 見出しだけの空画面 -- シェルの受け皿
-- [ ] `src/features/settings/model/useTheme.ts`, 設定画面のテーマ切替 UI -- 端末追従 / ライト / ダークの3択、localStorage 永続化(try/catch)-- UX-DR2
-- [ ] `src/data/supabase.ts` -- `createClient` を1回。env 未設定時はコンソール警告 -- AD-1 / AD-9 の土台
-- [ ] `src/data/env.ts` -- 環境変数の読み取りと検証を1か所に -- 設定の一元化
-- [ ] `.env.local.example` -- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` のテンプレ -- セットアップ手引き
-- [ ] `supabase/config.toml` -- ローカル開発の設定を配置(Supabase CLI があれば `supabase init`、無ければ最小の `config.toml` を手書き)。`supabase/migrations/.gitkeep`、`supabase/functions/.gitkeep` も置く -- デプロイ規約(Supabase CLI 管理)
-- [ ] `eslint.config.js`, `.prettierrc` -- lint / format 設定。import のレイヤ逆流を検出するルール(`import/no-restricted-paths` 等)を最小限で -- AD-10
-- [ ] `README.md` -- セットアップ手順(`npm install` / `npm run dev` / `supabase start`)-- オンボーディング
-- [ ] `src/app/__tests__/shell.test.tsx` -- シェルが3タブを描画しタブ切替でルートが変わることのテスト(Vitest + Testing Library)-- 回帰防止
+- [x] `package.json`(ルート) -- npm workspaces(`packages/*`)、スクリプト `dev` / `build` / `preview` / `typecheck` / `lint` / `test` を定義 -- モノレポの起点
+- [x] `packages/core/package.json`, `packages/core/src/index.ts`, `packages/core/tsconfig.json` -- 純粋ドメインパッケージの器(中身は最小のプレースホルダ export)-- 後続ストーリーが selection / priority / pay-calc を足す
+- [x] `tsconfig.json` + `tsconfig.app.json` + `tsconfig.node.json` -- strict、path alias `@core` → `packages/core/src`、`@/*` → `src/*` -- AD-10 のレイヤ分離を型で支える土台
+- [x] `vite.config.ts` -- React プラグイン、alias 解決、`vite-plugin-pwa` は入れるが `disable: true` / `injectRegister: null` で無効化(有効化は 1.6)、Vitest の test 設定も内包 -- ビルド設定
+- [x] `index.html`, `src/main.tsx` -- エントリ。React 19 の `createRoot` -- 起動点
+- [x] `src/styles/tokens.css` -- `DESIGN.md` の全トークンを CSS 変数で定義(light / dark / `[data-theme]`)-- UX-DR1
+- [x] `src/styles/global.css` -- リセット、`body` に背景・フォント、Tailwind の読み込み、`@theme` でトークン変数を Tailwind に橋渡し -- UX-DR1
+- [x] CSS 内 `@theme`(`src/styles/global.css`)-- Tailwind 4 の CSS-first 設定でトークンを参照 -- UX-DR1
+- [x] `src/app/AppShell.tsx`, `src/app/routes.tsx` -- React Router で3ルート、下タブバー、単一カラムのレイアウト、アクティブタブ強調(アクセント色)-- UX-DR12
+- [x] `src/app/BottomTabs.tsx` -- タブバーコンポーネント。キーボード操作・フォーカス可視・44px ターゲット -- UX-DR12 / UX-DR15
+- [x] `src/features/home/ui/HomeScreen.tsx`, `src/features/calendar/ui/CalendarScreen.tsx`, `src/features/settings/ui/SettingsScreen.tsx` -- 見出しだけの空画面 -- シェルの受け皿
+- [x] `src/features/settings/model/useTheme.ts`, 設定画面のテーマ切替 UI -- 端末追従 / ライト / ダークの3択、localStorage 永続化(try/catch)-- UX-DR2
+- [x] `src/data/supabase.ts` -- `createSupabaseClient(env)` を1回。env 未設定時はコンソール警告 -- AD-1 / AD-9 の土台
+- [x] `src/data/env.ts` -- 環境変数の読み取りと検証を1か所に -- 設定の一元化
+- [x] `env.example`(`.env.local.example` はハーネス制限で不可)-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` のテンプレ -- セットアップ手引き
+- [x] `supabase/config.toml`(`supabase init` で生成)、`supabase/migrations/.gitkeep`、`supabase/functions/.gitkeep` -- デプロイ規約(Supabase CLI 管理)
+- [x] `eslint.config.js`, `.prettierrc.json`, `.prettierignore` -- lint / format 設定。`import/no-restricted-paths` でレイヤ逆流を検出 -- AD-10
+- [x] `README.md` -- セットアップ手順 -- オンボーディング
+- [x] `src/app/__tests__/shell.test.tsx` + `src/data/supabase.test.ts` + `src/features/settings/model/useTheme.test.ts` + `packages/core/src/index.test.ts` -- I/O マトリクスの各行を含むテスト -- 回帰防止
+- [x] `.gitattributes` -- 改行コードを LF に統一(Windows 対応)
 
 **Acceptance Criteria:**
 - Given クローン直後のリポジトリ, when `npm install && npm run build` を実行, then `packages/core` と SPA がエラーなくビルドされる
@@ -87,7 +89,14 @@ context:
 
 ## Implementation Notes
 
-<!-- 実装中に追記 -->
+- **スタック確定版**: Vite 7.3 / React 19 / TypeScript 5.9 / Tailwind CSS 4(`@tailwindcss/vite` プラグイン、CSS-first `@theme`)/ react-router-dom 7(宣言的 `<BrowserRouter>` + `useRoutes`)/ @supabase/supabase-js 2 / vite-plugin-pwa 1(このストーリーでは `disable: true`)。テストは Vitest 3 + Testing Library + jsdom。
+- **tsconfig は3分割**: ルート `tsconfig.json`(solution)→ `tsconfig.app.json`(src + packages/core、noEmit、alias)/ `tsconfig.node.json`(vite.config、node types)。`typecheck` は `tsc -b`。
+- **ルーティング**: 当初 `createBrowserRouter`(data router)で組んだが、jsdom + Node 24 + undici の `AbortSignal` 不整合で RR7 の data router がテスト中に unhandled rejection を起こした。宣言的 `<BrowserRouter>` + `useRoutes(routes)` に変更して回避。`routes` 配列は `routes.tsx` 内に閉じ、公開は `<AppRoutes />` コンポーネントのみ(react-refresh 警告も解消)。
+- **`.env.local.example`**: ハーネスが `.env*` 名のファイル書き込みを拒否するため `env.example`(先頭ドットなし)にした。`.gitignore` は `.env` / `.env.*` を無視しつつ `!env.example` で例外。
+- **npm install スクリプト承認**: この環境の npm は install スクリプトを既定で実行しない設定。`esbuild` と `unrs-resolver` の postinstall を `npm approve-scripts` で承認(`package.json` の `allowScripts` に記録)。esbuild のバイナリ取得に必須。
+- **Supabase**: CLI はインストール済みだが Docker 未導入のため `supabase start` は未検証(Open Question の決定どおり)。`supabase init` で `config.toml` は生成済み。
+- **検証結果**: `npm run build` / `tsc -b` / `eslint .` / `vitest run`(12 tests、4 ファイル)すべて成功。`npm run dev` は未起動(CLI セッションのため)。目視確認は Story 完了後にユーザーが実施。
+- **タブのアイコン**: プレースホルダの記号(▦ / ▤ / ⚙)。正式なアイコンセットは後続で検討。
 
 ## Verification
 

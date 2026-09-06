@@ -1,0 +1,77 @@
+/*
+ * デザイントークン — 出所: _bmad-output/planning-artifacts/ux-designs/ux-calendar-app-2026-09-06/DESIGN.md
+ *
+ * ライトは素の :root。
+ * ダークは (a) 端末設定が dark かつ data-theme が明示 light でないとき、(b) data-theme="dark" の明示時。
+ * これにより「端末追従」と「設定での固定」の両方が効く。
+ * 色はここでしか定義しない(メディアクエリの中だけで定義しない)。
+ */
+
+:root {
+  /* --- color --- */
+  --color-surface-base: #ffffff;
+  --color-surface-sunken: #f4f5f7;
+  --color-surface-raised: #ffffff;
+  --color-ink-primary: #1a1c1e;
+  --color-ink-secondary: #585f68;
+  --color-ink-disabled: #a0a6ad;
+  --color-accent: #2563eb;
+  --color-accent-weak: #eaf1ff;
+  --color-on-accent: #ffffff;
+  --color-border-hairline: #e3e6eb;
+  --color-danger: #be3b30;
+
+  /* --- typography --- */
+  --font-family-base:
+    -apple-system, 'Segoe UI', Roboto, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --font-size-amount: 1.75rem; /* ~28px */
+  --font-size-title: 1.25rem; /* ~20px */
+  --font-size-body: 0.9375rem; /* ~15px */
+  --font-size-meta: 0.8125rem; /* ~13px */
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --line-height-body: 1.6;
+
+  /* --- spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* --- radius --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-surface-base: #16181c;
+    --color-surface-sunken: #0f1113;
+    --color-surface-raised: #1e2126;
+    --color-ink-primary: #e6e8eb;
+    --color-ink-secondary: #9aa1a9;
+    --color-ink-disabled: #5b616a;
+    --color-accent: #6aa0ff;
+    --color-accent-weak: #1c2740;
+    --color-on-accent: #0f1113;
+    --color-border-hairline: #2a2e35;
+    --color-danger: #e3776b;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-surface-base: #16181c;
+  --color-surface-sunken: #0f1113;
+  --color-surface-raised: #1e2126;
+  --color-ink-primary: #e6e8eb;
+  --color-ink-secondary: #9aa1a9;
+  --color-ink-disabled: #5b616a;
+  --color-accent: #6aa0ff;
+  --color-accent-weak: #1c2740;
+  --color-on-accent: #0f1113;
+  --color-border-hairline: #2a2e35;
+  --color-danger: #e3776b;
+}

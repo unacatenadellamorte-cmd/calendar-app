@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "types": [
+      "vite/client",
+      "vite-plugin-pwa/client",
+      "vitest/globals",
+      "@testing-library/jest-dom"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@core": ["packages/core/src/index.ts"],
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src", "packages/core/src"]
+}

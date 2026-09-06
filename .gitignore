@@ -1,7 +1,19 @@
 node_modules/
 dist/
+packages/*/dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# env（env.example のみコミット）
 .env
-.env.local
+.env.*
+!env.example
+
+# BMAD レンダリングキャッシュ
 _bmad/render/
+
+# Supabase ローカル
 supabase/.branches/
 supabase/.temp/
+supabase/.env
