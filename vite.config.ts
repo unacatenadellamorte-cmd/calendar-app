@@ -9,13 +9,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // PWA は Story 1.6 で有効化する。ここではプラグインを読み込むだけで
-    // Service Worker の登録・生成はしない(injectRegister: null / selfDestroying)。
-    VitePWA({
-      disable: true,
-      injectRegister: null,
-      registerType: 'prompt',
-    }),
+    // PWA は Story 1.6 で有効化する。今は無効(Service Worker の登録・生成はしない)。
+    VitePWA({ disable: true, injectRegister: null }),
   ],
   resolve: {
     alias: {

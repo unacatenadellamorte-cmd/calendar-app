@@ -2,7 +2,7 @@
 title: 'Story 1.1: プロジェクト基盤とアプリシェル'
 type: 'feature'
 created: '2026-09-06'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'e7087cc5f39762703a7d1de152fdec65a9f6f910'
@@ -110,3 +110,17 @@ context:
 
 **Manual checks:**
 - `npm run dev` を開き、3タブの切替、テーマ3択の切替と再読み込み後の復元、Supabase 環境変数を外したときのコンソール警告を目視確認。
+
+## Review Triage Log
+
+*step-04 レビュー(blind-hunter / edge-case-hunter / verification-gap の3レンズをこのセッションで実施 — この環境ではバックグラウンドのサブエージェントを使えないため)。*
+
+| 所見 | 検証 | 判定 | ルート |
+| --- | --- | --- | --- |
+| `src/main.tsx` の `import('@/data/supabase')` が fire-and-forget の Promise で `.catch` なし → import 失敗時に unhandled rejection | ローカル静的モジュールなので実際には失敗しないが、副作用 import に動的 import を使う理由もない | low | patch(静的 `import '@/data/supabase'` に変更、適用済み) |
+| `vite.config.ts` の `VitePWA` に `disable: true` と併せて `registerType: 'prompt'` の死んだ設定 | `disable: true` で全設定が無効。害はないが誤読の元 | low | patch(死んだ行を削除、適用済み) |
+| `package.json` の `allowScripts`(esbuild / unrs-resolver)がこの環境固有 → 他マシン / CI で `npm ci` 時に install スクリプトが走らずビルド不能になりうる | この環境の npm が install スクリプトを既定で止める設定。CI は未決定(アーキで Deferred)。ストーリー起因ではなく環境起因 | medium(未検証・CI 導入時) | defer |
+| `Screen.tsx` の `pb-24`(96px)がタブバー高さ(56px + safe-area)に対する経験則のマジックナンバー | 余白過多だが表示は崩れない。トークン化は複雑さを足す | low | reject(日常利用で当たらず、修正が単純な訂正を超える) |
+| 44px タップターゲット / フォーカスリングがコードで表現されるがテストされていない(jsdom はレイアウトを計算しない) | `min-h-14`(56px)と `:focus-visible` outline で担保。E2E / 視覚監査は 1.1 の範囲外 | low | reject(仕組みはコードにあり、検証手段が単体テストの守備範囲外) |
+| `import/no-restricted-paths` の `src/data` ゾーンが `except: ['../data/index.ts']` を参照するが `src/data/index.ts` 未作成 | ルールは先行定義。features → data の import はまだ無いので実害ゼロ。1.4 で `src/data/index.ts` 作成時に有効化 | low | reject(将来ストーリーで自然に解消) |
+| PWA マニフェスト / favicon 未整備で dev 時に favicon 404 | UX-DR18 / Story 1.6 の範囲。1.1 の Non-goal | — | 対象外(intent が 1.6 に切り出し済み) |
