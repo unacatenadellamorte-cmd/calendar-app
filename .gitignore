@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.local
+_bmad/render/
+supabase/.branches/
+supabase/.temp/

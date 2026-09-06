@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カレンダー管理(優先度) — カレンダーアプリ(仮)</title>
+<style>
+/*
+  対象サーフェス: カレンダー管理(全カレンダー一覧 + ドラッグで優先度)
+  governed by:
+   - EXPERIENCE.md § Information Architecture(カレンダー管理)
+   - EXPERIENCE.md § 優先度と選抜の挙動(優先度の設定 = 並べ替え)
+   - EXPERIENCE.md § Component Patterns(calendar-row, connection-card)
+   - EXPERIENCE.md § Interaction Primitives(並べ替えのキーボード代替)
+   - EXPERIENCE.md § Accessibility Floor(色非依存 / 順位番号 / 上へ下へ)
+   - EXPERIENCE.md § Key Flows Flow 2(圭太、初回セットアップ)
+   - DESIGN.md § Components(calendar-row, connection-card)
+*/
+:root{
+  --surface-base:#FFFFFF;--surface-sunken:#F4F5F7;--ink-primary:#1A1C1E;--ink-secondary:#585F68;
+  --ink-disabled:#A0A6AD;--accent:#2563EB;--accent-weak:#EAF1FF;--on-accent:#FFFFFF;--hairline:#E3E6EB;
+  --cal-work:#C6413B;--cal-personal:#7A5AF0;--cal-club:#E08A1E;--cal-shift:#2E9E6B;
+  --r-sm:6px;--r-md:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#3a3d42;font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;
+  color:var(--ink-primary);padding:28px 16px;display:flex;flex-wrap:wrap;gap:32px;justify-content:center}
+.phone{width:378px;background:var(--surface-sunken);border-radius:34px;overflow:hidden;
+  box-shadow:0 12px 40px rgba(0,0,0,.35);border:1px solid #000}
+.statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:13px;font-weight:600;color:var(--ink-secondary)}
+.nav{display:flex;align-items:center;gap:12px;padding:6px 16px 12px}
+.nav .back{font-size:22px;color:var(--accent);line-height:1}
+.nav .ttl{font-size:20px;font-weight:600}
+.hint{font-size:13px;color:var(--ink-secondary);padding:0 18px 10px}
+
+.list{background:var(--surface-base);border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)}
+.row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--hairline)}
+.row:last-child{border-bottom:none}
+.rank{width:18px;text-align:center;font-size:13px;color:var(--ink-secondary);font-variant-numeric:tabular-nums}
+.grip{color:var(--ink-disabled);font-size:16px;cursor:grab}
+.dot{width:12px;height:12px;border-radius:3px;flex:none}
+.meta{flex:1;min-width:0}
+.meta .nm{font-size:15px}
+.meta .src{font-size:13px;color:var(--ink-secondary);margin-top:1px}
+.updown{display:flex;flex-direction:column;gap:2px}
+.updown button{width:26px;height:18px;border:1px solid var(--hairline);background:var(--surface-base);border-radius:4px;color:var(--ink-secondary);font-size:10px;line-height:1}
+.tgl{width:40px;height:24px;border-radius:999px;background:var(--accent);position:relative;flex:none}
+.tgl::after{content:"";position:absolute;width:18px;height:18px;border-radius:999px;background:#fff;top:3px;right:3px}
+.tgl.off{background:var(--hairline)}
+.tgl.off::after{right:auto;left:3px}
+.row.dragging{background:var(--accent-weak);box-shadow:0 6px 18px rgba(0,0,0,.14)}
+
+.section{font-size:13px;color:var(--ink-secondary);padding:16px 18px 6px}
+.conn{background:var(--surface-base);border:1px solid var(--hairline);border-radius:var(--r-md);margin:0 16px 16px;padding:14px}
+.conn .r1{display:flex;align-items:center;justify-content:space-between}
+.conn .acct{font-size:15px}
+.conn .st{font-size:13px;color:var(--ink-secondary);margin-top:4px}
+.conn .st.warn{color:var(--cal-work)}
+.conn .acts{display:flex;gap:8px;margin-top:12px}
+.conn .acts button{flex:1;padding:8px 0;border-radius:var(--r-sm);font-size:13px;border:1px solid var(--hairline);background:var(--surface-base);color:var(--ink-primary)}
+.conn .acts button.pri{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.addbtn{display:block;text-align:center;margin:0 16px 20px;padding:11px 0;border:1px dashed var(--accent);color:var(--accent);border-radius:var(--r-sm);font-size:14px}
+.caption{width:100%;text-align:center;color:#cfd2d6;font-size:12px}
+h2.mock{width:100%;color:#e7e9ec;font-size:14px;font-weight:600;text-align:center;margin:6px 0 -10px}
+</style>
+</head>
+<body>
+
+<h2 class="mock">カレンダー管理 — 3行目をドラッグ中</h2>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+  <div class="nav"><span class="back">‹</span><span class="ttl">カレンダーの並び順</span></div>
+  <div class="hint">上にあるカレンダーほど優先。狭い表示や重なったときに先に出る。</div>
+
+  <div class="list">
+    <div class="row">
+      <span class="rank">1</span><span class="grip">⋮⋮</span>
+      <span class="dot" style="background:var(--cal-work)"></span>
+      <span class="meta"><span class="nm">仕事</span><span class="src">ローカル</span></span>
+      <span class="updown"><button aria-label="上へ">▲</button><button aria-label="下へ">▼</button></span>
+      <span class="tgl"></span>
+    </div>
+    <div class="row">
+      <span class="rank">2</span><span class="grip">⋮⋮</span>
+      <span class="dot" style="background:var(--cal-personal)"></span>
+      <span class="meta"><span class="nm">個人</span><span class="src">Google</span></span>
+      <span class="updown"><button aria-label="上へ">▲</button><button aria-label="下へ">▼</button></span>
+      <span class="tgl"></span>
+    </div>
+    <div class="row dragging">
+      <span class="rank">3</span><span class="grip">⋮⋮</span>
+      <span class="dot" style="background:var(--cal-club)"></span>
+      <span class="meta"><span class="nm">部活(共有)</span><span class="src">Google</span></span>
+      <span class="updown"><button aria-label="上へ">▲</button><button aria-label="下へ">▼</button></span>
+      <span class="tgl"></span>
+    </div>
+    <div class="row">
+      <span class="rank">4</span><span class="grip">⋮⋮</span>
+      <span class="dot" style="background:var(--cal-shift)"></span>
+      <span class="meta"><span class="nm">シフト用</span><span class="src">ローカル</span></span>
+      <span class="updown"><button aria-label="上へ">▲</button><button aria-label="下へ">▼</button></span>
+      <span class="tgl off"></span>
+    </div>
+  </div>
+
+  <div class="section">接続</div>
+  <div class="conn">
+    <div class="r1"><span class="acct">Google ・ keita@gmail.com</span></div>
+    <div class="st">最終取り込み 8:40</div>
+    <div class="acts"><button class="pri">今すぐ取り込み</button><button>接続を解除</button></div>
+  </div>
+  <div class="conn">
+    <div class="r1"><span class="acct">Google ・ 部活(共有)</span></div>
+    <div class="st warn">取り込めませんでした</div>
+    <div class="acts"><button class="pri">再試行</button></div>
+  </div>
+  <a class="addbtn" href="#">＋ カレンダーを接続</a>
+</div>
+
+<div class="caption">行の順序 = 優先度。ドラッグの代替に「▲▼」。トグルoffでも順位は保持。source(ローカル/Google)を明示。色は名前とセット。</div>
+</body>
+</html>

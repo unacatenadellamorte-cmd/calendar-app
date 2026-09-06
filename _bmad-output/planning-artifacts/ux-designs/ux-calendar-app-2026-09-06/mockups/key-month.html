@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カレンダー(月ビュー)+ クイックシフト入力 — カレンダーアプリ(仮)</title>
+<style>
+/*
+  対象サーフェス: カレンダー(月ビュー)、および quick-shift-sheet(日付タップ時)
+  governed by:
+   - EXPERIENCE.md § Component Patterns(month-cell, event-chip, quick-shift-sheet)
+   - EXPERIENCE.md § 優先度と選抜の挙動(FR-7 視覚的な優先 / 「他 N 件」)
+   - EXPERIENCE.md § State Patterns(お気に入りシフト未登録で日付タップ)
+   - EXPERIENCE.md § Key Flows Flow 3(美咲、1週間のシフト入力)
+   - DESIGN.md § Layout & Spacing(7列グリッド), § Components, § Shapes
+*/
+:root{
+  --surface-base:#FFFFFF;--surface-sunken:#F4F5F7;--ink-primary:#1A1C1E;--ink-secondary:#585F68;
+  --ink-disabled:#A0A6AD;--accent:#2563EB;--accent-weak:#EAF1FF;--on-accent:#FFFFFF;
+  --hairline:#E3E6EB;
+  --cal-work:#C6413B;--cal-personal:#7A5AF0;--cal-club:#E08A1E;--cal-shift:#2E9E6B;
+  --r-sm:6px;--r-md:10px;--r-lg:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#3a3d42;font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;
+  color:var(--ink-primary);padding:28px 16px;display:flex;flex-wrap:wrap;gap:32px;justify-content:center}
+.phone{width:378px;height:760px;background:var(--surface-base);border-radius:34px;overflow:hidden;position:relative;
+  box-shadow:0 12px 40px rgba(0,0,0,.35);border:1px solid #000;display:flex;flex-direction:column}
+.statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:13px;font-weight:600;color:var(--ink-secondary);flex:none}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px;flex:none}
+.month{font-size:20px;font-weight:600}
+.seg{display:flex;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:hidden;font-size:13px}
+.seg span{padding:5px 10px;color:var(--ink-secondary)}
+.seg span.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--hairline);flex:none}
+.dow div{text-align:center;font-size:11px;color:var(--ink-secondary);padding:6px 0}
+.dow .sun{color:var(--cal-work)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);flex:1;overflow:hidden}
+.cell{border-right:1px solid var(--hairline);border-bottom:1px solid var(--hairline);padding:3px;min-height:0;overflow:hidden}
+.cell:nth-child(7n){border-right:none}
+.dnum{font-size:11px;color:var(--ink-secondary);font-variant-numeric:tabular-nums;padding:1px 3px}
+.cell.dim .dnum{color:var(--ink-disabled)}
+.cell.today .dnum{background:var(--accent);color:var(--on-accent);border-radius:999px;display:inline-block;min-width:17px;text-align:center;font-weight:600}
+.chip{font-size:10px;line-height:1.25;padding:2px 3px 2px 6px;border-radius:3px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.chip::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:2px;background:var(--c)}
+.chip.work{--c:var(--cal-work)} .chip.personal{--c:var(--cal-personal)}
+.chip.club{--c:var(--cal-club)} .chip.shift{--c:var(--cal-shift)}
+.chip .t{color:var(--ink-secondary);font-variant-numeric:tabular-nums}
+.morek{font-size:10px;color:var(--ink-secondary);padding:2px 3px}
+.tabbar{display:flex;border-top:1px solid var(--hairline);background:var(--surface-base);flex:none}
+.tab{flex:1;text-align:center;padding:10px 0 14px;font-size:11px;color:var(--ink-disabled)}
+.tab .ico{display:block;font-size:19px;margin-bottom:3px}
+.tab.on{color:var(--accent)}
+
+/* quick-shift-sheet */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.28)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface-base);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  box-shadow:0 -8px 30px rgba(0,0,0,.18);padding:8px 16px 20px}
+.grip{width:36px;height:4px;background:var(--hairline);border-radius:2px;margin:6px auto 12px}
+.sheet h3{font-size:15px;font-weight:600;margin-bottom:2px}
+.sheet .sub{font-size:13px;color:var(--ink-secondary);margin-bottom:12px}
+.sheet .seg2{display:flex;gap:16px;font-size:13px;margin-bottom:12px;border-bottom:1px solid var(--hairline)}
+.sheet .seg2 span{padding-bottom:8px;color:var(--ink-secondary)}
+.sheet .seg2 span.on{color:var(--accent);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.tchips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.tchip{flex:none;border:1px solid var(--hairline);border-radius:999px;padding:8px 14px;font-size:13px;background:color-mix(in srgb,var(--cal-shift) 8%,#fff)}
+.tchip .nm{font-weight:600}
+.tchip .hr{color:var(--ink-secondary);font-variant-numeric:tabular-nums;font-size:12px}
+.tchip.add{background:var(--surface-base);color:var(--accent);border-style:dashed}
+.caption{width:100%;text-align:center;color:#cfd2d6;font-size:12px}
+h2.mock{width:100%;color:#e7e9ec;font-size:14px;font-weight:600;text-align:center;margin:6px 0 -10px}
+</style>
+</head>
+<body>
+
+<h2 class="mock">カレンダー — 月ビュー(9月、今日 = 6日)</h2>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+  <div class="topbar">
+    <div class="month">2026年9月</div>
+    <div class="seg"><span class="on">月</span><span>週</span><span>リスト</span></div>
+  </div>
+  <div class="dow"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div></div>
+  <div class="grid">
+    <!-- 週1 -->
+    <div class="cell dim"><div class="dnum">31</div></div>
+    <div class="cell"><div class="dnum">1</div><div class="chip shift"><span class="t">17:00</span> バイト</div></div>
+    <div class="cell"><div class="dnum">2</div><div class="chip shift"><span class="t">17:00</span> バイト</div></div>
+    <div class="cell"><div class="dnum">3</div></div>
+    <div class="cell"><div class="dnum">4</div><div class="chip shift"><span class="t">17:00</span> バイト</div></div>
+    <div class="cell"><div class="dnum">5</div><div class="chip work"><span class="t">15:00</span> 面談</div></div>
+    <div class="cell"><div class="dnum">6</div>
+      <div class="chip work"><span class="t">10:00</span> 役員会議</div>
+      <div class="chip work"><span class="t">13:00</span> 1on1</div>
+      <div class="chip personal"><span class="t">19:00</span> 歯医者</div>
+      <div class="morek">他2件</div>
+    </div>
+    <!-- 週2 (今日を含む) -->
+    <div class="cell today"><div class="dnum">6</div></div>
+    <div class="cell"><div class="dnum">7</div><div class="chip club"><span class="t">終日</span> 合宿</div></div>
+    <div class="cell"><div class="dnum">8</div><div class="chip work"><span class="t">11:00</span> 定例</div></div>
+    <div class="cell"><div class="dnum">9</div><div class="chip shift"><span class="t">9:00</span> バイト</div></div>
+    <div class="cell"><div class="dnum">10</div></div>
+    <div class="cell"><div class="dnum">11</div><div class="chip personal"><span class="t">18:30</span> 会食</div></div>
+    <div class="cell"><div class="dnum">12</div><div class="chip shift"><span class="t">9:00</span> バイト</div></div>
+    <!-- 週3 -->
+    <div class="cell"><div class="dnum">13</div></div>
+    <div class="cell"><div class="dnum">14</div><div class="chip work"><span class="t">10:00</span> 役員会議</div></div>
+    <div class="cell"><div class="dnum">15</div><div class="chip personal"><span class="t">終日</span> 祝日</div></div>
+    <div class="cell"><div class="dnum">16</div><div class="chip work"><span class="t">14:00</span> 面接</div></div>
+    <div class="cell"><div class="dnum">17</div></div>
+    <div class="cell"><div class="dnum">18</div><div class="chip shift"><span class="t">17:00</span> バイト</div></div>
+    <div class="cell"><div class="dnum">19</div><div class="chip club"><span class="t">19:00</span> 練習</div></div>
+    <!-- 週4 -->
+    <div class="cell"><div class="dnum">20</div></div>
+    <div class="cell"><div class="dnum">21</div></div>
+    <div class="cell"><div class="dnum">22</div><div class="chip work"><span class="t">11:00</span> 定例</div></div>
+    <div class="cell"><div class="dnum">23</div><div class="chip personal"><span class="t">終日</span> 祝日</div></div>
+    <div class="cell"><div class="dnum">24</div></div>
+    <div class="cell"><div class="dnum">25</div><div class="chip shift"><span class="t">17:00</span> バイト</div></div>
+    <div class="cell"><div class="dnum">26</div></div>
+  </div>
+  <div class="tabbar">
+    <div class="tab"><span class="ico">▦</span>ホーム</div>
+    <div class="tab on"><span class="ico">▤</span>カレンダー</div>
+    <div class="tab"><span class="ico">⚙</span>設定</div>
+  </div>
+</div>
+
+<h2 class="mock">日付タップ → クイックシフト入力シート</h2>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+  <div class="topbar">
+    <div class="month">2026年9月</div>
+    <div class="seg"><span class="on">月</span><span>週</span><span>リスト</span></div>
+  </div>
+  <div class="dow"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div></div>
+  <div class="grid" style="filter:brightness(.97)">
+    <div class="cell dim"><div class="dnum">31</div></div>
+    <div class="cell"><div class="dnum">1</div></div>
+    <div class="cell"><div class="dnum">2</div></div>
+    <div class="cell"><div class="dnum">3</div></div>
+    <div class="cell"><div class="dnum">4</div></div>
+    <div class="cell"><div class="dnum">5</div></div>
+    <div class="cell" style="outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px"><div class="dnum">6</div></div>
+    <div class="cell"><div class="dnum">7</div></div><div class="cell"><div class="dnum">8</div></div>
+    <div class="cell"><div class="dnum">9</div></div><div class="cell"><div class="dnum">10</div></div>
+    <div class="cell"><div class="dnum">11</div></div><div class="cell"><div class="dnum">12</div></div>
+    <div class="cell"><div class="dnum">13</div></div>
+  </div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grip"></div>
+    <h3>9月6日(日)</h3>
+    <div class="sub">お気に入りシフトをタップで追加</div>
+    <div class="seg2"><span class="on">シフト</span><span>予定を追加</span></div>
+    <div class="tchips">
+      <div class="tchip"><div class="nm">平日シフト</div><div class="hr">17:00–22:00</div></div>
+      <div class="tchip"><div class="nm">土曜シフト</div><div class="hr">9:00–18:00</div></div>
+      <div class="tchip add">＋ お気に入りシフトを作る</div>
+    </div>
+  </div>
+  <div class="tabbar">
+    <div class="tab"><span class="ico">▦</span>ホーム</div>
+    <div class="tab on"><span class="ico">▤</span>カレンダー</div>
+    <div class="tab"><span class="ico">⚙</span>設定</div>
+  </div>
+</div>
+
+<div class="caption">月セル: 予定は優先度順(仕事→個人→部活)に積み、あふれは「他 N 件」。終日予定は時刻付きの後。今日はアクセントの丸。</div>
+</body>
+</html>

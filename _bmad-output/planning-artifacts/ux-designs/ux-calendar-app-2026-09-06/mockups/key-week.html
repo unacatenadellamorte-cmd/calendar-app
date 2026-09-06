@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カレンダー(週 = 1日タイムライン) — カレンダーアプリ(仮)</title>
+<style>
+/*
+  対象サーフェス: カレンダー(週ビュー) — v1 は「1日タイムライン」に割り切り
+  governed by:
+   - EXPERIENCE.md § 優先度と選抜の挙動(FR-7 視覚的な優先: 重なりは優先度が高いカレンダーを左端/前面)
+   - EXPERIENCE.md § Component Patterns(week-timeline, event-chip)
+   - EXPERIENCE.md § Interaction Primitives(空きスロットをタップで追加 / 横スワイプで前日翌日)
+   - DESIGN.md § Layout & Spacing(週ビュー = 1日タイムライン [ASSUMPTION]), § Components(week-timeline)
+  重なり順の見せ方が唯一の非自明ポイント。
+*/
+:root{
+  --surface-base:#FFFFFF;--surface-sunken:#F4F5F7;--ink-primary:#1A1C1E;--ink-secondary:#585F68;
+  --ink-disabled:#A0A6AD;--accent:#2563EB;--accent-weak:#EAF1FF;--on-accent:#FFFFFF;--hairline:#E3E6EB;
+  --cal-work:#C6413B;--cal-personal:#7A5AF0;--cal-club:#E08A1E;--cal-shift:#2E9E6B;
+  --r-sm:6px;--hour:46px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#3a3d42;font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;
+  color:var(--ink-primary);padding:28px 16px;display:flex;flex-wrap:wrap;gap:32px;justify-content:center}
+.phone{width:378px;height:812px;background:var(--surface-base);border-radius:34px;overflow:hidden;position:relative;
+  box-shadow:0 12px 40px rgba(0,0,0,.35);border:1px solid #000;display:flex;flex-direction:column}
+.statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:13px;font-weight:600;color:var(--ink-secondary);flex:none}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 8px;flex:none}
+.day{font-size:20px;font-weight:600}
+.day small{font-size:13px;font-weight:400;color:var(--ink-secondary);margin-left:6px}
+.seg{display:flex;border:1px solid var(--hairline);border-radius:var(--r-sm);overflow:hidden;font-size:13px}
+.seg span{padding:5px 10px;color:var(--ink-secondary)}
+.seg span.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+
+.allday{display:flex;gap:6px;padding:6px 16px 8px;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);flex:none;align-items:center}
+.allday .lbl{font-size:11px;color:var(--ink-secondary);width:38px;flex:none}
+.adchip{font-size:11px;padding:2px 8px 2px 10px;border-radius:3px;position:relative;background:var(--surface-sunken)}
+.adchip::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:2px;background:var(--c)}
+.adchip.club{--c:var(--cal-club)}
+
+.body{flex:1;overflow-y:auto;position:relative}
+.axis{position:absolute;left:0;top:0;width:46px}
+.axis .h{height:var(--hour);font-size:11px;color:var(--ink-secondary);text-align:right;padding-right:6px;transform:translateY(-6px);font-variant-numeric:tabular-nums}
+.lanes{position:absolute;left:46px;right:8px;top:0;bottom:0}
+.hline{position:absolute;left:0;right:0;border-top:1px solid var(--hairline)}
+.ev{position:absolute;border-radius:var(--r-sm);padding:3px 6px 3px 9px;font-size:11px;line-height:1.25;overflow:hidden;
+  background:var(--surface-base);border:1px solid var(--hairline)}
+.ev::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:2px;background:var(--c)}
+.ev .t{color:var(--ink-secondary);font-variant-numeric:tabular-nums}
+.ev.work{--c:var(--cal-work)} .ev.personal{--c:var(--cal-personal)}
+.ev.club{--c:var(--cal-club)} .ev.shift{--c:var(--cal-shift)}
+.nowline{position:absolute;left:40px;right:0;border-top:2px solid var(--accent)}
+.nowline::before{content:"";position:absolute;left:0;top:-4px;width:7px;height:7px;border-radius:999px;background:var(--accent);transform:translateX(-3px)}
+
+.tabbar{display:flex;border-top:1px solid var(--hairline);background:var(--surface-base);flex:none}
+.tab{flex:1;text-align:center;padding:10px 0 14px;font-size:11px;color:var(--ink-disabled)}
+.tab .ico{display:block;font-size:19px;margin-bottom:3px}
+.tab.on{color:var(--accent)}
+.caption{width:100%;text-align:center;color:#cfd2d6;font-size:12px;max-width:420px;line-height:1.5}
+h2.mock{width:100%;color:#e7e9ec;font-size:14px;font-weight:600;text-align:center;margin:6px 0 -10px}
+</style>
+</head>
+<body>
+
+<h2 class="mock">カレンダー — 週(v1 = 1日タイムライン)、重なりは優先度順</h2>
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>●●● ▮</span></div>
+  <div class="topbar">
+    <div class="day">9月6日<small>(日)</small></div>
+    <div class="seg"><span>月</span><span class="on">週</span><span>リスト</span></div>
+  </div>
+
+  <div class="allday">
+    <span class="lbl">終日</span>
+    <span class="adchip club">合宿の持ち物準備 ・ 部活</span>
+  </div>
+
+  <div class="body">
+    <div class="axis">
+      <div class="h">8:00</div><div class="h">9:00</div><div class="h">10:00</div><div class="h">11:00</div>
+      <div class="h">12:00</div><div class="h">13:00</div><div class="h">14:00</div><div class="h">15:00</div>
+      <div class="h">16:00</div><div class="h">17:00</div><div class="h">18:00</div><div class="h">19:00</div>
+      <div class="h">20:00</div>
+    </div>
+    <div class="lanes">
+      <div class="hline" style="top:0"></div>
+      <div class="hline" style="top:46px"></div>
+      <div class="hline" style="top:92px"></div>
+      <div class="hline" style="top:138px"></div>
+      <div class="hline" style="top:184px"></div>
+      <div class="hline" style="top:230px"></div>
+      <div class="hline" style="top:276px"></div>
+      <div class="hline" style="top:322px"></div>
+      <div class="hline" style="top:368px"></div>
+      <div class="hline" style="top:414px"></div>
+      <div class="hline" style="top:460px"></div>
+      <div class="hline" style="top:506px"></div>
+
+      <!-- 10:00-11:00 役員会議 (仕事, 優先度1) と 10:30-11:30 部内MTG (仕事, 同カレンダー→開始時刻順で左) -->
+      <div class="ev work" style="top:92px;height:46px;left:0;width:49%"><span class="t">10:00</span> 役員会議</div>
+      <div class="ev work" style="top:115px;height:46px;left:50%;width:49%"><span class="t">10:30</span> 部内MTG</div>
+
+      <!-- 12:15-13:00 ランチ (個人) 単独 -->
+      <div class="ev personal" style="top:195px;height:34px;left:0;width:99%"><span class="t">12:15</span> ランチ 田中さん ・ 個人</div>
+
+      <!-- 13:00-13:30 1on1 (仕事, 優先度1 → 左) と 13:00-14:00 歯医者 (個人, 優先度2 → 右) -->
+      <div class="ev work" style="top:230px;height:23px;left:0;width:49%"><span class="t">13:00</span> 1on1 佐藤</div>
+      <div class="ev personal" style="top:230px;height:46px;left:50%;width:49%"><span class="t">13:00</span> 歯医者</div>
+
+      <!-- 19:00-19:45 練習連絡 (部活, 優先度3) 単独 -->
+      <div class="ev club" style="top:506px;height:34px;left:0;width:99%"><span class="t">19:00</span> 練習の連絡 ・ 部活</div>
+
+      <div class="nowline" style="top:66px"></div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab"><span class="ico">▦</span>ホーム</div>
+    <div class="tab on"><span class="ico">▤</span>カレンダー</div>
+    <div class="tab"><span class="ico">⚙</span>設定</div>
+  </div>
+</div>
+
+<div class="caption">
+10:00 の重なり: どちらも「仕事」→ 同カレンダー内は開始時刻順で 役員会議 が左。<br>
+13:00 の重なり: 「仕事(優先度1)」の 1on1 が左、「個人(優先度2)」の 歯医者 が右。<br>
+空きスロットをタップ → その時刻で予定を追加。横スワイプで前日/翌日。
+</div>
+</body>
+</html>
