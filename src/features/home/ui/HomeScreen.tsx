@@ -10,9 +10,14 @@ export function HomeScreen() {
     <Screen
       title="今日"
       action={
-        <Link to="/calendars" className="text-meta text-accent">
-          カレンダー管理 ›
-        </Link>
+        <span className="flex gap-3">
+          <Link to="/calendar" className="text-meta text-accent">
+            予定を追加
+          </Link>
+          <Link to="/calendars" className="text-meta text-accent">
+            カレンダー管理 ›
+          </Link>
+        </span>
       }
     >
       <p className="text-meta text-ink-secondary">

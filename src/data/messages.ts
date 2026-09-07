@@ -11,6 +11,11 @@ const DATA_MESSAGES: Record<string, string> = {
   'calendar/invalid-name': 'カレンダー名を入力してください',
   'calendar/invalid-color': '色はプリセットから選んでください',
   'calendar/shift-undeletable': 'シフト用カレンダーは削除できません',
+  'event/invalid-title': '予定のタイトルを入力してください',
+  'event/invalid-time': '終了は開始より後にしてください',
+  'event/invalid-date': '日付を選んでください',
+  'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
+  'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };
