@@ -1,20 +1,22 @@
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { formatEventDate, formatEventTime } from '@/lib/datetime';
+import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
 
 interface EventListItemProps {
   event: EventItem;
   calendar: Calendar | undefined;
   onEdit: (event: EventItem) => void;
+  /** true なら日付を省き時刻のみ表示(日付見出しのあるリストビュー用)。 */
+  compact?: boolean;
 }
 
-export function EventListItem({ event, calendar, onEdit }: EventListItemProps) {
-  const when =
-    event.allDay && event.eventDate
-      ? formatEventDate(event.eventDate)
-      : event.startsAt
-        ? formatEventTime(event.startsAt)
-        : '';
+export function EventListItem({ event, calendar, onEdit, compact = false }: EventListItemProps) {
+  let when = '';
+  if (event.allDay && event.eventDate) {
+    when = compact ? '終日' : formatEventDate(event.eventDate);
+  } else if (event.startsAt) {
+    when = compact ? formatClock(event.startsAt) : formatEventTime(event.startsAt);
+  }
 
   return (
     <li className="border-b border-border-hairline last:border-b-0">

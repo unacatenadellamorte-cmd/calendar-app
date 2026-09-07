@@ -52,10 +52,12 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('useEvents', () => {
-  it('初期化でリストを読み込む', async () => {
+  it('初期化でリストを読み込む(全期間・range 引数なし)', async () => {
     const { result } = renderHook(() => useEvents(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.events).toHaveLength(1);
+    // 月 / 週 / リストは過去も見るため範囲で絞らない(Story 1.5)。
+    expect(listEvents).toHaveBeenCalledWith(undefined);
   });
 
   it('create 成功でリストに追加(時系列ソート)', async () => {

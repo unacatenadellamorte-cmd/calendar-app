@@ -6,17 +6,29 @@ import type { Calendar } from '@/data/calendars';
 import {
   localInputToUtcIso,
   nowLocalInput,
+  plusMinutesLocal,
   todayLocalDate,
   utcIsoToLocalInput,
 } from '@/lib/datetime';
+
+/** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
+export interface EventSeed {
+  /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
+  date?: string;
+  /** "YYYY-MM-DDTHH:mm"。この時刻から1時間を既定にする。 */
+  startLocal?: string;
+}
 
 interface EventFormSheetProps {
   open: boolean;
   editing: EventItem | null;
   calendars: Calendar[];
+  seed?: EventSeed;
   onClose: () => void;
   onCreate: (input: NewEventInput) => Promise<boolean>;
   onUpdate: (current: EventItem, input: NewEventInput) => Promise<boolean>;
+  /** 編集中の予定を削除する(渡されたときだけ削除ボタンを出す)。 */
+  onDelete?: (event: EventItem) => void;
 }
 
 interface FormState {
@@ -29,16 +41,27 @@ interface FormState {
   note: string;
 }
 
-function initialState(editing: EventItem | null, calendars: Calendar[]): FormState {
+function initialState(
+  editing: EventItem | null,
+  calendars: Calendar[],
+  seed?: EventSeed,
+): FormState {
   const firstCalendar = calendars[0]?.id ?? '';
   if (!editing) {
+    const seededStart =
+      seed?.startLocal ?? (seed?.date ? `${seed.date}T09:00` : nowLocalInput());
+    const seededEnd = seed?.startLocal
+      ? plusMinutesLocal(seed.startLocal, 60)
+      : seed?.date
+        ? `${seed.date}T10:00`
+        : nowLocalInput(60);
     return {
       title: '',
       calendarId: firstCalendar,
       allDay: false,
-      startLocal: nowLocalInput(),
-      endLocal: nowLocalInput(60),
-      dateLocal: todayLocalDate(),
+      startLocal: seededStart,
+      endLocal: seededEnd,
+      dateLocal: seed?.date ?? seededStart.slice(0, 10),
       note: '',
     };
   }
@@ -69,20 +92,22 @@ export function EventFormSheet({
   open,
   editing,
   calendars,
+  seed,
   onClose,
   onCreate,
   onUpdate,
+  onDelete,
 }: EventFormSheetProps) {
-  const [form, setForm] = useState<FormState>(() => initialState(editing, calendars));
+  const [form, setForm] = useState<FormState>(() => initialState(editing, calendars, seed));
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setForm(initialState(editing, calendars));
+    setForm(initialState(editing, calendars, seed));
     setErrorKey(null);
     setSubmitting(false);
-  }, [open, editing, calendars]);
+  }, [open, editing, calendars, seed]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -205,6 +230,19 @@ export function EventFormSheet({
         >
           {submitting ? '保存中…' : '保存'}
         </button>
+
+        {editing && onDelete && (
+          <button
+            type="button"
+            onClick={() => {
+              onDelete(editing);
+              onClose();
+            }}
+            className="min-h-11 text-meta text-danger"
+          >
+            この予定を削除
+          </button>
+        )}
       </form>
     </BottomSheet>
   );
