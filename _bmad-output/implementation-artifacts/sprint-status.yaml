@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-07-2026 20:05
+last_updated: 09-07-2026 20:35
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -42,7 +42,7 @@ development_status:
   1-4-ローカル予定の作成-編集-削除: review
   1-5-月-週-リストのカレンダー表示: review
   1-6-pwa-インストールとオフライン閲覧: review
-  1-7-データの-json-エクスポート: backlog
+  1-7-データの-json-エクスポート: review
   epic-1-retrospective: optional
 
   epic-2: backlog

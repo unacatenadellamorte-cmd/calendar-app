@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useTheme, type ThemePreference } from '@/features/settings/model/useTheme';
 import { AccountSection } from './AccountSection';
+import { DataSection } from './DataSection';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: '端末に合わせる' },
@@ -60,8 +61,10 @@ export function SettingsScreen() {
         </Link>
       </section>
 
+      <DataSection />
+
       <p className="mt-6 text-meta text-ink-secondary">
-        データのエクスポート・カレンダー接続は後続ストーリーでここに追加されます。
+        カレンダー接続は後続ストーリーでここに追加されます。
       </p>
     </Screen>
   );
