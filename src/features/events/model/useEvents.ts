@@ -55,8 +55,8 @@ export function useEvents(enabled: boolean) {
     if (!enabled) return;
     setLoading(true);
     setErrorKey(null);
-    const fromIso = new Date().toISOString();
-    const result = await listEvents({ fromIso, limit: 100 });
+    // 月 / 週 / リストのビューは過去〜未来を見るため全期間を読む(Story 1.5)。
+    const result = await listEvents();
     if (result.ok) setEvents(sortEvents(result.value));
     else setErrorKey(result.error.messageKey);
     setLoading(false);

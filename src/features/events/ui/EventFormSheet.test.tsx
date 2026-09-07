@@ -69,6 +69,45 @@ describe('EventFormSheet', () => {
     expect(onCreate).not.toHaveBeenCalled();
   });
 
+  it('seed.date を渡すと新規フォームの開始日がその日付になる', () => {
+    setup({ seed: { date: '2026-09-20' } });
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-09-20T09:00');
+    expect(screen.getByLabelText('終了')).toHaveValue('2026-09-20T10:00');
+  });
+
+  it('seed.startLocal を渡すとその時刻から1時間が既定になる', () => {
+    setup({ seed: { startLocal: '2026-09-20T14:00' } });
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-09-20T14:00');
+    expect(screen.getByLabelText('終了')).toHaveValue('2026-09-20T15:00');
+  });
+
+  it('編集中に onDelete を渡すと削除ボタンが出て、押すと onDelete + onClose', async () => {
+    const user = userEvent.setup();
+    const editing = {
+      id: 'e9',
+      calendarId: 'c1',
+      title: '古い予定',
+      allDay: false as const,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+      eventDate: null,
+      note: null,
+      source: 'local' as const,
+      createdAt: '',
+      updatedAt: '',
+    };
+    const onDelete = vi.fn();
+    const { onClose } = setup({ editing, onDelete });
+    await user.click(screen.getByRole('button', { name: 'この予定を削除' }));
+    expect(onDelete).toHaveBeenCalledWith(editing);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('onDelete 未指定なら削除ボタンは出ない', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: 'この予定を削除' })).not.toBeInTheDocument();
+  });
+
   it('正しい入力で onCreate を呼び、UTC ISO で渡す', async () => {
     const user = userEvent.setup();
     const { onCreate, onClose } = setup();

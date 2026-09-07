@@ -27,5 +27,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'packages/*/src/**/*.{test,spec}.ts'],
+    // 日付ロジック(月グリッド・TZ 境界)を決定的にするため実行 TZ を固定する。
+    env: { TZ: 'Asia/Tokyo' },
   },
 });
