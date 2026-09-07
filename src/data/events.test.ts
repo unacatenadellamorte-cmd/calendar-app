@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** supabase クエリビルダのモック(calendars.test.ts と同型)。 */
 let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
@@ -223,5 +223,47 @@ describe('events.ts', () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.kind).toBe('data/query');
+  });
+});
+
+describe('events.ts — オフライン(Story 1.6)', () => {
+  beforeEach(() => vi.stubGlobal('navigator', { onLine: false }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('listEvents はネットワーク障害でキャッシュを返す', async () => {
+    const { cachePut } = await import('./cache');
+    await cachePut('events', {
+      id: 'c1', calendarId: 'c1', title: 'キャッシュ予定', allDay: false,
+      startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z', eventDate: null,
+      note: null, source: 'local', createdAt: '', updatedAt: '',
+    });
+    queryResult = { data: null, error: { message: 'Failed to fetch' } };
+    const { listEvents } = await importEvents();
+    const r = await listEvents();
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.map((e) => e.title)).toEqual(['キャッシュ予定']);
+  });
+
+  it('createEvent はオフラインで outbox に積み、楽観行を返す(supabase に触れない)', async () => {
+    const { createEvent } = await importEvents();
+    const { listOutbox } = await import('./outbox');
+    const r = await createEvent({
+      calendarId: 'c1', title: '打合せ', allDay: false,
+      startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(from).not.toHaveBeenCalled();
+    const outbox = await listOutbox();
+    expect(outbox[0]).toMatchObject({ entity: 'event', op: 'create' });
+  });
+
+  it('deleteEvent はオフラインで outbox に delete を積む', async () => {
+    const { deleteEvent } = await importEvents();
+    const { listOutbox } = await import('./outbox');
+    const r = await deleteEvent({ id: 'e1', source: 'local' });
+    expect(r.ok).toBe(true);
+    expect((await listOutbox())[0]).toMatchObject({ op: 'delete', targetId: 'e1' });
+    expect(from).not.toHaveBeenCalled();
   });
 });

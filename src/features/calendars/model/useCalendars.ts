@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useOnline } from '@/app/online-context';
 import {
   createCalendar,
   deleteCalendar,
@@ -20,6 +21,7 @@ interface PendingDelete {
 }
 
 export function useCalendars(enabled: boolean) {
+  const { syncNonce } = useOnline();
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [loading, setLoading] = useState(enabled);
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -48,6 +50,11 @@ export function useCalendars(enabled: boolean) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // オンライン復帰でフラッシュされたら、実データを取り直す。
+  useEffect(() => {
+    if (syncNonce > 0) void reload();
+  }, [syncNonce, reload]);
 
   useEffect(
     () => () => {
@@ -128,7 +135,7 @@ export function useCalendars(enabled: boolean) {
     clearTimeout(pending.timer);
     pendingRef.current = null;
     setPendingDelete(null);
-    const result = await restoreCalendar(pending.calendar.id);
+    const result = await restoreCalendar(pending.calendar);
     if (result.ok) {
       setCalendars((cs) =>
         [...cs, pending.calendar].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),

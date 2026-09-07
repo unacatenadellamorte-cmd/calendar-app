@@ -1,11 +1,21 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { appError, err, ok, type AppError, type Result } from './result';
+import { isNetworkError, isOffline } from './net';
+import { cacheDelete, cacheGetAll, cachePut, cacheReplace } from './cache';
+import {
+  newLocalId,
+  offlineCreateEvent,
+  offlineDeleteEvent,
+  offlineRestoreEvent,
+  offlineUpdateEvent,
+} from './offline-write';
 
 /**
- * 予定の data-access レイヤ(AD-9 / AD-7 / AD-8)。
+ * 予定の data-access レイヤ(AD-9 / AD-7 / AD-8 / AD-1)。
  * 真実源は Supabase Postgres。時刻は UTC の ISO 文字列で扱い、TZ 変換は表示層。
  * すべて Result を返し throw しない。snake↔camel はこのファイルだけ。
+ * オフライン時: 読みは IndexedDB キャッシュ、書きは outbox キュー(offline-write.ts)。
  */
 
 export type EventSource = 'local' | 'google';
@@ -37,9 +47,13 @@ interface AllDayInput {
   eventDate: string;
 }
 
-export type NewEventInput = { calendarId: string; title: string; note?: string | null } & (
-  TimedInput | AllDayInput
-);
+export type NewEventInput = {
+  /** 省略時は DB 発番。オフライン作成・フラッシュ時はクライアント発番の id を渡す。 */
+  id?: string;
+  calendarId: string;
+  title: string;
+  note?: string | null;
+} & (TimedInput | AllDayInput);
 
 export type EventPatch = Partial<{
   calendarId: string;
@@ -122,13 +136,14 @@ export function validateEventInput(input: EventInputShape): AppError | null {
 }
 
 function rowFromInput(input: NewEventInput): Record<string, unknown> {
-  const base = {
+  const base: Record<string, unknown> = {
     calendar_id: input.calendarId,
     title: input.title.trim(),
     note: input.note?.trim() || null,
     all_day: input.allDay,
     source: 'local' as const,
   };
+  if (input.id) base.id = input.id;
   return input.allDay
     ? { ...base, event_date: input.eventDate, starts_at: null, ends_at: null }
     : { ...base, starts_at: input.startsAt, ends_at: input.endsAt, event_date: null };
@@ -136,6 +151,7 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
 
 export async function listEvents(range: EventRange = {}): Promise<Result<EventItem[]>> {
   if (!supabase) return err(UNAVAILABLE);
+  if (isOffline()) return ok(await cacheGetAll('events'));
   let query = supabase
     .from('events')
     .select(COLUMNS)
@@ -144,28 +160,51 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
     .order('starts_at', { ascending: true, nullsFirst: false })
     .order('event_date', { ascending: true });
   if (range.fromIso) {
-    // 時刻付きは starts_at、終日は event_date で絞る(どちらか一方が非 null)
     query = query.or(
       `starts_at.gte.${range.fromIso},event_date.gte.${range.fromIso.slice(0, 10)}`,
     );
   }
   if (range.limit) query = query.limit(range.limit);
-  const { data, error } = await query;
-  if (error) return err(fromPostgrest(error));
-  return ok((data as EventRow[]).map(toEvent));
+
+  try {
+    const { data, error } = await query;
+    if (error) {
+      if (isNetworkError(error)) return ok(await cacheGetAll('events'));
+      return err(fromPostgrest(error));
+    }
+    const mapped = (data as EventRow[]).map(toEvent);
+    if (!range.fromIso && !range.limit) await cacheReplace('events', mapped);
+    else for (const row of mapped) await cachePut('events', row);
+    return ok(mapped);
+  } catch (e) {
+    if (isNetworkError(e)) return ok(await cacheGetAll('events'));
+    return err(appError('data/query', 'data/query', e));
+  }
 }
 
 export async function createEvent(input: NewEventInput): Promise<Result<EventItem>> {
   if (!supabase) return err(UNAVAILABLE);
   const invalid = validateEventInput(input);
   if (invalid) return err(invalid);
-  const { data, error } = await supabase
-    .from('events')
-    .insert(rowFromInput(input))
-    .select(COLUMNS)
-    .single();
-  if (error) return err(fromPostgrest(error));
-  return ok(toEvent(data as EventRow));
+  if (isOffline()) return offlineCreateEvent(input.id ?? newLocalId(), input);
+
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .insert(rowFromInput(input))
+      .select(COLUMNS)
+      .single();
+    if (error) {
+      if (isNetworkError(error)) return offlineCreateEvent(input.id ?? newLocalId(), input);
+      return err(fromPostgrest(error));
+    }
+    const row = toEvent(data as EventRow);
+    await cachePut('events', row);
+    return ok(row);
+  } catch (e) {
+    if (isNetworkError(e)) return offlineCreateEvent(input.id ?? newLocalId(), input);
+    return err(appError('data/query', 'data/query', e));
+  }
 }
 
 /** patch に含まれる項目だけを検証する。 */
@@ -210,6 +249,7 @@ export async function updateEvent(
   }
   const invalid = validateEventPatch(patch);
   if (invalid) return err(invalid);
+  if (isOffline()) return offlineUpdateEvent(current.id, patch);
 
   const row: Record<string, unknown> = {};
   if (patch.calendarId !== undefined) row.calendar_id = patch.calendarId;
@@ -220,14 +260,24 @@ export async function updateEvent(
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
   if (patch.eventDate !== undefined) row.event_date = patch.eventDate;
 
-  const { data, error } = await supabase
-    .from('events')
-    .update(row)
-    .eq('id', current.id)
-    .select(COLUMNS)
-    .single();
-  if (error) return err(fromPostgrest(error));
-  return ok(toEvent(data as EventRow));
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .update(row)
+      .eq('id', current.id)
+      .select(COLUMNS)
+      .single();
+    if (error) {
+      if (isNetworkError(error)) return offlineUpdateEvent(current.id, patch);
+      return err(fromPostgrest(error));
+    }
+    const updated = toEvent(data as EventRow);
+    await cachePut('events', updated);
+    return ok(updated);
+  } catch (e) {
+    if (isNetworkError(e)) return offlineUpdateEvent(current.id, patch);
+    return err(appError('data/query', 'data/query', e));
+  }
 }
 
 export async function deleteEvent(
@@ -237,17 +287,42 @@ export async function deleteEvent(
   if (current.source !== 'local') {
     return err(appError('event/not-editable', 'event/not-editable'));
   }
-  const { error } = await supabase
-    .from('events')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', current.id);
-  if (error) return err(fromPostgrest(error));
-  return ok(undefined);
+  if (isOffline()) return offlineDeleteEvent(current.id);
+
+  try {
+    const { error } = await supabase
+      .from('events')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', current.id);
+    if (error) {
+      if (isNetworkError(error)) return offlineDeleteEvent(current.id);
+      return err(fromPostgrest(error));
+    }
+    await cacheDelete('events', current.id);
+    return ok(undefined);
+  } catch (e) {
+    if (isNetworkError(e)) return offlineDeleteEvent(current.id);
+    return err(appError('data/query', 'data/query', e));
+  }
 }
 
-export async function restoreEvent(id: string): Promise<Result<void>> {
+export async function restoreEvent(event: EventItem): Promise<Result<void>> {
   if (!supabase) return err(UNAVAILABLE);
-  const { error } = await supabase.from('events').update({ deleted_at: null }).eq('id', id);
-  if (error) return err(fromPostgrest(error));
-  return ok(undefined);
+  if (isOffline()) return offlineRestoreEvent(event);
+
+  try {
+    const { error } = await supabase
+      .from('events')
+      .update({ deleted_at: null })
+      .eq('id', event.id);
+    if (error) {
+      if (isNetworkError(error)) return offlineRestoreEvent(event);
+      return err(fromPostgrest(error));
+    }
+    await cachePut('events', event);
+    return ok(undefined);
+  } catch (e) {
+    if (isNetworkError(e)) return offlineRestoreEvent(event);
+    return err(appError('data/query', 'data/query', e));
+  }
 }

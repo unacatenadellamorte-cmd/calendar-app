@@ -19,6 +19,7 @@
   "dependencies": {
     "@calendar-app/core": "*",
     "@supabase/supabase-js": "^2.45.0",
+    "idb": "^8.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0"
@@ -39,6 +40,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^16.0.0",
     "jsdom": "^26.0.0",
     "prettier": "^3.5.0",
