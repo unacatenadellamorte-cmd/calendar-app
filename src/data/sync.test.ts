@@ -11,6 +11,7 @@ const createCalendar = vi.fn();
 const renameCalendar = vi.fn();
 const recolorCalendar = vi.fn();
 const setCalendarVisible = vi.fn();
+const reorderCalendars = vi.fn();
 const deleteCalendar = vi.fn();
 
 vi.mock('./events', () => ({
@@ -23,6 +24,7 @@ vi.mock('./calendars', () => ({
   renameCalendar: (...a: unknown[]) => renameCalendar(...a),
   recolorCalendar: (...a: unknown[]) => recolorCalendar(...a),
   setCalendarVisible: (...a: unknown[]) => setCalendarVisible(...a),
+  reorderCalendars: (...a: unknown[]) => reorderCalendars(...a),
   deleteCalendar: (...a: unknown[]) => deleteCalendar(...a),
 }));
 
@@ -51,6 +53,7 @@ beforeEach(() => {
     renameCalendar,
     recolorCalendar,
     setCalendarVisible,
+    reorderCalendars,
     deleteCalendar,
   ].forEach((f) => f.mockReset());
 });
@@ -89,6 +92,19 @@ describe('flushOutbox', () => {
     const result = await flushOutbox();
     expect(result).toMatchObject({ flushed: 1, dropped: 1, interrupted: false });
     expect(await listOutbox()).toHaveLength(0);
+  });
+
+  it('calendar/reorder は reorderCalendars を orderedIds で呼ぶ', async () => {
+    await enqueue({
+      entity: 'calendar',
+      op: 'reorder',
+      targetId: 'reorder',
+      payload: { orderedIds: ['c2', 'c1'] },
+    });
+    reorderCalendars.mockResolvedValue(ok([]));
+    const result = await flushOutbox();
+    expect(reorderCalendars).toHaveBeenCalledWith(['c2', 'c1']);
+    expect(result.flushed).toBe(1);
   });
 
   it('ネットワーク障害で中断し、未処理項目は残す', async () => {

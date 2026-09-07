@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { Calendar } from '@/data/calendars';
@@ -21,6 +21,7 @@ const hookValue = {
   rename: vi.fn(),
   recolor: vi.fn(),
   toggleVisible: vi.fn(),
+  reorder: vi.fn(),
   remove: vi.fn(),
   undoDelete: vi.fn(),
   dismissError: vi.fn(),
@@ -36,6 +37,7 @@ const cal = (over: Partial<Calendar> = {}): Calendar => ({
   source: 'local',
   isShift: false,
   isVisible: true,
+  priority: 0,
   createdAt: '2026-09-07T00:00:00Z',
   updatedAt: '2026-09-07T00:00:00Z',
   ...over,
@@ -84,7 +86,7 @@ describe('CalendarsScreen', () => {
     const user = userEvent.setup();
     hookValue.calendars = [cal({ id: 's1', name: 'シフト', isShift: true })];
     renderScreen();
-    await user.click(screen.getByRole('button', { name: /シフト/ }));
+    await user.click(screen.getByRole('button', { name: /^シフト/ }));
     expect(screen.getByRole('dialog', { name: 'カレンダーを編集' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'このカレンダーを削除' }),
@@ -95,8 +97,36 @@ describe('CalendarsScreen', () => {
     const user = userEvent.setup();
     hookValue.calendars = [cal({ name: '仕事' })];
     renderScreen();
-    await user.click(screen.getByRole('button', { name: /仕事/ }));
+    await user.click(screen.getByRole('button', { name: /^仕事/ }));
     expect(screen.getByRole('button', { name: 'このカレンダーを削除' })).toBeInTheDocument();
+  });
+
+  it('▲ で上へ動かすと reorder が入れ替えた id 順で呼ばれる', async () => {
+    const user = userEvent.setup();
+    hookValue.calendars = [cal({ id: 'a', name: '仕事' }), cal({ id: 'b', name: '個人', priority: 1 })];
+    renderScreen();
+    await user.click(screen.getByRole('button', { name: '「個人」を上へ' }));
+    expect(hookValue.reorder).toHaveBeenCalledWith(['b', 'a']);
+  });
+
+  it('先頭行の ▲ と末尾行の ▼ は無効', () => {
+    hookValue.calendars = [cal({ id: 'a', name: '仕事' }), cal({ id: 'b', name: '個人', priority: 1 })];
+    renderScreen();
+    expect(screen.getByRole('button', { name: '「仕事」を上へ' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '「個人」を下へ' })).toBeDisabled();
+  });
+
+  it('行をドラッグして落とすと reorder が並べ替えた id 順で呼ばれる', () => {
+    hookValue.calendars = [
+      cal({ id: 'a', name: '仕事' }),
+      cal({ id: 'b', name: '個人', priority: 1 }),
+      cal({ id: 'c', name: '部活', priority: 2 }),
+    ];
+    renderScreen();
+    const items = screen.getAllByRole('listitem');
+    fireEvent.dragStart(items[2]!); // 部活 を掴む
+    fireEvent.drop(items[0]!); // 仕事 の位置へ落とす
+    expect(hookValue.reorder).toHaveBeenCalledWith(['c', 'a', 'b']);
   });
 
   it('pendingDelete があれば Undo バーを出す', () => {

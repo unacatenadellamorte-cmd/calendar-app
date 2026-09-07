@@ -13,10 +13,11 @@ export function CalendarsScreen() {
   const cal = useCalendars(enabled);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Calendar | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   if (state === 'unavailable') {
     return (
-      <Screen title="カレンダー管理">
+      <Screen title="カレンダーの並び順">
         <p className="text-body text-ink-secondary">
           Supabase を設定すると、カレンダーを作成・管理できます。
         </p>
@@ -33,8 +34,32 @@ export function CalendarsScreen() {
     setSheetOpen(true);
   };
 
+  const move = (calendar: Calendar, dir: 'up' | 'down') => {
+    const i = cal.calendars.findIndex((c) => c.id === calendar.id);
+    const j = dir === 'up' ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= cal.calendars.length) return;
+    const ids = cal.calendars.map((c) => c.id);
+    const a = ids[i];
+    const b = ids[j];
+    if (a === undefined || b === undefined) return;
+    ids[i] = b;
+    ids[j] = a;
+    void cal.reorder(ids);
+  };
+
+  const dropOn = (targetId: string) => {
+    const source = draggedId;
+    setDraggedId(null);
+    if (!source || source === targetId) return;
+    const ids = cal.calendars.map((c) => c.id).filter((id) => id !== source);
+    const at = ids.indexOf(targetId);
+    if (at < 0) return;
+    ids.splice(at, 0, source);
+    void cal.reorder(ids);
+  };
+
   return (
-    <Screen title="カレンダー管理">
+    <Screen title="カレンダーの並び順">
       {cal.errorKey && (
         <p
           role="alert"
@@ -56,16 +81,26 @@ export function CalendarsScreen() {
         </p>
       )}
 
+      <p className="mb-3 text-meta text-ink-secondary">
+        上にあるカレンダーほど優先。狭い表示や重なったときに先に出ます。
+      </p>
+
       {cal.loading ? (
         <p className="text-meta text-ink-secondary">読み込み中…</p>
       ) : (
         <ul className="rounded-md border border-border-hairline bg-surface-raised">
-          {cal.calendars.map((c) => (
+          {cal.calendars.map((c, i) => (
             <CalendarRow
               key={c.id}
               calendar={c}
+              rank={i + 1}
+              total={cal.calendars.length}
               onEdit={openEdit}
               onToggleVisible={(x) => void cal.toggleVisible(x)}
+              onMove={move}
+              onDragStartRow={setDraggedId}
+              onDropRow={dropOn}
+              dragging={draggedId === c.id}
             />
           ))}
         </ul>

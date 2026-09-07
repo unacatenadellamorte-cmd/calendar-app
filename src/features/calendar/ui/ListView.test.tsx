@@ -12,6 +12,7 @@ const calendar: Calendar = {
   source: 'local',
   isShift: false,
   isVisible: true,
+  priority: 0,
   createdAt: '',
   updatedAt: '',
 };

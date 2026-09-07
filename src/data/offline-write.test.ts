@@ -2,13 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { cacheGetAll, cachePut } from './cache';
 import { listOutbox } from './outbox';
 import type { EventItem } from './events';
+import type { Calendar } from './calendars';
 import {
   newLocalId,
   offlineCreateEvent,
   offlineDeleteEvent,
+  offlineReorderCalendars,
   offlineRestoreEvent,
   offlineUpdateEvent,
 } from './offline-write';
+
+const cal = (id: string, priority: number): Calendar => ({
+  id,
+  name: id,
+  color: '#2563EB',
+  source: 'local',
+  isShift: false,
+  isVisible: true,
+  priority,
+  createdAt: '',
+  updatedAt: '',
+});
 
 const timedInput = {
   calendarId: 'c1',
@@ -69,5 +83,21 @@ describe('offline-write', () => {
     await offlineRestoreEvent(ev({ id: 'e1' }));
     expect((await cacheGetAll('events')).map((e) => e.id)).toEqual(['e1']);
     expect(await listOutbox()).toHaveLength(0);
+  });
+
+  it('offlineReorderCalendars はキャッシュの priority を振り直し、reorder を1件だけ残す', async () => {
+    await cachePut('calendars', cal('a', 0));
+    await cachePut('calendars', cal('b', 1));
+    await cachePut('calendars', cal('c', 2));
+
+    await offlineReorderCalendars(['c', 'a', 'b']);
+    await offlineReorderCalendars(['b', 'c', 'a']); // 直前の reorder を置き換える
+
+    const cached = (await cacheGetAll('calendars')).sort((x, y) => x.priority - y.priority);
+    expect(cached.map((c) => c.id)).toEqual(['b', 'c', 'a']);
+    const outbox = await listOutbox();
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({ entity: 'calendar', op: 'reorder' });
+    expect((outbox[0]!.payload as { orderedIds: string[] }).orderedIds).toEqual(['b', 'c', 'a']);
   });
 });

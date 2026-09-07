@@ -9,6 +9,7 @@ import {
   offlineCreateCalendar,
   offlineDeleteCalendar,
   offlinePatchCalendar,
+  offlineReorderCalendars,
   offlineRestoreCalendar,
 } from './offline-write';
 
@@ -28,6 +29,8 @@ export interface Calendar {
   source: CalendarSource;
   isShift: boolean;
   isVisible: boolean;
+  /** 表示優先度。小さいほど上位。user_id 内で一意(Story 2.1、AD-5)。 */
+  priority: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,12 +49,13 @@ interface CalendarRow {
   source: CalendarSource;
   is_shift: boolean;
   is_visible: boolean;
+  priority: number;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
-const COLUMNS = 'id,name,color,source,is_shift,is_visible,created_at,updated_at';
+const COLUMNS = 'id,name,color,source,is_shift,is_visible,priority,created_at,updated_at';
 
 function toCalendar(row: CalendarRow): Calendar {
   return {
@@ -61,9 +65,17 @@ function toCalendar(row: CalendarRow): Calendar {
     source: row.source,
     isShift: row.is_shift,
     isVisible: row.is_visible,
+    priority: row.priority,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** 優先度昇順、同順は作成順(オフライン fallback とローカル並べ直しで使う)。 */
+export function sortCalendars(list: Calendar[]): Calendar[] {
+  return [...list].sort(
+    (a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt),
+  );
 }
 
 function fromPostgrest(error: PostgrestError): AppError {
@@ -92,7 +104,7 @@ export async function listCalendars(): Promise<Result<Calendar[]>> {
       .from('calendars')
       .select(COLUMNS)
       .is('deleted_at', null)
-      .order('is_shift', { ascending: true })
+      .order('priority', { ascending: true })
       .order('created_at', { ascending: true });
     if (error) {
       if (isNetworkError(error)) return ok(sortCalendars(await cacheGetAll('calendars')));
@@ -105,13 +117,6 @@ export async function listCalendars(): Promise<Result<Calendar[]>> {
     if (isNetworkError(e)) return ok(sortCalendars(await cacheGetAll('calendars')));
     return err(appError('data/query', 'data/query', e));
   }
-}
-
-function sortCalendars(list: Calendar[]): Calendar[] {
-  return [...list].sort(
-    (a, b) =>
-      Number(a.isShift) - Number(b.isShift) || a.createdAt.localeCompare(b.createdAt),
-  );
 }
 
 export async function createCalendar(input: NewCalendarInput): Promise<Result<Calendar>> {
@@ -248,6 +253,27 @@ export async function restoreCalendar(calendar: Calendar): Promise<Result<void>>
     return ok(undefined);
   } catch (e) {
     if (isNetworkError(e)) return offlineRestoreCalendar(calendar);
+    return err(appError('data/query', 'data/query', e));
+  }
+}
+
+/**
+ * `orderedIds` の順に priority を採番し直す(Story 2.1、AD-5)。
+ * 一意制約は RPC `reorder_calendars` 側で保証する。成功時は最新のカレンダー一覧を返す。
+ */
+export async function reorderCalendars(orderedIds: string[]): Promise<Result<Calendar[]>> {
+  if (!supabase) return err(UNAVAILABLE);
+  if (isOffline()) return offlineReorderCalendars(orderedIds);
+
+  try {
+    const { error } = await supabase.rpc('reorder_calendars', { ordered_ids: orderedIds });
+    if (error) {
+      if (isNetworkError(error)) return offlineReorderCalendars(orderedIds);
+      return err(fromPostgrest(error));
+    }
+    return listCalendars();
+  } catch (e) {
+    if (isNetworkError(e)) return offlineReorderCalendars(orderedIds);
     return err(appError('data/query', 'data/query', e));
   }
 }

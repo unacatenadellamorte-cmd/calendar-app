@@ -13,6 +13,7 @@ const cal = (over: Partial<Calendar> = {}): Calendar => ({
   source: 'local',
   isShift: false,
   isVisible: true,
+  priority: 0,
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z',
   ...over,
