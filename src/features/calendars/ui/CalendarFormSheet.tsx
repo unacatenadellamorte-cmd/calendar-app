@@ -1,0 +1,106 @@
+import { useEffect, useState } from 'react';
+import { BottomSheet } from '@/ui/BottomSheet';
+import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
+import type { Calendar } from '@/data/calendars';
+
+interface CalendarFormSheetProps {
+  open: boolean;
+  /** 編集対象。null なら新規作成。 */
+  editing: Calendar | null;
+  /** 既存カレンダーの使用済み色(新規作成時の初期色決めに使う)。 */
+  usedColors: readonly string[];
+  onClose: () => void;
+  onSubmit: (values: { name: string; color: string }) => Promise<boolean>;
+  onDelete?: (calendar: Calendar) => void;
+}
+
+export function CalendarFormSheet({
+  open,
+  editing,
+  usedColors,
+  onClose,
+  onSubmit,
+  onDelete,
+}: CalendarFormSheetProps) {
+  const [name, setName] = useState('');
+  const [color, setColor] = useState<string>(CALENDAR_COLORS[0]!.hex);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(editing?.name ?? '');
+    setColor(editing?.color ?? nextUnusedColor(usedColors));
+    setSubmitting(false);
+  }, [open, editing, usedColors]);
+
+  const canDelete = Boolean(editing && !editing.isShift && onDelete);
+
+  return (
+    <BottomSheet
+      open={open}
+      title={editing ? 'カレンダーを編集' : 'カレンダーを作成'}
+      onClose={onClose}
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (submitting) return;
+          setSubmitting(true);
+          const okResult = await onSubmit({ name, color });
+          setSubmitting(false);
+          if (okResult) onClose();
+        }}
+      >
+        <label className="flex flex-col gap-1">
+          <span className="text-meta text-ink-secondary">名前</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={100}
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+          />
+        </label>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-meta text-ink-secondary">色</legend>
+          <div className="flex flex-wrap gap-2">
+            {CALENDAR_COLORS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                aria-label={c.name}
+                aria-pressed={color === c.hex}
+                onClick={() => setColor(c.hex)}
+                className={[
+                  'h-11 w-11 rounded-sm border',
+                  color === c.hex ? 'border-accent' : 'border-border-hairline',
+                ].join(' ')}
+                style={{ backgroundColor: c.hex }}
+              />
+            ))}
+          </div>
+        </fieldset>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
+        >
+          {submitting ? '保存中…' : '保存'}
+        </button>
+
+        {canDelete && editing && (
+          <button
+            type="button"
+            onClick={() => onDelete?.(editing)}
+            className="min-h-11 text-meta text-danger"
+          >
+            このカレンダーを削除
+          </button>
+        )}
+      </form>
+    </BottomSheet>
+  );
+}

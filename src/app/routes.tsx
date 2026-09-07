@@ -4,6 +4,7 @@ import { HomeScreen } from '@/features/home/ui/HomeScreen';
 import { CalendarScreen } from '@/features/calendar/ui/CalendarScreen';
 import { SettingsScreen } from '@/features/settings/ui/SettingsScreen';
 import { AuthScreen } from '@/features/auth/ui/AuthScreen';
+import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
 
 const routes: RouteObject[] = [
   {
@@ -15,6 +16,8 @@ const routes: RouteObject[] = [
       { path: 'settings', element: <SettingsScreen /> },
       // タブ外。設定のアカウント欄から遷移する。
       { path: 'auth', element: <AuthScreen /> },
+      // タブ外。ホーム見出しと設定から遷移する。
+      { path: 'calendars', element: <CalendarsScreen /> },
     ],
   },
 ];

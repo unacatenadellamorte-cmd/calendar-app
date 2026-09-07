@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
-import { authMessage } from '@/data/auth.errors';
+import { resolveMessage } from '@/data/messages';
 import { useAuthForm } from '@/features/auth/model/useAuthForm';
 
 /**
@@ -73,7 +73,7 @@ export function AuthScreen() {
 
         {form.errorKey && (
           <p role="alert" className="text-meta text-danger">
-            {authMessage(form.errorKey)}
+            {resolveMessage(form.errorKey)}
           </p>
         )}
 

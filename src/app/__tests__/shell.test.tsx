@@ -32,11 +32,12 @@ describe('AppShell', () => {
   it('タブをクリックするとルートが変わる', async () => {
     const user = userEvent.setup();
     renderApp('/');
+    const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
 
-    await user.click(screen.getByRole('link', { name: /カレンダー/ }));
+    await user.click(within(nav).getByRole('link', { name: /カレンダー/ }));
     expect(screen.getByRole('heading', { level: 1, name: 'カレンダー' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: /設定/ }));
+    await user.click(within(nav).getByRole('link', { name: /設定/ }));
     expect(screen.getByRole('heading', { level: 1, name: '設定' })).toBeInTheDocument();
   });
 

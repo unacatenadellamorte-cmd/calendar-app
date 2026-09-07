@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useTheme, type ThemePreference } from '@/features/settings/model/useTheme';
 import { AccountSection } from './AccountSection';
@@ -46,6 +47,18 @@ export function SettingsScreen() {
       </section>
 
       <AccountSection />
+
+      <section className="mt-6">
+        <Link
+          to="/calendars"
+          className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
+        >
+          カレンダー管理
+          <span aria-hidden="true" className="text-ink-secondary">
+            ›
+          </span>
+        </Link>
+      </section>
 
       <p className="mt-6 text-meta text-ink-secondary">
         データのエクスポート・カレンダー接続は後続ストーリーでここに追加されます。

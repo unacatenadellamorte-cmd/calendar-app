@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 
 /**
@@ -6,7 +7,14 @@ import { Screen } from '@/ui/Screen';
  */
 export function HomeScreen() {
   return (
-    <Screen title="今日">
+    <Screen
+      title="今日"
+      action={
+        <Link to="/calendars" className="text-meta text-accent">
+          カレンダー管理 ›
+        </Link>
+      }
+    >
       <p className="text-meta text-ink-secondary">
         代表予定と給料見込みはこの画面に表示されます(後続ストーリーで実装)。
       </p>
