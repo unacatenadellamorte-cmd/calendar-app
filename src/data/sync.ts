@@ -8,6 +8,7 @@ import {
   deleteCalendar,
   recolorCalendar,
   renameCalendar,
+  reorderCalendars,
   setCalendarVisible,
 } from './calendars';
 import { createEvent, deleteEvent, updateEvent } from './events';
@@ -80,6 +81,14 @@ async function replay(
         (item.payload as { isVisible: boolean }).isVisible,
       );
       if (r.ok) await cachePut('calendars', r.value);
+      return r;
+    }
+    case 'reorder': {
+      const orderedIds = (item.payload as { orderedIds: string[] }).orderedIds.map(
+        (id) => idMap.get(id) ?? id,
+      );
+      const r = await reorderCalendars(orderedIds);
+      if (r.ok) for (const c of r.value) await cachePut('calendars', c);
       return r;
     }
     case 'delete':

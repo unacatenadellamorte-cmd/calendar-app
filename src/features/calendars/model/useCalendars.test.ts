@@ -9,6 +9,7 @@ const createCalendar = vi.fn();
 const renameCalendar = vi.fn();
 const recolorCalendar = vi.fn();
 const setCalendarVisible = vi.fn();
+const reorderCalendars = vi.fn();
 const deleteCalendar = vi.fn();
 const restoreCalendar = vi.fn();
 
@@ -19,8 +20,11 @@ vi.mock('@/data/calendars', () => ({
   renameCalendar: (id: string, n: string) => renameCalendar(id, n),
   recolorCalendar: (id: string, c: string) => recolorCalendar(id, c),
   setCalendarVisible: (id: string, v: boolean) => setCalendarVisible(id, v),
+  reorderCalendars: (ids: string[]) => reorderCalendars(ids),
   deleteCalendar: (c: unknown) => deleteCalendar(c),
-  restoreCalendar: (id: string) => restoreCalendar(id),
+  restoreCalendar: (c: unknown) => restoreCalendar(c),
+  sortCalendars: (list: Calendar[]) =>
+    [...list].sort((a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)),
 }));
 
 const { useCalendars } = await import('./useCalendars');
@@ -32,6 +36,7 @@ const cal = (over: Partial<Calendar> = {}): Calendar => ({
   source: 'local',
   isShift: false,
   isVisible: true,
+  priority: 0,
   createdAt: '2026-09-07T00:00:00Z',
   updatedAt: '2026-09-07T00:00:00Z',
   ...over,
@@ -46,6 +51,7 @@ beforeEach(() => {
     renameCalendar,
     recolorCalendar,
     setCalendarVisible,
+    reorderCalendars,
     deleteCalendar,
     restoreCalendar,
   ].forEach((f) => f.mockReset());
@@ -128,5 +134,31 @@ describe('useCalendars', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.errorKey).toBe('data/query');
     expect(listCalendars).not.toHaveBeenCalled();
+  });
+
+  it('reorder は楽観的に並べ替え、成功で確定順を反映する', async () => {
+    listCalendars.mockResolvedValue(ok([cal({ id: 'a', priority: 0 }), cal({ id: 'b', priority: 1 })]));
+    reorderCalendars.mockResolvedValue(
+      ok([cal({ id: 'b', priority: 0 }), cal({ id: 'a', priority: 1 })]),
+    );
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.reorder(['b', 'a']);
+    });
+    expect(reorderCalendars).toHaveBeenCalledWith(['b', 'a']);
+    expect(result.current.calendars.map((c) => c.id)).toEqual(['b', 'a']);
+  });
+
+  it('reorder が失敗したら元の順に戻し errorKey を出す', async () => {
+    listCalendars.mockResolvedValue(ok([cal({ id: 'a', priority: 0 }), cal({ id: 'b', priority: 1 })]));
+    reorderCalendars.mockResolvedValue(err(appError('data/query', 'data/query')));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.reorder(['b', 'a']);
+    });
+    expect(result.current.calendars.map((c) => c.id)).toEqual(['a', 'b']);
+    expect(result.current.errorKey).toBe('data/query');
   });
 });

@@ -85,6 +85,8 @@ export async function offlineCreateCalendar(
   id: string,
   input: { name: string; color: string },
 ): Promise<Result<Calendar>> {
+  const existing = await cacheGetAll('calendars');
+  const nextPriority = existing.reduce((max, c) => Math.max(max, c.priority), -1) + 1;
   const row: Calendar = {
     id,
     name: input.name.trim(),
@@ -92,12 +94,31 @@ export async function offlineCreateCalendar(
     source: 'local',
     isShift: false,
     isVisible: true,
+    priority: nextPriority,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
   await enqueue({ entity: 'calendar', op: 'create', targetId: id, payload: { ...input, id } });
   await cachePut('calendars', row);
   return ok(row);
+}
+
+/**
+ * オフラインでの並べ替え。楽観的にキャッシュの priority を `orderedIds` の順で 0.. に振り直し、
+ * `outbox` には最新の並べ替え1件だけを残す(last-wins)。フラッシュ時に1回の RPC で適用。
+ */
+export async function offlineReorderCalendars(
+  orderedIds: string[],
+): Promise<Result<Calendar[]>> {
+  const all = await cacheGetAll('calendars');
+  const pos = new Map(orderedIds.map((id, i) => [id, i]));
+  const reordered = all
+    .map((c) => ({ ...c, priority: pos.get(c.id) ?? orderedIds.length + c.priority }))
+    .sort((a, b) => a.priority - b.priority);
+  for (const c of reordered) await cachePut('calendars', c);
+  await dropOutboxFor('calendar', 'reorder', 'reorder');
+  await enqueue({ entity: 'calendar', op: 'reorder', targetId: 'reorder', payload: { orderedIds } });
+  return ok(reordered);
 }
 
 export async function offlinePatchCalendar(

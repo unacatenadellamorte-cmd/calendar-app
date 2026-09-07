@@ -7,8 +7,10 @@ import {
   listCalendars,
   recolorCalendar,
   renameCalendar,
+  reorderCalendars,
   restoreCalendar,
   setCalendarVisible,
+  sortCalendars,
   type Calendar,
   type NewCalendarInput,
 } from '@/data/calendars';
@@ -27,6 +29,9 @@ export function useCalendars(enabled: boolean) {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Calendar | null>(null);
   const pendingRef = useRef<PendingDelete | null>(null);
+  /** ロールバック用に現在のリストを常に保持する。 */
+  const calendarsRef = useRef<Calendar[]>([]);
+  calendarsRef.current = calendars;
 
   const reload = useCallback(async () => {
     if (!enabled) return;
@@ -40,7 +45,7 @@ export function useCalendars(enabled: boolean) {
     }
     const list = await listCalendars();
     if (list.ok) {
-      setCalendars(list.value);
+      setCalendars(sortCalendars(list.value));
     } else {
       setErrorKey(list.error.messageKey);
     }
@@ -66,11 +71,29 @@ export function useCalendars(enabled: boolean) {
   const create = useCallback(async (input: NewCalendarInput) => {
     const result = await createCalendar(input);
     if (result.ok) {
-      setCalendars((cs) => [...cs, result.value]);
+      setCalendars((cs) => sortCalendars([...cs, result.value]));
       return true;
     }
     setErrorKey(result.error.messageKey);
     return false;
+  }, []);
+
+  /** `orderedIds` の順に並べ替える(ドラッグ / ▲▼ 双方)。楽観 → 失敗でロールバック。 */
+  const reorder = useCallback(async (orderedIds: string[]) => {
+    const snapshot = calendarsRef.current;
+    const byId = new Map(snapshot.map((c) => [c.id, c]));
+    const optimistic = orderedIds
+      .map((id) => byId.get(id))
+      .filter((c): c is Calendar => c !== undefined);
+    if (optimistic.length !== snapshot.length) return; // id 集合が食い違う → 何もしない
+    setCalendars(optimistic);
+    const result = await reorderCalendars(orderedIds);
+    if (result.ok) {
+      setCalendars(sortCalendars(result.value));
+    } else {
+      setCalendars(snapshot);
+      setErrorKey(result.error.messageKey);
+    }
   }, []);
 
   const rename = useCallback(async (id: string, name: string) => {
@@ -137,9 +160,7 @@ export function useCalendars(enabled: boolean) {
     setPendingDelete(null);
     const result = await restoreCalendar(pending.calendar);
     if (result.ok) {
-      setCalendars((cs) =>
-        [...cs, pending.calendar].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-      );
+      setCalendars((cs) => sortCalendars([...cs, pending.calendar]));
     } else {
       setErrorKey(result.error.messageKey);
     }
@@ -155,6 +176,7 @@ export function useCalendars(enabled: boolean) {
     rename,
     recolor,
     toggleVisible,
+    reorder,
     remove,
     undoDelete,
     dismissError,

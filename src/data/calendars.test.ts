@@ -38,8 +38,9 @@ function makeChain() {
 
 const from = vi.fn();
 const getUser = vi.fn(async () => ({ data: { user: { id: 'user-1' } } }));
+const rpc = vi.fn(async () => queryResult);
 
-let supabaseValue: unknown = { from, auth: { getUser } };
+let supabaseValue: unknown = { from, auth: { getUser }, rpc };
 
 vi.mock('@/data/supabase', () => ({
   get supabase() {
@@ -58,6 +59,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   source: 'local',
   is_shift: false,
   is_visible: true,
+  priority: 0,
   created_at: '2026-09-07T00:00:00Z',
   updated_at: '2026-09-07T00:00:00Z',
   ...over,
@@ -67,10 +69,11 @@ beforeEach(() => {
   vi.resetModules();
   calls.length = 0;
   queryResult = { data: null, error: null };
-  supabaseValue = { from, auth: { getUser } };
+  supabaseValue = { from, auth: { getUser }, rpc };
   from.mockReset();
   from.mockImplementation(() => makeChain());
   getUser.mockClear();
+  rpc.mockClear();
 });
 
 describe('calendars.ts', () => {
@@ -80,10 +83,15 @@ describe('calendars.ts', () => {
     const r = await listCalendars();
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value[0]).toMatchObject({ id: 'c1', isShift: false, isVisible: true });
+      expect(r.value[0]).toMatchObject({ id: 'c1', isShift: false, isVisible: true, priority: 0 });
       expect(r.value[1]).toMatchObject({ id: 'c2', isShift: true });
     }
     expect(calls.map((c) => c.method)).toContain('is'); // deleted_at is null で絞る
+    // priority 昇順で取得(Story 2.1)
+    expect(calls.find((c) => c.method === 'order')?.args).toEqual([
+      'priority',
+      { ascending: true },
+    ]);
   });
 
   it('createCalendar: source=local で insert し、camelCase を返す', async () => {
@@ -209,6 +217,25 @@ describe('calendars.ts', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.kind).toBe('data/query');
   });
+
+  it('reorderCalendars: RPC reorder_calendars を ordered_ids で呼び、最新一覧を返す', async () => {
+    queryResult = {
+      data: [row({ id: 'b', priority: 0 }), row({ id: 'a', priority: 1 })],
+      error: null,
+    };
+    const { reorderCalendars } = await importCalendars();
+    const r = await reorderCalendars(['b', 'a']);
+    expect(rpc).toHaveBeenCalledWith('reorder_calendars', { ordered_ids: ['b', 'a'] });
+    expect(r.ok && r.value.map((c) => c.id)).toEqual(['b', 'a']);
+  });
+
+  it('reorderCalendars: RPC エラーは data/query', async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom', code: 'P0001' } });
+    const { reorderCalendars } = await importCalendars();
+    const r = await reorderCalendars(['a', 'b']);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('data/query');
+  });
 });
 
 describe('calendars.ts — オフライン(Story 1.6)', () => {
@@ -219,7 +246,7 @@ describe('calendars.ts — オフライン(Story 1.6)', () => {
     const { cachePut } = await import('./cache');
     await cachePut('calendars', {
       id: 'c1', name: 'キャッシュ', color: '#2563EB', source: 'local',
-      isShift: false, isVisible: true, createdAt: '', updatedAt: '',
+      isShift: false, isVisible: true, priority: 0, createdAt: '', updatedAt: '',
     });
     const { listCalendars } = await importCalendars();
     const r = await listCalendars();
@@ -240,7 +267,7 @@ describe('calendars.ts — オフライン(Story 1.6)', () => {
     const { cachePut } = await import('./cache');
     await cachePut('calendars', {
       id: 'c1', name: '旧', color: '#2563EB', source: 'local',
-      isShift: false, isVisible: true, createdAt: '', updatedAt: '',
+      isShift: false, isVisible: true, priority: 0, createdAt: '', updatedAt: '',
     });
     const { renameCalendar } = await importCalendars();
     const { listOutbox } = await import('./outbox');
