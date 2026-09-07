@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useOnline } from '@/app/online-context';
 import {
   createEvent,
   deleteEvent,
@@ -26,10 +27,6 @@ function inputToPatch(input: NewEventInput): EventPatch {
 
 const UNDO_MS = 6000;
 
-function isOffline(): boolean {
-  return typeof navigator !== 'undefined' && navigator.onLine === false;
-}
-
 function sortEvents(events: EventItem[]): EventItem[] {
   return [...events].sort((a, b) => {
     if (a.allDay !== b.allDay) return a.allDay ? 1 : -1;
@@ -40,6 +37,7 @@ function sortEvents(events: EventItem[]): EventItem[] {
 }
 
 export function useEvents(enabled: boolean) {
+  const { syncNonce } = useOnline();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(enabled);
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -56,6 +54,7 @@ export function useEvents(enabled: boolean) {
     setLoading(true);
     setErrorKey(null);
     // 月 / 週 / リストのビューは過去〜未来を見るため全期間を読む(Story 1.5)。
+    // オフライン時は data-access がキャッシュを返す(Story 1.6)。
     const result = await listEvents();
     if (result.ok) setEvents(sortEvents(result.value));
     else setErrorKey(result.error.messageKey);
@@ -65,6 +64,11 @@ export function useEvents(enabled: boolean) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // オンライン復帰でフラッシュされたら、実データを取り直す。
+  useEffect(() => {
+    if (syncNonce > 0) void reload();
+  }, [syncNonce, reload]);
 
   useEffect(
     () => () => {
@@ -76,10 +80,6 @@ export function useEvents(enabled: boolean) {
   const dismissError = useCallback(() => setErrorKey(null), []);
 
   const create = useCallback(async (input: NewEventInput) => {
-    if (isOffline()) {
-      setErrorKey('event/offline');
-      return false;
-    }
     const result = await createEvent(input);
     if (result.ok) {
       setEvents((es) => sortEvents([...es, result.value]));
@@ -90,10 +90,6 @@ export function useEvents(enabled: boolean) {
   }, []);
 
   const update = useCallback(async (current: EventItem, input: NewEventInput) => {
-    if (isOffline()) {
-      setErrorKey('event/offline');
-      return false;
-    }
     const patch = inputToPatch(input);
     const optimistic = { ...current, ...patch } as EventItem;
     setEvents((es) => sortEvents(es.map((e) => (e.id === current.id ? optimistic : e))));
@@ -114,10 +110,6 @@ export function useEvents(enabled: boolean) {
 
   const remove = useCallback(
     async (event: EventItem) => {
-      if (isOffline()) {
-        setErrorKey('event/offline');
-        return;
-      }
       const snapshot = eventsRef.current;
       setEvents((es) => es.filter((e) => e.id !== event.id));
       const result = await deleteEvent(event);
@@ -139,7 +131,7 @@ export function useEvents(enabled: boolean) {
     clearTimeout(pending.timer);
     pendingRef.current = null;
     setPendingDelete(null);
-    const result = await restoreEvent(pending.event.id);
+    const result = await restoreEvent(pending.event);
     if (result.ok) setEvents((es) => sortEvents([...es, pending.event]));
     else setErrorKey(result.error.messageKey);
   }, []);

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * supabase のクエリビルダをモックして calendars.ts を検証する。
@@ -208,5 +208,45 @@ describe('calendars.ts', () => {
     const r = await listCalendars();
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.kind).toBe('data/query');
+  });
+});
+
+describe('calendars.ts — オフライン(Story 1.6)', () => {
+  beforeEach(() => vi.stubGlobal('navigator', { onLine: false }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('listCalendars はオフラインでキャッシュを返す(supabase に触れない)', async () => {
+    const { cachePut } = await import('./cache');
+    await cachePut('calendars', {
+      id: 'c1', name: 'キャッシュ', color: '#2563EB', source: 'local',
+      isShift: false, isVisible: true, createdAt: '', updatedAt: '',
+    });
+    const { listCalendars } = await importCalendars();
+    const r = await listCalendars();
+    expect(r.ok && r.value.map((c) => c.name)).toEqual(['キャッシュ']);
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('createCalendar はオフラインで outbox に積み、楽観行を返す', async () => {
+    const { createCalendar } = await importCalendars();
+    const { listOutbox } = await import('./outbox');
+    const r = await createCalendar({ name: '部活', color: '#009E73' });
+    expect(r.ok).toBe(true);
+    expect(from).not.toHaveBeenCalled();
+    expect((await listOutbox())[0]).toMatchObject({ entity: 'calendar', op: 'create' });
+  });
+
+  it('renameCalendar はオフラインで outbox に rename を積む', async () => {
+    const { cachePut } = await import('./cache');
+    await cachePut('calendars', {
+      id: 'c1', name: '旧', color: '#2563EB', source: 'local',
+      isShift: false, isVisible: true, createdAt: '', updatedAt: '',
+    });
+    const { renameCalendar } = await importCalendars();
+    const { listOutbox } = await import('./outbox');
+    const r = await renameCalendar('c1', '新');
+    expect(r.ok && r.value.name).toBe('新');
+    expect((await listOutbox())[0]).toMatchObject({ op: 'rename', targetId: 'c1' });
+    expect(from).not.toHaveBeenCalled();
   });
 });

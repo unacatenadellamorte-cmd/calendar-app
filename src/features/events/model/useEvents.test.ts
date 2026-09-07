@@ -70,15 +70,18 @@ describe('useEvents', () => {
     expect(result.current.events.map((e) => e.id)).toEqual(['e2', 'e1']);
   });
 
-  it('オフラインでは create せず event/offline を出す', async () => {
+  it('オフラインでも createEvent を呼ぶ(data 層がキューに積む。エラー表示しない)', async () => {
     vi.stubGlobal('navigator', { onLine: false });
+    // data 層はオフラインでも楽観行を ok で返す。
+    createEvent.mockResolvedValue(ok(ev({ id: 'local-1' })));
     const { result } = renderHook(() => useEvents(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
       await result.current.create(timedInput);
     });
-    expect(createEvent).not.toHaveBeenCalled();
-    expect(result.current.errorKey).toBe('event/offline');
+    expect(createEvent).toHaveBeenCalledWith(timedInput);
+    expect(result.current.errorKey).toBeNull();
+    expect(result.current.events.map((e) => e.id)).toContain('local-1');
   });
 
   it('update の楽観更新は失敗でロールバックする', async () => {

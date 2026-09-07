@@ -16,6 +16,8 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/invalid-date': '日付を選んでください',
   'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
   'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',
+  'data/offline': 'オフラインです。接続すると同期します',
+  'sync/partial': '一部の変更を送信できませんでした',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };
