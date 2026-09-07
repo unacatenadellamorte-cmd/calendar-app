@@ -18,6 +18,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',
   'data/offline': 'オフラインです。接続すると同期します',
   'sync/partial': '一部の変更を送信できませんでした',
+  'export/failed': 'ファイルの書き出しに失敗しました',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };
