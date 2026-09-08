@@ -13,7 +13,14 @@ vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 
 const { DataSection } = await import('./DataSection');
 
-const bundle = { app: 'calendar-app', schemaVersion: 1, exportedAt: 'x', calendars: [], events: [] };
+const bundle = {
+  app: 'calendar-app',
+  schemaVersion: 2,
+  exportedAt: 'x',
+  calendars: [],
+  events: [],
+  shiftTemplates: [],
+};
 
 beforeEach(() => {
   buildExportBundle.mockReset();

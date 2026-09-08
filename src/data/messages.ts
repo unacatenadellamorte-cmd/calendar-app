@@ -19,6 +19,12 @@ const DATA_MESSAGES: Record<string, string> = {
   'data/offline': 'オフラインです。接続すると同期します',
   'sync/partial': '一部の変更を送信できませんでした',
   'export/failed': 'ファイルの書き出しに失敗しました',
+  'shift-template/invalid-name': 'シフト名を入力してください',
+  'shift-template/invalid-time': '開始と終了の時刻を確認してください',
+  'shift-template/invalid-break': '休憩は0以上で、実働時間より短くしてください',
+  'shift-template/invalid-wage': '時給は0以上で入力してください',
+  'shift-template/invalid-workplace': '勤務先ラベルは100文字までです',
+  'shift-template/invalid-color': '色はプリセットから選んでください',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };

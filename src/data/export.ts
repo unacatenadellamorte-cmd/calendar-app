@@ -1,23 +1,25 @@
 import { listCalendars, type Calendar } from './calendars';
 import { listEvents, type EventItem } from './events';
+import { listShiftTemplates, type ShiftTemplate } from './shift-templates';
 import { err, ok, type Result } from './result';
 
 /**
  * エクスポート用のデータ組み立て(FR17)。
  * ローカルで作成したデータ(`source === 'local'`)だけを1つのバンドルにする。
- * 取り込んだ外部予定は含めない。お気に入りシフトのテンプレは Epic 4 で追加する。
+ * 取り込んだ外部予定は含めない。お気に入りシフトのテンプレも含める(Story 4.1)。
  *
- * データ取得は `listCalendars` / `listEvents` を再利用する(オフライン時はキャッシュに
- * フォールバックする分岐がそこに閉じているため。Story 1.6)。
+ * データ取得は `listCalendars` / `listEvents` / `listShiftTemplates` を再利用する。
  */
 
 export interface ExportBundle {
   app: 'calendar-app';
-  schemaVersion: 1;
+  /** shiftTemplates の追加で 1 → 2(Story 4.1)。 */
+  schemaVersion: 2;
   /** 書き出した時刻(UTC ISO)。 */
   exportedAt: string;
   calendars: Calendar[];
   events: EventItem[];
+  shiftTemplates: ShiftTemplate[];
 }
 
 function eventKey(e: EventItem): string {
@@ -29,6 +31,8 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
   if (!calendars.ok) return err(calendars.error);
   const events = await listEvents();
   if (!events.ok) return err(events.error);
+  const templates = await listShiftTemplates();
+  if (!templates.ok) return err(templates.error);
 
   const localCalendars = calendars.value
     .filter((c) => c.source === 'local')
@@ -37,7 +41,7 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
 
   return ok({
     app: 'calendar-app',
-    schemaVersion: 1,
+    schemaVersion: 2,
     exportedAt: new Date().toISOString(),
     calendars: localCalendars,
     // ローカル予定のうち、書き出すカレンダーに属すものだけ(削除済みカレンダーの
@@ -45,5 +49,8 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
     events: events.value
       .filter((e) => e.source === 'local' && localIds.has(e.calendarId))
       .sort((a, b) => eventKey(a).localeCompare(eventKey(b))),
+    shiftTemplates: [...templates.value].sort((a, b) =>
+      a.createdAt.localeCompare(b.createdAt),
+    ),
   });
 }

@@ -21,7 +21,13 @@ beforeEach(() => {
   resetFeaturedCountForTests();
 });
 
-describe('SettingsScreen / ホームに出す予定の数', () => {
+describe('SettingsScreen', () => {
+  it('カレンダー管理・お気に入りシフトへのリンクがある', () => {
+    renderSettings();
+    expect(screen.getByRole('link', { name: /カレンダー管理/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /お気に入りシフト/ })).toBeInTheDocument();
+  });
+
   it('既定は 3 件が選択されている', () => {
     renderSettings();
     expect(screen.getByRole('radio', { name: '3 件', checked: true })).toBeInTheDocument();

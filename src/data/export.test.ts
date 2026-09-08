@@ -2,14 +2,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { appError, err, ok } from './result';
 import type { Calendar } from './calendars';
 import type { EventItem } from './events';
+import type { ShiftTemplate } from './shift-templates';
 
 const listCalendars = vi.fn();
 const listEvents = vi.fn();
+const listShiftTemplates = vi.fn();
 
 vi.mock('./calendars', () => ({ listCalendars: () => listCalendars() }));
 vi.mock('./events', () => ({ listEvents: () => listEvents() }));
+vi.mock('./shift-templates', () => ({ listShiftTemplates: () => listShiftTemplates() }));
 
 const { buildExportBundle } = await import('./export');
+
+const tpl = (over: Partial<ShiftTemplate> = {}): ShiftTemplate => ({
+  id: 't1',
+  name: '平日',
+  startLocal: '17:00',
+  endLocal: '22:00',
+  breakMinutes: 30,
+  hourlyWage: 1100,
+  workplaceLabel: null,
+  color: '#009E73',
+  createdAt: '2026-09-01T00:00:00Z',
+  updatedAt: '2026-09-01T00:00:00Z',
+  ...over,
+});
 
 const cal = (over: Partial<Calendar> = {}): Calendar => ({
   id: 'c1',
@@ -42,6 +59,8 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
 beforeEach(() => {
   listCalendars.mockReset();
   listEvents.mockReset();
+  listShiftTemplates.mockReset();
+  listShiftTemplates.mockResolvedValue(ok([]));
 });
 
 describe('buildExportBundle', () => {
@@ -58,10 +77,31 @@ describe('buildExportBundle', () => {
     const r = await buildExportBundle();
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value).toMatchObject({ app: 'calendar-app', schemaVersion: 1 });
+    expect(r.value).toMatchObject({ app: 'calendar-app', schemaVersion: 2 });
     expect(r.value.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(r.value.calendars.map((c) => c.id)).toEqual(['a', 'b']);
     expect(r.value.events.map((e) => e.id)).toEqual(['early', 'late']);
+  });
+
+  it('お気に入りシフトのテンプレを createdAt 順で含める', async () => {
+    listCalendars.mockResolvedValue(ok([cal()]));
+    listEvents.mockResolvedValue(ok([]));
+    listShiftTemplates.mockResolvedValue(
+      ok([
+        tpl({ id: 'later', createdAt: '2026-09-05T00:00:00Z' }),
+        tpl({ id: 'earlier', createdAt: '2026-09-01T00:00:00Z' }),
+      ]),
+    );
+    const r = await buildExportBundle();
+    expect(r.ok && r.value.shiftTemplates.map((t) => t.id)).toEqual(['earlier', 'later']);
+  });
+
+  it('listShiftTemplates が err なら伝播する', async () => {
+    listCalendars.mockResolvedValue(ok([cal()]));
+    listEvents.mockResolvedValue(ok([]));
+    listShiftTemplates.mockResolvedValue(err(appError('data/query', 'data/query')));
+    const r = await buildExportBundle();
+    expect(r.ok).toBe(false);
   });
 
   it('取り込んだ外部予定・外部カレンダーは含めない', async () => {
