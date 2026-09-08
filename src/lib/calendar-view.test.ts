@@ -6,9 +6,11 @@ import {
   eventOccursOnDate,
   groupEventsByDay,
   layoutDayEvents,
+  makePriorityOf,
   monthGridDays,
   ymd,
 } from './calendar-view';
+import type { Calendar } from '@/data/calendars';
 
 const ev = (over: Partial<EventItem> = {}): EventItem => ({
   id: 'e1',
@@ -128,5 +130,79 @@ describe('layoutDayEvents', () => {
 
   it('終日予定は無視する', () => {
     expect(layoutDayEvents([allDay('2026-09-08')])).toEqual([]);
+  });
+
+  it('重なるグループ内は優先度が高いカレンダーを左の列(column 0)に置く', () => {
+    // 低優先度(1)の 13:00–14:30 の方が早く始まるが、高優先度(0)の 13:30–14:00 が左。
+    const low = ev({
+      id: 'low',
+      calendarId: 'low',
+      startsAt: '2026-09-08T04:00:00Z',
+      endsAt: '2026-09-08T05:30:00Z',
+    });
+    const high = ev({
+      id: 'high',
+      calendarId: 'high',
+      startsAt: '2026-09-08T04:30:00Z',
+      endsAt: '2026-09-08T05:00:00Z',
+    });
+    const priorityOf = (id: string) => (id === 'high' ? 0 : 1);
+    const byId = new Map(
+      layoutDayEvents([low, high], priorityOf).map((p) => [p.event.id, p]),
+    );
+    expect(byId.get('high')).toMatchObject({ column: 0, columnCount: 2 });
+    expect(byId.get('low')).toMatchObject({ column: 1, columnCount: 2 });
+  });
+
+  it('時間が重ならない隣接予定は優先度に関係なく別グループ・全幅(列は増えない)', () => {
+    const a = ev({
+      id: 'a',
+      calendarId: 'lowpri',
+      startsAt: '2026-09-08T00:00:00Z',
+      endsAt: '2026-09-08T01:00:00Z',
+    }); // 09:00–10:00
+    const b = ev({
+      id: 'b',
+      calendarId: 'highpri',
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    }); // 10:00–11:00
+    const priorityOf = (id: string) => (id === 'highpri' ? 0 : 5);
+    const positioned = layoutDayEvents([a, b], priorityOf);
+    expect(positioned.every((p) => p.column === 0 && p.columnCount === 1)).toBe(true);
+  });
+
+  it('priorityOf 省略時は開始時刻順の列割り当て(Story 1.5 の回帰なし)', () => {
+    const a = ev({ id: 'a', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' });
+    const b = ev({ id: 'b', startsAt: '2026-09-08T01:30:00Z', endsAt: '2026-09-08T02:30:00Z' });
+    const byId = new Map(layoutDayEvents([b, a]).map((p) => [p.event.id, p]));
+    expect(byId.get('a')).toMatchObject({ column: 0, columnCount: 2 });
+    expect(byId.get('b')).toMatchObject({ column: 1, columnCount: 2 });
+  });
+});
+
+describe('makePriorityOf', () => {
+  const cal = (over: Partial<Calendar>): Calendar => ({
+    id: 'c1',
+    name: 'x',
+    color: '#000',
+    source: 'local',
+    isShift: false,
+    isVisible: true,
+    priority: 0,
+    createdAt: '',
+    updatedAt: '',
+    ...over,
+  });
+
+  it('既知の id はその優先度、未知の id は最下位相当', () => {
+    const map = new Map<string, Calendar>([
+      ['a', cal({ id: 'a', priority: 2 })],
+      ['b', cal({ id: 'b', priority: 0 })],
+    ]);
+    const priorityOf = makePriorityOf(map);
+    expect(priorityOf('a')).toBe(2);
+    expect(priorityOf('b')).toBe(0);
+    expect(priorityOf('missing')).toBe(Number.MAX_SAFE_INTEGER);
   });
 });

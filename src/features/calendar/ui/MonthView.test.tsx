@@ -105,4 +105,33 @@ describe('MonthView', () => {
     await user.click(screen.getByRole('button', { name: '他 1 件' }));
     expect(onOverflowTap).toHaveBeenCalledWith('2026-09-08');
   });
+
+  it('セルに入りきらない時は優先度の高いカレンダーの予定から見せる', () => {
+    // 高優先度(priority 0)の遅い予定2件が、低優先度(priority 1)の早い予定より先に出る。
+    const twoCals = new Map<string, Calendar>([
+      ['c1', calendar],
+      ['c2', { ...calendar, id: 'c2', name: '低優先', priority: 1 }],
+    ]);
+    render(
+      <MonthView
+        cursor="2026-09-08"
+        events={[
+          ev({ id: 'lo0', title: '低0', calendarId: 'c2', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
+          ev({ id: 'lo1', title: '低1', calendarId: 'c2', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' }),
+          ev({ id: 'hi0', title: '高0', calendarId: 'c1', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
+          ev({ id: 'hi1', title: '高1', calendarId: 'c1', startsAt: '2026-09-08T06:00:00Z', endsAt: '2026-09-08T07:00:00Z' }),
+        ]}
+        calendarById={twoCals}
+        today="2026-09-08"
+        onDayTap={vi.fn()}
+        onEventTap={vi.fn()}
+        onOverflowTap={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /高0/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /高1/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /低0/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /低1/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '他 1 件' })).toBeInTheDocument();
+  });
 });

@@ -3,8 +3,8 @@
  * 日付は "YYYY-MM-DD" のローカル暦日、時刻付き予定は UTC ISO で受け取る。
  * `Date` はすべてローカル TZ で解釈する(AD-7。表示は端末ローカル)。
  *
- * 重なりレイアウトの順序(開始時刻→タイトル)は Epic 2 / Story 2.3 で
- * カレンダー優先度順へ差し替える。差し替え点として `layoutDayEvents` に隔離している。
+ * 重なり・あふれの描画順は所属カレンダーの優先度順(Story 2.3)。
+ * 並び規則は `@core` の `compareEventsForList` に集約し、ここは列詰め・グルーピングだけ持つ。
  */
 
 import { compareEventsForList, type PriorityLookup } from '@core';
@@ -13,6 +13,13 @@ import { localDateOf, localDateString, minutesIntoLocalDay } from './datetime';
 
 /** 優先度を問わない(全カレンダー同順位)ルックアップ。 */
 const NO_PRIORITY: PriorityLookup = () => 0;
+
+/** カレンダー Map から優先度ルックアップを作る。未知の id は最下位相当。 */
+export function makePriorityOf(
+  calendarById: ReadonlyMap<string, { priority: number }>,
+): PriorityLookup {
+  return (id) => calendarById.get(id)?.priority ?? Number.MAX_SAFE_INTEGER;
+}
 
 const MIN_EVENT_MINUTES = 15;
 
@@ -119,13 +126,23 @@ export function groupEventsByDay(
   return map;
 }
 
+interface TimedItem {
+  event: EventItem;
+  startMin: number;
+  endMin: number;
+}
+
 /**
  * 時刻付き予定の重なりを列に割る。終日予定は無視する。
- * 重なりグループごとに列数を出し、グループ内の全予定にその列数を付ける。
- * 順序は開始時刻→タイトル(Story 2.3 で優先度順に差し替え)。
+ * 重なりグループの検出は開始時刻順(グループ境界は時間で決まる)。
+ * グループ内の列詰めだけ優先度順 ── `priorityOf` が高い予定ほど先に処理され、
+ * 空いている最小の列番号(= 左端)を取る。`priorityOf` 省略時は Story 1.5 と同じ。
  */
-export function layoutDayEvents(events: EventItem[]): PositionedEvent[] {
-  const timed = events
+export function layoutDayEvents(
+  events: EventItem[],
+  priorityOf: PriorityLookup = NO_PRIORITY,
+): PositionedEvent[] {
+  const timed: TimedItem[] = events
     .filter((e) => !e.allDay && e.startsAt)
     .map((e) => {
       const startMin = minutesIntoLocalDay(e.startsAt as string);
@@ -141,29 +158,48 @@ export function layoutDayEvents(events: EventItem[]): PositionedEvent[] {
     );
 
   const result: PositionedEvent[] = [];
-  let group: { event: EventItem; startMin: number; endMin: number; column: number }[] = [];
+  let group: TimedItem[] = [];
   let groupEnd = -1;
-  const colEnds: number[] = [];
 
   const flush = () => {
     if (group.length === 0) return;
+    // グループ内は優先度順で貪欲に列詰め。高い優先度ほど小さい列番号を取る。
+    const ordered = [...group].sort(
+      (a, b) =>
+        compareEventsForList(a.event, b.event, priorityOf) ||
+        a.endMin - b.endMin ||
+        a.event.title.localeCompare(b.event.title),
+    );
+    const colEnds: number[] = [];
+    const columnOf = new Map<TimedItem, number>();
+    for (const item of ordered) {
+      let column = colEnds.findIndex((end) => end <= item.startMin);
+      if (column === -1) {
+        column = colEnds.length;
+        colEnds.push(item.endMin);
+      } else {
+        colEnds[column] = item.endMin;
+      }
+      columnOf.set(item, column);
+    }
     const columnCount = colEnds.length;
-    for (const item of group) result.push({ ...item, columnCount });
+    // 出力は開始時刻順のまま(描画順の安定性)。列だけ優先度順の結果を使う。
+    for (const item of group) {
+      result.push({
+        event: item.event,
+        startMin: item.startMin,
+        endMin: item.endMin,
+        column: columnOf.get(item) ?? 0,
+        columnCount,
+      });
+    }
     group = [];
     groupEnd = -1;
-    colEnds.length = 0;
   };
 
   for (const item of timed) {
     if (group.length > 0 && item.startMin >= groupEnd) flush();
-    let column = colEnds.findIndex((end) => end <= item.startMin);
-    if (column === -1) {
-      column = colEnds.length;
-      colEnds.push(item.endMin);
-    } else {
-      colEnds[column] = item.endMin;
-    }
-    group.push({ ...item, column });
+    group.push(item);
     groupEnd = Math.max(groupEnd, item.endMin);
   }
   flush();

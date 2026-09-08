@@ -59,8 +59,9 @@ export function CalendarScreen() {
     setSheetOpen(true);
   };
   const openOverflow = (date: string) => {
+    // 「他 N 件」→ その日を優先度順(同順は開始時刻順)で一覧できるリストビューへ。
     jumpTo(date);
-    setView('week');
+    setView('list');
   };
 
   const loading = ev.loading || cal.loading;

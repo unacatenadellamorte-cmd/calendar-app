@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { groupEventsByDay, monthGridDays, ymd } from '@/lib/calendar-view';
+import { groupEventsByDay, makePriorityOf, monthGridDays, ymd } from '@/lib/calendar-view';
 import { EventChip } from './EventChip';
 
 interface MonthViewProps {
@@ -17,7 +17,7 @@ interface MonthViewProps {
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const MAX_CHIPS = 3;
 
-/** 月ビュー。7列グリッド、時刻付き→終日順で最大3件 +「他 N 件」。 */
+/** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
 export function MonthView({
   cursor,
   events,
@@ -29,7 +29,9 @@ export function MonthView({
 }: MonthViewProps) {
   const { year, month } = ymd(cursor);
   const cells = useMemo(() => monthGridDays(year, month, today), [year, month, today]);
-  const byDay = useMemo(() => groupEventsByDay(events), [events]);
+  // セル内の積み順・あふれ選抜は所属カレンダーの優先度順(Story 2.3)。
+  const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
+  const byDay = useMemo(() => groupEventsByDay(events, priorityOf), [events, priorityOf]);
 
   return (
     <div>

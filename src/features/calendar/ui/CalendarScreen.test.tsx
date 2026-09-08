@@ -80,6 +80,25 @@ describe('CalendarScreen', () => {
     expect(screen.getByText('9月8日(火)')).toBeInTheDocument();
   });
 
+  it('月ビューで「他 N 件」をタップするとその日へ移動してリストビューに切り替わる', async () => {
+    const user = userEvent.setup();
+    // 今日(9/8)ではなく 9/18 に4件 ── overflow で cursor が動くことも見る。
+    evState.events = [0, 1, 2, 3].map((i) => ({
+      ...sampleEvent,
+      id: `s${i}`,
+      title: `予定${i}`,
+      startsAt: `2026-09-18T0${i}:00:00Z`,
+      endsAt: `2026-09-18T0${i + 1}:00:00Z`,
+    }));
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('button', { name: '他 1 件' }));
+    expect(screen.getByRole('radio', { name: 'リスト', checked: true })).toBeInTheDocument();
+    expect(screen.getByText('9月18日(金)')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '9月15日に予定を追加' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('月ビューで日セルをタップすると予定追加シートが開く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);

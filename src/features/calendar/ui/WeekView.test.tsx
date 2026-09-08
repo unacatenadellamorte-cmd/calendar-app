@@ -78,4 +78,56 @@ describe('WeekView', () => {
     setup([ev({ id: 'x', title: '別日', startsAt: '2026-09-10T01:00:00Z', endsAt: '2026-09-10T02:00:00Z' })]);
     expect(screen.queryByRole('button', { name: /別日/ })).not.toBeInTheDocument();
   });
+
+  it('重なりは優先度が高いカレンダーを左端(left:0%)に置く', () => {
+    // 低優先度(1)の 13:00–14:30 が早く始まるが、高優先度(0)の 13:30–14:00 が左。
+    render(
+      <WeekView
+        cursor="2026-09-08"
+        events={[
+          ev({ id: 'low', title: '低優先', calendarId: 'c-low', startsAt: '2026-09-08T04:00:00Z', endsAt: '2026-09-08T05:30:00Z' }),
+          ev({ id: 'high', title: '高優先', calendarId: 'c-high', startsAt: '2026-09-08T04:30:00Z', endsAt: '2026-09-08T05:00:00Z' }),
+        ]}
+        calendarById={
+          new Map<string, Calendar>([
+            ['c-high', { ...calendar, id: 'c-high', name: '高', priority: 0 }],
+            ['c-low', { ...calendar, id: 'c-low', name: '低', priority: 1 }],
+          ])
+        }
+        today="2026-01-01"
+        onSlotTap={vi.fn()}
+        onEventTap={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /高優先/ }).style.left).toBe('0%');
+    expect(screen.getByRole('button', { name: /低優先/ }).style.left).toBe('50%');
+  });
+
+  it('終日帯は優先度順に並ぶ', () => {
+    render(
+      <WeekView
+        cursor="2026-09-08"
+        events={[
+          ev({ id: 'a2', title: '合宿', calendarId: 'c-low', allDay: true, startsAt: null, endsAt: null, eventDate: '2026-09-08' }),
+          ev({ id: 'a1', title: '当番', calendarId: 'c-high', allDay: true, startsAt: null, endsAt: null, eventDate: '2026-09-08' }),
+        ]}
+        calendarById={
+          new Map<string, Calendar>([
+            ['c-high', { ...calendar, id: 'c-high', name: '高', priority: 0 }],
+            ['c-low', { ...calendar, id: 'c-low', name: '低', priority: 1 }],
+          ])
+        }
+        today="2026-01-01"
+        onSlotTap={vi.fn()}
+        onEventTap={vi.fn()}
+      />,
+    );
+    const allDayChips = screen
+      .getAllByRole('button')
+      .filter((el) => el.getAttribute('aria-label')?.startsWith('終日 '));
+    expect(allDayChips.map((el) => el.getAttribute('aria-label'))).toEqual([
+      '終日 当番 高',
+      '終日 合宿 低',
+    ]);
+  });
 });
