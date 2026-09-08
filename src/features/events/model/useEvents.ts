@@ -89,6 +89,12 @@ export function useEvents(enabled: boolean) {
     return false;
   }, []);
 
+  /** 既に data 層で作成済みの予定を楽観的に一覧へ足す(quick-shift 等)。 */
+  const addLocal = useCallback((added: EventItem[]) => {
+    if (added.length === 0) return;
+    setEvents((es) => sortEvents([...es, ...added]));
+  }, []);
+
   const update = useCallback(async (current: EventItem, input: NewEventInput) => {
     const patch = inputToPatch(input);
     const optimistic = { ...current, ...patch } as EventItem;
@@ -143,6 +149,7 @@ export function useEvents(enabled: boolean) {
     pendingDelete,
     reload,
     create,
+    addLocal,
     update,
     remove,
     undoDelete,
