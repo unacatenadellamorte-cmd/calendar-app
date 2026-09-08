@@ -20,6 +20,19 @@ vi.mock('@/features/events/model/useEvents', () => ({
     dismissError: vi.fn(),
   }),
 }));
+vi.mock('@/features/shifts/model/useShiftTemplates', () => ({
+  useShiftTemplates: () => ({
+    templates: [],
+    loading: false,
+    errorKey: null,
+    pendingDelete: null,
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    undoDelete: vi.fn(),
+    dismissError: vi.fn(),
+  }),
+}));
 
 const { AppRoutes } = await import('./routes');
 
@@ -47,5 +60,12 @@ describe('CalendarRoute の ?date=', () => {
   it('?date 無しなら今日の月', () => {
     renderAt('/calendar');
     expect(screen.getByRole('button', { name: /年\d+月$/ })).toBeInTheDocument();
+  });
+});
+
+describe('その他のルート', () => {
+  it('/shift-templates でお気に入りシフト画面が出る', () => {
+    renderAt('/shift-templates');
+    expect(screen.getByRole('heading', { level: 1, name: 'お気に入りシフト' })).toBeInTheDocument();
   });
 });

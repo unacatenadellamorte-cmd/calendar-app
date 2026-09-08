@@ -28,3 +28,11 @@
 - source_spec: `spec-2-5-home-compact-view.md`
   summary: コンパクトビューの `now` は events/calendars/count が変わったときにだけ取り直す。ホームを開きっぱなしにしても、過ぎた予定が自動で消えたり次の予定に繰り上がったりしない。引っ張って更新(pull-to-refresh)も未実装。
   evidence: `useFeaturedEvents` の `useMemo` が `new Date()` を読む。`syncNonce`(オンライン復帰)・画面の開き直しで更新される。可視性 API での復帰時再計算、または一定間隔の tick、pull-to-refresh のタッチジェスチャを別途足す。
+
+- source_spec: `spec-4-1-shift-templates.md`
+  summary: `shift_templates` のオフライン対応(IndexedDB 表示キャッシュ + outbox キュー)を Story 4.1 では入れなかった。オフライン時は一覧が「オフラインです」エラーになり、テンプレの作成・編集・削除もできない。
+  evidence: Story 1.3(カレンダー CRUD)もオンライン先行で、後の Story 1.6 が outbox / キャッシュを足した。テンプレは低頻度データなので優先度は低い。`local-db.ts` を DB v2 にして `shiftTemplates` ストアを足し、`cache.ts` / `offline-write.ts` / `sync.ts` に `shiftTemplate` エンティティを追加する。Story 4.2(オフライン quick-shift でテンプレ一覧が要る)が来たら回収を検討。
+
+- source_spec: `spec-4-1-shift-templates.md`
+  summary: `useCalendars` / `useEvents` / `useShiftTemplates` の削除 Undo タイマは、Undo 前に次の削除をすると前のタイマを止めずに `pendingRef` を差し替える。前の孤児タイマが発火すると2件目の Undo バーが早期に消える。Story 4.1 では `useShiftTemplates` だけ `clearTimeout` を足して直した。
+  evidence: `useCalendars.remove` / `useEvents.remove` に同じパターンが残る(`pendingRef.current = { ..., timer }` の前に `clearTimeout` が無い)。連続削除は稀だが、両フックにも同じ1行を足せば揃う。

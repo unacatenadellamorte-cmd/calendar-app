@@ -5,6 +5,7 @@ import { CalendarScreen } from '@/features/calendar/ui/CalendarScreen';
 import { SettingsScreen } from '@/features/settings/ui/SettingsScreen';
 import { AuthScreen } from '@/features/auth/ui/AuthScreen';
 import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
+import { ShiftTemplatesScreen } from '@/features/shifts/ui/ShiftTemplatesScreen';
 
 /** `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)を CalendarScreen に渡す。 */
 function CalendarRoute() {
@@ -27,6 +28,8 @@ const routes: RouteObject[] = [
       { path: 'auth', element: <AuthScreen /> },
       // タブ外。ホーム見出しと設定から遷移する。
       { path: 'calendars', element: <CalendarsScreen /> },
+      // タブ外。設定から遷移する。
+      { path: 'shift-templates', element: <ShiftTemplatesScreen /> },
     ],
   },
 ];
