@@ -33,6 +33,11 @@ export interface EventItem {
   eventDate: string | null;
   note: string | null;
   source: EventSource;
+  /** シフト属性(AD-8)。シフト実体以外はすべて null。 */
+  breakMinutes: number | null;
+  hourlyWage: number | null;
+  workplaceLabel: string | null;
+  shiftTemplateId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,12 +52,22 @@ interface AllDayInput {
   eventDate: string;
 }
 
+/** シフト実体を作るときだけ渡すシフト属性(AD-8)。省略時は書かない。 */
+export interface ShiftAttributes {
+  breakMinutes: number;
+  hourlyWage: number;
+  workplaceLabel?: string | null;
+  shiftTemplateId?: string | null;
+}
+
 export type NewEventInput = {
   /** 省略時は DB 発番。オフライン作成・フラッシュ時はクライアント発番の id を渡す。 */
   id?: string;
   calendarId: string;
   title: string;
   note?: string | null;
+  /** シフト実体を作るときだけ。汎用の予定作成では渡さない。 */
+  shift?: ShiftAttributes;
 } & (TimedInput | AllDayInput);
 
 export type EventPatch = Partial<{
@@ -81,13 +96,17 @@ interface EventRow {
   event_date: string | null;
   note: string | null;
   source: EventSource;
+  break_minutes: number | null;
+  hourly_wage: number | null;
+  workplace_label: string | null;
+  shift_template_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,created_at,updated_at';
 
 function toEvent(row: EventRow): EventItem {
   return {
@@ -100,6 +119,10 @@ function toEvent(row: EventRow): EventItem {
     eventDate: row.event_date,
     note: row.note,
     source: row.source,
+    breakMinutes: row.break_minutes ?? null,
+    hourlyWage: row.hourly_wage ?? null,
+    workplaceLabel: row.workplace_label ?? null,
+    shiftTemplateId: row.shift_template_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -144,6 +167,12 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
     source: 'local' as const,
   };
   if (input.id) base.id = input.id;
+  if (input.shift) {
+    base.break_minutes = input.shift.breakMinutes;
+    base.hourly_wage = input.shift.hourlyWage;
+    base.workplace_label = input.shift.workplaceLabel?.trim() || null;
+    base.shift_template_id = input.shift.shiftTemplateId ?? null;
+  }
   return input.allDay
     ? { ...base, event_date: input.eventDate, starts_at: null, ends_at: null }
     : { ...base, starts_at: input.startsAt, ends_at: input.endsAt, event_date: null };

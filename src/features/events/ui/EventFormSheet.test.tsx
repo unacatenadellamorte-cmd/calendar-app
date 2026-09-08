@@ -94,6 +94,10 @@ describe('EventFormSheet', () => {
       eventDate: null,
       note: null,
       source: 'local' as const,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
       createdAt: '',
       updatedAt: '',
     };

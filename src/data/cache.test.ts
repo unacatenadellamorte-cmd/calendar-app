@@ -26,6 +26,10 @@ const ev = (id: string): EventItem => ({
   eventDate: null,
   note: null,
   source: 'local',
+  breakMinutes: null,
+  hourlyWage: null,
+  workplaceLabel: null,
+  shiftTemplateId: null,
   createdAt: '',
   updatedAt: '',
 });

@@ -119,6 +119,70 @@ describe('events.ts', () => {
     });
   });
 
+  it('createEvent: input.shift があるとシフト属性列を insert し、toEvent が写す', async () => {
+    queryResult = {
+      data: row({
+        break_minutes: 30,
+        hourly_wage: 1100,
+        workplace_label: 'カフェ',
+        shift_template_id: 'tpl-1',
+      }),
+      error: null,
+    };
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'shift',
+      title: '平日',
+      allDay: false,
+      startsAt: '2026-09-08T08:00:00Z',
+      endsAt: '2026-09-08T13:00:00Z',
+      shift: { breakMinutes: 30, hourlyWage: 1100, workplaceLabel: 'カフェ', shiftTemplateId: 'tpl-1' },
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value).toMatchObject({
+        breakMinutes: 30,
+        hourlyWage: 1100,
+        workplaceLabel: 'カフェ',
+        shiftTemplateId: 'tpl-1',
+      });
+    }
+    expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({
+      break_minutes: 30,
+      hourly_wage: 1100,
+      workplace_label: 'カフェ',
+      shift_template_id: 'tpl-1',
+    });
+  });
+
+  it('createEvent: shift なしのときシフト属性列は insert row に含めない', async () => {
+    queryResult = { data: row(), error: null };
+    const { createEvent } = await importEvents();
+    await createEvent({
+      calendarId: 'c1',
+      title: '普通の予定',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    const insertRow = calls.find((c) => c.method === 'insert')?.args[0] as Record<string, unknown>;
+    expect(insertRow).not.toHaveProperty('break_minutes');
+    expect(insertRow).not.toHaveProperty('hourly_wage');
+  });
+
+  it('updateEvent: 送る row にシフト属性列は絶対に入らない(汎用編集で不変・AD-8)', async () => {
+    queryResult = { data: row(), error: null };
+    const { updateEvent } = await importEvents();
+    await updateEvent(
+      { id: 'e1', source: 'local' },
+      { title: '改名', startsAt: '2026-09-08T03:00:00Z', endsAt: '2026-09-08T04:00:00Z', note: 'x' },
+    );
+    const updateRow = calls.find((c) => c.method === 'update')?.args[0] as Record<string, unknown>;
+    expect(Object.keys(updateRow)).toEqual(
+      expect.not.arrayContaining(['break_minutes', 'hourly_wage', 'workplace_label', 'shift_template_id']),
+    );
+  });
+
   it('createEvent: 終日は event_date のみ、時刻は null', async () => {
     queryResult = {
       data: row({ all_day: true, starts_at: null, ends_at: null, event_date: '2026-09-09' }),
@@ -235,7 +299,9 @@ describe('events.ts — オフライン(Story 1.6)', () => {
     await cachePut('events', {
       id: 'c1', calendarId: 'c1', title: 'キャッシュ予定', allDay: false,
       startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z', eventDate: null,
-      note: null, source: 'local', createdAt: '', updatedAt: '',
+      note: null, source: 'local',
+      breakMinutes: null, hourlyWage: null, workplaceLabel: null, shiftTemplateId: null,
+      createdAt: '', updatedAt: '',
     });
     queryResult = { data: null, error: { message: 'Failed to fetch' } };
     const { listEvents } = await importEvents();

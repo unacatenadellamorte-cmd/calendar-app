@@ -36,3 +36,11 @@
 - source_spec: `spec-4-1-shift-templates.md`
   summary: `useCalendars` / `useEvents` / `useShiftTemplates` の削除 Undo タイマは、Undo 前に次の削除をすると前のタイマを止めずに `pendingRef` を差し替える。前の孤児タイマが発火すると2件目の Undo バーが早期に消える。Story 4.1 では `useShiftTemplates` だけ `clearTimeout` を足して直した。
   evidence: `useCalendars.remove` / `useEvents.remove` に同じパターンが残る(`pendingRef.current = { ..., timer }` の前に `clearTimeout` が無い)。連続削除は稀だが、両フックにも同じ1行を足せば揃う。
+
+- source_spec: `spec-4-2-quick-shift.md`
+  summary: quick-shift の複数日はシート内「この日から N 日」ステッパ(1〜14)。月グリッド上をドラッグ/長押しして日付範囲を選ぶ操作は未実装。週ビューの日タップからは quick-shift を開けない(週はスロット=時刻指定の予定追加のまま)。シフト実体のオフライン作成(outbox)も未対応。
+  evidence: モバイル web のグリッドドラッグは scroll と競合(1.5 スワイプ / 2.1 スムーズドラッグと同じ判断)。ステッパで「1週間分」の主目的は満たせる。範囲選択 UI・週からの導線・`createShifts` の outbox 対応は利用実態を見て追加。
+
+- source_spec: `spec-4-2-quick-shift.md`
+  summary: `EventItem` にシフト属性4列(`breakMinutes` 等)を必須で追加したが、この deploy より前に IndexedDB キャッシュに入った予定レコードにはその4フィールドが無い(`undefined`)。型上は `number|null` なので、オフライン直後にだけ齟齬が出うる。
+  evidence: 4.2 以前にシフト実体は存在しないので実害はほぼ無い(非シフト予定は全 null で `undefined` と同義)。オンライン再取得1回で `cacheReplace` により解消。厳密には `local-db` の読み出しで `?? null` 正規化を1か所入れれば消せる。

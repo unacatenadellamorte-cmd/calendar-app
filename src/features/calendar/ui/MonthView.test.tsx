@@ -28,6 +28,10 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   eventDate: null,
   note: null,
   source: 'local',
+  breakMinutes: null,
+  hourlyWage: null,
+  workplaceLabel: null,
+  shiftTemplateId: null,
   createdAt: '',
   updatedAt: '',
   ...over,
@@ -58,14 +62,14 @@ describe('MonthView', () => {
       expect(screen.getByText(w)).toBeInTheDocument();
     }
     expect(
-      screen.getByRole('button', { name: '9月15日に予定を追加' }),
+      screen.getByRole('button', { name: '9月15日を開く' }),
     ).toBeInTheDocument();
   });
 
   it('日セルの日付番号をタップすると onDayTap(その日) を呼ぶ', async () => {
     const user = userEvent.setup();
     const { onDayTap } = setup();
-    await user.click(screen.getByRole('button', { name: '9月15日に予定を追加' }));
+    await user.click(screen.getByRole('button', { name: '9月15日を開く' }));
     expect(onDayTap).toHaveBeenCalledWith('2026-09-15');
   });
 

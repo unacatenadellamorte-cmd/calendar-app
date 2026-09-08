@@ -64,7 +64,7 @@ export function MonthView({
                   e.stopPropagation();
                   onDayTap(cell.date);
                 }}
-                aria-label={`${ymd(cell.date).month}月${cell.day}日に予定を追加`}
+                aria-label={`${ymd(cell.date).month}月${cell.day}日を開く`}
                 className={[
                   'self-start rounded-full px-1 text-meta tabular',
                   cell.isToday

@@ -1,12 +1,18 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { resolveMessage } from '@/data/messages';
 import type { EventItem, NewEventInput } from '@/data/events';
+import { createShifts } from '@/data/shifts';
+import type { ShiftTemplate } from '@/data/shift-templates';
+import { addDays } from '@/lib/calendar-view';
 import { todayLocalDate } from '@/lib/datetime';
 import { useCalendars } from '@/features/calendars/model/useCalendars';
 import { useEvents } from '@/features/events/model/useEvents';
+import { useShiftTemplates } from '@/features/shifts/model/useShiftTemplates';
 import { EventFormSheet, type EventSeed } from '@/features/events/ui/EventFormSheet';
+import { QuickShiftSheet } from '@/features/shifts/ui/QuickShiftSheet';
 import { useCalendarView } from '@/features/calendar/model/useCalendarView';
 import { ViewSwitcher } from './ViewSwitcher';
 import { DateNav } from './DateNav';
@@ -29,6 +35,8 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const ev = useEvents(enabled);
+  const sh = useShiftTemplates(enabled);
+  const navigate = useNavigate();
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
     useCalendarView(ev.events, cal.calendars, initialDate);
   const today = todayLocalDate();
@@ -36,6 +44,13 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<EventItem | null>(null);
   const [seed, setSeed] = useState<EventSeed | undefined>(undefined);
+  const [quickDate, setQuickDate] = useState<string | null>(null);
+  const [shiftErrorKey, setShiftErrorKey] = useState<string | null>(null);
+
+  const shiftCalendar = useMemo(
+    () => cal.calendars.find((c) => c.isShift),
+    [cal.calendars],
+  );
 
   const calendarById = useMemo(
     () => new Map(cal.calendars.map((c) => [c.id, c])),
@@ -67,6 +82,23 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
     // 「他 N 件」→ その日を優先度順(同順は開始時刻順)で一覧できるリストビューへ。
     jumpTo(date);
     setView('list');
+  };
+
+  const openQuickShift = (date: string) => {
+    setShiftErrorKey(null);
+    setQuickDate(date);
+  };
+
+  const pickShiftTemplate = async (template: ShiftTemplate, dayCount: number) => {
+    if (!shiftCalendar || !quickDate) return false;
+    const dates = Array.from({ length: dayCount }, (_, i) => addDays(quickDate, i));
+    const result = await createShifts(shiftCalendar.id, template, dates);
+    if (!result.ok) {
+      setShiftErrorKey(result.error.messageKey);
+      return false;
+    }
+    ev.addLocal(result.value);
+    return true;
   };
 
   const loading = ev.loading || cal.loading;
@@ -131,7 +163,7 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
           events={visibleEvents}
           calendarById={calendarById}
           today={today}
-          onDayTap={(date) => openCreate({ date })}
+          onDayTap={openQuickShift}
           onEventTap={openEdit}
           onOverflowTap={openOverflow}
         />
@@ -153,6 +185,22 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
           onEventTap={openEdit}
         />
       )}
+
+      <QuickShiftSheet
+        open={quickDate !== null}
+        date={quickDate ?? today}
+        templates={sh.templates}
+        shiftReady={Boolean(shiftCalendar)}
+        errorKey={shiftErrorKey}
+        onClose={() => setQuickDate(null)}
+        onPick={pickShiftTemplate}
+        onAddEvent={() => {
+          const date = quickDate;
+          setQuickDate(null);
+          openCreate(date ? { date } : undefined);
+        }}
+        onCreateTemplate={() => navigate('/shift-templates')}
+      />
 
       <EventFormSheet
         open={sheetOpen}

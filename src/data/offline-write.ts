@@ -47,6 +47,10 @@ export async function offlineCreateEvent(
     eventDate: input.allDay ? input.eventDate : null,
     note: input.note?.trim() || null,
     source: 'local',
+    breakMinutes: input.shift?.breakMinutes ?? null,
+    hourlyWage: input.shift?.hourlyWage ?? null,
+    workplaceLabel: input.shift?.workplaceLabel ?? null,
+    shiftTemplateId: input.shift?.shiftTemplateId ?? null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };

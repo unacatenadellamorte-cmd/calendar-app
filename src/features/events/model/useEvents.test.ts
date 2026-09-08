@@ -29,6 +29,10 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   eventDate: null,
   note: null,
   source: 'local',
+  breakMinutes: null,
+  hourlyWage: null,
+  workplaceLabel: null,
+  shiftTemplateId: null,
   createdAt: '2026-09-07T00:00:00Z',
   updatedAt: '2026-09-07T00:00:00Z',
   ...over,
@@ -123,5 +127,20 @@ describe('useEvents', () => {
     });
     expect(result.current.events).toHaveLength(1);
     expect(result.current.errorKey).toBe('event/not-editable');
+  });
+
+  it('addLocal は作成済み予定を時系列ソートで一覧へ足す', async () => {
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => {
+      result.current.addLocal([
+        ev({ id: 's1', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
+        ev({ id: 's2', startsAt: '2026-09-08T03:00:00Z', endsAt: '2026-09-08T04:00:00Z' }),
+      ]);
+    });
+    const ids = result.current.events.map((e) => e.id);
+    expect(ids).toContain('s1');
+    expect(ids).toContain('s2');
+    expect(ids.indexOf('s2')).toBeLessThan(ids.indexOf('s1'));
   });
 });
