@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { eventOccursOnDate, layoutDayEvents } from '@/lib/calendar-view';
+import { compareEventsForList } from '@core';
+import { eventOccursOnDate, layoutDayEvents, makePriorityOf } from '@/lib/calendar-view';
 import { minutesIntoLocalDay } from '@/lib/datetime';
 import { EventChip } from './EventChip';
 
@@ -30,15 +31,26 @@ export function WeekView({
   onSlotTap,
   onEventTap,
 }: WeekViewProps) {
+  // 重なり順・終日帯の並びは所属カレンダーの優先度順(Story 2.3)。
+  const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
   const dayEvents = useMemo(
     () => events.filter((e) => eventOccursOnDate(e, cursor)),
     [events, cursor],
   );
   const allDayEvents = useMemo(
-    () => dayEvents.filter((e) => e.allDay).sort((a, b) => a.title.localeCompare(b.title)),
-    [dayEvents],
+    () =>
+      dayEvents
+        .filter((e) => e.allDay)
+        .sort(
+          (a, b) =>
+            compareEventsForList(a, b, priorityOf) || a.title.localeCompare(b.title),
+        ),
+    [dayEvents, priorityOf],
   );
-  const positioned = useMemo(() => layoutDayEvents(dayEvents), [dayEvents]);
+  const positioned = useMemo(
+    () => layoutDayEvents(dayEvents, priorityOf),
+    [dayEvents, priorityOf],
+  );
   const nowMin = cursor === today ? minutesIntoLocalDay(new Date().toISOString()) : null;
 
   const scrollRef = useRef<HTMLDivElement>(null);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { groupEventsByDay } from '@/lib/calendar-view';
+import { groupEventsByDay, makePriorityOf } from '@/lib/calendar-view';
 import { formatDayTitle } from '@/lib/datetime';
 import { EventListItem } from '@/features/events/ui/EventListItem';
 
@@ -17,10 +17,7 @@ interface ListViewProps {
 /** リストビュー。日ごとの見出し + その日の予定。`scrollTo` の日へ見出しをスクロールする。 */
 export function ListView({ events, calendarById, today, scrollTo, onEventTap }: ListViewProps) {
   // 日内の並びは所属カレンダーの優先度順(Story 2.2)。未知は最下位相当。
-  const priorityOf = useMemo(
-    () => (id: string) => calendarById.get(id)?.priority ?? Number.MAX_SAFE_INTEGER,
-    [calendarById],
-  );
+  const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
   const byDay = useMemo(() => groupEventsByDay(events, priorityOf), [events, priorityOf]);
   const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
   const headerRefs = useRef(new Map<string, HTMLElement>());
