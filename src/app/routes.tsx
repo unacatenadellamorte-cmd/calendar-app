@@ -1,4 +1,4 @@
-import { useRoutes, type RouteObject } from 'react-router-dom';
+import { useRoutes, useSearchParams, type RouteObject } from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { HomeScreen } from '@/features/home/ui/HomeScreen';
 import { CalendarScreen } from '@/features/calendar/ui/CalendarScreen';
@@ -6,13 +6,22 @@ import { SettingsScreen } from '@/features/settings/ui/SettingsScreen';
 import { AuthScreen } from '@/features/auth/ui/AuthScreen';
 import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
 
+/** `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)を CalendarScreen に渡す。 */
+function CalendarRoute() {
+  const [params] = useSearchParams();
+  const raw = params.get('date');
+  // 手書き URL 等の不正値でカレンダー描画が壊れないよう、暦日の形だけ通す。
+  const initialDate = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+  return <CalendarScreen initialDate={initialDate} />;
+}
+
 const routes: RouteObject[] = [
   {
     path: '/',
     element: <AppShell />,
     children: [
       { index: true, element: <HomeScreen /> },
-      { path: 'calendar', element: <CalendarScreen /> },
+      { path: 'calendar', element: <CalendarRoute /> },
       { path: 'settings', element: <SettingsScreen /> },
       // タブ外。設定のアカウント欄から遷移する。
       { path: 'auth', element: <AuthScreen /> },

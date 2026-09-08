@@ -20,3 +20,11 @@
 - source_spec: `spec-2-3-priority-overlap-display.md`
   summary: 週ビューの重なり列数の上限(キャップ)と、それを超えたときの z-index による「前面」表示(FR-7「左右に並べきれない場合は優先度が高いものを前面にする」)は Story 2.3 では実装せず、常に左右タイル(列幅 = 100 / 列数 %)にとどめた。
   evidence: v1 は列数に上限を設けないため「並べきれない場合」が発生しない(細くはなるが必ずタイルできる)。Story 2.3 の主眼「優先度が高い = 左端」はグループ内の優先度順列詰めで達成済み。密な日(4件以上の同時重なり)の可読性課題として、列キャップ + `PositionedEvent` への z-index 付与 + WeekView 側のスタック描画を別途行う。個人カレンダーで4件同時重なりは稀。
+
+- source_spec: `spec-2-5-home-compact-view.md`
+  summary: ホームのコンパクトビューの行は開始時刻のみ(`EventListItem` の compact 表示)で、翌日以降の代表予定でも「10:00」のように日付なしで出る。今日以外のとき短い日付("12/25" 等)を添える改善は見送り。
+  evidence: AC は「各行にカレンダー名・色・開始時刻」とだけ規定。当日の予定が主で、翌日以降が出るのは今日に予定が無いときに限られる。`EventListItem` に「compact だが当日以外は日付を出す」モードを足すか、compact-card 専用行を作る。UX-DR3 の lead 装飾(筆頭を大きく)も同じタイミングで検討。
+
+- source_spec: `spec-2-5-home-compact-view.md`
+  summary: コンパクトビューの `now` は events/calendars/count が変わったときにだけ取り直す。ホームを開きっぱなしにしても、過ぎた予定が自動で消えたり次の予定に繰り上がったりしない。引っ張って更新(pull-to-refresh)も未実装。
+  evidence: `useFeaturedEvents` の `useMemo` が `new Date()` を読む。`syncNonce`(オンライン復帰)・画面の開き直しで更新される。可視性 API での復帰時再計算、または一定間隔の tick、pull-to-refresh のタッチジェスチャを別途足す。

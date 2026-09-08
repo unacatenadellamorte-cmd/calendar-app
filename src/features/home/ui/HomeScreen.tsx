@@ -1,28 +1,55 @@
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
+import { useAuth } from '@/app/auth-context';
+import type { EventItem } from '@/data/events';
+import { localDateOf } from '@/lib/datetime';
+import { useCalendars } from '@/features/calendars/model/useCalendars';
+import { useEvents } from '@/features/events/model/useEvents';
+import { useFeaturedCount } from '@/features/compact/model/featuredCount';
+import { useFeaturedEvents } from '@/features/compact/model/useFeaturedEvents';
+import { CompactCard } from '@/features/compact/ui/CompactCard';
 
 /**
- * ホーム(コンパクトビュー + 給料見込み)。
- * 中身は Epic 2(代表予定)/ Epic 4(給料見込み)で実装する。
+ * ホーム。この後の代表予定を優先度順で出すコンパクトビュー。
+ * 給料見込みカードは Epic 4 でこの下に追加する。
  */
 export function HomeScreen() {
+  const { state } = useAuth();
+  const enabled = state === 'guest' || state === 'authenticated';
+  const cal = useCalendars(enabled);
+  const ev = useEvents(enabled);
+  const navigate = useNavigate();
+  const count = useFeaturedCount();
+  const featured = useFeaturedEvents(ev.events, cal.calendars, count);
+  const calendarById = useMemo(
+    () => new Map(cal.calendars.map((c) => [c.id, c])),
+    [cal.calendars],
+  );
+
+  const openDay = (event: EventItem) => {
+    const date = event.allDay
+      ? event.eventDate
+      : event.startsAt
+        ? localDateOf(event.startsAt)
+        : null;
+    if (date) navigate(`/calendar?date=${date}`);
+  };
+
   return (
     <Screen
       title="今日"
       action={
-        <span className="flex gap-3">
-          <Link to="/calendar" className="text-meta text-accent">
-            予定を追加
-          </Link>
-          <Link to="/calendars" className="text-meta text-accent">
-            カレンダー管理 ›
-          </Link>
-        </span>
+        <Link to="/calendars" className="text-meta text-accent">
+          カレンダーの並び順 ›
+        </Link>
       }
     >
-      <p className="text-meta text-ink-secondary">
-        代表予定と給料見込みはこの画面に表示されます(後続ストーリーで実装)。
-      </p>
+      {ev.loading || cal.loading ? (
+        <p className="text-meta text-ink-secondary">読み込み中…</p>
+      ) : (
+        <CompactCard featured={featured} calendarById={calendarById} onSelect={openDay} />
+      )}
     </Screen>
   );
 }

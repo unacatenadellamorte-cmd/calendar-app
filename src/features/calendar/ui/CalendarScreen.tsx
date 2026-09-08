@@ -14,18 +14,23 @@ import { MonthView } from './MonthView';
 import { WeekView } from './WeekView';
 import { ListView } from './ListView';
 
+interface CalendarScreenProps {
+  /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
+  initialDate?: string;
+}
+
 /**
  * カレンダー画面。月 / 週(1日タイムライン)/ リストの3ビューと日付ナビ。
  * 表示オンのカレンダーの予定だけを描画し、日セル / 空きスロットのタップで追加、
  * チップのタップで編集につなぐ。
  */
-export function CalendarScreen() {
+export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
   const { state } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const ev = useEvents(enabled);
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
-    useCalendarView(ev.events, cal.calendars);
+    useCalendarView(ev.events, cal.calendars, initialDate);
   const today = todayLocalDate();
 
   const [sheetOpen, setSheetOpen] = useState(false);
