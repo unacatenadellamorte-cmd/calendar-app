@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-08-2026 21:00
+last_updated: 09-08-2026 21:05
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -63,6 +63,6 @@ development_status:
   epic-4: in-progress
   4-1-お気に入りシフトの登録: review
   4-2-ワンタップ-シフト入力-quick-shift-sheet: backlog
-  4-3-実働時間の計算-packages-core-pay-calc: backlog
+  4-3-実働時間の計算-packages-core-pay-calc: review
   4-4-当月の給料見込みとトップ画面表示-pay-card: backlog
   epic-4-retrospective: optional

@@ -6,7 +6,7 @@
  * 依存方向: どのレイヤからも import されてよいが、ここからは何も import しない(ARCHITECTURE-SPINE AD-10)。
  *
  * 後続ストーリーで実装:
- *  - pay-calc: 実働時間・給料見込み (Epic 4: Story 4.3 / 4.4)
+ *  - 給料見込みの月次集計 (Epic 4: Story 4.4)
  */
 
 export {
@@ -17,6 +17,8 @@ export {
 } from './priority';
 
 export { selectFeaturedEvents, type FeaturableEvent } from './featured';
+
+export { workedMinutes } from './pay';
 
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;
