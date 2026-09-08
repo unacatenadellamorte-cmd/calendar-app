@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-08-2026 20:15
+last_updated: 09-08-2026 20:25
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   2-1-カレンダーの優先度設定-ドラッグ-キーボード: review
   2-2-優先度ユーティリティと一覧-リストの並び: review
   2-3-重なった予定の視覚的な優先表示-週-月: review
-  2-4-代表予定の選抜ロジック-packages-core: backlog
+  2-4-代表予定の選抜ロジック-packages-core: review
   2-5-ホームのコンパクトビュー: backlog
   epic-2-retrospective: optional
 
