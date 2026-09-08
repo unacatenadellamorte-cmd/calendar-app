@@ -62,6 +62,26 @@ describe('useCalendarView', () => {
     expect(result.current.cursor).toBe(addDays(addMonths(start, 1), -1));
   });
 
+  it('initialDate を渡すと cursor がその日で始まる', () => {
+    const { result } = renderHook(() => useCalendarView([], [], '2026-12-25'));
+    expect(result.current.cursor).toBe('2026-12-25');
+  });
+
+  it('initialDate 省略時は今日(回帰)', () => {
+    const { result } = renderHook(() => useCalendarView([], []));
+    expect(result.current.cursor).toBe(todayLocalDate());
+  });
+
+  it('initialDate が後から変わると cursor が追従する', () => {
+    const { result, rerender } = renderHook(
+      ({ d }: { d?: string }) => useCalendarView([], [], d),
+      { initialProps: { d: '2026-12-25' } },
+    );
+    expect(result.current.cursor).toBe('2026-12-25');
+    rerender({ d: '2027-01-02' });
+    expect(result.current.cursor).toBe('2027-01-02');
+  });
+
   it('goToday / jumpTo で cursor が動く', () => {
     const { result } = renderHook(() => useCalendarView([], []));
     act(() => result.current.jumpTo('2026-12-25'));

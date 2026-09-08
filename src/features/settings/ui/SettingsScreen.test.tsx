@@ -1,0 +1,38 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { AuthProvider } from '@/app/AuthProvider';
+import { resetFeaturedCountForTests } from '@/features/compact/model/featuredCount';
+import { SettingsScreen } from './SettingsScreen';
+
+function renderSettings() {
+  return render(
+    <AuthProvider>
+      <MemoryRouter>
+        <SettingsScreen />
+      </MemoryRouter>
+    </AuthProvider>,
+  );
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  resetFeaturedCountForTests();
+});
+
+describe('SettingsScreen / ホームに出す予定の数', () => {
+  it('既定は 3 件が選択されている', () => {
+    renderSettings();
+    expect(screen.getByRole('radio', { name: '3 件', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '1 件', checked: false })).toBeInTheDocument();
+  });
+
+  it('件数を選ぶと選択が変わり localStorage に保存される', async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    await user.click(screen.getByRole('radio', { name: '2 件' }));
+    expect(screen.getByRole('radio', { name: '2 件', checked: true })).toBeInTheDocument();
+    expect(window.localStorage.getItem('calendar-app.featured-count')).toBe('2');
+  });
+});

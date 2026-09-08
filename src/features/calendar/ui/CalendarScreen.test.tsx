@@ -71,6 +71,14 @@ describe('CalendarScreen', () => {
     ).toBeInTheDocument();
   });
 
+  it('initialDate を渡すとその月・その日で開く', () => {
+    render(<CalendarScreen initialDate="2026-12-25" />);
+    expect(screen.getByRole('button', { name: '2026年12月' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '12月25日に予定を追加' }),
+    ).toBeInTheDocument();
+  });
+
   it('「リスト」を選ぶとリストビューに切り替わる', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);

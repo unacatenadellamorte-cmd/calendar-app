@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { todayLocalDate } from '@/lib/datetime';
@@ -20,12 +20,22 @@ function readStoredView(): ViewMode {
 }
 
 /**
- * カレンダー画面の表示状態。選択中のビューは localStorage に保存して次回復元し、
- * cursor 日付は毎回「今日」で開始する。表示オンのカレンダーの予定だけを導出する。
+ * カレンダー画面の表示状態。選択中のビューは localStorage に保存して次回復元する。
+ * cursor 日付は `initialDate`(ホームの代表予定タップ等)があればその日、無ければ「今日」。
+ * 表示オンのカレンダーの予定だけを導出する。
  */
-export function useCalendarView(events: EventItem[], calendars: Calendar[]) {
+export function useCalendarView(
+  events: EventItem[],
+  calendars: Calendar[],
+  initialDate?: string,
+) {
   const [view, setViewState] = useState<ViewMode>(readStoredView);
-  const [cursor, setCursor] = useState<string>(() => todayLocalDate());
+  const [cursor, setCursor] = useState<string>(() => initialDate ?? todayLocalDate());
+
+  // マウント後に initialDate が変わったら(別の日の予定から遷移し直した等)追従する。
+  useEffect(() => {
+    if (initialDate) setCursor(initialDate);
+  }, [initialDate]);
 
   const setView = useCallback((next: ViewMode) => {
     setViewState(next);
