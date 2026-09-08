@@ -5,8 +5,6 @@
  * フロント(src/)と将来の Supabase Edge Function が同じコードを共有する。
  * 依存方向: どのレイヤからも import されてよいが、ここからは何も import しない(ARCHITECTURE-SPINE AD-10)。
  *
- * 後続ストーリーで実装:
- *  - 給料見込みの月次集計 (Epic 4: Story 4.4)
  */
 
 export {
@@ -18,7 +16,7 @@ export {
 
 export { selectFeaturedEvents, type FeaturableEvent } from './featured';
 
-export { workedMinutes } from './pay';
+export { workedMinutes, monthlyPayEstimate, type PayableShift } from './pay';
 
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;

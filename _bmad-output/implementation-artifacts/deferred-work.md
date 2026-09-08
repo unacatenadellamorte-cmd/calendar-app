@@ -44,3 +44,11 @@
 - source_spec: `spec-4-2-quick-shift.md`
   summary: `EventItem` にシフト属性4列(`breakMinutes` 等)を必須で追加したが、この deploy より前に IndexedDB キャッシュに入った予定レコードにはその4フィールドが無い(`undefined`)。型上は `number|null` なので、オフライン直後にだけ齟齬が出うる。
   evidence: 4.2 以前にシフト実体は存在しないので実害はほぼ無い(非シフト予定は全 null で `undefined` と同義)。オンライン再取得1回で `cacheReplace` により解消。厳密には `local-db` の読み出しで `?? null` 正規化を1か所入れれば消せる。
+
+- source_spec: `spec-4-4-pay-card.md`
+  summary: pay-card の内訳シート(`PayDetailSheet`)は各シフトの小計を per-row で `Math.round` して表示する。一方カードの合計 `amount` は各シフト実額を合算後に丸めるので、端数の出るシフトが複数あると「行の小計の和」と「表示合計」が数円ずれうる。
+  evidence: `monthlyPayEstimate` が per-shift の内訳を返さないため、シートが再計算している。`monthlyPayEstimate` に `breakdown: {shiftId, subtotal}[]` を持たせて単一ソースにすれば消える。個人の時給は通常キリの良い数字なので実害は稀。
+
+- source_spec: `spec-4-4-pay-card.md`
+  summary: pay-card の月ラベルは「9月」形式で年を出さない。前月/翌月を12ヶ月ぶん送ると翌年の同月が現在月と同じラベルになり区別できない。
+  evidence: モックも年なし。`monthOffset !== 0` かつ年をまたぐときだけ「2027年9月」のように出す、または送れる範囲を数ヶ月に絞る。そこまで送る利用は稀。

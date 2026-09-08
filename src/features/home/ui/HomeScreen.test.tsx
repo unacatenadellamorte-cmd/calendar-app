@@ -92,6 +92,11 @@ describe('HomeScreen', () => {
     expect(screen.getByText('この後の予定はありません')).toBeInTheDocument();
   });
 
+  it('compact-card の下に pay-card(給料見込み)が出る', () => {
+    renderHome();
+    expect(screen.getByRole('region', { name: '9月の給料見込み' })).toBeInTheDocument();
+  });
+
   it('代表予定をタップするとその予定の日付でカレンダーへ遷移', async () => {
     const user = userEvent.setup();
     evState.events = [futureEvent({ id: 'a', title: '役員会議', startsAt: '2026-12-25T01:00:00Z', endsAt: '2026-12-25T02:00:00Z' })];
