@@ -6,9 +6,16 @@
  * 依存方向: どのレイヤからも import されてよいが、ここからは何も import しない(ARCHITECTURE-SPINE AD-10)。
  *
  * 後続ストーリーで実装:
- *  - priority ユーティリティ / selectFeaturedEvents (Epic 2: Story 2.2 / 2.4)
+ *  - selectFeaturedEvents (Epic 2: Story 2.4)
  *  - pay-calc: 実働時間・給料見込み (Epic 4: Story 4.3 / 4.4)
  */
+
+export {
+  byPriorityValue,
+  compareEventsForList,
+  type OrderableEvent,
+  type PriorityLookup,
+} from './priority';
 
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;

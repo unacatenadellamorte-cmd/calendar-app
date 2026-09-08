@@ -1,4 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js';
+import { byPriorityValue } from '@core';
 import { supabase } from './supabase';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isPresetColor, SHIFT_CALENDAR_COLOR } from './calendar-colors';
@@ -74,7 +75,7 @@ function toCalendar(row: CalendarRow): Calendar {
 /** 優先度昇順、同順は作成順(オフライン fallback とローカル並べ直しで使う)。 */
 export function sortCalendars(list: Calendar[]): Calendar[] {
   return [...list].sort(
-    (a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt),
+    (a, b) => byPriorityValue(a, b) || a.createdAt.localeCompare(b.createdAt),
   );
 }
 

@@ -7,8 +7,12 @@
  * カレンダー優先度順へ差し替える。差し替え点として `layoutDayEvents` に隔離している。
  */
 
+import { compareEventsForList, type PriorityLookup } from '@core';
 import type { EventItem } from '@/data/events';
 import { localDateOf, localDateString, minutesIntoLocalDay } from './datetime';
+
+/** 優先度を問わない(全カレンダー同順位)ルックアップ。 */
+const NO_PRIORITY: PriorityLookup = () => 0;
 
 const MIN_EVENT_MINUTES = 15;
 
@@ -83,17 +87,20 @@ export function eventOccursOnDate(event: EventItem, date: string): boolean {
   return event.startsAt ? localDateOf(event.startsAt) === date : false;
 }
 
-/** 同じ日の中での並び順: 時刻付き→終日、時刻付きは開始時刻順、同時刻はタイトル順。 */
+/** 同じ日の中での並び順(全カレンダー同順位版)。`@core` の並び規則の特殊化。 */
 export function compareWithinDay(a: EventItem, b: EventItem): number {
-  if (a.allDay !== b.allDay) return a.allDay ? 1 : -1;
-  if (a.allDay) return a.title.localeCompare(b.title);
-  const am = minutesIntoLocalDay(a.startsAt as string);
-  const bm = minutesIntoLocalDay(b.startsAt as string);
-  return am - bm || a.title.localeCompare(b.title);
+  return compareEventsForList(a, b, NO_PRIORITY);
 }
 
-/** 予定を出現日ごとにまとめる。各配列は `compareWithinDay` 順。 */
-export function groupEventsByDay(events: EventItem[]): Map<string, EventItem[]> {
+/**
+ * 予定を出現日ごとにまとめる。各配列は `@core` の並び規則順。
+ * `priorityOf` を渡すと所属カレンダーの優先度が第一キーになる(Story 2.2)。
+ * 省略時は全カレンダー同順位(Story 1.5 の挙動)。
+ */
+export function groupEventsByDay(
+  events: EventItem[],
+  priorityOf: PriorityLookup = NO_PRIORITY,
+): Map<string, EventItem[]> {
   const map = new Map<string, EventItem[]>();
   for (const event of events) {
     const key = event.allDay
@@ -106,7 +113,9 @@ export function groupEventsByDay(events: EventItem[]): Map<string, EventItem[]> 
     if (arr) arr.push(event);
     else map.set(key, [event]);
   }
-  for (const arr of map.values()) arr.sort(compareWithinDay);
+  for (const arr of map.values()) {
+    arr.sort((a, b) => compareEventsForList(a, b, priorityOf));
+  }
   return map;
 }
 
