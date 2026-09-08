@@ -22,3 +22,32 @@ export function workedMinutes(
   if (end <= start) end += DAY_MS;
   return Math.round((end - start) / 60000) - breakMinutes;
 }
+
+/** 給料集計に必要な最小のシフト表現(camelCase・UTC ISO)。 */
+export interface PayableShift {
+  startsAt: string;
+  endsAt: string;
+  breakMinutes: number;
+  hourlyWage: number;
+}
+
+/**
+ * 対象月に絞り込み済みのシフト配列を「実働時間 × 時給」で合算する(FR-14 / FR-15)。
+ * 暦月の判定・TZ 変換は呼び出し側の責務(ここは合算のみ)。
+ * 各シフトの実働は 0 未満にクランプ(休憩過大でもマイナス給与にしない)。
+ * `amount` は各シフト実額を合算後に丸める(per-shift 丸めの誤差を避ける)。
+ */
+export function monthlyPayEstimate(shifts: readonly PayableShift[]): {
+  amount: number;
+  shiftCount: number;
+  workedMinutes: number;
+} {
+  let minutes = 0;
+  let raw = 0;
+  for (const s of shifts) {
+    const worked = Math.max(0, workedMinutes(s.startsAt, s.endsAt, s.breakMinutes));
+    minutes += worked;
+    raw += (worked / 60) * s.hourlyWage;
+  }
+  return { amount: Math.round(raw), shiftCount: shifts.length, workedMinutes: minutes };
+}

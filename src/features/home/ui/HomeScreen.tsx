@@ -9,6 +9,7 @@ import { useEvents } from '@/features/events/model/useEvents';
 import { useFeaturedCount } from '@/features/compact/model/featuredCount';
 import { useFeaturedEvents } from '@/features/compact/model/useFeaturedEvents';
 import { CompactCard } from '@/features/compact/ui/CompactCard';
+import { PayCard } from '@/features/pay/ui/PayCard';
 
 /**
  * ホーム。この後の代表予定を優先度順で出すコンパクトビュー。
@@ -48,7 +49,10 @@ export function HomeScreen() {
       {ev.loading || cal.loading ? (
         <p className="text-meta text-ink-secondary">読み込み中…</p>
       ) : (
-        <CompactCard featured={featured} calendarById={calendarById} onSelect={openDay} />
+        <>
+          <CompactCard featured={featured} calendarById={calendarById} onSelect={openDay} />
+          <PayCard events={ev.events} calendars={cal.calendars} />
+        </>
       )}
     </Screen>
   );
