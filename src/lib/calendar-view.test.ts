@@ -98,6 +98,15 @@ describe('groupEventsByDay', () => {
     expect(map.get('2026-09-08')?.map((e) => e.id)).toEqual(['a', 'b', 'c']);
     expect(map.get('2026-09-09')?.map((e) => e.id)).toEqual(['d']);
   });
+
+  it('priorityOf を渡すと所属カレンダーの優先度が第一キーになる', () => {
+    // 優先度1のカレンダーの早い予定より、優先度0のカレンダーの遅い予定が先。
+    const highLate = ev({ id: 'x', calendarId: 'high', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' });
+    const lowEarly = ev({ id: 'y', calendarId: 'low', startsAt: '2026-09-08T02:00:00Z', endsAt: '2026-09-08T03:00:00Z' });
+    const priorityOf = (id: string) => (id === 'low' ? 0 : 1);
+    const map = groupEventsByDay([lowEarly, highLate], priorityOf);
+    expect(map.get('2026-09-08')?.map((e) => e.id)).toEqual(['y', 'x']);
+  });
 });
 
 describe('layoutDayEvents', () => {

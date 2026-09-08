@@ -76,4 +76,26 @@ describe('ListView', () => {
     await user.click(screen.getByRole('button', { name: /会議アルファ/ }));
     expect(onEventTap).toHaveBeenCalledWith(target);
   });
+
+  it('同じ日の中で所属カレンダーの優先度順に並ぶ(同順は開始時刻順)', () => {
+    render(
+      <ListView
+        events={[
+          ev({ id: 'low-late', title: '低優先の夕方', calendarId: 'low', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' }),
+          ev({ id: 'high-morning', title: '高優先の朝', calendarId: 'high', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
+        ]}
+        calendarById={
+          new Map<string, Calendar>([
+            ['high', { ...calendar, id: 'high', name: '高', priority: 0 }],
+            ['low', { ...calendar, id: 'low', name: '低', priority: 1 }],
+          ])
+        }
+        today="2026-09-08"
+        scrollTo="2026-09-08"
+        onEventTap={vi.fn()}
+      />,
+    );
+    const titles = screen.getAllByText(/優先の/).map((el) => el.textContent);
+    expect(titles).toEqual(['高優先の朝', '低優先の夕方']);
+  });
 });
