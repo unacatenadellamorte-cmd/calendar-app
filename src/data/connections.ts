@@ -1,5 +1,6 @@
 import { buildGoogleAuthUrl } from '@core';
 import { supabase } from './supabase';
+import { selectActive } from './soft-delete';
 import { env } from './env';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
@@ -144,16 +145,14 @@ export async function getDisconnectImpact(
   if (!supabase) return err(UNAVAILABLE);
   try {
     const [events, calendars] = await Promise.all([
-      supabase
-        .from('events')
-        .select('*', { count: 'exact', head: true })
-        .eq('connection_id', connectionId)
-        .is('deleted_at', null),
-      supabase
-        .from('calendars')
-        .select('*', { count: 'exact', head: true })
-        .eq('external_connection_id', connectionId)
-        .is('deleted_at', null),
+      selectActive('events', '*', { count: 'exact', head: true }).eq(
+        'connection_id',
+        connectionId,
+      ),
+      selectActive('calendars', '*', { count: 'exact', head: true }).eq(
+        'external_connection_id',
+        connectionId,
+      ),
     ]);
     if (events.error) return err(appError('data/query', 'data/query', events.error));
     if (calendars.error) return err(appError('data/query', 'data/query', calendars.error));
@@ -189,10 +188,7 @@ export async function disconnectGoogle(): Promise<Result<DisconnectImpact>> {
 export async function getConnection(): Promise<Result<Connection | null>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
-    const { data, error } = await supabase
-      .from('connections')
-      .select(COLUMNS)
-      .is('deleted_at', null)
+    const { data, error } = await selectActive('connections', COLUMNS)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle<ConnectionRow>();

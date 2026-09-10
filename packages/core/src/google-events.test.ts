@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deletedExternalIds, normalizeGoogleEvent } from './google-events';
+import { deletedExternalIds, normalizeGoogleEvent, toEventRow } from './google-events';
 
 describe('normalizeGoogleEvent', () => {
   it('cancelled は null(取り込まない)', () => {
@@ -93,6 +93,37 @@ describe('normalizeGoogleEvent', () => {
       normalizeGoogleEvent({ id: 'e9', summary: 'x', description: long, start: { date: '2026-09-15' } })
         ?.note,
     ).toHaveLength(2000);
+  });
+});
+
+describe('toEventRow', () => {
+  it('camelCase を RPC 行(snake_case)へ写す', () => {
+    const n = normalizeGoogleEvent({
+      id: 'e1',
+      summary: '会議',
+      description: 'メモ',
+      start: { dateTime: '2026-09-15T10:00:00Z' },
+      end: { dateTime: '2026-09-15T11:00:00Z' },
+    })!;
+    expect(toEventRow(n)).toEqual({
+      external_id: 'e1',
+      title: '会議',
+      note: 'メモ',
+      all_day: false,
+      starts_at: '2026-09-15T10:00:00.000Z',
+      ends_at: '2026-09-15T11:00:00.000Z',
+      event_date: null,
+    });
+  });
+
+  it('終日は starts_at/ends_at が null、event_date が入る', () => {
+    const n = normalizeGoogleEvent({ id: 'e2', summary: 'ゴミ', start: { date: '2026-09-15' } })!;
+    expect(toEventRow(n)).toMatchObject({
+      all_day: true,
+      starts_at: null,
+      ends_at: null,
+      event_date: '2026-09-15',
+    });
   });
 });
 

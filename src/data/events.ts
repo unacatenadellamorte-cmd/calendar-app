@@ -1,5 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isNetworkError, isOffline } from './net';
 import { cacheDelete, cacheGetAll, cachePut, cacheReplace } from './cache';
@@ -181,10 +182,7 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
 export async function listEvents(range: EventRange = {}): Promise<Result<EventItem[]>> {
   if (!supabase) return err(UNAVAILABLE);
   if (isOffline()) return ok(await cacheGetAll('events'));
-  let query = supabase
-    .from('events')
-    .select(COLUMNS)
-    .is('deleted_at', null)
+  let query = selectActive('events', COLUMNS)
     .order('all_day', { ascending: true })
     .order('starts_at', { ascending: true, nullsFirst: false })
     .order('event_date', { ascending: true });
@@ -201,7 +199,7 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
       if (isNetworkError(error)) return ok(await cacheGetAll('events'));
       return err(fromPostgrest(error));
     }
-    const mapped = (data as EventRow[]).map(toEvent);
+    const mapped = (data as unknown as EventRow[]).map(toEvent);
     if (!range.fromIso && !range.limit) await cacheReplace('events', mapped);
     else for (const row of mapped) await cachePut('events', row);
     return ok(mapped);

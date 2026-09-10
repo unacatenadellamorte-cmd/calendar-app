@@ -1,5 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isPresetColor } from './calendar-colors';
 import { isNetworkError } from './net';
@@ -153,13 +154,11 @@ function rowFromInput(input: NewShiftTemplateInput): Record<string, unknown> {
 export async function listShiftTemplates(): Promise<Result<ShiftTemplate[]>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
-    const { data, error } = await supabase
-      .from('shift_templates')
-      .select(COLUMNS)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
+    const { data, error } = await selectActive('shift_templates', COLUMNS).order('created_at', {
+      ascending: true,
+    });
     if (error) return err(fromPostgrest(error));
-    return ok((data as ShiftTemplateRow[]).map(toTemplate));
+    return ok((data as unknown as ShiftTemplateRow[]).map(toTemplate));
   } catch (e) {
     // オフライン対応(キャッシュ)は未実装(deferred)。せめて文言はオフライン寄りにする。
     if (isNetworkError(e)) return err(appError('data/offline', 'data/offline'));

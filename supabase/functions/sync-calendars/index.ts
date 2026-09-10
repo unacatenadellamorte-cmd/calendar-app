@@ -12,64 +12,10 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { corsHeadersFor, handlePreflight, jsonResponse } from '../_shared/cors.ts';
-import { fetchGoogleEvents, refreshAccessToken, type GoogleEventRaw } from '../_shared/google.ts';
-
-// --- packages/core/src/google-events.ts と同じ規則。変更時は両方を直す。---
-interface NormalizedEvent {
-  external_id: string;
-  title: string;
-  note: string | null;
-  all_day: boolean;
-  starts_at: string | null;
-  ends_at: string | null;
-  event_date: string | null;
-}
-
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
-
-function normalizeGoogleEvent(raw: GoogleEventRaw): NormalizedEvent | null {
-  if (!raw || raw.status === 'cancelled') return null;
-  const externalId = typeof raw.id === 'string' ? raw.id : '';
-  if (!externalId) return null;
-
-  const title = (typeof raw.summary === 'string' ? raw.summary.trim() : '') || '(タイトルなし)';
-  const noteRaw = typeof raw.description === 'string' ? raw.description.trim() : '';
-  const note = noteRaw ? noteRaw.slice(0, 2000) : null;
-
-  const startDate = raw.start?.date;
-  if (typeof startDate === 'string' && DATE_ONLY.test(startDate)) {
-    return {
-      external_id: externalId,
-      title: title.slice(0, 200),
-      note,
-      all_day: true,
-      starts_at: null,
-      ends_at: null,
-      event_date: startDate,
-    };
-  }
-
-  const startDateTime = raw.start?.dateTime;
-  if (typeof startDateTime === 'string') {
-    const startMs = Date.parse(startDateTime);
-    if (Number.isNaN(startMs)) return null;
-    const endSource = raw.end?.dateTime;
-    const endMs = typeof endSource === 'string' ? Date.parse(endSource) : NaN;
-    const safeEndMs = Number.isNaN(endMs) || endMs < startMs ? startMs : endMs;
-    return {
-      external_id: externalId,
-      title: title.slice(0, 200),
-      note,
-      all_day: false,
-      starts_at: new Date(startMs).toISOString(),
-      ends_at: new Date(safeEndMs).toISOString(),
-      event_date: null,
-    };
-  }
-
-  return null;
-}
-// --- 複製ここまで ---
+import { fetchGoogleEvents, refreshAccessToken } from '../_shared/google.ts';
+// 正規化の純ロジックは packages/core/src/google-events.ts が一次ソース。
+// この _shared/google-events.ts は scripts/sync-edge-shared.mjs が生成する(手で編集しない)。
+import { normalizeGoogleEvent, toEventRow, type EventRow } from '../_shared/google-events.ts';
 
 interface Target {
   user_id: string;
@@ -221,10 +167,11 @@ async function handle(req: Request): Promise<Response> {
           windowMax,
         );
         // 正規化 + external_id で重複排除(同一バッチ内の ON CONFLICT 二重更新を避ける)。
-        const byExternalId = new Map<string, NormalizedEvent>();
+        // RPC の p_events は snake_case(toEventRow で写す)。
+        const byExternalId = new Map<string, EventRow>();
         for (const item of raw) {
           const n = normalizeGoogleEvent(item);
-          if (n) byExternalId.set(n.external_id, n);
+          if (n) byExternalId.set(n.externalId, toEventRow(n));
         }
         const normalized = [...byExternalId.values()];
         const { data: applied, error: applyError } = await admin.rpc('apply_calendar_sync', {

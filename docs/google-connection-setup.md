@@ -188,6 +188,19 @@ headers := jsonb_build_object(
 - Vault に入れる2値: `project_url`(`https://<ref>.supabase.co`)と `service_role_key`。`vault.create_secret('<値>', '<名前>')` ── 値は必ず**単一引用符で囲む**(囲まないと `missing FROM-clause entry for table` エラー)。
 - 手動で叩いて確認するときも同じ2ヘッダを付ける。成功時は 200 + `{"ok":true,"calendars":N,"errors":0}`。
 
+## C-8. Edge Function をデプロイする前に(2026-09-11 追記・Epic 3 retro F1)
+
+`sync-calendars` の予定正規化ロジックは `packages/core/src/google-events.ts` が一次ソース。
+Deno が import できる `supabase/functions/_shared/google-events.ts` はそこから**生成**する。
+
+```
+npm run sync:edge-shared                 # _shared/google-events.ts を再生成
+supabase functions deploy sync-calendars # デプロイ
+```
+
+- `packages/core/src/google-events.ts` を編集したら **必ず** `npm run sync:edge-shared` を実行して両方コミットする(`google-events.parity.test.ts` がドリフトを検出する)。
+- デプロイ後は手動 `net.http_post`(C-7 の2ヘッダ)で 1 回スモークして 200 を確認する。
+
 ---
 
 # 進行順まとめ

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { selectActive } from './soft-delete';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
 import { invokeFn } from './edge';
@@ -49,10 +50,7 @@ function slugToKey(slug: string): string {
 export async function listConnectionCalendars(): Promise<Result<GoogleCalendarChoice[]>> {
   if (!supabase) return err(appError('connection/unavailable', 'connection/unavailable'));
   try {
-    const { data, error } = await supabase
-      .from('connection_calendars')
-      .select(COLUMNS)
-      .is('deleted_at', null)
+    const { data, error } = await selectActive('connection_calendars', COLUMNS)
       .order('summary', { ascending: true })
       .returns<ConnectionCalendarRow[]>();
     if (error) return err(appError('data/query', 'data/query', error));

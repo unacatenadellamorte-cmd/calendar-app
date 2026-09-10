@@ -30,8 +30,10 @@ export {
 export {
   normalizeGoogleEvent,
   deletedExternalIds,
+  toEventRow,
   type GoogleEventRaw,
   type NormalizedGoogleEvent,
+  type EventRow,
 } from './google-events';
 
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
