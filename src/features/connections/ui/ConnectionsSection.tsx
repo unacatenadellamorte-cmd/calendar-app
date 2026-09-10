@@ -67,9 +67,16 @@ export function ConnectionsSection() {
             <p className="mt-1 text-body text-ink-primary">
               {connection.googleEmail ?? 'Google カレンダー'}
             </p>
-            <p className="mt-2 text-meta text-ink-secondary">
-              取り込むカレンダーの選択は次のステップで追加されます。
-            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/connections/google/calendars')}
+              className="mt-3 flex min-h-11 w-full items-center justify-between rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
+            >
+              取り込むカレンダーを選ぶ
+              <span aria-hidden="true" className="text-ink-secondary">
+                ›
+              </span>
+            </button>
           </>
         ) : (
           <>
