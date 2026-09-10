@@ -118,6 +118,57 @@ describe('useEvents', () => {
     expect(result.current.pendingDelete).toBeNull();
   });
 
+  it('create 成功で直前の errorKey をクリアする', async () => {
+    updateEvent.mockResolvedValue(err(appError('data/query', 'data/query')));
+    createEvent.mockResolvedValue(ok(ev({ id: 'e9' })));
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.update(ev(), { ...timedInput, title: 'x' });
+    });
+    expect(result.current.errorKey).toBe('data/query');
+    await act(async () => {
+      await result.current.create(timedInput);
+    });
+    expect(result.current.errorKey).toBeNull();
+  });
+
+  it('Undo 前に連続削除しても、前の孤児タイマが次の Undo バーを消さない', async () => {
+    vi.useFakeTimers();
+    try {
+      deleteEvent.mockResolvedValue(ok(undefined));
+      listEvents.mockResolvedValue(ok([ev({ id: 'a' }), ev({ id: 'b' })]));
+      const { result } = renderHook(() => useEvents(true));
+      await vi.waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.remove(ev({ id: 'a' })); // a のタイマは t=6000 で発火する予定
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(3000); // t=3000
+      });
+      await act(async () => {
+        await result.current.remove(ev({ id: 'b' })); // b のタイマは t=9000
+      });
+      expect(result.current.pendingDelete?.id).toBe('b');
+
+      // t=6000: a の孤児タイマが生きていれば発火して pendingDelete(b)を消してしまう。
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      // clearTimeout 済みなので b の Undo バーは残っている。
+      expect(result.current.pendingDelete?.id).toBe('b');
+
+      // t=9000: b 自身のタイマで確定 → 消える。
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(result.current.pendingDelete).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('remove が external 拒否を返したらリストを戻す', async () => {
     deleteEvent.mockResolvedValue(err(appError('event/not-editable', 'event/not-editable')));
     const { result } = renderHook(() => useEvents(true));

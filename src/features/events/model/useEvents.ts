@@ -83,6 +83,7 @@ export function useEvents(enabled: boolean) {
     const result = await createEvent(input);
     if (result.ok) {
       setEvents((es) => sortEvents([...es, result.value]));
+      setErrorKey(null); // 直前の失敗のエラーバナーを引きずらない
       return true;
     }
     setErrorKey(result.error.messageKey);
@@ -102,6 +103,7 @@ export function useEvents(enabled: boolean) {
     const result = await updateEvent(current, patch);
     if (result.ok) {
       setEvents((es) => sortEvents(es.map((e) => (e.id === current.id ? result.value : e))));
+      setErrorKey(null);
       return true;
     }
     setEvents((es) => sortEvents(es.map((e) => (e.id === current.id ? current : e))));
@@ -124,6 +126,9 @@ export function useEvents(enabled: boolean) {
         setErrorKey(result.error.messageKey);
         return;
       }
+      // 直前の削除の Undo タイマが残っていたら止める(連続削除で孤児タイマが
+      // 発火して次の Undo バーを早期に消すのを防ぐ。useShiftTemplates と揃える)。
+      if (pendingRef.current) clearTimeout(pendingRef.current.timer);
       const timer = setTimeout(finalize, UNDO_MS);
       pendingRef.current = { event, timer };
       setPendingDelete(event);

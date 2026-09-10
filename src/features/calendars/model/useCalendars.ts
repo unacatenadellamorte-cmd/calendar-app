@@ -72,6 +72,7 @@ export function useCalendars(enabled: boolean) {
     const result = await createCalendar(input);
     if (result.ok) {
       setCalendars((cs) => sortCalendars([...cs, result.value]));
+      setErrorKey(null); // 直前の失敗のエラーバナーを引きずらない
       return true;
     }
     setErrorKey(result.error.messageKey);
@@ -100,6 +101,7 @@ export function useCalendars(enabled: boolean) {
     const result = await renameCalendar(id, name);
     if (result.ok) {
       setCalendars((cs) => cs.map((c) => (c.id === id ? result.value : c)));
+      setErrorKey(null);
       return true;
     }
     setErrorKey(result.error.messageKey);
@@ -110,6 +112,7 @@ export function useCalendars(enabled: boolean) {
     const result = await recolorCalendar(id, color);
     if (result.ok) {
       setCalendars((cs) => cs.map((c) => (c.id === id ? result.value : c)));
+      setErrorKey(null);
       return true;
     }
     setErrorKey(result.error.messageKey);
@@ -143,6 +146,9 @@ export function useCalendars(enabled: boolean) {
         return;
       }
       setCalendars((cs) => cs.filter((c) => c.id !== calendar.id));
+      // 直前の削除の Undo タイマが残っていたら止める(連続削除で孤児タイマが
+      // 発火して次の Undo バーを早期に消すのを防ぐ。useShiftTemplates と揃える)。
+      if (pendingRef.current) clearTimeout(pendingRef.current.timer);
       const timer = setTimeout(finalizePendingDelete, UNDO_MS);
       pendingRef.current = { calendar, timer };
       setPendingDelete(calendar);

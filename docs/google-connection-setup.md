@@ -172,6 +172,22 @@ VITE_GOOGLE_OAUTH_CLIENT_ID=<B-4 のクライアント ID>
 
 Story 3.3 実装時に確定。マイグレーションの1行を変えるだけなので後からでも変えられる。
 
+## C-7. pg_cron から Edge Function を叩くときの認証(2026-09-11 追記・Story 3.3 の教訓)
+
+pg_cron / `net.http_post` で `sync-calendars` を叩くとき、**Supabase の関数ゲートウェイは `Authorization` ヘッダだけでなく `apikey` ヘッダも要求する**。片方だけだと実行時に 401(`UNAUTHORIZED_INVALID_JWT_FORMAT`)になる。`20260913000100` の cron に `apikey` が無く、`20260915000000_fix_cron_apikey.sql` で貼り直した。
+
+```sql
+headers := jsonb_build_object(
+  'Content-Type', 'application/json',
+  'apikey',        (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key'),
+  'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')
+)
+```
+
+- **`service_role_key` は Legacy の JWT 形式**(`/settings/api-keys/legacy`)。新式の `sb_secret_...` キーは JWT ではないので `sync-calendars` の `jwtRole()`(bearer をデコードして `role` を見る)を通らない。
+- Vault に入れる2値: `project_url`(`https://<ref>.supabase.co`)と `service_role_key`。`vault.create_secret('<値>', '<名前>')` ── 値は必ず**単一引用符で囲む**(囲まないと `missing FROM-clause entry for table` エラー)。
+- 手動で叩いて確認するときも同じ2ヘッダを付ける。成功時は 200 + `{"ok":true,"calendars":N,"errors":0}`。
+
 ---
 
 # 進行順まとめ

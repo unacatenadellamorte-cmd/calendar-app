@@ -35,7 +35,8 @@
 
 - source_spec: `spec-4-1-shift-templates.md`
   summary: `useCalendars` / `useEvents` / `useShiftTemplates` の削除 Undo タイマは、Undo 前に次の削除をすると前のタイマを止めずに `pendingRef` を差し替える。前の孤児タイマが発火すると2件目の Undo バーが早期に消える。Story 4.1 では `useShiftTemplates` だけ `clearTimeout` を足して直した。
-  evidence: `useCalendars.remove` / `useEvents.remove` に同じパターンが残る(`pendingRef.current = { ..., timer }` の前に `clearTimeout` が無い)。連続削除は稀だが、両フックにも同じ1行を足せば揃う。
+  evidence: `useCalendars.remove` / `useEvents.remove` に同じパターンが残っていた(`pendingRef.current = { ..., timer }` の前に `clearTimeout` が無い)。
+  status: **回収済み(2026-09-11、Epic 4 retro AI-1)**。両フックの `remove` に `if (pendingRef.current) clearTimeout(pendingRef.current.timer);` を1行ずつ追加。`useEvents.test.ts` に連続削除の回帰テストを追加。
 
 - source_spec: `spec-4-2-quick-shift.md`
   summary: quick-shift の複数日はシート内「この日から N 日」ステッパ(1〜14)。月グリッド上をドラッグ/長押しして日付範囲を選ぶ操作は未実装。週ビューの日タップからは quick-shift を開けない(週はスロット=時刻指定の予定追加のまま)。シフト実体のオフライン作成(outbox)も未対応。
