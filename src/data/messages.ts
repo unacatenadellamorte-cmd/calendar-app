@@ -18,6 +18,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',
   'data/offline': 'オフラインです。接続すると同期します',
   'sync/partial': '一部の変更を送信できませんでした',
+  'sync/failed': '取り込みに失敗しました。時間をおいてもう一度お試しください',
   'export/failed': 'ファイルの書き出しに失敗しました',
   'shift-template/invalid-name': 'シフト名を入力してください',
   'shift-template/invalid-time': '開始と終了の時刻を確認してください',

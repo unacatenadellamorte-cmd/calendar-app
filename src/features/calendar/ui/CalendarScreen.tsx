@@ -12,6 +12,7 @@ import { useCalendars } from '@/features/calendars/model/useCalendars';
 import { useEvents } from '@/features/events/model/useEvents';
 import { useShiftTemplates } from '@/features/shifts/model/useShiftTemplates';
 import { EventFormSheet, type EventSeed } from '@/features/events/ui/EventFormSheet';
+import { EventDetailSheet } from '@/features/events/ui/EventDetailSheet';
 import { QuickShiftSheet } from '@/features/shifts/ui/QuickShiftSheet';
 import { useCalendarView } from '@/features/calendar/model/useCalendarView';
 import { ViewSwitcher } from './ViewSwitcher';
@@ -43,6 +44,7 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<EventItem | null>(null);
+  const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
   const [seed, setSeed] = useState<EventSeed | undefined>(undefined);
   const [quickDate, setQuickDate] = useState<string | null>(null);
   const [shiftErrorKey, setShiftErrorKey] = useState<string | null>(null);
@@ -73,7 +75,11 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
     setSheetOpen(true);
   };
   const openEdit = (event: EventItem) => {
-    if (event.source !== 'local') return;
+    // 取り込んだ予定(source='google')は読み取り専用の詳細シート。ローカルは編集シート。
+    if (event.source !== 'local') {
+      setDetailEvent(event);
+      return;
+    }
     setEditing(event);
     setSeed(undefined);
     setSheetOpen(true);
@@ -211,6 +217,12 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
         onCreate={(input: NewEventInput) => ev.create(input)}
         onUpdate={(current, input) => ev.update(current, input)}
         onDelete={(event) => void ev.remove(event)}
+      />
+
+      <EventDetailSheet
+        event={detailEvent}
+        calendar={detailEvent ? calendarById.get(detailEvent.calendarId) : undefined}
+        onClose={() => setDetailEvent(null)}
       />
     </Screen>
   );

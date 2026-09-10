@@ -15,6 +15,10 @@ export interface GoogleCalendarChoice {
   /** 正規化済み #RRGGBB。取得できていなければ null。 */
   backgroundColor: string | null;
   selected: boolean;
+  /** 最後に予定を取り込めた時刻(UTC ISO)。まだ / 未選択なら null(Story 3.3)。 */
+  lastSyncedAt: string | null;
+  /** 直近の取り込み失敗(無ければ null、Story 3.3)。 */
+  lastError: string | null;
 }
 
 interface ConnectionCalendarRow {
@@ -22,6 +26,12 @@ interface ConnectionCalendarRow {
   summary: string;
   background_color: string | null;
   selected: boolean;
+}
+
+interface SyncStateRow {
+  external_calendar_id: string;
+  last_synced_at: string | null;
+  last_error: string | null;
 }
 
 const COLUMNS = 'external_calendar_id,summary,background_color,selected';
@@ -32,7 +42,10 @@ function slugToKey(slug: string): string {
   return 'connection/calendars-failed';
 }
 
-/** カタログ(直近の取得結果)を DB からそのまま読む。オフラインでも可。 */
+/**
+ * カタログ(直近の取得結果)を DB からそのまま読む。オフラインでも可。
+ * 取り込み状態(sync_state)もマージする。sync_state が引けなくてもカタログは返す。
+ */
 export async function listConnectionCalendars(): Promise<Result<GoogleCalendarChoice[]>> {
   if (!supabase) return err(appError('connection/unavailable', 'connection/unavailable'));
   try {
@@ -43,13 +56,25 @@ export async function listConnectionCalendars(): Promise<Result<GoogleCalendarCh
       .order('summary', { ascending: true })
       .returns<ConnectionCalendarRow[]>();
     if (error) return err(appError('data/query', 'data/query', error));
+
+    const { data: syncRows } = await supabase
+      .from('sync_state')
+      .select('external_calendar_id,last_synced_at,last_error')
+      .returns<SyncStateRow[]>();
+    const syncByCal = new Map((syncRows ?? []).map((s) => [s.external_calendar_id, s]));
+
     return ok(
-      (data ?? []).map((r) => ({
-        externalCalendarId: r.external_calendar_id,
-        summary: r.summary,
-        backgroundColor: r.background_color,
-        selected: r.selected,
-      })),
+      (data ?? []).map((r) => {
+        const s = syncByCal.get(r.external_calendar_id);
+        return {
+          externalCalendarId: r.external_calendar_id,
+          summary: r.summary,
+          backgroundColor: r.background_color,
+          selected: r.selected,
+          lastSyncedAt: s?.last_synced_at ?? null,
+          lastError: s?.last_error ?? null,
+        };
+      }),
     );
   } catch (e) {
     if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));

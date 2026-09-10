@@ -37,6 +37,8 @@ const choice = (over: Record<string, unknown> = {}) => ({
   summary: '個人',
   backgroundColor: '#4285F4',
   selected: false,
+  lastSyncedAt: null,
+  lastError: null,
   ...over,
 });
 
@@ -88,6 +90,23 @@ describe('GoogleCalendarPicker', () => {
     await user.click(cb);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('取得できませんでした'));
     expect((cb as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('選択済みカレンダー: 最終取り込み時刻 / 失敗を行ごとに出す', async () => {
+    listConnectionCalendars.mockResolvedValue(
+      ok([
+        choice({ externalCalendarId: 'a@g', summary: '個人', selected: true, lastSyncedAt: '2026-09-11T05:30:00Z' }),
+        choice({ externalCalendarId: 'b@g', summary: '部活', selected: true, lastError: 'sync-failed' }),
+        choice({ externalCalendarId: 'c@g', summary: '未選択', selected: false }),
+      ]),
+    );
+    refreshGoogleCalendars.mockResolvedValue(ok({ count: 3 }));
+    render(<GoogleCalendarPicker />);
+    await screen.findByText('個人');
+    expect(screen.getByText(/最終取り込み: .*9\/11/)).toBeInTheDocument();
+    expect(screen.getByText('前回は取り込めませんでした')).toBeInTheDocument();
+    // 未選択の行には注記を出さない
+    expect(screen.queryAllByText('まだ取り込んでいません')).toHaveLength(0);
   });
 
   it('取り直しに失敗してもカタログは出し続ける', async () => {

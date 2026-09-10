@@ -72,6 +72,51 @@ export async function fetchCalendarList(accessToken: string): Promise<GoogleCale
   return entries;
 }
 
+/** Google Calendar API のイベント(sync-calendars が使う部分だけ)。 */
+export interface GoogleEventRaw {
+  id?: string;
+  status?: string;
+  summary?: string;
+  description?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
+}
+
+/**
+ * 1カレンダー分の予定を時間窓で取得する(Story 3.3)。
+ * `singleEvents=true` で繰り返しは展開済みインスタンス、`showDeleted=false`。
+ * ページング対応。読み取りのみ。`!res.ok` は throw(呼び出し側が catch してカレンダー単位で記録)。
+ */
+export async function fetchGoogleEvents(
+  accessToken: string,
+  calendarId: string,
+  timeMinIso: string,
+  timeMaxIso: string,
+): Promise<GoogleEventRaw[]> {
+  const events: GoogleEventRaw[] = [];
+  let pageToken: string | undefined;
+  do {
+    const url = new URL(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    );
+    url.searchParams.set('singleEvents', 'true');
+    url.searchParams.set('showDeleted', 'false');
+    url.searchParams.set('maxResults', '2500');
+    url.searchParams.set('timeMin', timeMinIso);
+    url.searchParams.set('timeMax', timeMaxIso);
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw new Error(`events.list ${res.status}`);
+    const body = await res.json();
+    for (const item of body.items ?? []) {
+      if (item && typeof item === 'object') events.push(item as GoogleEventRaw);
+    }
+    pageToken = typeof body.nextPageToken === 'string' ? body.nextPageToken : undefined;
+  } while (pageToken);
+  return events;
+}
+
 // src/data/calendar-colors.ts の normalizeHexColor と同じパース規則(ローカルに Deno が
 // 無く import できないため複製)。ただし失敗時はこちらは null を返す(カタログに null 格納、
 // 実カレンダー生成時に SQL 側で既定色へ coalesce する)。変更時は両方を直す。

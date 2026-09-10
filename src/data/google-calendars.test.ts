@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('listConnectionCalendars', () => {
-  it('camelCase に変換して返す', async () => {
+  it('camelCase に変換して返す(sync_state なしは lastSyncedAt / lastError = null)', async () => {
     queryResult = {
       data: [
         { external_calendar_id: 'a@g', summary: '個人', background_color: '#4285F4', selected: true },
@@ -49,14 +49,36 @@ describe('listConnectionCalendars', () => {
     const r = await listConnectionCalendars();
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value[0]).toEqual({
+      expect(r.value[0]).toMatchObject({
         externalCalendarId: 'a@g',
         summary: '個人',
         backgroundColor: '#4285F4',
         selected: true,
+        lastSyncedAt: null,
+        lastError: null,
       });
       expect(r.value[1]!.backgroundColor).toBeNull();
     }
+  });
+
+  it('sync_state をカレンダーごとにマージする', async () => {
+    queryResult = {
+      data: [
+        {
+          external_calendar_id: 'a@g',
+          summary: '個人',
+          background_color: null,
+          selected: true,
+          last_synced_at: '2026-09-10T12:00:00Z',
+          last_error: null,
+        },
+      ],
+      error: null,
+    };
+    const { listConnectionCalendars } = await load();
+    const r = await listConnectionCalendars();
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value[0]!.lastSyncedAt).toBe('2026-09-10T12:00:00Z');
   });
 
   it('クエリエラーは data/query', async () => {

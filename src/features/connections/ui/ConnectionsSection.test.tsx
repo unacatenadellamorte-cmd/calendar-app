@@ -6,6 +6,8 @@ import { ok } from '@/data/result';
 const navigate = vi.fn();
 const startGoogleConnect = vi.fn();
 const getConnection = vi.fn();
+const syncGoogleCalendarsNow = vi.fn();
+const listSyncState = vi.fn();
 let authState: { state: string } = { state: 'authenticated' };
 let envValue = { hasSupabase: true, hasGoogleOauth: true };
 
@@ -21,13 +23,21 @@ vi.mock('@/data/connections', () => ({
   getConnection: () => getConnection(),
   GOOGLE_CALLBACK_PATH: '/connections/google/callback',
 }));
+vi.mock('@/data/google-sync', () => ({
+  syncGoogleCalendarsNow: () => syncGoogleCalendarsNow(),
+  listSyncState: () => listSyncState(),
+}));
 
 const { ConnectionsSection } = await import('./ConnectionsSection');
+
+const connected = ok({ id: 'c1', provider: 'google', googleEmail: 'me@gmail.com', createdAt: 'x' });
 
 beforeEach(() => {
   navigate.mockReset();
   startGoogleConnect.mockReset();
   getConnection.mockReset().mockResolvedValue(ok(null));
+  syncGoogleCalendarsNow.mockReset().mockResolvedValue(ok({ synced: [], errors: [] }));
+  listSyncState.mockReset().mockResolvedValue(ok([]));
   authState = { state: 'authenticated' };
   envValue = { hasSupabase: true, hasGoogleOauth: true };
 });
@@ -41,10 +51,8 @@ describe('ConnectionsSection', () => {
     expect(startGoogleConnect).toHaveBeenCalledTimes(1);
   });
 
-  it('authenticated・接続済み: email と接続中を表示、ボタンは出さない', async () => {
-    getConnection.mockResolvedValue(
-      ok({ id: 'c1', provider: 'google', googleEmail: 'me@gmail.com', createdAt: 'x' }),
-    );
+  it('authenticated・接続済み: email と接続中を表示、接続ボタンは出さない', async () => {
+    getConnection.mockResolvedValue(connected);
     render(<ConnectionsSection />);
     expect(await screen.findByText('me@gmail.com')).toBeInTheDocument();
     expect(screen.getByText('Google に接続中')).toBeInTheDocument();
@@ -81,5 +89,63 @@ describe('ConnectionsSection', () => {
     });
     render(<ConnectionsSection />);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('読み込みに失敗'));
+  });
+
+  it('接続済み: 取り込み履歴なしは「まだ取り込んでいません」', async () => {
+    getConnection.mockResolvedValue(connected);
+    render(<ConnectionsSection />);
+    expect(await screen.findByText('まだ取り込んでいません')).toBeInTheDocument();
+  });
+
+  it('接続済み: sync_state の最大 lastSyncedAt を「最終取り込み」に出す', async () => {
+    getConnection.mockResolvedValue(connected);
+    listSyncState.mockResolvedValue(
+      ok([
+        { calendarId: 'c1', externalCalendarId: 'a', lastSyncedAt: '2026-09-10T00:00:00Z', lastError: null },
+        { calendarId: 'c2', externalCalendarId: 'b', lastSyncedAt: '2026-09-11T05:30:00Z', lastError: null },
+      ]),
+    );
+    render(<ConnectionsSection />);
+    expect(await screen.findByText(/最終取り込み:/)).toHaveTextContent('9/11');
+  });
+
+  it('「今すぐ取り込み」成功: 新規件数を表示', async () => {
+    getConnection.mockResolvedValue(connected);
+    syncGoogleCalendarsNow.mockResolvedValue(
+      ok({ synced: [{ calendar: 'ゴミ', upserted: 4, deleted: 0 }], errors: [] }),
+    );
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
+    expect(await screen.findByText('取り込みました(4 件)')).toBeInTheDocument();
+    expect(listSyncState).toHaveBeenCalledTimes(2); // 初回 + 取り込み後
+  });
+
+  it('「今すぐ取り込み」失敗: エラー文言を alert で出す', async () => {
+    getConnection.mockResolvedValue(connected);
+    syncGoogleCalendarsNow.mockResolvedValue({
+      ok: false,
+      error: { kind: 'sync/failed', messageKey: 'sync/failed' },
+    });
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
+    await waitFor(() =>
+      expect(screen.getByText('取り込みに失敗しました。時間をおいてもう一度お試しください')).toBeInTheDocument(),
+    );
+  });
+
+  it('「今すぐ取り込み」でオフライン: オフライン文言', async () => {
+    getConnection.mockResolvedValue(connected);
+    syncGoogleCalendarsNow.mockResolvedValue({
+      ok: false,
+      error: { kind: 'data/offline', messageKey: 'data/offline' },
+    });
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
+    await waitFor(() =>
+      expect(screen.getByText('オフラインです。接続すると同期します')).toBeInTheDocument(),
+    );
   });
 });
