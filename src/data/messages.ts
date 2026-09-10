@@ -25,6 +25,13 @@ const DATA_MESSAGES: Record<string, string> = {
   'shift-template/invalid-wage': '時給は0以上で入力してください',
   'shift-template/invalid-workplace': '勤務先ラベルは100文字までです',
   'shift-template/invalid-color': '色はプリセットから選んでください',
+  'connection/exchange-failed': 'Google との接続に失敗しました。もう一度お試しください',
+  'connection/no-refresh-token':
+    '接続をやり直してください。Google の許可画面で「許可」を選んでください',
+  'connection/state-mismatch': '接続を確認できませんでした。もう一度お試しください',
+  'connection/cancelled': '接続をキャンセルしました',
+  'connection/not-authenticated': '接続にはログインが必要です',
+  'connection/unavailable': 'この機能は Supabase の設定後に使えます',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };

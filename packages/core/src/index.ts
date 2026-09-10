@@ -18,6 +18,15 @@ export { selectFeaturedEvents, type FeaturableEvent } from './featured';
 
 export { workedMinutes, monthlyPayEstimate, type PayableShift } from './pay';
 
+export {
+  GOOGLE_CALENDAR_SCOPES,
+  buildGoogleAuthUrl,
+  parseGoogleTokenResponse,
+  primaryEmailFromCalendarList,
+  type GoogleAuthUrlParams,
+  type GoogleTokenParse,
+} from './google-oauth';
+
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;
 

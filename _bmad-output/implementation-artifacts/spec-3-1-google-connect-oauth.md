@@ -2,9 +2,10 @@
 title: 'Story 3.1: Google 接続(OAuth)と資格情報の安全な保管'
 type: 'feature'
 created: '2026-09-10'
-status: 'ready-for-dev'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
+baseline_commit: '1a155b2'
 context:
   - '_bmad-output/implementation-artifacts/epic-3-context.md'
   - 'docs/google-connection-setup.md'
@@ -75,18 +76,18 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `packages/core/src/google-oauth.ts` + `index.ts` re-export -- 純関数3つ + スコープ定数 -- Edge Function とクライアントで同じ URL/パース規則
-- [ ] `packages/core/src/google-oauth.test.ts` -- I/O マトリクスの純ロジック行(URL 構築 / パース正常・欠落・エラー / primary 抽出)
-- [ ] `supabase/migrations/20260911000000_connections.sql` -- `connections` テーブル・RLS(SELECT own のみ、INSERT/UPDATE なし)・`create extension if not exists supabase_vault` -- refresh_token の受け皿
-- [ ] `supabase/functions/_shared/cors.ts` + `supabase/functions/oauth-exchange/index.ts` -- JWT→user、token 交換、`vault.create_secret`、`connections` upsert(古い secret 削除)、トークンを返さない -- AD-3
-- [ ] `src/data/env.ts` -- `googleOauthClientId` / `hasGoogleOauth` -- 未設定でもアプリは起動(接続ボタンは無効表示)
-- [ ] `src/data/connections.ts` + `connections.test.ts` -- `startGoogleConnect` / `completeGoogleConnect` / `getConnection`、全 `Result`、state 照合 -- data-access 境界
-- [ ] `src/data/messages.ts` -- `connection/*` 文言6件
-- [ ] `src/features/connections/model/useGoogleConnection.ts` + `ui/ConnectionsSection.tsx` -- 設定の接続欄(状態別)
-- [ ] `src/features/connections/ui/GoogleCallbackScreen.tsx` + `src/app/routes.tsx` -- コールバック処理画面 + ルート
-- [ ] `src/features/settings/ui/SettingsScreen.tsx` -- プレースホルダを `<ConnectionsSection />` へ
-- [ ] `env.example` + `env.local.append.txt`(scratchpad ではなくプロジェクト直下、ユーザー追記用) -- client ID の環境変数
-- [ ] `src/features/connections/**/*.test.tsx` -- guest→/auth、接続中表示、コールバック成功/失敗の結合テスト
+- [x] `packages/core/src/google-oauth.ts` + `index.ts` re-export -- 純関数3つ + スコープ定数 -- Edge Function とクライアントで同じ URL/パース規則
+- [x] `packages/core/src/google-oauth.test.ts` -- I/O マトリクスの純ロジック行(URL 構築 / パース正常・欠落・エラー / primary 抽出)
+- [x] `supabase/migrations/20260911000000_connections.sql` -- `connections` テーブル・RLS(SELECT own のみ、INSERT/UPDATE なし)・`create extension if not exists supabase_vault` -- refresh_token の受け皿
+- [x] `supabase/functions/_shared/cors.ts` + `supabase/functions/oauth-exchange/index.ts` -- JWT→user、token 交換、`vault.create_secret`、`connections` upsert(古い secret 削除)、トークンを返さない -- AD-3
+- [x] `src/data/env.ts` -- `googleOauthClientId` / `hasGoogleOauth` -- 未設定でもアプリは起動(接続ボタンは無効表示)
+- [x] `src/data/connections.ts` + `connections.test.ts` -- `startGoogleConnect` / `completeGoogleConnect` / `getConnection`、全 `Result`、state 照合 -- data-access 境界
+- [x] `src/data/messages.ts` -- `connection/*` 文言6件
+- [x] `src/features/connections/model/useGoogleConnection.ts` + `ui/ConnectionsSection.tsx` -- 設定の接続欄(状態別)
+- [x] `src/features/connections/ui/GoogleCallbackScreen.tsx` + `src/app/routes.tsx` -- コールバック処理画面 + ルート
+- [x] `src/features/settings/ui/SettingsScreen.tsx` -- プレースホルダを `<ConnectionsSection />` へ
+- [x] `env.example` + `env.local.append.txt`(scratchpad ではなくプロジェクト直下、ユーザー追記用) -- client ID の環境変数
+- [x] `src/features/connections/**/*.test.tsx` -- guest→/auth、接続中表示、コールバック成功/失敗の結合テスト
 
 **Acceptance Criteria:**
 - Given `authenticated` ユーザーが設定で「Google を接続」を押す、when 同意画面で許可して戻る、then `connections` に自分の行が1件でき、設定に「接続中: <email>」が出る。`refresh_token` はクライアントの JS からも Network 応答からも見えない。
@@ -97,9 +98,32 @@ context:
 
 ## Implementation Notes
 
+- **実装ファイル:** `packages/core/src/google-oauth.ts`(純関数3 + `GOOGLE_CALENDAR_SCOPES`)、`src/data/connections.ts`(`startGoogleConnect` / `completeGoogleConnect` / `getConnection` / `googleRedirectUri` / `GOOGLE_CALLBACK_PATH`)、`src/features/connections/`(`model/useGoogleConnection.ts` — `enabled` 引数つき、`ui/ConnectionsSection.tsx`、`ui/GoogleCallbackScreen.tsx`)、`supabase/migrations/20260911000000_connections.sql`、`supabase/functions/oauth-exchange/index.ts` + `_shared/cors.ts`。
+- **redirect URI パス確定:** `/connections/google/callback`(既存のフラットなタブ外ルート `/calendars` `/shift-templates` に合わせた)。`docs/google-connection-setup.md` も同値に更新済み。
+- **eslint:** `supabase/functions` を ignores に追加(Deno ランタイム、ローカルに Deno なし。マイグレーションと同じ目視レビュー扱い)。`tsc -b` は元々 `src` + `packages/core/src` のみ対象なので Edge Function は型チェック外。
+- **CORS:** `Access-Control-Allow-Headers` はプリフライトの `Access-Control-Request-Headers` をそのまま反映(supabase-js の送信ヘッダ集合がバージョン差で変わるため固定リストにしない)。
+- **Vault:** `upsert_google_connection(p_user_id, p_refresh_token, p_google_email)` RPC(`security definer`、`service_role` のみ grant)。`vault.create_secret` の戻り uuid を `connections.vault_secret_id` へ。貼り替え時は旧 secret を `delete from vault.secrets`。`search_path` に `extensions` を明示(security definer が Supabase 既定パスを失うため)。
+- **supabase-js `functions.invoke` の挙動(v2.115):** 非2xx は throw せず `{ error: FunctionsHttpError }`(`.context` が `Response`)、関数到達不能は `{ error: FunctionsFetchError }`。`completeGoogleConnect` は前者を本文の `{error: key}` に対応づけ、後者を `data/offline` にする。
+- **テスト:** core 13(google-oauth)、`connections.test.ts` 11、`ConnectionsSection.test.tsx` 6、`GoogleCallbackScreen.test.tsx` 3。全体 365。`window.location` は `Object.defineProperty` で差し替え(jsdom は `assign` を spy 不可)。
+- **未検証(ユーザーの実機確認待ち):** OAuth 往復、`oauth-exchange` デプロイ後の動作、`upsert_google_connection` の実 DB 実行、Vault 書き込み。Docker/Deno がローカルに無いため。
+
 ## Spec Change Log
 
 ## Review Triage Log
+
+**Pass 1(2026-09-10、3レンズ inline):**
+
+| # | レンズ | 指摘 | verdict | 対応 |
+|---|---|---|---|---|
+| F1 | blind | `oauth-exchange` の Google `fetch` / `createClient` が投げると CORS ヘッダ無しの 500 → ブラウザは素の CORS エラー | high | **patch**: ハンドラ全体を try/catch でくるみ、`fetch` も個別に。CORS ヘッダ付きで返す |
+| F2 | blind | CORS プリフライトの許可ヘッダが固定リスト。supabase-js が別ヘッダを送ると接続フロー全体が CORS エラーで死ぬ | high | **patch**: `Access-Control-Request-Headers` を反映 |
+| F3 | blind | 関数到達不能は `{error: FunctionsFetchError}`(throw されない)→ `isNetworkError` の catch を通らず「接続に失敗」表示(本来オフライン) | medium | **patch**: `if (error)` 分岐で name を見て `data/offline` |
+| F4 | blind | `sessionStorage.setItem` が投げると `startGoogleConnect` が `err` を返すが `ConnectionsSection` が無視 → ボタンが無反応 | low | **patch**: `onConnect` で戻り Result を拾って alert 表示 |
+| F5 | blind | `GoogleCallbackScreen` の成功後 `setTimeout(navigate)` がアンマウントで未クリア → 900ms 内に離脱すると余計な遷移 | low | **patch**: effect cleanup で `clearTimeout` |
+| F6 | blind/sql | `upsert_google_connection` は `security definer` + 明示 `search_path` で Supabase 既定の `extensions` を失う。`gen_random_uuid()` が `extensions` 側なら実行時エラー | low-med | **patch**: `search_path` に `extensions` 追加(防御的。実際は `gen_random_uuid` は `pg_catalog`) |
+| F7 | edge | 同時に2回 OAuth 往復すると `upsert_google_connection` が部分ユニーク索引違反 → 「exchange-failed」 | low | **defer**: 個人利用で同時実行は稀。3.4(接続解除/再接続)で `on conflict` を検討。deferred-work へ |
+| F8 | verification-gap | `oauth-exchange` / `upsert_google_connection` に自動テスト無し。関数内複製が core と一致する保証も無し | — | **reject**: spec Design Notes で承認済み(Deno/PG がローカルに無くマイグレーションと同じ目視 + 実機確認)。3.3 で Deno 環境が整えば import へ寄せる |
+| F9 | blind | `oauth-exchange` がクライアント送信の `redirectUri` を設定値より優先 | — | **reject**: 認可リクエストで使った値と厳密一致が必要なため、クライアント値優先が正しい。JWT で本人束縛済みで悪用不可。allowlist 検証は本番化時に検討 |
 
 ## Design Notes
 
