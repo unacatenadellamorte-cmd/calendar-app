@@ -32,39 +32,38 @@
   --spacing: 4px;
 }
 
-/* --- リセット --- */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* --- ベーススタイル ---
+ * `@layer base` に入れること。ここを素の(レイヤー無し)ルールにすると、
+ * Tailwind の余白系ユーティリティ(px-4 / mx-auto など。すべて @layer utilities)を
+ * 上書きしてしまう(レイヤー無し > どのレイヤーより優先)。
+ * `* { margin:0; padding:0; box-sizing:border-box }` は Tailwind v4 preflight が
+ * すでに行うので自前では持たない。 */
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
 
-html {
-  color-scheme: light dark;
-}
+  body {
+    min-height: 100dvh;
+    background: var(--color-surface-sunken);
+    color: var(--color-ink-primary);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    -webkit-font-smoothing: antialiased;
+  }
 
-body {
-  min-height: 100dvh;
-  background: var(--color-surface-sunken);
-  color: var(--color-ink-primary);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-  -webkit-font-smoothing: antialiased;
-}
+  img,
+  picture,
+  svg {
+    max-width: 100%;
+    display: block;
+  }
 
-img,
-picture,
-svg {
-  max-width: 100%;
-  display: block;
-}
-
-button {
-  font: inherit;
-  color: inherit;
+  button {
+    font: inherit;
+    color: inherit;
+  }
 }
 
 /* 数字は桁を揃える */
