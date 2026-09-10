@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-11-2026 05:21
+last_updated: 09-11-2026 05:31
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -86,14 +86,14 @@ action_items:
     action: "F5: バックエンド(Edge Function + migration RPC)のテスト方針を Epic 5 着手前に決める。推奨はデプロイ後に
       staging プロジェクトへ1回スモークを投げて 200 を確認する儀式の明記"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-4-f4-非-localhost-デプロイ前に全-edge-function-の-a"
     epic: 3
     action: "F4: 非 localhost デプロイ前に全 Edge Function の APP_ORIGIN 関数シークレットを実オリジンへ設定し、_shared/cors.ts
       のフォールバック値に本番では上書き必須のコメントを追加"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-5-f8-usegooglesync-の-runsync-成功時に-useonlin"
     epic: 3
@@ -119,14 +119,14 @@ action_items:
     action: "F4: global.css / トークン / レイアウトに触れるストーリーは実ブラウザ(npm run dev)のレイアウトスモークを受け入れ手順に明記。jsdom
       では CSS カスケードを検証できないことを spec の検証欄に注記"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-1-retro-2026-09-11.md"
   - id: "epic-1-retro-item-9-f6-バックエンド-rls-トリガ-マイグレーション-pwa-sw-オフライン"
     epic: 1
     action: "F6: バックエンド(RLS・トリガ・マイグレーション)+ PWA(SW・オフライン)のテスト/検証方針を Epic 5 着手前に決める。Epic
       3 retro の AI-3 と統合"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-1-retro-2026-09-11.md"
   - id: "epic-2-retro-item-10-f3-バックエンドのテスト方針-epic-1-retro-ai-3-epic-3"
     epic: 2
@@ -134,7 +134,7 @@ action_items:
       + RLS を実 DB or staging で1回検証する」を明示的に含める。Epic 1(CSS)/ Epic 2(採番トリガ)/ Epic 3(cron
       apikey)の3連続で同じ層の欠陥が出荷され実環境接続で発覚した事実を根拠にする"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-2-retro-2026-09-11.md"
   - id: "epic-4-retro-item-11-f2-useevents-remove-usecalendars-remove"
     epic: 4
