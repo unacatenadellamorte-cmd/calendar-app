@@ -1,6 +1,12 @@
 // Edge Function 共通の CORS ヘッダ。
-// 許可オリジンは APP_ORIGIN(関数シークレット)。未設定ならローカル開発の 5173。
-// 本番ホスティングを用意したら APP_ORIGIN をそのURLに設定する。
+// 許可オリジンは APP_ORIGIN(関数シークレット)。単一オリジンのみ許可する。
+//
+// ⚠️ フォールバックの `http://localhost:5173` は**ローカル開発専用**。
+//    localhost 以外へ SPA をデプロイする前に、必ず全 Edge Function
+//    (oauth-exchange / google-calendars / sync-calendars)の関数シークレット
+//    `APP_ORIGIN` を実オリジン(例 https://calendar.example.com)に設定すること。
+//    未設定のままだと本番からのリクエストが CORS で全部弾かれる。
+//    設定手順: docs/google-connection-setup.md / Epic 3 retro F4。
 
 const ALLOWED_ORIGIN = Deno.env.get('APP_ORIGIN') ?? 'http://localhost:5173';
 

@@ -122,7 +122,7 @@ graph TD
 | エラー形 | data-access は `Result<T, AppError>` を返す(throw しない)。`AppError` は `{ kind, messageKey }`。UI は `messageKey` を EXPERIENCE.md Voice の文言に対応づける |
 | 状態変更 | 書き込みは data-access リポジトリ関数のみ。楽観更新 → 失敗時ロールバック。オフラインは書き込みキュー(順序保持)→ オンライン復帰でフラッシュ |
 | 論理削除 | 削除は `deleted_at` を立てる(取り込み予定の外部消失・ローカル予定の Undo 対応)。data-access の共通ヘルパで全読み取りが `deleted_at IS NULL` を強制 |
-| テスト | `packages/core`(domain)は単体テスト必須(選抜・優先度・給料計算)。data-access は Supabase ローカル(`supabase start`)で結合テスト。Edge Function は Google API をモックして単体 |
+| テスト | `packages/core`(domain)は単体テスト必須(選抜・優先度・給料計算)。~~data-access は Supabase ローカル(`supabase start`)で結合テスト。Edge Function は Google API をモックして単体~~ **← 2026-09-11 修正: ローカルに Docker が無く `supabase start` 不可、Deno も無い。実態と代償コントロールは `docs/testing-and-verification.md` に明文化(Epic 1〜3 retro 共通アイテム)** |
 | 認証 | Supabase Auth(メール+パスワード / Google)。全テーブル RLS で `user_id = auth.uid()`。未ログインはローカルキャッシュのみで動作(FR-16、Google 接続時にログイン要求) |
 | 秘匿情報 | `provider_refresh_token` は Supabase Vault / 暗号化カラム。Edge Function からのみ復号。クライアントへ返さない |
 | 同期の実行 | Edge Function `sync-calendars`。pg_cron スケジュール + 手動トリガ。冪等 upsert + 論理削除 |
