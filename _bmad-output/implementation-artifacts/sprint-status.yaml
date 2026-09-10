@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-11-2026 00:30
+last_updated: 09-11-2026 03:51
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   3-2-取り込むカレンダーの選択と一覧表示: done
   3-3-定期取り込みと手動取り込み-sync-calendars-edge-function: done
   3-4-取り込み失敗の表示と接続解除: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   epic-4: in-progress
   4-1-お気に入りシフトの登録: review
@@ -66,3 +66,45 @@ development_status:
   4-3-実働時間の計算-packages-core-pay-calc: review
   4-4-当月の給料見込みとトップ画面表示-pay-card: review
   epic-4-retrospective: optional
+action_items:
+  - id: "epic-3-retro-item-1-f1-core-と-edge-の-normalizegoogleevent-no"
+    epic: 3
+    action: "F1: core と Edge の normalizeGoogleEvent / normalizeHexColor が同一出力を返すことを担保する(共有ファイル化
+      or golden fixture の parity テスト)。normalizeHexColor の失敗時挙動の差を意図的に固定するか揃えるかを先に決める"
+    owner: "Ryo"
+    status: open
+    ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
+  - id: "epic-3-retro-item-2-f2-接続セットアップ手順-docs-に-edge-function-ゲートウェ"
+    epic: 3
+    action: "F2: 接続セットアップ手順(docs)に Edge Function ゲートウェイは Authorization と apikey の両方が必須と明記し、net.http_post
+      / cron の例を両ヘッダ入りに統一"
+    owner: "Ryo"
+    status: open
+    ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
+  - id: "epic-3-retro-item-3-f5-バックエンド-edge-function-migration-rpc-のテ"
+    epic: 3
+    action: "F5: バックエンド(Edge Function + migration RPC)のテスト方針を Epic 5 着手前に決める。推奨はデプロイ後に
+      staging プロジェクトへ1回スモークを投げて 200 を確認する儀式の明記"
+    owner: "Ryo"
+    status: open
+    ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
+  - id: "epic-3-retro-item-4-f4-非-localhost-デプロイ前に全-edge-function-の-a"
+    epic: 3
+    action: "F4: 非 localhost デプロイ前に全 Edge Function の APP_ORIGIN 関数シークレットを実オリジンへ設定し、_shared/cors.ts
+      のフォールバック値に本番では上書き必須のコメントを追加"
+    owner: "Ryo"
+    status: open
+    ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
+  - id: "epic-3-retro-item-5-f8-usegooglesync-の-runsync-成功時に-useonlin"
+    epic: 3
+    action: "F8: useGoogleSync の runSync 成功時に useOnline().refetch() を呼び、今すぐ取り込み後に画面が即更新されるようにする(3.4
+      の接続解除と挙動を揃える)"
+    owner: "Ryo"
+    status: open
+    ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
+  - id: "epic-3-retro-item-6-f7-env-local-append-txt-を-git-rm-し-gitig"
+    epic: 3
+    action: "F7: env.local.append.txt を git rm し、.gitignore 済みか確認"
+    owner: "Ryo"
+    status: open
+    ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
