@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-11-2026 04:40
+last_updated: 09-11-2026 04:56
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -79,7 +79,7 @@ action_items:
     action: "F2: 接続セットアップ手順(docs)に Edge Function ゲートウェイは Authorization と apikey の両方が必須と明記し、net.http_post
       / cron の例を両ヘッダ入りに統一"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-3-f5-バックエンド-edge-function-migration-rpc-のテ"
     epic: 3
@@ -100,13 +100,13 @@ action_items:
     action: "F8: useGoogleSync の runSync 成功時に useOnline().refetch() を呼び、今すぐ取り込み後に画面が即更新されるようにする(3.4
       の接続解除と挙動を揃える)"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-6-f7-env-local-append-txt-を-git-rm-し-gitig"
     epic: 3
     action: "F7: env.local.append.txt を git rm し、.gitignore 済みか確認"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-1-retro-item-7-f2-data-access-の全読み取りに-deleted_at-is-nul"
     epic: 1
@@ -141,11 +141,11 @@ action_items:
     action: "F2: useEvents.remove / useCalendars.remove に pendingRef 差し替え前の clearTimeout(pendingRef.current?.timer)
       を1行ずつ足す(useShiftTemplates と揃える)。deferred-work.md spec-4-1 の該当項目をクローズ"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
   - id: "epic-4-retro-item-12-minor-shifttemplateformsheet-の正常作成成功時に-画"
     epic: 4
     action: "minor: ShiftTemplateFormSheet の正常作成成功時に、画面レベルのバリデーションエラーバナーをクリアする"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-4-retro-2026-09-11.md"
