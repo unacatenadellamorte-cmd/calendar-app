@@ -7,6 +7,7 @@ import { AuthScreen } from '@/features/auth/ui/AuthScreen';
 import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
 import { ShiftTemplatesScreen } from '@/features/shifts/ui/ShiftTemplatesScreen';
 import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
+import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPicker';
 
 /** `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)を CalendarScreen に渡す。 */
 function CalendarRoute() {
@@ -33,6 +34,8 @@ const routes: RouteObject[] = [
       { path: 'shift-templates', element: <ShiftTemplatesScreen /> },
       // タブ外。Google OAuth のリダイレクト先(Story 3.1)。
       { path: 'connections/google/callback', element: <GoogleCallbackScreen /> },
+      // タブ外。設定の接続欄から遷移(Story 3.2)。
+      { path: 'connections/google/calendars', element: <GoogleCalendarPicker /> },
     ],
   },
 ];

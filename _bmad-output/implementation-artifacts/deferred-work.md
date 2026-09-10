@@ -60,3 +60,7 @@
 - source_spec: `spec-3-1-google-connect-oauth.md`
   summary: `upsert_google_connection` は「既存行を select → 無ければ insert」で、同一ユーザーが同時に2回 OAuth 往復すると `connections_one_active_per_user` 部分ユニーク索引違反になり「接続に失敗しました」が出る。
   evidence: 個人利用で Google 接続を同時に2回走らせるのは稀。Story 3.4(接続解除・再接続)で `insert ... on conflict (user_id, provider) where deleted_at is null do update` に寄せるか、アドバイザリロックで直列化する。現状は1回リトライで解消する。
+
+- source_spec: `spec-3-2-google-calendar-selection.md`
+  summary: `calendars_set_priority` トリガの採番 `select coalesce(max(priority), -1) + 1` は非アトミックで、カレンダーを同時に2つ作る(ローカル連続作成・Google カレンダーの同時トグル・OAuth 往復2回)と `calendars_priority_uniq` 違反になりうる。
+  evidence: Story 2.1 由来の既存問題。3.1 F7 と同根。個人利用では稀。`calendars_set_priority` トリガと `set_google_calendar_selection` / `upsert_google_connection` の calendars 作成箇所に `pg_advisory_xact_lock(hashtext('calendars_priority:' || user_id))` を1行入れるか、insert を `on conflict` でリトライして全経路をまとめて直す。

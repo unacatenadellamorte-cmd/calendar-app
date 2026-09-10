@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import { env } from './env';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
+import { invokeFn } from './edge';
 
 /**
  * Google 接続の data-access レイヤ(Story 3.1、ARCHITECTURE-SPINE AD-3 / AD-9)。
@@ -109,27 +110,22 @@ export async function completeGoogleConnect(params: URLSearchParams): Promise<
     return err(appError('connection/state-mismatch', 'connection/state-mismatch'));
   }
 
-  try {
-    const { data, error } = await supabase.functions.invoke<{ googleEmail: string | null }>(
-      'oauth-exchange',
-      { body: { code, redirectUri: googleRedirectUri() } },
-    );
-    if (error) {
-      // supabase-js は非2xx/ネットワーク失敗を throw せず error として返す。
-      // FunctionsFetchError(関数へ到達できない)はオフライン扱い。
-      const name = (error as { name?: string }).name;
-      if (name === 'FunctionsFetchError' || isNetworkError(error)) {
-        return err(appError('data/offline', 'data/offline', error));
-      }
-      // FunctionsHttpError は context(Response)本文に { error: messageKey } を持つ。
-      const key = await extractFunctionErrorKey(error);
-      return err(appError(key, key, error));
-    }
-    return ok({ googleEmail: data?.googleEmail ?? null });
-  } catch (e) {
-    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
-    return err(appError('connection/exchange-failed', 'connection/exchange-failed', e));
-  }
+  const result = await invokeFn<{ googleEmail: string | null } | null>(
+    'oauth-exchange',
+    { code, redirectUri: googleRedirectUri() },
+    slugToConnectionKey,
+    'connection/exchange-failed',
+  );
+  if (!result.ok) return result;
+  return ok({ googleEmail: result.value?.googleEmail ?? null });
+}
+
+/** oauth-exchange の error slug をアプリの messageKey へ。 */
+function slugToConnectionKey(slug: string): string {
+  if (slug === 'not-authenticated') return 'connection/not-authenticated';
+  if (slug === 'no-refresh-token') return 'connection/no-refresh-token';
+  if (slug === 'cancelled') return 'connection/cancelled';
+  return 'connection/exchange-failed';
 }
 
 /** 自分の有効な Google 接続を1件返す(無ければ null)。 */
@@ -165,29 +161,4 @@ function safeClearState(): void {
   } catch {
     // no-op
   }
-}
-
-const KNOWN_CONNECTION_KEYS = new Set([
-  'connection/exchange-failed',
-  'connection/no-refresh-token',
-  'connection/cancelled',
-  'connection/state-mismatch',
-  'connection/not-authenticated',
-]);
-
-/** Edge Function のエラー応答本文から messageKey を取り出す(取れなければ汎用)。 */
-async function extractFunctionErrorKey(error: unknown): Promise<string> {
-  const ctx = (error as { context?: unknown })?.context;
-  if (ctx instanceof Response) {
-    try {
-      const body = await ctx.clone().json();
-      const raw = typeof body?.error === 'string' ? body.error : '';
-      if (raw === 'not-authenticated') return 'connection/not-authenticated';
-      if (KNOWN_CONNECTION_KEYS.has(`connection/${raw}`)) return `connection/${raw}`;
-      if (KNOWN_CONNECTION_KEYS.has(raw)) return raw;
-    } catch {
-      // フォールスルー
-    }
-  }
-  return 'connection/exchange-failed';
 }

@@ -25,6 +25,26 @@ export const CALENDAR_COLORS: readonly CalendarColor[] = [
 /** シフト用カレンダーの既定色(緑)。 */
 export const SHIFT_CALENDAR_COLOR = '#009E73';
 
+/** 取り込んだ外部カレンダーで色が取れなかったときの既定色(灰)。 */
+export const EXTERNAL_DEFAULT_COLOR = '#7A7A7A';
+
+/**
+ * 外部サービス(Google 等)由来の色文字列を `#RRGGBB`(大文字)に正規化する。
+ * `#RGB` は各桁を2倍に展開。`#RRGGBB` はそのまま大文字化。
+ * それ以外(名前付き色・rgb()・null・undefined)は既定色。
+ * `calendars.color` の CHECK(`^#[0-9A-Fa-f]{6}$`)を必ず満たす戻り値。
+ */
+export function normalizeHexColor(input: string | null | undefined): string {
+  if (typeof input !== 'string') return EXTERNAL_DEFAULT_COLOR;
+  const value = input.trim();
+  const short = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/.exec(value);
+  if (short) {
+    return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toUpperCase();
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value.toUpperCase();
+  return EXTERNAL_DEFAULT_COLOR;
+}
+
 const PRESET_HEXES = new Set(CALENDAR_COLORS.map((c) => c.hex));
 
 /** プリセットに含まれる色か(大文字小文字を無視)。 */
