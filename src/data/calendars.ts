@@ -1,6 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { byPriorityValue } from '@core';
 import { supabase } from './supabase';
+import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isPresetColor, SHIFT_CALENDAR_COLOR } from './calendar-colors';
 import { isNetworkError, isOffline } from './net';
@@ -101,17 +102,14 @@ export async function listCalendars(): Promise<Result<Calendar[]>> {
   if (!supabase) return err(UNAVAILABLE);
   if (isOffline()) return ok(sortCalendars(await cacheGetAll('calendars')));
   try {
-    const { data, error } = await supabase
-      .from('calendars')
-      .select(COLUMNS)
-      .is('deleted_at', null)
+    const { data, error } = await selectActive('calendars', COLUMNS)
       .order('priority', { ascending: true })
       .order('created_at', { ascending: true });
     if (error) {
       if (isNetworkError(error)) return ok(sortCalendars(await cacheGetAll('calendars')));
       return err(fromPostgrest(error));
     }
-    const mapped = (data as CalendarRow[]).map(toCalendar);
+    const mapped = (data as unknown as CalendarRow[]).map(toCalendar);
     await cacheReplace('calendars', mapped);
     return ok(mapped);
   } catch (e) {
@@ -288,10 +286,7 @@ export async function ensureShiftCalendar(): Promise<Result<Calendar>> {
   }
 
   try {
-    const { data: existing, error: selectError } = await supabase
-      .from('calendars')
-      .select(COLUMNS)
-      .is('deleted_at', null)
+    const { data: existing, error: selectError } = await selectActive('calendars', COLUMNS)
       .eq('is_shift', true)
       .limit(1)
       .maybeSingle();
@@ -303,7 +298,7 @@ export async function ensureShiftCalendar(): Promise<Result<Calendar>> {
       return err(fromPostgrest(selectError));
     }
     if (existing) {
-      const cal = toCalendar(existing as CalendarRow);
+      const cal = toCalendar(existing as unknown as CalendarRow);
       await cachePut('calendars', cal);
       return ok(cal);
     }

@@ -14,7 +14,8 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync:edge-shared": "node scripts/sync-edge-shared.mjs"
   },
   "dependencies": {
     "@calendar-app/core": "*",

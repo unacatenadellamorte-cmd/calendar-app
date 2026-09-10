@@ -2,6 +2,8 @@
 // refresh_token → access_token の交換と Google への読み取りリクエストはここに集約する。
 // 書き込みスコープは要求しない。アプリから Google へ書き戻す関数はコードベースに置かない。
 
+import type { GoogleEventRaw } from './google-events.ts';
+
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
 export type AccessTokenResult =
@@ -70,16 +72,6 @@ export async function fetchCalendarList(accessToken: string): Promise<GoogleCale
     pageToken = typeof body.nextPageToken === 'string' ? body.nextPageToken : undefined;
   } while (pageToken);
   return entries;
-}
-
-/** Google Calendar API のイベント(sync-calendars が使う部分だけ)。 */
-export interface GoogleEventRaw {
-  id?: string;
-  status?: string;
-  summary?: string;
-  description?: string;
-  start?: { date?: string; dateTime?: string };
-  end?: { date?: string; dateTime?: string };
 }
 
 /**

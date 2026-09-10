@@ -68,9 +68,36 @@ export default tseslint.config(
     },
   },
   {
+    // 論理削除の除外は selectActive(src/data/soft-delete.ts)に一本化する
+    // (epics.md 1.4 AC3。書き忘れ防止)。読み取りに .is('deleted_at', null) を
+    // 直書きしない ── 唯一の例外がヘルパ本体。
+    files: ['src/data/**/*.ts'],
+    ignores: ['src/data/soft-delete.ts', 'src/data/**/*.{test,spec}.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='is'][arguments.0.value='deleted_at']",
+          message:
+            "読み取りは selectActive('table', columns) を使う。.is('deleted_at', null) を直書きしない(src/data/soft-delete.ts)。",
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.{test,spec}.{ts,tsx}', 'src/test/**'],
     rules: {
       'import/no-restricted-paths': 'off',
+    },
+  },
+  {
+    // ビルド補助スクリプト(Node、ESM)。
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node },
     },
   },
 );
