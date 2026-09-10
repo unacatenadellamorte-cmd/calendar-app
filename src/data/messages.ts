@@ -36,6 +36,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'connection/reauth-needed': 'Google を接続し直してください',
   'connection/not-connected': '先に Google を接続してください',
   'connection/calendars-failed': 'カレンダー一覧を取得できませんでした。もう一度お試しください',
+  'connection/disconnect-failed': '接続の解除に失敗しました。もう一度お試しください',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };

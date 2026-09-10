@@ -28,6 +28,17 @@ const hookValue = {
 };
 vi.mock('../model/useCalendars', () => ({ useCalendars: () => hookValue }));
 
+const syncStatus = {
+  errorByCalendarId: new Map<string, string>(),
+  retrying: false,
+  retryErrorKey: null as string | null,
+  retry: vi.fn(),
+  reload: vi.fn(),
+};
+vi.mock('@/features/connections/model/useCalendarSyncStatus', () => ({
+  useCalendarSyncStatus: () => syncStatus,
+}));
+
 const { CalendarsScreen } = await import('./CalendarsScreen');
 
 const cal = (over: Partial<Calendar> = {}): Calendar => ({
@@ -60,6 +71,11 @@ beforeEach(() => {
   Object.values(hookValue).forEach(
     (v) => typeof v === 'function' && (v as ReturnType<typeof vi.fn>).mockReset?.(),
   );
+  syncStatus.errorByCalendarId = new Map();
+  syncStatus.retrying = false;
+  syncStatus.retryErrorKey = null;
+  syncStatus.retry.mockReset();
+  syncStatus.reload.mockReset();
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -134,5 +150,28 @@ describe('CalendarsScreen', () => {
     renderScreen();
     expect(screen.getByText(/「個人」を削除しました/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '取り消す' })).toBeInTheDocument();
+  });
+
+  it('取り込み失敗のある google 行に警告 + 再試行、他の行は無傷', async () => {
+    const user = userEvent.setup();
+    hookValue.calendars = [
+      cal({ id: 'g1', name: 'ゴミ', source: 'google' }),
+      cal({ id: 'l1', name: '仕事', source: 'local', priority: 1 }),
+    ];
+    syncStatus.errorByCalendarId = new Map([['g1', 'sync-failed']]);
+    renderScreen();
+    expect(screen.getByText('取り込めませんでした')).toBeInTheDocument();
+    // local 行には警告が付かない(1つだけ)
+    expect(screen.getAllByText('取り込めませんでした')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: '再試行' }));
+    expect(syncStatus.retry).toHaveBeenCalled();
+  });
+
+  it('再試行が失敗したら画面上部に文言を出す', () => {
+    hookValue.calendars = [cal({ id: 'g1', name: 'ゴミ', source: 'google' })];
+    syncStatus.errorByCalendarId = new Map([['g1', 'sync-failed']]);
+    syncStatus.retryErrorKey = 'sync/failed';
+    renderScreen();
+    expect(screen.getByText('取り込みに失敗しました。時間をおいてもう一度お試しください')).toBeInTheDocument();
   });
 });

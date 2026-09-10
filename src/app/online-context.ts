@@ -7,7 +7,7 @@ import { createContext, useContext } from 'react';
 
 export interface OnlineState {
   online: boolean;
-  /** オンライン復帰でフラッシュ後に増える。hooks はこれを見て reload する。 */
+  /** オンライン復帰でフラッシュ後、または `refetch()` で増える。hooks はこれを見て reload する。 */
   syncNonce: number;
   /** 未送信の outbox 件数。 */
   pendingCount: number;
@@ -16,6 +16,8 @@ export interface OnlineState {
   /** フラッシュで項目を破棄したときの一度きりの通知(messageKey 解決済み文言)。 */
   syncNotice: string | null;
   dismissSyncNotice: () => void;
+  /** `syncNonce` を進め、events / calendars 等の購読 hooks に再取得させる(接続解除など、Story 3.4)。 */
+  refetch: () => void;
 }
 
 export const defaultOnlineState: OnlineState = {
@@ -25,6 +27,7 @@ export const defaultOnlineState: OnlineState = {
   flushing: false,
   syncNotice: null,
   dismissSyncNotice: () => {},
+  refetch: () => {},
 };
 
 export const OnlineContext = createContext<OnlineState>(defaultOnlineState);

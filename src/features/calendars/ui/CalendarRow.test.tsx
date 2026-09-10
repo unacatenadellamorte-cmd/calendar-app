@@ -71,4 +71,33 @@ describe('CalendarRow', () => {
     await user.click(screen.getByRole('checkbox'));
     expect(onToggleVisible).toHaveBeenCalledWith(calendar);
   });
+
+  it('google 行 + syncError: 「取り込めませんでした」+「再試行」を出し、onRetry を呼ぶ', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    setup({ calendar: cal({ source: 'google', name: 'ゴミ' }), syncError: 'sync-failed', onRetry });
+    expect(screen.getByText('取り込めませんでした')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '再試行' }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('retrying 中は再試行ボタンが無効', () => {
+    setup({
+      calendar: cal({ source: 'google' }),
+      syncError: 'sync-failed',
+      onRetry: vi.fn(),
+      retrying: true,
+    });
+    expect(screen.getByRole('button', { name: '取り込み中…' })).toBeDisabled();
+  });
+
+  it('local 行は syncError があっても失敗表示を出さない', () => {
+    setup({ calendar: cal({ source: 'local' }), syncError: 'sync-failed', onRetry: vi.fn() });
+    expect(screen.queryByText('取り込めませんでした')).not.toBeInTheDocument();
+  });
+
+  it('syncError なしなら失敗行は出ない', () => {
+    setup({ calendar: cal({ source: 'google' }), syncError: null });
+    expect(screen.queryByText('取り込めませんでした')).not.toBeInTheDocument();
+  });
 });

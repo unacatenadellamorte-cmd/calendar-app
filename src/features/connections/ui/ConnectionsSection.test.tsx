@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ok } from '@/data/result';
 
@@ -8,11 +8,15 @@ const startGoogleConnect = vi.fn();
 const getConnection = vi.fn();
 const syncGoogleCalendarsNow = vi.fn();
 const listSyncState = vi.fn();
+const disconnectGoogle = vi.fn();
+const getDisconnectImpact = vi.fn();
+const refetch = vi.fn();
 let authState: { state: string } = { state: 'authenticated' };
 let envValue = { hasSupabase: true, hasGoogleOauth: true };
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigate }));
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
+vi.mock('@/app/online-context', () => ({ useOnline: () => ({ refetch }) }));
 vi.mock('@/data/env', () => ({
   get env() {
     return envValue;
@@ -21,6 +25,8 @@ vi.mock('@/data/env', () => ({
 vi.mock('@/data/connections', () => ({
   startGoogleConnect: () => startGoogleConnect(),
   getConnection: () => getConnection(),
+  disconnectGoogle: () => disconnectGoogle(),
+  getDisconnectImpact: (...a: unknown[]) => getDisconnectImpact(...a),
   GOOGLE_CALLBACK_PATH: '/connections/google/callback',
 }));
 vi.mock('@/data/google-sync', () => ({
@@ -38,6 +44,9 @@ beforeEach(() => {
   getConnection.mockReset().mockResolvedValue(ok(null));
   syncGoogleCalendarsNow.mockReset().mockResolvedValue(ok({ synced: [], errors: [] }));
   listSyncState.mockReset().mockResolvedValue(ok([]));
+  disconnectGoogle.mockReset().mockResolvedValue(ok({ events: 252, calendars: 1 }));
+  getDisconnectImpact.mockReset().mockResolvedValue(ok({ events: 252, calendars: 1 }));
+  refetch.mockReset();
   authState = { state: 'authenticated' };
   envValue = { hasSupabase: true, hasGoogleOauth: true };
 });
@@ -147,5 +156,64 @@ describe('ConnectionsSection', () => {
     await waitFor(() =>
       expect(screen.getByText('オフラインです。接続すると同期します')).toBeInTheDocument(),
     );
+  });
+
+  it('接続済み: 「接続を解除」→ 確認シートに影響件数、確定で disconnectGoogle + refetch + 未接続へ', async () => {
+    getConnection.mockResolvedValue(connected);
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '接続を解除' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Google 接続を解除' });
+    await waitFor(() => expect(dialog).toHaveTextContent('予定 252 件'));
+
+    // 解除後は getConnection が null を返す(接続欄が未接続へ)
+    getConnection.mockResolvedValue(ok(null));
+    await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
+
+    expect(disconnectGoogle).toHaveBeenCalledTimes(1);
+    expect(refetch).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Google を接続' })).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/接続を解除しました/)).toBeInTheDocument();
+  });
+
+  it('接続解除の RPC が失敗: シートにエラー、接続状態は変わらない', async () => {
+    getConnection.mockResolvedValue(connected);
+    disconnectGoogle.mockResolvedValue({
+      ok: false,
+      error: { kind: 'connection/disconnect-failed', messageKey: 'connection/disconnect-failed' },
+    });
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '接続を解除' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Google 接続を解除' });
+    await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
+    await waitFor(() =>
+      expect(within(dialog).getByText('接続の解除に失敗しました。もう一度お試しください')).toBeInTheDocument(),
+    );
+    expect(screen.getByText('me@gmail.com')).toBeInTheDocument();
+  });
+
+  it('未接続 / guest: 「接続を解除」は出さない', async () => {
+    render(<ConnectionsSection />); // getConnection = ok(null)
+    await screen.findByRole('button', { name: 'Google を接続' });
+    expect(screen.queryByRole('button', { name: '接続を解除' })).not.toBeInTheDocument();
+  });
+
+  it('影響件数の取得に失敗しても解除は可能(件数は「—」)', async () => {
+    getConnection.mockResolvedValue(connected);
+    getDisconnectImpact.mockResolvedValue({
+      ok: false,
+      error: { kind: 'data/query', messageKey: 'data/query' },
+    });
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '接続を解除' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Google 接続を解除' });
+    expect(dialog).toHaveTextContent('予定 —');
+    await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
+    expect(disconnectGoogle).toHaveBeenCalledTimes(1);
   });
 });

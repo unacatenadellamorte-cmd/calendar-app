@@ -7,9 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const STATE_KEY = 'calendar-app.google-oauth-state';
 
-let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
+let queryResult: { data: unknown; error: unknown; count?: number } = { data: null, error: null };
 let invokeResult: { data: unknown; error: unknown } = { data: null, error: null };
+let rpcResult: { data: unknown; error: unknown } = { data: null, error: null };
 const invoke = vi.fn(async () => invokeResult);
+const rpc = vi.fn(async () => rpcResult);
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
@@ -17,11 +19,13 @@ function makeChain() {
     chain[m] = () => chain;
   }
   chain.maybeSingle = async () => queryResult;
+  // .is() 等で終端して await するクエリ用(getDisconnectImpact)。
+  chain.then = (resolve: (v: unknown) => unknown) => resolve(queryResult);
   return chain;
 }
 const from = vi.fn(() => makeChain());
 
-let supabaseValue: unknown = { from, functions: { invoke } };
+let supabaseValue: unknown = { from, functions: { invoke }, rpc };
 interface FakeEnv {
   supabaseUrl: string | undefined;
   supabaseAnonKey: string | undefined;
@@ -76,9 +80,11 @@ beforeEach(() => {
   vi.resetModules();
   queryResult = { data: null, error: null };
   invokeResult = { data: null, error: null };
+  rpcResult = { data: null, error: null };
   invoke.mockClear();
+  rpc.mockClear();
   from.mockClear();
-  supabaseValue = { from, functions: { invoke } };
+  supabaseValue = { from, functions: { invoke }, rpc };
   envValue = {
     supabaseUrl: 'http://x',
     supabaseAnonKey: 'k',
@@ -211,5 +217,58 @@ describe('getConnection', () => {
     const r = await getConnection();
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/query');
+  });
+});
+
+describe('getDisconnectImpact', () => {
+  it('events / calendars の件数を返す', async () => {
+    queryResult = { data: null, error: null, count: 252 };
+    const { getDisconnectImpact } = await load();
+    const r = await getDisconnectImpact('conn1');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toEqual({ events: 252, calendars: 252 });
+  });
+
+  it('クエリエラーは data/query', async () => {
+    queryResult = { data: null, error: { message: 'x' } };
+    const { getDisconnectImpact } = await load();
+    const r = await getDisconnectImpact('conn1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('data/query');
+  });
+});
+
+describe('disconnectGoogle', () => {
+  it('RPC の返り値(消えた件数)を返す', async () => {
+    rpcResult = { data: { deleted: true, events: 252, calendars: 1 }, error: null };
+    const { disconnectGoogle } = await load();
+    const r = await disconnectGoogle();
+    expect(rpc).toHaveBeenCalledWith('disconnect_google_connection');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toEqual({ events: 252, calendars: 1 });
+  });
+
+  it('接続が無くても冪等に成功(deleted:false)', async () => {
+    rpcResult = { data: { deleted: false, events: 0, calendars: 0 }, error: null };
+    const { disconnectGoogle } = await load();
+    const r = await disconnectGoogle();
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toEqual({ events: 0, calendars: 0 });
+  });
+
+  it('RPC エラーは connection/disconnect-failed', async () => {
+    rpcResult = { data: null, error: { message: 'boom' } };
+    const { disconnectGoogle } = await load();
+    const r = await disconnectGoogle();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('connection/disconnect-failed');
+  });
+
+  it('ネットワーク障害はオフライン扱い', async () => {
+    rpcResult = { data: null, error: { message: 'Failed to fetch' } };
+    const { disconnectGoogle } = await load();
+    const r = await disconnectGoogle();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('data/offline');
   });
 });

@@ -3,6 +3,7 @@ import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { resolveMessage } from '@/data/messages';
 import type { Calendar } from '@/data/calendars';
+import { useCalendarSyncStatus } from '@/features/connections/model/useCalendarSyncStatus';
 import { useCalendars } from '../model/useCalendars';
 import { CalendarRow } from './CalendarRow';
 import { CalendarFormSheet } from './CalendarFormSheet';
@@ -11,6 +12,7 @@ export function CalendarsScreen() {
   const { state } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
+  const sync = useCalendarSyncStatus(enabled);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Calendar | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -72,6 +74,12 @@ export function CalendarsScreen() {
         </p>
       )}
 
+      {sync.retryErrorKey && (
+        <p role="alert" className="mb-3 text-meta text-danger">
+          {resolveMessage(sync.retryErrorKey)}
+        </p>
+      )}
+
       {cal.pendingDelete && (
         <p className="mb-3 flex items-center justify-between rounded-sm bg-surface-raised px-3 py-2 text-meta text-ink-secondary">
           「{cal.pendingDelete.name}」を削除しました
@@ -101,6 +109,9 @@ export function CalendarsScreen() {
               onDragStartRow={setDraggedId}
               onDropRow={dropOn}
               dragging={draggedId === c.id}
+              syncError={sync.errorByCalendarId.get(c.id) ?? null}
+              onRetry={() => void sync.retry()}
+              retrying={sync.retrying}
             />
           ))}
         </ul>

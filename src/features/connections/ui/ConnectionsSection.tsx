@@ -1,28 +1,70 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/auth-context';
+import { useOnline } from '@/app/online-context';
 import { env } from '@/data/env';
 import { resolveMessage } from '@/data/messages';
-import { startGoogleConnect } from '@/data/connections';
+import {
+  disconnectGoogle,
+  getDisconnectImpact,
+  startGoogleConnect,
+  type DisconnectImpact,
+} from '@/data/connections';
 import { listSyncState } from '@/data/google-sync';
 import { formatEventTime } from '@/lib/datetime';
 import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
 import { useGoogleSync } from '@/features/connections/model/useGoogleSync';
+import { DisconnectSheet } from './DisconnectSheet';
 
 /**
- * 設定画面の「カレンダー接続」欄(Story 3.1 / 3.3)。
+ * 設定画面の「カレンダー接続」欄(Story 3.1 / 3.3 / 3.4)。
  * 状態別:
  *  - unavailable / OAuth 未設定: 無効表示
  *  - guest:          ログインへ誘導
- *  - authenticated:  接続中なら email + 取り込むカレンダー導線 + 「今すぐ取り込み」、未接続なら「Google を接続」
+ *  - authenticated:  接続中なら email + 取り込むカレンダー導線 + 「今すぐ取り込み」+「接続を解除」、未接続なら「Google を接続」
  */
 export function ConnectionsSection() {
   const { state } = useAuth();
   const navigate = useNavigate();
-  const { connection, loading, errorKey } = useGoogleConnection(
+  const { refetch } = useOnline();
+  const { connection, loading, errorKey, refresh } = useGoogleConnection(
     env.hasSupabase && env.hasGoogleOauth,
   );
   const [actionErrorKey, setActionErrorKey] = useState<string | null>(null);
+
+  // 接続解除の確認シート(Story 3.4)。
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [impact, setImpact] = useState<DisconnectImpact | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnectErrorKey, setDisconnectErrorKey] = useState<string | null>(null);
+  const [disconnectedLine, setDisconnectedLine] = useState<string | null>(null);
+
+  const openDisconnect = () => {
+    if (!connection) return;
+    setImpact(null);
+    setDisconnectErrorKey(null);
+    setDisconnectOpen(true);
+    void getDisconnectImpact(connection.id).then((r) => {
+      if (r.ok) setImpact(r.value);
+    });
+  };
+
+  const confirmDisconnect = async () => {
+    setDisconnecting(true);
+    setDisconnectErrorKey(null);
+    const result = await disconnectGoogle();
+    setDisconnecting(false);
+    if (!result.ok) {
+      setDisconnectErrorKey(result.error.messageKey);
+      return;
+    }
+    setDisconnectOpen(false);
+    setDisconnectedLine(
+      `接続を解除しました(予定 ${result.value.events} 件を削除)`,
+    );
+    refresh();
+    refetch();
+  };
 
   // 取り込み状態(全体の最終取り込み時刻)。取り込み後に取り直す。
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -134,6 +176,14 @@ export function ConnectionsSection() {
                 </p>
               )
             )}
+
+            <button
+              type="button"
+              onClick={openDisconnect}
+              className="mt-3 min-h-11 w-full rounded-sm px-4 text-meta text-danger"
+            >
+              接続を解除
+            </button>
           </>
         ) : (
           <>
@@ -141,6 +191,11 @@ export function ConnectionsSection() {
             <p className="mt-1 text-meta text-ink-secondary">
               選んだカレンダーを読み取り専用で取り込みます。
             </p>
+            {disconnectedLine && (
+              <p role="status" className="mt-1 text-meta text-ink-secondary">
+                {disconnectedLine}
+              </p>
+            )}
             <button
               type="button"
               onClick={onConnect}
@@ -157,6 +212,15 @@ export function ConnectionsSection() {
           </p>
         )}
       </div>
+
+      <DisconnectSheet
+        open={disconnectOpen}
+        impact={impact}
+        busy={disconnecting}
+        errorKey={disconnectErrorKey}
+        onConfirm={() => void confirmDisconnect()}
+        onClose={() => setDisconnectOpen(false)}
+      />
     </section>
   );
 }

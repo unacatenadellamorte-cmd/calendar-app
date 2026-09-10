@@ -12,6 +12,10 @@ interface CalendarRowProps {
   onDragStartRow: (id: string) => void;
   onDropRow: (targetId: string) => void;
   dragging: boolean;
+  /** 直近の取り込み失敗(Story 3.4)。あれば警告行 + 再試行を出す(google のみ)。 */
+  syncError?: string | null;
+  onRetry?: () => void;
+  retrying?: boolean;
 }
 
 const SOURCE_LABEL: Record<Calendar['source'], string> = {
@@ -33,7 +37,11 @@ export function CalendarRow({
   onDragStartRow,
   onDropRow,
   dragging,
+  syncError,
+  onRetry,
+  retrying,
 }: CalendarRowProps) {
+  const showSyncError = calendar.source === 'google' && Boolean(syncError);
   return (
     <li
       draggable
@@ -47,10 +55,11 @@ export function CalendarRow({
         onDropRow(calendar.id);
       }}
       className={[
-        'flex items-center gap-1 border-b border-border-hairline px-1 last:border-b-0',
+        'border-b border-border-hairline last:border-b-0',
         dragging ? 'opacity-50' : '',
       ].join(' ')}
     >
+     <div className="flex items-center gap-1 px-1">
       <span
         aria-hidden="true"
         className="w-5 flex-none text-center text-meta tabular text-ink-secondary"
@@ -115,6 +124,23 @@ export function CalendarRow({
           className="h-5 w-5 accent-[var(--color-accent)]"
         />
       </label>
+     </div>
+
+      {showSyncError && (
+        <div className="flex items-center justify-between gap-2 px-3 pb-2 pl-8">
+          <span className="text-meta text-danger">取り込めませんでした</span>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={retrying}
+              className="h-11 shrink-0 px-2 text-meta text-accent disabled:opacity-50"
+            >
+              {retrying ? '取り込み中…' : '再試行'}
+            </button>
+          )}
+        </div>
+      )}
     </li>
   );
 }

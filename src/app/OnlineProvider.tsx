@@ -70,6 +70,8 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     };
   }, [runFlush, refreshPending]);
 
+  const refetch = useCallback(() => setSyncNonce((n) => n + 1), []);
+
   const value: OnlineState = {
     online,
     syncNonce,
@@ -77,6 +79,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     flushing,
     syncNotice,
     dismissSyncNotice: () => setSyncNotice(null),
+    refetch,
   };
 
   return <OnlineContext.Provider value={value}>{children}</OnlineContext.Provider>;
