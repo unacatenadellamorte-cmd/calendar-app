@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/auth-context';
 import { env } from '@/data/env';
 import { resolveMessage } from '@/data/messages';
 import { startGoogleConnect } from '@/data/connections';
+import { listSyncState } from '@/data/google-sync';
+import { formatEventTime } from '@/lib/datetime';
 import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
+import { useGoogleSync } from '@/features/connections/model/useGoogleSync';
 
 /**
- * 設定画面の「カレンダー接続」欄(Story 3.1)。
+ * 設定画面の「カレンダー接続」欄(Story 3.1 / 3.3)。
  * 状態別:
  *  - unavailable / OAuth 未設定: 無効表示
  *  - guest:          ログインへ誘導
- *  - authenticated:  接続中なら email 表示、未接続なら「Google を接続」
- * 取り込むカレンダーの選択は Story 3.2。
+ *  - authenticated:  接続中なら email + 取り込むカレンダー導線 + 「今すぐ取り込み」、未接続なら「Google を接続」
  */
 export function ConnectionsSection() {
   const { state } = useAuth();
@@ -22,12 +24,40 @@ export function ConnectionsSection() {
   );
   const [actionErrorKey, setActionErrorKey] = useState<string | null>(null);
 
+  // 取り込み状態(全体の最終取り込み時刻)。取り込み後に取り直す。
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const reloadSyncState = useCallback(async () => {
+    const result = await listSyncState();
+    if (!result.ok) return;
+    let latest: string | null = null;
+    for (const s of result.value) {
+      if (s.lastSyncedAt && (!latest || Date.parse(s.lastSyncedAt) > Date.parse(latest))) {
+        latest = s.lastSyncedAt;
+      }
+    }
+    setLastSyncedAt(latest);
+  }, []);
+  const { syncing, lastRun, errorKey: syncErrorKey, runSync } = useGoogleSync(reloadSyncState);
+
+  useEffect(() => {
+    if (connection) void reloadSyncState();
+  }, [connection, reloadSyncState]);
+
   const onConnect = () => {
     setActionErrorKey(null);
     const result = startGoogleConnect();
     // 成功時はページ遷移するので返らない。返ってきたら失敗(遷移していない)。
     if (result && !result.ok) setActionErrorKey(result.error.messageKey);
   };
+
+  const runResultLine = (() => {
+    if (!lastRun) return null;
+    const added = lastRun.synced.reduce((n, s) => n + s.upserted, 0);
+    if (lastRun.errors.length > 0) {
+      return `一部のカレンダーを取り込めませんでした(${lastRun.errors.length} 件)`;
+    }
+    return `取り込みました(${added} 件)`;
+  })();
 
   return (
     <section aria-labelledby="connections-heading" className="mt-6">
@@ -77,6 +107,33 @@ export function ConnectionsSection() {
                 ›
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => void runSync()}
+              disabled={syncing}
+              className="mt-2 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-60"
+            >
+              {syncing ? '取り込み中…' : '今すぐ取り込み'}
+            </button>
+
+            <p className="mt-2 text-meta text-ink-secondary">
+              {lastSyncedAt
+                ? `最終取り込み: ${formatEventTime(lastSyncedAt)}`
+                : 'まだ取り込んでいません'}
+            </p>
+
+            {syncErrorKey ? (
+              <p role="alert" className="mt-1 text-meta text-danger">
+                {resolveMessage(syncErrorKey)}
+              </p>
+            ) : (
+              runResultLine && (
+                <p role="status" className="mt-1 text-meta text-ink-secondary">
+                  {runResultLine}
+                </p>
+              )
+            )}
           </>
         ) : (
           <>

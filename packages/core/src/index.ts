@@ -27,6 +27,13 @@ export {
   type GoogleTokenParse,
 } from './google-oauth';
 
+export {
+  normalizeGoogleEvent,
+  deletedExternalIds,
+  type GoogleEventRaw,
+  type NormalizedGoogleEvent,
+} from './google-events';
+
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;
 

@@ -3,6 +3,7 @@ import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { env } from '@/data/env';
 import { resolveMessage } from '@/data/messages';
+import { formatEventTime } from '@/lib/datetime';
 import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
 import { useGoogleCalendars } from '@/features/connections/model/useGoogleCalendars';
 
@@ -83,7 +84,7 @@ export function GoogleCalendarPicker() {
               key={c.externalCalendarId}
               className={i > 0 ? 'border-t border-border-hairline' : ''}
             >
-              <label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-2">
+              <label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 pt-2">
                 <span
                   aria-hidden="true"
                   className="size-3 shrink-0 rounded-full"
@@ -99,6 +100,15 @@ export function GoogleCalendarPicker() {
                   onChange={(e) => void toggle(c.externalCalendarId, e.target.checked)}
                 />
               </label>
+              {c.selected && (
+                <p className="px-4 pb-2 pl-10 text-meta text-ink-secondary">
+                  {c.lastError
+                    ? '前回は取り込めませんでした'
+                    : c.lastSyncedAt
+                      ? `最終取り込み: ${formatEventTime(c.lastSyncedAt)}`
+                      : 'まだ取り込んでいません'}
+                </p>
+              )}
             </li>
           ))}
         </ul>

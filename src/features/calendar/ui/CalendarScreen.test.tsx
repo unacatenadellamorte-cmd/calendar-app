@@ -168,6 +168,22 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
   });
 
+  it('取り込んだ予定(source=google)をタップすると読み取り専用の詳細シートを開く', async () => {
+    const user = userEvent.setup();
+    calState.calendars = [{ ...calendar, id: 'g1', name: 'ゴミ収集日', source: 'google' }];
+    evState.events = [
+      { ...sampleEvent, id: 'gx', calendarId: 'g1', title: 'ゴミ収集', source: 'google' },
+    ];
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('radio', { name: 'リスト' }));
+    await user.click(screen.getByRole('button', { name: /ゴミ収集/ }));
+    expect(screen.getByRole('dialog', { name: '予定の詳細' })).toBeInTheDocument();
+    expect(
+      screen.getByText('この予定は Google カレンダーから取り込んだものです。編集はできません。'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '削除' })).not.toBeInTheDocument();
+  });
+
   it('ev.errorKey があるとアラートを表示する', () => {
     evState.errorKey = 'event/offline';
     render(<CalendarScreen />);

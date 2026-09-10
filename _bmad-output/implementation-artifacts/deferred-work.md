@@ -64,3 +64,7 @@
 - source_spec: `spec-3-2-google-calendar-selection.md`
   summary: `calendars_set_priority` トリガの採番 `select coalesce(max(priority), -1) + 1` は非アトミックで、カレンダーを同時に2つ作る(ローカル連続作成・Google カレンダーの同時トグル・OAuth 往復2回)と `calendars_priority_uniq` 違反になりうる。
   evidence: Story 2.1 由来の既存問題。3.1 F7 と同根。個人利用では稀。`calendars_set_priority` トリガと `set_google_calendar_selection` / `upsert_google_connection` の calendars 作成箇所に `pg_advisory_xact_lock(hashtext('calendars_priority:' || user_id))` を1行入れるか、insert を `on conflict` でリトライして全経路をまとめて直す。
+
+- source_spec: `spec-3-3-google-event-sync.md`
+  summary: `apply_calendar_sync` の削除差分は「開始時刻が取り込み時間窓内」の行だけを対象にするため、窓の開始より前に始まり窓に重なる予定(複数日タイムド等)が Google 側で削除されても論理削除されず孤児行として残り続ける。
+  evidence: 個人カレンダーで「60日以上前に始まってまだ続くタイムド予定」自体が稀で、それが Google 側で消される状況はさらに稀。削除差分の窓判定を `tstzrange(starts_at, ends_at) && tstzrange(p_window_min, p_window_max)`(重なり)へ広げるか、`ends_at` も条件に含める。3.4(取り込み失敗表示・接続解除)で sync ロジックを触るときにまとめて。
