@@ -9,6 +9,7 @@ import {
 } from '@/features/compact/model/featuredCount';
 import { AccountSection } from './AccountSection';
 import { DataSection } from './DataSection';
+import { ConnectionsSection } from '@/features/connections/ui/ConnectionsSection';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: '端末に合わせる' },
@@ -96,6 +97,8 @@ export function SettingsScreen() {
 
       <AccountSection />
 
+      <ConnectionsSection />
+
       <section className="mt-6 flex flex-col gap-2">
         <Link
           to="/calendars"
@@ -118,10 +121,6 @@ export function SettingsScreen() {
       </section>
 
       <DataSection />
-
-      <p className="mt-6 text-meta text-ink-secondary">
-        カレンダー接続は後続ストーリーでここに追加されます。
-      </p>
     </Screen>
   );
 }

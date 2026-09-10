@@ -56,3 +56,7 @@
 - source_spec: `spec-1-1-project-foundation-and-app-shell.md`
   summary: アプリシェルは `max-w-2xl`(672px)の中央寄せカラム固定。UX-DR17「タブレット/PC 幅では月ビューを広く使う」は未実装 ── PC で開くと左右に広い余白が残る。
   evidence: commit b888a15 で「中央寄せが効かない」バグ(CSS レイヤー)は直したが、そもそもの「広い画面では月グリッドを広げる」対応は別。`AppShell` の `max-w` をビュー種別やブレークポイントで可変にする、または月ビューだけ広い max-w にする。v1 の主対象はスマホなので優先度は低い。
+
+- source_spec: `spec-3-1-google-connect-oauth.md`
+  summary: `upsert_google_connection` は「既存行を select → 無ければ insert」で、同一ユーザーが同時に2回 OAuth 往復すると `connections_one_active_per_user` 部分ユニーク索引違反になり「接続に失敗しました」が出る。
+  evidence: 個人利用で Google 接続を同時に2回走らせるのは稀。Story 3.4(接続解除・再接続)で `insert ... on conflict (user_id, provider) where deleted_at is null do update` に寄せるか、アドバイザリロックで直列化する。現状は1回リトライで解消する。

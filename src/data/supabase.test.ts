@@ -13,6 +13,8 @@ describe('createSupabaseClient', () => {
       supabaseUrl: undefined,
       supabaseAnonKey: undefined,
       hasSupabase: false,
+      googleOauthClientId: undefined,
+      hasGoogleOauth: false,
     };
 
     const client = createSupabaseClient(missing);
@@ -28,6 +30,8 @@ describe('createSupabaseClient', () => {
       supabaseUrl: 'http://localhost:54321',
       supabaseAnonKey: 'anon-key-for-tests',
       hasSupabase: true,
+      googleOauthClientId: undefined,
+      hasGoogleOauth: false,
     };
 
     const client = createSupabaseClient(present);

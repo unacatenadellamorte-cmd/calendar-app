@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-08-2026 23:20
+last_updated: 09-10-2026 12:30
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -53,8 +53,8 @@ development_status:
   2-5-ホームのコンパクトビュー: review
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-google-接続-oauth-と資格情報の安全な保管: backlog
+  epic-3: in-progress
+  3-1-google-接続-oauth-と資格情報の安全な保管: review
   3-2-取り込むカレンダーの選択と一覧表示: backlog
   3-3-定期取り込みと手動取り込み-sync-calendars-edge-function: backlog
   3-4-取り込み失敗の表示と接続解除: backlog

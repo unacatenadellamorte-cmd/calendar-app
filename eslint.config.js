@@ -14,6 +14,9 @@ export default tseslint.config(
       '_bmad',
       '_bmad-output',
       'supabase/.temp',
+      // Edge Functions は Deno ランタイム(jsr: 指定・Deno グローバル)。
+      // ローカルに Deno が無いためマイグレーションと同じく目視レビュー。
+      'supabase/functions',
     ],
   },
   js.configs.recommended,
