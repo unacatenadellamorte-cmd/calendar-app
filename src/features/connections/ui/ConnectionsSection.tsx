@@ -79,7 +79,13 @@ export function ConnectionsSection() {
     }
     setLastSyncedAt(latest);
   }, []);
-  const { syncing, lastRun, errorKey: syncErrorKey, runSync } = useGoogleSync(reloadSyncState);
+  // 取り込み成功後は sync_state の表示を取り直し、かつ月/週/リストの予定も
+  // 取り直す(refetch = syncNonce を bump。useEvents / useCalendars が追随)。
+  const onSyncDone = useCallback(() => {
+    void reloadSyncState();
+    refetch();
+  }, [reloadSyncState, refetch]);
+  const { syncing, lastRun, errorKey: syncErrorKey, runSync } = useGoogleSync(onSyncDone);
 
   useEffect(() => {
     if (connection) void reloadSyncState();

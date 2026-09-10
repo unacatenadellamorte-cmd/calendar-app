@@ -96,6 +96,23 @@ describe('useCalendars', () => {
     expect(result.current.errorKey).toBe('calendar/invalid-color');
   });
 
+  it('create 成功で直前の errorKey をクリアする', async () => {
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    createCalendar.mockResolvedValueOnce(
+      err(appError('calendar/invalid-color', 'calendar/invalid-color')),
+    );
+    await act(async () => {
+      await result.current.create({ name: 'x', color: '#000000' });
+    });
+    expect(result.current.errorKey).toBe('calendar/invalid-color');
+    createCalendar.mockResolvedValueOnce(ok(cal({ id: 'c3', name: 'ok' })));
+    await act(async () => {
+      await result.current.create({ name: 'ok', color: '#009E73' });
+    });
+    expect(result.current.errorKey).toBeNull();
+  });
+
   it('remove で一覧から消え、Undo で戻す', async () => {
     deleteCalendar.mockResolvedValue(ok(undefined));
     restoreCalendar.mockResolvedValue(ok(undefined));

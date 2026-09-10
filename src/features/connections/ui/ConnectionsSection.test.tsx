@@ -128,6 +128,7 @@ describe('ConnectionsSection', () => {
     await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
     expect(await screen.findByText('取り込みました(4 件)')).toBeInTheDocument();
     expect(listSyncState).toHaveBeenCalledTimes(2); // 初回 + 取り込み後
+    expect(refetch).toHaveBeenCalled(); // 月/週/リストの予定も取り直す(Epic 3 retro F8)
   });
 
   it('「今すぐ取り込み」失敗: エラー文言を alert で出す', async () => {

@@ -79,6 +79,25 @@ describe('useShiftTemplates', () => {
     expect(result.current.templates).toEqual([]);
   });
 
+  it('create 失敗 → 再度 create 成功で errorKey をクリアする', async () => {
+    const { result } = renderHook(() => useShiftTemplates(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    createShiftTemplate.mockResolvedValueOnce(
+      err(appError('shift-template/invalid-wage', 'shift-template/invalid-wage')),
+    );
+    await act(async () => {
+      await result.current.create({} as never);
+    });
+    expect(result.current.errorKey).toBe('shift-template/invalid-wage');
+
+    createShiftTemplate.mockResolvedValueOnce(ok(tpl({ id: 'ok' })));
+    await act(async () => {
+      await result.current.create({} as never);
+    });
+    expect(result.current.errorKey).toBeNull();
+  });
+
   it('update 失敗で楽観分をロールバックする', async () => {
     listShiftTemplates.mockResolvedValue(ok([tpl({ id: 't1', name: '平日' })]));
     updateShiftTemplate.mockResolvedValue(err(appError('shift-template/invalid-time', 'shift-template/invalid-time')));

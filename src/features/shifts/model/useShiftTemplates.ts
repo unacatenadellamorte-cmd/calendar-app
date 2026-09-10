@@ -57,6 +57,7 @@ export function useShiftTemplates(enabled: boolean) {
     const result = await createShiftTemplate(input);
     if (result.ok) {
       setTemplates((ts) => sortTemplates([...ts, result.value]));
+      setErrorKey(null); // 直前の失敗のエラーバナーを引きずらない
       return true;
     }
     setErrorKey(result.error.messageKey);
@@ -69,6 +70,7 @@ export function useShiftTemplates(enabled: boolean) {
     const result = await updateShiftTemplate(current, patch);
     if (result.ok) {
       setTemplates((ts) => ts.map((t) => (t.id === current.id ? result.value : t)));
+      setErrorKey(null);
       return true;
     }
     setTemplates((ts) => ts.map((t) => (t.id === current.id ? current : t)));
