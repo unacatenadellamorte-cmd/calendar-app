@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-06-2026 20:35
-last_updated: 09-11-2026 04:56
+last_updated: 09-11-2026 05:21
 project: カレンダーアプリ(仮)
 project_key: NOKEY
 tracking_system: file-system
@@ -72,7 +72,7 @@ action_items:
     action: "F1: core と Edge の normalizeGoogleEvent / normalizeHexColor が同一出力を返すことを担保する(共有ファイル化
       or golden fixture の parity テスト)。normalizeHexColor の失敗時挙動の差を意図的に固定するか揃えるかを先に決める"
     owner: "Ryo"
-    status: open
+    status: in-progress
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-3-retro-2026-09-11.md"
   - id: "epic-3-retro-item-2-f2-接続セットアップ手順-docs-に-edge-function-ゲートウェ"
     epic: 3
@@ -112,7 +112,7 @@ action_items:
     epic: 1
     action: "F2: data-access の全読み取りに deleted_at IS NULL を強制する共通ヘルパ(or lint ルール)を入れ、各クエリ直書きをやめる"
     owner: "Ryo"
-    status: open
+    status: done
     ref: "C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/calendar-app/_bmad-output/implementation-artifacts/epic-1-retro-2026-09-11.md"
   - id: "epic-1-retro-item-8-f4-global-css-トークン-レイアウトに触れるストーリーは実ブラウザ"
     epic: 1
