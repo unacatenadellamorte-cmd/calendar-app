@@ -128,6 +128,63 @@ function slugToConnectionKey(slug: string): string {
   return 'connection/exchange-failed';
 }
 
+/** 接続解除で消えるものの件数(確認シートのプレビュー用、Story 3.4)。 */
+export interface DisconnectImpact {
+  events: number;
+  calendars: number;
+}
+
+/**
+ * 接続解除で消える予定・カレンダーの件数を数える(実削除の前に見せる)。
+ * 取得できなくても解除自体は続行できるため、失敗は呼び出し側で握りつぶしてよい。
+ */
+export async function getDisconnectImpact(
+  connectionId: string,
+): Promise<Result<DisconnectImpact>> {
+  if (!supabase) return err(UNAVAILABLE);
+  try {
+    const [events, calendars] = await Promise.all([
+      supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .eq('connection_id', connectionId)
+        .is('deleted_at', null),
+      supabase
+        .from('calendars')
+        .select('*', { count: 'exact', head: true })
+        .eq('external_connection_id', connectionId)
+        .is('deleted_at', null),
+    ]);
+    if (events.error) return err(appError('data/query', 'data/query', events.error));
+    if (calendars.error) return err(appError('data/query', 'data/query', calendars.error));
+    return ok({ events: events.count ?? 0, calendars: calendars.count ?? 0 });
+  } catch (e) {
+    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
+    return err(appError('data/query', 'data/query', e));
+  }
+}
+
+/**
+ * Google 接続を解除する(Story 3.4)。`disconnect_google_connection` RPC が
+ * 取り込んだ予定・カレンダー行・接続・Vault secret を実削除する。冪等。
+ * 返り値は実際に消えた件数。
+ */
+export async function disconnectGoogle(): Promise<Result<DisconnectImpact>> {
+  if (!supabase) return err(UNAVAILABLE);
+  try {
+    const { data, error } = await supabase.rpc('disconnect_google_connection');
+    if (error) {
+      if (isNetworkError(error)) return err(appError('data/offline', 'data/offline', error));
+      return err(appError('connection/disconnect-failed', 'connection/disconnect-failed', error));
+    }
+    const row = (data ?? {}) as { events?: number; calendars?: number };
+    return ok({ events: row.events ?? 0, calendars: row.calendars ?? 0 });
+  } catch (e) {
+    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
+    return err(appError('connection/disconnect-failed', 'connection/disconnect-failed', e));
+  }
+}
+
 /** 自分の有効な Google 接続を1件返す(無ければ null)。 */
 export async function getConnection(): Promise<Result<Connection | null>> {
   if (!supabase) return err(UNAVAILABLE);
