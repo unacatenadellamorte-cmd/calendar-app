@@ -88,7 +88,7 @@ Google Cloud Console( https://console.cloud.google.com/ )で作業する。Ryo �
 5. **承認済みの JavaScript 生成元** に追加:
    - `http://localhost:5173`
 6. **承認済みのリダイレクト URI** に追加:
-   - `http://localhost:5173/settings/connections/google/callback`
+   - `http://localhost:5173/connections/google/callback`
    - (本番ホスティングを用意したら、そのURLの同じパスも後で足す)
 7. 「作成」
 8. 出てくる **クライアント ID** と **クライアント シークレット** を控える
@@ -145,7 +145,7 @@ Supabase ダッシュボード → プロジェクト → **Edge Functions** →
 | --- | --- |
 | `GOOGLE_OAUTH_CLIENT_ID` | B-4 のクライアント ID |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | B-4 のクライアント シークレット |
-| `GOOGLE_OAUTH_REDIRECT_URI` | `http://localhost:5173/settings/connections/google/callback` |
+| `GOOGLE_OAUTH_REDIRECT_URI` | `http://localhost:5173/connections/google/callback` |
 
 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` は関数実行時に自動で入るので登録不要。
 
