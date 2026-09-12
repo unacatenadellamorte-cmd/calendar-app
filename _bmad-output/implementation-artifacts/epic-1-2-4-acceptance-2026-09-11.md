@@ -125,7 +125,7 @@
 | 1.5 | AC1 | ✅ | 月 = 7列グリッド + 今日(11)にアクセントのリング。週 = 1日タイムライン + 時刻軸 + **現在時刻ライン(青の横線)**。リスト = 日付昇順。表示オンのカレンダー予定が全ビューで表示(実機) |
 | 1.5 | AC2 | ✅ | チップ = カレンダー色バー + 時刻 + タイトル(+ リストは右にカレンダー名)。色だけで所属を表さない(実機) |
 | 1.5 | AC3 | ⚠️ | 週の空きスロットタップ → タップ時刻をプリセットした「予定を追加」(実機 ✅)。**横スワイプ日付移動は deferred**(`deferred-work.md` spec-1-5)、**PC 幅で月ビューを広く(UX-DR17)は未実装**(`deferred-work.md` spec-1-1、`max-w-2xl` 固定)(→ G3) |
-| 1.6 | AC1 | 🖥️ | dev サーバーでは SW / manifest が無効(`vite-plugin-pwa` の devOptions 未有効)。`npm run build` 出力で `dist/sw.js` + precache 16 entries(626.98 KiB)生成を確認。実機のインストール/スプラッシュは Ryo が `npm run preview` で |
+| 1.6 | AC1 | ✅ | **2026-09-12 `npm run build && npm run preview` で実機確認済み**。`manifest.webmanifest` 配信(name「カレンダーアプリ(仮)」/ display:standalone / theme_color #2563EB / icons 192・512・512-maskable)、SW 登録・`active:true`、`workbox-precache-v2` に10エントリ。ページ下部に「オフラインでも使えます」通知(`PwaUpdatePrompt`)表示。dev サーバーでは devOptions 未有効のため出ない(仕様どおり) |
 | 1.6 | AC2 | ✅ | 上記の offline バナー(実機)+ IndexedDB キャッシュ存在。取り込み系 UI のオフライン表示は Epic 3 スコープ |
 | 1.7 | AC1 | ✅ | `buildExportBundle`(`src/data/export.ts`): `calendars`(local)+ `events`(local かつ書き出すカレンダー所属)。ファイル名 `calendar-app-export-YYYY-MM-DD.json`。単体テストあり。※実 DL クリックは未実施(標準 `<a download>`、Ryo が1回押して確認推奨) |
 | 1.7 | AC2 | ✅ | `.filter((c) => c.source === 'local')` / `.filter((e) => e.source === 'local' && localIds.has(e.calendarId))` で外部を明示除外(コメントも明記) |
@@ -175,7 +175,7 @@
 - **G1**(Epic 1 / 1.1・1.6・1.4): ローカル DB / Edge Function / PWA の統合テストが無い(Docker 無し・dev で SW 無効)。Epic 3 の F5 と同根。実機検証で代替しているが構造的に脆い。
 - **G2**(Epic 1 / 1.3 AC3): 初回・データなしの「カレンダーを接続 / 予定を追加」2入口が未実装。UX-DR13 の状態を1つ落としている。実害小(シフト用カレンダー常在)。
 - **G3**(Epic 1 / 1.5 AC3・UX-DR17): 月/週の横スワイプ日付移動、PC 幅で月ビューを広く ── どちらも `deferred-work.md` 記載済み。個人スマホ利用で実害小。
-- **G4**(Epic 1 / 1.6): PWA の実機インストール/オフライン SW は `npm run build && preview` でしか確認できない(dev では無効)。build 出力で precache 16 entries 生成は確認済み。Ryo が preview で1回確認推奨。
+- **G4**(Epic 1 / 1.6): ~~PWA の実機インストール/オフライン SW は `npm run build && preview` でしか確認できない~~ **→ 2026-09-12 解消**。manifest 配信・SW 登録・precache 10エントリ・オフライン通知バナーを `npm run preview` で実機確認済み。
 - **G5**(Epic 2 / 2.3 AC1): 週の重なり列キャップ + z-index「前面」表示(FR-7「並べきれない場合」)未実装。`deferred-work.md` 記載済み。個人カレンダーで4件同時重なりは稀。
 - **G6**(Epic 1 / 1.4 AC3): `deleted_at IS NULL` が共通ヘルパではなく各読み取りクエリで個別指定。invariant は保たれるが規約(共通ヘルパ)と乖離。
 - **minor**(Epic 4 / 4.1): 無効入力 → 修正 → 成功後に、画面レベルの stale validation error バナーが残る(「閉じる」で消える)。
