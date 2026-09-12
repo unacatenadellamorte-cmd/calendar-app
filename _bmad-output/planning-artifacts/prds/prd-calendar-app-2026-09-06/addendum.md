@@ -14,16 +14,16 @@ PRD 本文は「能力(何ができるか)」に絞っている。ここには�
 | 層 | 第一候補 | 理由 | 実装結果 |
 |---|---|---|---|
 | フロント | ~~Next.js~~ → **Vite + React 19 + TypeScript + Tailwind CSS 4** | 当初は human-book(Next.js)踏襲を想定していたが、2026-09-06 のアーキテクチャ工程で Vite SPA に変更(static export の罠回避) | **実装・実機受け入れ完了(2026-09-11)** |
-| スマホ化 | Capacitor で Web をラップ | React Native 書き直し不要。CRUD 中心アプリに RN の重さは不要(human-book の判断と同じ) | **未着手(Epic 5)**。human-book も Capacitor 実機テスト未実施 ── 前例が無いので、ウィジェット/通知/端末カレンダーの各プラグインはアーキテクチャ工程で個別に調査が要る |
+| スマホ化 | Capacitor で Web をラップ | React Native 書き直し不要。CRUD 中心アプリに RN の重さは不要(human-book の判断と同じ) | **2026-09-12 正式採用決定**(`bmad-architecture`、AD-11)。`@capacitor/core` 8.5.1。human-book はまだ実機実績が無いが、本プロジェクトが先行して検証する |
 | データ保管 | Supabase(Postgres + 認証 + RLS) | 複数端末同期・配布・OAuth トークン保管・将来のウィジェット連携に適合。human-book で実績 | **実装・実機受け入れ完了** |
 | 外部接続 | Google Calendar API(OAuth 2.0、`calendar.readonly` 相当の最小スコープ) | v1 は読み取り専用のため書き込みスコープは要求しない | **実装・実機受け入れ完了** |
 
-**アーキテクチャ工程で確定すること(Epic 5):**
+**アーキテクチャ工程で確定すること(Epic 5)** → **2026-09-12 全項目決定済み**(`architecture-calendar-app-epic5-2026-09-12/ARCHITECTURE-SPINE.md`):
 - ~~データ保管を Supabase にするか端末内完結か~~ → 解決済み(Supabase)。
-- Capacitor でホーム画面ウィジェット(iOS WidgetKit / Android App Widget)をどう提供するか。JS ブリッジだけでは native UI を書けないため、プラットフォームごとのネイティブコード or 既存プラグインの選定が要る。
-- 端末カレンダー読み取りのプラグイン(`@capacitor-community/calendar` 等)の権限モデル・対応 OS バージョン。
-- ローカル通知(`@capacitor/local-notifications` 等)のスケジューリング精度・端末再起動後の再登録・OS のバッテリー最適化による抑制。
-- iOS は Apple Developer Program(年額)+ App Store 審査が要る。Android は開発者登録が無料・審査も軽い(PRD §9-8)。
+- ~~Capacitor でホーム画面ウィジェット(iOS WidgetKit / Android App Widget)をどう提供するか~~ → **AD-12**: `capacitor-widget-bridge` で共有ストレージへデータを渡し、ウィジェットの見た目自体は iOS(SwiftUI WidgetKit)・Android(App Widget/Glance)双方ネイティブ実装(ストーリー側で作業)。更新はイベント駆動 + OS 定期更新の併用。
+- ~~端末カレンダー読み取りのプラグイン(`@capacitor-community/calendar` 等)の権限モデル・対応 OS バージョン~~ → **AD-13/AD-14**: `@ebarooni/capacitor-calendar` を採用(`requestReadOnlyCalendarAccess()` で読み取り専用、Capacitor 8.x 対応、2026年時点でアクティブメンテナンス確認)。
+- ~~ローカル通知(`@capacitor/local-notifications` 等)のスケジューリング精度・端末再起動後の再登録・OS のバッテリー最適化による抑制~~ → **AD-15**: 公式 `@capacitor/local-notifications` を採用。通知IDは予定UUIDから決定的に導出。再起動後の再登録・Doze 耐性の高度な対応は Deferred(v1 は `allowWhileIdle` 止まり)。
+- iOS は Apple Developer Program(年額)+ App Store 審査が要る。Android は開発者登録が無料・審査も軽い(PRD §9-8)。**登録可否は引き続き PM(Ryo)判断待ち** — 技術方式はどちらでも成立する形にした。
 
 ## 代替案の検討メモ
 
@@ -74,6 +74,7 @@ web 調査(2026-09-06)。v1 では扱わないが、v2 の給料計算を設計�
 | 代表予定の選抜ロジック詳細 | **確定・実装完了**: 優先度 → 開始時刻が早い順、終日は後。PRD §9-1 |
 | ウィジェット / 端末カレンダー / 通知の範囲 | **2026-09-12 更新**: v1(Web)は無し。**Epic 5** でこの3つを追加(PRD §4.6)。ウォッチのみ引き続き対象外(v2+)。通知は当初想定の「選抜結果ダイジェスト」ではなく予定ごとの個別リマインダーに変更。§8 |
 | Epic 5 の対象プラットフォーム | **2026-09-12 確定**: Android・iOS 両方同時。iOS は Apple Developer Program + 審査が要ることは把握済み(PRD §9-8) |
+| Epic 5 の技術方式 | **2026-09-12 確定・アーキテクチャ完了**(`architecture-calendar-app-epic5-2026-09-12`): Capacitor 正式採用(AD-11)、ウィジェット=データブリッジ+ネイティブUI(AD-12)、端末カレンダー=クライアント発読み取り専用取り込み(AD-13/14)、通知=ローカルスケジュール+決定的ID導出(AD-15)、ウィジェット/通知タップの遷移はディープリンクで統一(AD-16) |
 | データ保管 / スタック | **確定・実装完了**: Supabase + Vite(Next.js から変更)。上表参照 |
 | 配布 / 課金 | 配布はする(無料)。課金モデル未定。PRD §9-6 |
 | プロダクト名 | 未定 |
