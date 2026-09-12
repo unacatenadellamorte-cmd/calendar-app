@@ -1,20 +1,21 @@
 ---
-stepsCompleted: [step-01, step-02, step-03, step-04]
+stepsCompleted: [step-01, step-02, step-03, step-04, epic5-step-01, epic5-step-02, epic5-step-03, epic5-step-04]
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-calendar-app-2026-09-06/prd.md
   - _bmad-output/planning-artifacts/prds/prd-calendar-app-2026-09-06/addendum.md
   - _bmad-output/planning-artifacts/ux-designs/ux-calendar-app-2026-09-06/DESIGN.md
   - _bmad-output/planning-artifacts/ux-designs/ux-calendar-app-2026-09-06/EXPERIENCE.md
   - _bmad-output/planning-artifacts/architecture/architecture-calendar-app-2026-09-06/ARCHITECTURE-SPINE.md
+  - _bmad-output/planning-artifacts/architecture/architecture-calendar-app-epic5-2026-09-12/ARCHITECTURE-SPINE.md
 ---
 
 # カレンダーアプリ(仮) - Epic Breakdown
 
-> 注: このワークスペースは複数プロダクトを含むため、既存の `epics.md`(human-book)を保護し、本プロダクトは `epics-calendar-app.md` に出力する。
+> 注: このワークスペースは独立プロジェクト(calendar-app/ 自身の `_bmad-output/`)。旧メモにある「epics-calendar-app.md」という名前は共有ワークスペース時代の名残で、実体はこの `epics.md`。
 
 ## Overview
 
-カレンダーアプリ(仮)v1(Web / PWA)の、PRD(FR-1〜17)・UX スパイン(DESIGN.md / EXPERIENCE.md)・アーキテクチャスパイン(AD-1〜10)を実装可能なストーリーへ分解する。
+カレンダーアプリ(仮)v1(Web / PWA、FR-1〜17)+ Epic 5「スマホアプリ化」(FR-18〜20)の、PRD・UX スパイン(DESIGN.md / EXPERIENCE.md)・アーキテクチャスパイン(v1: AD-1〜10 / Epic5: AD-11〜18)を実装可能なストーリーへ分解する。v1(Epic 1〜4)は実装・実機受け入れ・レトロまで完了済み(2026-09-11)。以下は Epic 5 の追加分。
 
 ## Requirements Inventory
 
@@ -38,6 +39,12 @@ FR15: トップ画面での見込み表示(追加操作なしに当月を確認�
 FR16: サインアップ / ログイン(未ログインでもローカル予定の作成・閲覧は可。Google 接続にはログイン必須。ログアウト可)
 FR17: データの持ち出し(ローカルのカレンダー・予定・お気に入りシフトを JSON エクスポート。取り込んだ外部予定は含めない)
 
+**Epic 5(スマホアプリ化、2026-09-12 追加)**
+
+FR18: ホーム画面ウィジェット(選抜ロジック FR-9 の結果をそのまま表示。カレンダー名・色・開始時刻。サイズで1/2/3件可変。タップで該当予定/日へ。Android・iOS 両対応)
+FR19: 端末カレンダーの取り込み(スマホ本体(OS)のカレンダーを Google と同様の「外部接続」として選択制で取り込み。読み取り専用。優先度がそのまま効く)
+FR20: リマインダー通知(予定ごとに個別のリマインダー通知を任意設定。既定オフ。プリセット10分/30分/1時間前 + ユーザー定義。ローカル通知のみ。編集/削除に追従)
+
 ### NonFunctional Requirements
 
 NFR1: 最小権限 — Google 連携で要求する OAuth スコープはカレンダー読み取りに必要な最小限のみ。書き込み・連絡先等を要求しない。(FR3、PRD §8.3)
@@ -52,6 +59,11 @@ NFR9: 当月の給料見込みが、トップ画面で追加操作なしに確�
 NFR10: 優先度・選抜の設定項目を増やさない。優先度は「順位」ひとつ、効き方は固定。(PRD SM-C1)
 NFR11: v1 に給料計算オプション(割増・締め日・勤務先別・年別)を足さない。(PRD SM-C2)
 NFR12: 静かなトーン — 感嘆符・達成演出・ストリーク・再エンゲージ通知を UI/コピーに入れない。(DESIGN.md、EXPERIENCE.md Voice)
+
+**Epic 5(2026-09-12 追加)**
+
+NFR13: 端末カレンダーも同じ3原則 — 最小権限・読み取り専用・接続解除でデータを残さない。OS の権限ダイアログで明示的に許可を得る。(FR19、PRD §8.3、AD-13)
+NFR14: 通知はローカル完結 — リマインダーは端末側でスケジュールし、予定本文を外部の通知配信サーバーへ送らない。(FR20、PRD §8.3、AD-15)
 
 ### Additional Requirements
 
@@ -71,6 +83,18 @@ NFR12: 静かなトーン — 感嘆符・達成演出・ストリーク・再�
 - **規約**: DB snake_case / TS camelCase(変換は data-access のみ)、UUID v4、`deleted_at` ソフトデリート(共通ヘルパで全読み取りが除外)、`EventItem` 型名(`Event` は DOM と衝突)
 - **テスト**: `packages/core` は単体テスト必須。data-access は `supabase start` で結合テスト。Edge Function は Google API モックで単体
 - **デプロイ**: SPA は静的ホスティング。DB マイグレーション / Edge Function は Supabase CLI。シークレットは Supabase の関数シークレット。prod 1 + ローカル開発のみ(ステージングなし)
+
+**Epic 5(アーキテクチャスパイン AD-11〜18 由来。Epic 5 の基盤ストーリーに集約する)**
+
+- **AD-11**: Capacitor(`@capacitor/core` 8.5.1)採用。既存 `src/`, `packages/core` は無変更のままラップ。`ios/`, `android/` ネイティブプロジェクトを追加
+- **AD-12**: ウィジェット = データブリッジ(`src/platform/widget.ts`)+ ネイティブUI。`selectFeaturedEvents` の結果(上限3件、カレンダー名・色・開始時刻)を共有ストレージ(App Group UserDefaults / SharedPreferences)へ push。`capacitor-widget-bridge` 8.1.0。ネイティブUI(SwiftUI WidgetKit / Jetpack Glance)はストーリー側で実装
+- **AD-13/14**: 端末カレンダーは `connections.provider='device'` 行としてモデル化(読み取り専用)。取り込みはクライアント発(`@ebarooni/capacitor-calendar`)、`packages/core` の device 用 normalizer を経由
+- **AD-15**: リマインダーは `@capacitor/local-notifications`。通知IDは `events.id` から決定的に導出した符号あり32bit整数(`packages/core` に導出関数1本)。同期由来の時刻変更でも cancel/reschedule を経由
+- **AD-16**: ウィジェット/通知タップは共通ディープリンク(`calendar-app://event/{id}`, `.../day/{date}`)、受け口は `src/app` に1つ
+- **AD-17**: 端末カレンダーの書き込みは RLS 経由のクライアント直接 upsert。Google 専用の `service_role` RPC(`apply_calendar_sync` 等)は流用しない。`connections.provider` / `calendars.source` / `events.source` の CHECK 制約を1本のマイグレーションでリテラル `'device'` に拡張。`connection_calendars` に device 用の書き込み RLS ポリシーを追加
+- **AD-18**: プロダクト識別子は暫定 `jp.ryo.calendarapp`。Bundle ID / App Group ID / ディープリンクスキームをここから導出
+- **規約追加**: 権限拒否時のエラー表現は既存の `Result<T, AppError>` / `messageKey` 規約に乗せる。プラットフォーム分岐は `src/platform` 内に閉じる
+- **デプロイ追加**: 署名鍵(iOS provisioning profile / Android キーストア)は Ryo 本人管理。ネイティブビルドのシークレットは Xcode/Android Studio のビルド設定ファイル経由。アプリ更新は毎回ストア審査(OTA不採用)
 
 ### UX Design Requirements
 
@@ -93,6 +117,11 @@ UX-DR16: インタラクションプリミティブ — タップで開く、長
 UX-DR17: レスポンシブ — スマホ縦基準の単一カラム。タブレット/PC 幅は月ビューを広く(2カラムは v1 では任意)
 UX-DR18: PWA シェル — インストール可、スプラッシュ、オフラインでローカルデータ閲覧、下タブのアプリシェル
 
+**Epic 5(addendum.md の Epic 5 追記より、2026-09-12)**
+
+UX-DR19: ウィジェットは `DESIGN.md` のトークン(色・タイポグラフィ)をそのままネイティブ実装(iOS/Android)へ落とし込み、アプリ内コンパクトビューと視覚的に統一する
+UX-DR20: リマインダー設定 UI は既存の予定詳細/編集シートに「リマインダーを追加」の導線を1つ足す程度に留め、`EXPERIENCE.md` Voice(静かなトーン・感嘆符なし)を踏襲する
+
 ### FR Coverage Map
 
 - FR1: Epic 1 — ローカル予定の CRUD
@@ -112,6 +141,9 @@ UX-DR18: PWA シェル — インストール可、スプラッシュ、オフ�
 - FR15: Epic 4 — トップ画面での見込み表示
 - FR16: Epic 1 — サインアップ / ログイン(未ログインでもローカル可)
 - FR17: Epic 1 — JSON エクスポート
+- FR18: Epic 5 — ホーム画面ウィジェット
+- FR19: Epic 5 — 端末カレンダーの取り込み
+- FR20: Epic 5 — リマインダー通知
 
 ## Epic List
 
@@ -135,13 +167,23 @@ Google アカウントを接続し、選んだカレンダーを読み取り専�
 よく使うシフトをお気に入りシフトとして登録し、日付をタップしてテンプレを選ぶだけ(連続日は一括)でシフトを入れられる。実働時間を計算し、当月の給料見込みをホームで追加操作なしに確認できる。Epic 1 の予定・カレンダー基盤の上に載る独立機能。
 **FRs covered:** FR11, FR12, FR13, FR14, FR15
 
+### Epic 5: スマホアプリ化(ウィジェット・端末カレンダー・リマインダー)
+
+Web PWA(Epic 1〜4)を Capacitor でネイティブアプリとして包み、アプリを開かなくてもホーム画面ウィジェットで代表予定を確認でき、端末(OS)のカレンダーも Google と同じ感覚で取り込め、予定ごとに個別のリマインダー通知を設定できる。Android・iOS 両対応。FR18〜20 はすべて「Capacitor でネイティブ機能をラップする」という同じ技術基盤(`src/platform` ブリッジ、ネイティブプロジェクト追加)の上に載るため、1つのエピックにまとめ、まず基盤を作ってから3機能を順に積む。
+**FRs covered:** FR18, FR19, FR20
+
 ### 依存関係
 
-- **ビルド順は 1 → 2 → 3 → 4。**
+- **ビルド順は 1 → 2 → 3 → 4 → 5。**
 - Epic 1 は単独。
 - Epic 2 は Epic 1 に載る。
 - Epic 3 は Epic 1 + **Epic 2 Story 2.1(`calendars.priority` カラムと採番 RPC)**を前提とする。取り込んだカレンダーは Epic 2 の優先度機構をそのまま使うため。ユーザー価値としては独立(外部カレンダーの統合表示)だが、コード上は 2.1 に依存する。
 - Epic 4 は Epic 1 のみに依存(Epic 2 / 3 とは独立)。Story 1.7 の JSON エクスポートに Story 4.1 でシフトテンプレを追加する(1.7 は 4.1 なしでも完結)。
+- Epic 5 は Epic 1(予定・カレンダー基盤)+ Epic 2 Story 2.4(`selectFeaturedEvents`、ウィジェットが再利用)に依存。Epic 3(Google 取り込み)・Epic 4(シフト)とは独立(端末カレンダーは Epic 3 の実装パターンを踏襲するが、コード上の依存ではない)。
+
+### エピック分割の根拠(Epic 5、ファイル重複の検討)
+
+FR18(ウィジェット)・FR19(端末カレンダー)・FR20(リマインダー)を3エピックに分けない。理由は Epic 2/3 分割の逆で、こちらは「同じコンポーネントの重複」パターン(参照: エピック設計原則の File Churn 例)に当てはまる ── 3機能とも `src/platform` ブリッジ層・ネイティブプロジェクト(`ios/`, `android/`)・プロダクト識別子(AD-18)という同じ技術基盤を最初に必要とし、基盤を3回に分けて作る理由が無い。1エピックにまとめ、ストーリー1本目で基盤を作ってから3機能を順に積む。
 
 ### エピック分割の根拠(ファイル重複の検討)
 
@@ -563,3 +605,174 @@ So that 今月いくらになるか常に把握できる。
 **Given** `pay-card` をタップする
 **When** 給料見込みの詳細を開く
 **Then** その月のシフトの内訳が見える。v1 では割増・締め日・勤務先別の設定項目を出さない(NFR11)
+
+## Epic 5: スマホアプリ化(ウィジェット・端末カレンダー・リマインダー)
+
+Web PWA(Epic 1〜4)を Capacitor でネイティブアプリとして包み、ホーム画面ウィジェットで代表予定を確認でき、端末(OS)のカレンダーも Google と同じ感覚で取り込め、予定ごとに個別のリマインダー通知を設定できる。Android・iOS 両対応。基盤(5.1)→ 端末カレンダー(5.2〜5.3)→ リマインダー(5.4)→ ウィジェット iOS/Android(5.5〜5.6)の順で積む。
+
+### Story 5.1: Capacitor 基盤とネイティブプロジェクトの追加
+
+As a 開発者,
+I want 既存の Web SPA を Capacitor でラップし、iOS/Android のネイティブプロジェクトとディープリンクの受け口が揃うこと,
+So that 以降のウィジェット・端末カレンダー・通知ストーリーが同じ土台の上で実装できる。
+
+**Acceptance Criteria:**
+
+**Given** 既存の Vite + React19 SPA(Epic 1〜4 完了状態)
+**When** `@capacitor/core` 8.5.1 を導入し `npx cap add ios` / `npx cap add android` を実行する
+**Then** `ios/`, `android/` ディレクトリが追加され、`capacitor.config.ts` の `appId` が暫定プロダクト識別子 `jp.ryo.calendarapp` に設定される(AD-11, AD-18)
+
+**Given** ネイティブプロジェクトが追加された
+**When** Xcode / Android Studio でビルドし、それぞれのシミュレータ/エミュレータで起動する
+**Then** 既存の Web SPA が WebView 経由で表示され、Epic 1〜4 の機能(カレンダー表示・予定 CRUD・優先度・PWA 機能等)がそのまま動作する(AD-11)
+
+**Given** ディープリンクのスキーム
+**When** iOS の `Info.plist`(`CFBundleURLSchemes`)と Android Manifest(`intent-filter scheme`)に `calendar-app` を登録する
+**Then** `calendar-app://event/{eventId}` と `calendar-app://day/{yyyy-mm-dd}` の両形式で OS からアプリが起動でき、`src/app` の受け口が該当予定 / 該当日へ遷移する。存在しない予定 ID は統合ビューへフォールバックする(AD-16)
+
+**Given** 開発用ビルド
+**When** 実機 / シミュレータ向けにビルドする
+**Then** iOS は自動管理の開発用証明書、Android はデバッグ鍵でビルドが通る。ストア配布用の正式な署名鍵の準備は別途(Deferred、Apple Developer Program 登録待ち)
+
+### Story 5.2: 端末カレンダーの接続と取り込み対象の選択
+
+As a ユーザー,
+I want スマホ本体のカレンダーを、Google と同じ感覚で取り込み対象に選べること,
+So that 会社携帯・家族共有カレンダー等、Google 以外の予定もこのアプリで一元管理できる。
+
+**Acceptance Criteria:**
+
+**Given** 未接続の状態
+**When** 設定から「端末カレンダーを接続」を選ぶ
+**Then** OS の権限ダイアログ(iOS: カレンダーの読み取り許可 / Android: `READ_CALENDAR`)が表示され、許可すると `connections` テーブルに `provider='device'` の行が作られる(FR19, AD-13)
+**And** 権限要求は読み取り専用スコープのみで、書き込み権限は要求しない(NFR13)
+
+**Given** 権限ダイアログで拒否する
+**When** 「端末カレンダーを接続」を再度確認する
+**Then** 機能が無効化されている旨が既存の `Result<T, AppError>` / `messageKey` 規約で表示され、アプリ全体は落ちない(FR19 Consequence, NFR13)
+
+**Given** `connections.provider` / `calendars.source` / `events.source` の既存 CHECK 制約
+**When** このストーリーのマイグレーションを適用する
+**Then** 3箇所すべてがリテラル `'device'` を許可するよう1本のマイグレーションで拡張される(AD-17)
+
+**Given** 端末カレンダー接続済み
+**When** 取り込み対象カレンダーの選択画面を開く
+**Then** 端末上のカレンダー一覧(名前・色)が表示され、Google の取り込み対象選択(Story 3.2)と同じ操作感で個別にオン/オフできる(FR19)
+**And** 選択は `connection_calendars` テーブルを再利用し、`provider='device'` の接続に属す行に限り本人が直接 INSERT/UPDATE できる新規 RLS ポリシーで書き込む(Google 行の既存ポリシーは変更しない、AD-17)
+
+### Story 5.3: 端末カレンダーの同期実行と接続解除
+
+As a ユーザー,
+I want 選んだ端末カレンダーの予定が実際に取り込まれ、接続をやめたら痕跡が残らないこと,
+So that 会社携帯の予定もアプリ内で見られ、やめたいときにやめられる。
+
+**Acceptance Criteria:**
+
+**Given** 取り込み対象に選んだ端末カレンダー
+**When** アプリがフォアグラウンドに復帰する、または「今すぐ取り込み」を手動実行する
+**Then** `src/platform/deviceCalendar.ts` が `@ebarooni/capacitor-calendar` 経由で生データを読み、`packages/core` の device 用 normalizer で正規化し、認証済みクライアントが `src/data` 経由で RLS(`user_id = auth.uid()`)の範囲内で直接 upsert する。Google 専用の `service_role` RPC(`apply_calendar_sync` 等)は一切呼ばれない(FR19, AD-14, AD-17)
+
+**Given** 前回取り込んだ予定が端末側で削除された
+**When** 次の取り込みが走る
+**Then** 対象 `connection_id`+`calendar_id` の既存行を SELECT → 今回読んだ外部 ID と diff → 消えた予定は `deleted_at` をセットする、というクライアント側の逐次処理で論理削除される(AD-17)
+
+**Given** 取り込んだ端末予定
+**When** 詳細を開く
+**Then** 閲覧のみで編集・削除 UI が出ない。優先度(Epic 2)がそのまま効き、月/週/リスト/コンパクトビューのどこでも他の予定と同列に扱われる(FR19, AD-2 継承)
+
+**Given** 端末カレンダー接続を解除する
+**When** 解除を確定する
+**Then** その接続由来の取り込み予定・`connection_calendars` 行がローカル(Postgres + キャッシュ)から削除され、影響が事前に明示される(Story 3.4 と同じパターン、NFR13)
+
+### Story 5.4: 予定ごとのリマインダー通知
+
+As a ユーザー,
+I want 予定ごとに個別のリマインダー通知を任意で設定できること,
+So that 見落としたくない予定だけ、事前に気づける。
+
+**Acceptance Criteria:**
+
+**Given** 予定の詳細/編集シート
+**When** 「リマインダーを追加」を選ぶ
+**Then** プリセット(10分前 / 30分前 / 1時間前)またはユーザー定義の分数から選べ、`events` テーブルの nullable カラム(既定 `null` = 通知なし)に保存される(FR20, AD-15)
+**And** UI は既存シートに導線を1つ足す程度に留め、`EXPERIENCE.md` Voice(静かなトーン)を踏襲する(UX-DR20)
+
+**Given** リマインダーを設定した予定
+**When** 保存する
+**Then** `@capacitor/local-notifications` で端末ローカルにスケジュールされる。通知 ID は `events.id` から `packages/core` の導出関数で決定的に計算した符号あり 32bit 整数で、予定の source(ローカル / Google / 端末カレンダー)を問わず同じ経路が使われる(FR20, AD-15)
+
+**Given** リマインダー設定済みの予定
+**When** 開始/終了時刻を編集する、または削除する
+**Then** 同じ導出 ID で `cancel()` してから必要なら `schedule()` し直す。削除時は再スケジュールしない(FR20)
+
+**Given** Google 取り込み・端末カレンダー取り込みの同期が予定時刻を書き換えた
+**When** 同期の upsert が完了する
+**Then** ユーザーによる編集と同じ cancel/reschedule フックを経由し、古い時刻のまま通知が残らない(FR20 Consequence)
+
+**Given** 通知をタップする
+**When** アプリが起動する
+**Then** `calendar-app://event/{eventId}` のディープリンク(Story 5.1)経由で該当予定の詳細へ遷移する(AD-16)
+
+**Given** OS の通知権限(iOS 許可ダイアログ / Android 13+ の `POST_NOTIFICATIONS`)を拒否する
+**When** リマインダーを設定しようとする
+**Then** 通知が送れない旨が `Result<T, AppError>` / `messageKey` 規約で表示され、予定自体の保存は妨げられない
+
+### Story 5.5: ホーム画面ウィジェット — iOS
+
+As a ユーザー,
+I want iOS のホーム画面に置いたウィジェットで、アプリを開かず代表予定を確認できること,
+So that ロック解除してアプリを開く手間なしに、次に外せない予定が分かる。
+
+**Acceptance Criteria:**
+
+**Given** ウィジェットが未追加
+**When** iOS のホーム画面にウィジェットを追加する
+**Then** WidgetKit の SwiftUI 実装が表示され、`DESIGN.md` のトークン(色・タイポグラフィ)をアプリ内コンパクトビューと統一して使う(FR18, UX-DR19)
+
+**Given** アプリ側
+**When** `selectFeaturedEvents`(Epic 2 Story 2.4)を呼ぶ
+**Then** `src/platform/widget.ts` が上限3件を計算し、`{ calendarName, colorHex, startsAtIso, schemaVersion }` の JSON を App Group `group.jp.ryo.calendarapp.widget` の UserDefaults キー `featuredEvents` へ書き込む(AD-12)
+
+**Given** 共有ストレージに書き込まれた代表予定
+**When** ウィジェットのサイズ(小/中/大 = 1/2/3件相当)が決まる
+**Then** ネイティブ側が渡された配列を現在のサイズに応じて切り詰めて表示する。各行はカレンダー名・色・開始時刻(タイトルは表示しない、FR18, AD-12)
+
+**Given** 対象予定が0件
+**When** ウィジェットを表示する
+**Then** 感嘆符のない静かな表示になる(コンパクトビューの「次の予定なし」に準じる、NFR12)
+
+**Given** ウィジェットをタップする
+**When** OS がアプリを起動する
+**Then** `calendar-app://event/{eventId}` のディープリンク(Story 5.1)経由で該当予定へ、0件時は該当日へ遷移する(FR18, AD-16)
+
+**Given** アプリのフォアグラウンド復帰・取り込み完了・予定の作成/編集/削除
+**When** これらのイベントが起きる
+**Then** ウィジェットのタイムライン再読み込みが明示的にトリガーされる。OS の定期更新は補助として扱う(AD-12)
+
+### Story 5.6: ホーム画面ウィジェット — Android
+
+As a ユーザー,
+I want Android のホーム画面に置いたウィジェットで、アプリを開かず代表予定を確認できること,
+So that iOS と同じ体験を Android でも得られる。
+
+**Acceptance Criteria:**
+
+**Given** ウィジェットが未追加
+**When** Android のホーム画面にウィジェットを追加する
+**Then** App Widget(Jetpack Glance または RemoteViews)の実装が表示され、Story 5.5 と同じ共有ストレージ契約(SharedPreferences キー `featuredEvents`、同じ JSON スキーマ)を読む(FR18, AD-12)
+
+**Given** 共有ストレージに書き込まれた代表予定
+**When** ウィジェットのサイズが決まる
+**Then** Story 5.5 と同じ切り詰めロジックで、カレンダー名・色・開始時刻を表示する(FR18, AD-12, UX-DR19)
+
+**Given** 対象予定が0件
+**When** ウィジェットを表示する
+**Then** Story 5.5 と同じ静かな表示になる(NFR12)
+
+**Given** ウィジェットをタップする
+**When** OS がアプリを起動する
+**Then** Story 5.5 と同じディープリンクで該当予定/該当日へ遷移する(FR18, AD-16)
+
+**Given** `updatePeriodMillis`(最短30分)による OS 定期更新
+**When** イベント駆動の明示的な再読み込み(Story 5.5 と同じトリガー)と併用する
+**Then** Android 実機でウィジェットが極端に古い情報のまま固まらないことを確認する(AD-12)
