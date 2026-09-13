@@ -51,4 +51,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        端末カレンダー(ARCHITECTURE-SPINE Epic5 AD-13、Story 5.2)。
+        読み取り専用スコープのみ。WRITE_CALENDAR は意図的に追加しない
+        (誤って書き込み API を呼んでも OS が拒否するようにするため)。
+    -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 </manifest>

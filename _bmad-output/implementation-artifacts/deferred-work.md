@@ -73,3 +73,15 @@
 - source_spec: `spec-5-1-capacitor-foundation-and-native-projects.md`
   summary: iOS の Xcode ビルド確認は本ストーリーでは実施していない。`ios/` の雛形生成と `Info.plist` の `CFBundleURLSchemes` 登録はコードとして用意したが、Xcode を開いてのビルド・シミュレータ/実機起動・ディープリンクの動作確認は未実施。
   evidence: 開発機が Windows のため Xcode が使えず、本ストーリーでは Android のみビルド・エミュレータ(`Pixel_7_API_36`)確認まで完了させた(spec の frozen block に明記の決定)。Mac 環境が確保でき次第、`docs/capacitor-mobile-setup.md` の「iOS(Mac 確保後のフォローアップ)」手順で回収する。
+
+- source_spec: `spec-5-2-device-calendar-connect-and-select.md`
+  summary: `DeviceCalendarPicker`(および `GoogleCalendarPicker`)が `useAuth()` の `state==='loading'` 中、一瞬「先に接続してください」を表示してしまう。
+  evidence: 呼び出し元が `connectionEnabled` の算出に `state==='authenticated'` を含め、さらに `useDeviceConnection`/`useGoogleConnection` 内部でも同じ判定をしているため、`enabled=false` を渡した瞬間は `loading` も `false` になり「未接続」表示が先に出る。Google 側・端末側どちらも同一構造(既存パターン)。呼び出し元の外部チェックを外し、フック内部の `state` 判定だけに一本化すれば直る。
+
+- source_spec: `spec-5-2-device-calendar-connect-and-select.md`
+  summary: `useDeviceCalendars`/`useGoogleCalendars` の `reloadCatalog()` が初回読み込み失敗時に `errorKey` をセットしない。
+  evidence: 直後に呼ばれる `refresh()` が成功すれば自己修復するが、両方失敗する完全オフライン時などに一瞬「空のカタログ・エラー無し」の状態になり得る。`reloadCatalog` 内で `!result.ok` の分岐に `errorKey` 設定を足せば直る(Google/device 両方に同じ修正が要る)。
+
+- source_spec: `spec-5-2-device-calendar-connect-and-select.md`
+  summary: `useDeviceCalendars`/`useGoogleCalendars` の `toggle()`/`refresh()` に mount時以外の `cancelled` ガードが無い。
+  evidence: 処理中にコンポーネントがアンマウントされると、非同期処理完了後に setState が呼ばれ得る(React 開発モードの警告対象。実害は稀)。`toggle`/`refresh` 内にも同様の `cancelled` ref を持たせれば直る(Google/device 両方に同じ修正が要る)。

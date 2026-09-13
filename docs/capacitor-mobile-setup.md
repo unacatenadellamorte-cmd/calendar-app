@@ -105,6 +105,40 @@ adb shell am start -W -a android.intent.action.VIEW -d "calendar-app://event/<�
 
 ---
 
+## 端末カレンダー権限(Story 5.2)
+
+`@ebarooni/capacitor-calendar` 経由で端末のカレンダーを読み取り専用で取り込む
+(ARCHITECTURE-SPINE Epic5 AD-13)。権限は Android/iOS で区分が違う:
+
+| プラットフォーム | 要求する権限 | 宣言場所 |
+| --- | --- | --- |
+| Android | `READ_CALENDAR`(読み取り専用の区分あり) | `android/app/src/main/AndroidManifest.xml` |
+| iOS | full access(読み取り専用の区分が無い。`requestFullCalendarAccess()` を使う) | `ios/App/App/Info.plist` の `NSCalendarsUsageDescription`(iOS 13-16)・`NSCalendarsFullAccessUsageDescription`(iOS 17+) |
+
+どちらも `WRITE_CALENDAR` / `NSCalendarsWriteOnlyAccessUsageDescription` は追加しない。
+アプリのコードが書き込み系 API(`createCalendar` / `modifyCalendar` / `deleteCalendar` 等)を
+一切呼ばないため、iOS で権限ダイアログの文言が「読み書き」相当になっていても、実際の挙動としての
+「読み取り専用」原則(AD-13, NFR13)は保たれる。
+
+Android はエミュレータ(`Pixel_7_API_36`)で許可ダイアログの実地確認まで可能:
+
+```powershell
+npm run build
+npx cap sync android
+cd android
+.\gradlew.bat assembleDebug
+adb install -r android\app\build\outputs\apk\debug\app-debug.apk
+adb shell am start -W -n jp.ryo.calendarapp/.MainActivity
+```
+
+設定画面の「端末カレンダーを接続」をタップ → OS の権限ダイアログで許可 → 端末のカレンダー
+(通常は「バースデー」等が最低1つ存在)が選択画面の一覧に出ることを確認する。
+
+iOS は `Info.plist` の設定のみで、Xcode でのビルド確認はしていない(開発機が Windows のため。
+Story 5.1 と同じ理由。下記「iOS(Mac 確保後のフォローアップ)」に合流する)。
+
+---
+
 ## iOS(Mac 確保後のフォローアップ)
 
 このストーリーでは `npx cap add ios` で `ios/` の雛形生成と `Info.plist` の
