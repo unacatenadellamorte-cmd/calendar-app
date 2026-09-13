@@ -11,9 +11,12 @@ import {
   type DisconnectImpact,
 } from '@/data/connections';
 import { listSyncState } from '@/data/google-sync';
+import { connectDevice } from '@/data/device-connections';
+import { isDeviceCalendarSupported } from '@/platform/deviceCalendar';
 import { formatEventTime } from '@/lib/datetime';
 import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
 import { useGoogleSync } from '@/features/connections/model/useGoogleSync';
+import { useDeviceConnection } from '@/features/connections/model/useDeviceConnection';
 import { DisconnectSheet } from './DisconnectSheet';
 
 /**
@@ -96,6 +99,33 @@ export function ConnectionsSection() {
     const result = startGoogleConnect();
     // 成功時はページ遷移するので返らない。返ってきたら失敗(遷移していない)。
     if (result && !result.ok) setActionErrorKey(result.error.messageKey);
+  };
+
+  // 端末カレンダー接続(Story 5.2)。OAuth を持たないため env.hasGoogleOauth には依存しない。
+  // Web/PWA ビルドでは機能自体が原理的に成立しないため、ブロックごと出さない。
+  const deviceSupported = isDeviceCalendarSupported();
+  const {
+    connection: deviceConnection,
+    loading: deviceLoading,
+    errorKey: deviceLoadErrorKey,
+    refresh: refreshDevice,
+  } = useDeviceConnection(deviceSupported && env.hasSupabase);
+  const [deviceActionErrorKey, setDeviceActionErrorKey] = useState<string | null>(null);
+  const [deviceDenied, setDeviceDenied] = useState(false);
+  const [deviceConnecting, setDeviceConnecting] = useState(false);
+
+  const onConnectDevice = async () => {
+    setDeviceActionErrorKey(null);
+    setDeviceConnecting(true);
+    const result = await connectDevice();
+    setDeviceConnecting(false);
+    if (!result.ok) {
+      setDeviceActionErrorKey(result.error.messageKey);
+      if (result.error.kind === 'connection/permission-denied') setDeviceDenied(true);
+      return;
+    }
+    setDeviceDenied(false);
+    refreshDevice();
   };
 
   const runResultLine = (() => {
@@ -218,6 +248,74 @@ export function ConnectionsSection() {
           </p>
         )}
       </div>
+
+      {/* 端末カレンダー(Story 5.2)。Google ブロックと並ぶ独立ブロック。Web/PWA では非表示。 */}
+      {deviceSupported && (
+      <div className="mt-3 rounded-md border border-border-hairline bg-surface-raised p-4">
+        {state === 'unavailable' || !env.hasSupabase ? (
+          <p className="text-meta text-ink-secondary">
+            Supabase を設定すると、端末カレンダーを接続できます。
+          </p>
+        ) : state === 'loading' ? (
+          <p className="text-meta text-ink-secondary">読み込み中…</p>
+        ) : state === 'guest' ? (
+          <>
+            <p className="text-body text-ink-primary">端末カレンダーを接続できます</p>
+            <p className="mt-1 text-meta text-ink-secondary">
+              接続にはログインが必要です。
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/auth')}
+              className="mt-3 min-h-11 w-full rounded-sm bg-accent px-4 text-body font-semibold text-on-accent"
+            >
+              ログインして接続
+            </button>
+          </>
+        ) : deviceLoading ? (
+          <p className="text-meta text-ink-secondary">読み込み中…</p>
+        ) : deviceConnection ? (
+          <>
+            <p className="text-meta text-ink-secondary">端末カレンダーに接続中</p>
+            <button
+              type="button"
+              onClick={() => navigate('/connections/device/calendars')}
+              className="mt-3 flex min-h-11 w-full items-center justify-between rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
+            >
+              取り込むカレンダーを選ぶ
+              <span aria-hidden="true" className="text-ink-secondary">
+                ›
+              </span>
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-body text-ink-primary">端末カレンダーを接続</p>
+            <p className="mt-1 text-meta text-ink-secondary">
+              選んだカレンダーを読み取り専用で取り込みます。
+            </p>
+            <button
+              type="button"
+              onClick={() => void onConnectDevice()}
+              disabled={deviceConnecting}
+              className="mt-3 min-h-11 w-full rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
+            >
+              {deviceConnecting
+                ? '確認中…'
+                : deviceDenied
+                  ? 'もう一度許可する'
+                  : '端末カレンダーを接続'}
+            </button>
+          </>
+        )}
+
+        {(deviceActionErrorKey ?? deviceLoadErrorKey) && (
+          <p role="alert" className="mt-2 text-meta text-danger">
+            {resolveMessage(deviceActionErrorKey ?? deviceLoadErrorKey!)}
+          </p>
+        )}
+      </div>
+      )}
 
       <DisconnectSheet
         open={disconnectOpen}

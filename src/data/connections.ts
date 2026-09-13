@@ -184,11 +184,16 @@ export async function disconnectGoogle(): Promise<Result<DisconnectImpact>> {
   }
 }
 
-/** 自分の有効な Google 接続を1件返す(無ければ null)。 */
+/**
+ * 自分の有効な Google 接続を1件返す(無ければ null)。
+ * `provider='google'` を明示フィルタする ── device 接続(Story 5.2)と混在しても
+ * 惑わされない。
+ */
 export async function getConnection(): Promise<Result<Connection | null>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
     const { data, error } = await selectActive('connections', COLUMNS)
+      .eq('provider', 'google')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle<ConnectionRow>();

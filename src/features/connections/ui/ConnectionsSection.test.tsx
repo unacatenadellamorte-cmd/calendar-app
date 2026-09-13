@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ok } from '@/data/result';
+import { ok, err, appError } from '@/data/result';
 
 const navigate = vi.fn();
 const startGoogleConnect = vi.fn();
@@ -11,8 +11,16 @@ const listSyncState = vi.fn();
 const disconnectGoogle = vi.fn();
 const getDisconnectImpact = vi.fn();
 const refetch = vi.fn();
+const connectDevice = vi.fn();
+const isDeviceCalendarSupported = vi.fn();
 let authState: { state: string } = { state: 'authenticated' };
 let envValue = { hasSupabase: true, hasGoogleOauth: true };
+let deviceConnectionValue: { connection: unknown; loading: boolean; errorKey: string | null; refresh: () => void } = {
+  connection: null,
+  loading: false,
+  errorKey: null,
+  refresh: vi.fn(),
+};
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigate }));
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
@@ -33,6 +41,15 @@ vi.mock('@/data/google-sync', () => ({
   syncGoogleCalendarsNow: () => syncGoogleCalendarsNow(),
   listSyncState: () => listSyncState(),
 }));
+vi.mock('@/data/device-connections', () => ({
+  connectDevice: () => connectDevice(),
+}));
+vi.mock('@/platform/deviceCalendar', () => ({
+  isDeviceCalendarSupported: () => isDeviceCalendarSupported(),
+}));
+vi.mock('@/features/connections/model/useDeviceConnection', () => ({
+  useDeviceConnection: () => deviceConnectionValue,
+}));
 
 const { ConnectionsSection } = await import('./ConnectionsSection');
 
@@ -47,8 +64,11 @@ beforeEach(() => {
   disconnectGoogle.mockReset().mockResolvedValue(ok({ events: 252, calendars: 1 }));
   getDisconnectImpact.mockReset().mockResolvedValue(ok({ events: 252, calendars: 1 }));
   refetch.mockReset();
+  connectDevice.mockReset().mockResolvedValue(ok(undefined));
+  isDeviceCalendarSupported.mockReset().mockReturnValue(true);
   authState = { state: 'authenticated' };
   envValue = { hasSupabase: true, hasGoogleOauth: true };
+  deviceConnectionValue = { connection: null, loading: false, errorKey: null, refresh: vi.fn() };
 });
 
 describe('ConnectionsSection', () => {
@@ -72,23 +92,27 @@ describe('ConnectionsSection', () => {
     authState = { state: 'guest' };
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(screen.getByRole('button', { name: 'ログインして接続' }));
+    // Google ブロック・端末カレンダーブロックの両方に「ログインして接続」が出る(並ぶブロック)。
+    const [loginButton] = screen.getAllByRole('button', { name: 'ログインして接続' });
+    await user.click(loginButton!);
     expect(navigate).toHaveBeenCalledWith('/auth');
     expect(startGoogleConnect).not.toHaveBeenCalled();
   });
 
-  it('OAuth クライアント ID 未設定: 設定待ちの案内、接続 UI なし', () => {
+  it('OAuth クライアント ID 未設定: 設定待ちの案内、Google の接続 UI なし', () => {
     envValue = { hasSupabase: true, hasGoogleOauth: false };
     render(<ConnectionsSection />);
     expect(screen.getByText(/まだ設定されていません/)).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Google を接続' })).not.toBeInTheDocument();
+    // 端末カレンダーは Google の OAuth 設定に依存しない(並ぶ独立ブロック)。
+    expect(screen.getByRole('button', { name: '端末カレンダーを接続' })).toBeInTheDocument();
   });
 
-  it('Supabase 未設定: その旨を案内', () => {
+  it('Supabase 未設定: その旨を案内(Google・端末カレンダーの両ブロック)', () => {
     envValue = { hasSupabase: false, hasGoogleOauth: false };
     authState = { state: 'unavailable' };
     render(<ConnectionsSection />);
-    expect(screen.getByText(/Supabase を設定すると/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Supabase を設定すると/)).toHaveLength(2);
   });
 
   it('接続状態の取得に失敗したら alert を出す', async () => {
@@ -216,5 +240,53 @@ describe('ConnectionsSection', () => {
     expect(dialog).toHaveTextContent('予定 —');
     await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
     expect(disconnectGoogle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ConnectionsSection の端末カレンダーブロック(Story 5.2)', () => {
+  it('authenticated・未接続: 「端末カレンダーを接続」ボタンで connectDevice を呼ぶ', async () => {
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    const btn = await screen.findByRole('button', { name: '端末カレンダーを接続' });
+    await user.click(btn);
+    expect(connectDevice).toHaveBeenCalledTimes(1);
+    expect(deviceConnectionValue.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('権限拒否: エラー文言を表示し、ボタンが「もう一度許可する」に変わる', async () => {
+    connectDevice.mockResolvedValue(
+      err(appError('connection/permission-denied', 'connection/permission-denied')),
+    );
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '端末カレンダーを接続' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(/端末カレンダーへのアクセスが許可されませんでした/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: 'もう一度許可する' })).toBeInTheDocument();
+  });
+
+  it('接続済み: 「取り込むカレンダーを選ぶ」で /connections/device/calendars へ', async () => {
+    deviceConnectionValue = {
+      connection: { id: 'd1', provider: 'device', createdAt: 'x' },
+      loading: false,
+      errorKey: null,
+      refresh: vi.fn(),
+    };
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '取り込むカレンダーを選ぶ' }));
+    expect(navigate).toHaveBeenCalledWith('/connections/device/calendars');
+  });
+
+  it('Web/PWA(isDeviceCalendarSupported=false)ではブロック自体を表示しない', async () => {
+    isDeviceCalendarSupported.mockReturnValue(false);
+    render(<ConnectionsSection />);
+    // Google ブロックは影響を受けない(読み込み完了を待ってから判定)。
+    expect(await screen.findByRole('button', { name: 'Google を接続' })).toBeInTheDocument();
+    expect(screen.queryByText('端末カレンダーを接続')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '端末カレンダーを接続' })).not.toBeInTheDocument();
   });
 });

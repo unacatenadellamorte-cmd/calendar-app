@@ -40,6 +40,20 @@
 			</array>
 		</dict>
 	</array>
+	<!--
+		端末カレンダー(ARCHITECTURE-SPINE Epic5 AD-13、Story 5.2)。iOS には
+		「読み取り専用」という権限区分が無いため requestFullCalendarAccess() を使う
+		(アプリのコード自体は書き込み系 API を一切呼ばない。docs/capacitor-mobile-setup.md 参照)。
+		OS が実際に許可する権限は読み書き両方を含むため、文言では「このアプリ自身は
+		読み取りにしか使わない」という趣旨を明示し、ダイアログとの食い違いで
+		ユーザーが混乱しないようにする。
+		NSCalendarsWriteOnlyAccessUsageDescription・reminders 系キーは追加しない
+		(書き込み・リマインダーは対象外)。
+	-->
+	<key>NSCalendarsUsageDescription</key>
+	<string>予定を取り込むために端末のカレンダーを読み取ります。このアプリ自身は読み取りにしか使いません(iOS 13-16)。</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>予定を取り込むために端末のカレンダーを読み取ります。このアプリ自身は読み取りにしか使いません(iOS 17+)。</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

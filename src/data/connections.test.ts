@@ -13,11 +13,17 @@ let rpcResult: { data: unknown; error: unknown } = { data: null, error: null };
 const invoke = vi.fn(async () => invokeResult);
 const rpc = vi.fn(async () => rpcResult);
 
+let eqCalls: unknown[][] = [];
+
 function makeChain() {
   const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'is', 'order', 'limit']) {
+  for (const m of ['select', 'is', 'order', 'limit']) {
     chain[m] = () => chain;
   }
+  chain.eq = (...args: unknown[]) => {
+    eqCalls.push(args);
+    return chain;
+  };
   chain.maybeSingle = async () => queryResult;
   // .is() 等で終端して await するクエリ用(getDisconnectImpact)。
   chain.then = (resolve: (v: unknown) => unknown) => resolve(queryResult);
@@ -81,6 +87,7 @@ beforeEach(() => {
   queryResult = { data: null, error: null };
   invokeResult = { data: null, error: null };
   rpcResult = { data: null, error: null };
+  eqCalls = [];
   invoke.mockClear();
   rpc.mockClear();
   from.mockClear();
@@ -217,6 +224,12 @@ describe('getConnection', () => {
     const r = await getConnection();
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/query');
+  });
+
+  it('provider=google を明示フィルタする(device 接続に惑わされない、Story 5.2)', async () => {
+    const { getConnection } = await load();
+    await getConnection();
+    expect(eqCalls).toContainEqual(['provider', 'google']);
   });
 });
 

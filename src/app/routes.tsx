@@ -8,6 +8,7 @@ import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
 import { ShiftTemplatesScreen } from '@/features/shifts/ui/ShiftTemplatesScreen';
 import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
 import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPicker';
+import { DeviceCalendarPicker } from '@/features/connections/ui/DeviceCalendarPicker';
 
 /**
  * `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)と
@@ -43,6 +44,8 @@ const routes: RouteObject[] = [
       { path: 'connections/google/callback', element: <GoogleCallbackScreen /> },
       // タブ外。設定の接続欄から遷移(Story 3.2)。
       { path: 'connections/google/calendars', element: <GoogleCalendarPicker /> },
+      // タブ外。設定の接続欄から遷移(Story 5.2)。
+      { path: 'connections/device/calendars', element: <DeviceCalendarPicker /> },
     ],
   },
 ];

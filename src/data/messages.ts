@@ -37,6 +37,11 @@ const DATA_MESSAGES: Record<string, string> = {
   'connection/not-connected': '先に Google を接続してください',
   'connection/calendars-failed': 'カレンダー一覧を取得できませんでした。もう一度お試しください',
   'connection/disconnect-failed': '接続の解除に失敗しました。もう一度お試しください',
+  'connection/permission-denied':
+    '端末カレンダーへのアクセスが許可されませんでした。設定から許可してください',
+  'connection/device-unavailable': '端末カレンダーに接続できませんでした。もう一度お試しください',
+  'connection/calendar-not-found':
+    'このカレンダーは一覧に見つかりませんでした。更新してもう一度お試しください',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };
