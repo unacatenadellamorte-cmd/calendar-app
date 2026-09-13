@@ -17,6 +17,10 @@ export default tseslint.config(
       // Edge Functions は Deno ランタイム(jsr: 指定・Deno グローバル)。
       // ローカルに Deno が無いためマイグレーションと同じく目視レビュー。
       'supabase/functions',
+      // Capacitor ネイティブプロジェクト(spec-5-1)。ネイティブコード本体に加え、
+      // `npx cap sync` が dist/ をそのままコピーする public/ 配下も対象外にする。
+      'ios',
+      'android',
     ],
   },
   js.configs.recommended,

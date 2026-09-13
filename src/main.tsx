@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { initTheme } from '@/features/settings/model/useTheme';
 import { AuthProvider } from '@/app/AuthProvider';
 import { AppRoutes } from '@/app/routes';
+import { DeepLinkListener } from '@/app/DeepLinkListener';
 // Supabase クライアントの初期化(モジュール副作用)。未設定なら警告が1行出るだけ。
 import '@/data/supabase';
 import './styles/global.css';
@@ -21,6 +22,7 @@ createRoot(rootEl).render(
     <AuthProvider>
       <BrowserRouter>
         <AppRoutes />
+        <DeepLinkListener />
       </BrowserRouter>
     </AuthProvider>
   </StrictMode>,

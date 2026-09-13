@@ -38,6 +38,7 @@ Epic 1 / 2 / 3 で **3 回連続**、「単体テストで見えない層」の�
 | PWA の Service Worker / インストール / オフライン SW | dev サーバーでは `vite-plugin-pwa` が SW を出さない |
 | Edge Function の実行時(Deno ランタイム、ゲートウェイ認証) | ローカルに Deno が無い |
 | ライブ pg_cron のスケジュール発火 | prod でしか動かない |
+| Android Gradle / iOS Xcode のネイティブビルド(`ios/`, `android/`) | `npm run typecheck` / `lint` / `test` / `build` は Web バンドル(`dist/`)しか見ておらず、ネイティブプロジェクトのコンパイル可否は検知できない。`cd android && gradlew.bat assembleDebug`(Windows)/ Xcode ビルド(Mac)を明示的に実行する必要がある(`docs/capacitor-mobile-setup.md`) |
 
 **ステージング用の Supabase プロジェクトは当面持たない**(コスト・セットアップ、個人配布規模)。
 利用が増える / 2人目の開発者が入る ときに再検討する。

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
@@ -24,6 +24,8 @@ import { ListView } from './ListView';
 interface CalendarScreenProps {
   /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
   initialDate?: string;
+  /** ディープリンク(`calendar-app://event/{id}`)由来の「この予定を開く」指定。 */
+  initialEventId?: string;
 }
 
 /**
@@ -31,7 +33,7 @@ interface CalendarScreenProps {
  * 表示オンのカレンダーの予定だけを描画し、日セル / 空きスロットのタップで追加、
  * チップのタップで編集につなぐ。
  */
-export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
+export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenProps = {}) {
   const { state } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
@@ -58,16 +60,6 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
     () => new Map(cal.calendars.map((c) => [c.id, c])),
     [cal.calendars],
   );
-
-  if (state === 'unavailable') {
-    return (
-      <Screen title="カレンダー">
-        <p className="text-body text-ink-secondary">
-          Supabase を設定すると、予定を作成・表示できます。
-        </p>
-      </Screen>
-    );
-  }
 
   const openCreate = (nextSeed?: EventSeed) => {
     setEditing(null);
@@ -106,6 +98,29 @@ export function CalendarScreen({ initialDate }: CalendarScreenProps = {}) {
     ev.addLocal(result.value);
     return true;
   };
+
+  // ディープリンク(`calendar-app://event/{id}`)由来。auth 解決(enabled)・ev/cal のロード完了後に
+  // 該当予定を探して openEdit を呼ぶ。見つからなければ何もしない(静かにフォールバック、AD-16)。
+  // ラッチは「最後に処理した initialEventId」を保持し、値が変わったら再度処理できるようにする。
+  const processedEventIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!initialEventId || processedEventIdRef.current === initialEventId) return;
+    if (!enabled || ev.loading || cal.loading) return;
+    processedEventIdRef.current = initialEventId;
+    const target = ev.events.find((e) => e.id === initialEventId);
+    if (target) openEdit(target);
+    // openEdit は毎レンダー再生成される関数だが、initialEventId/enabled/ev/cal の変化にのみ追従すればよい。
+  }, [initialEventId, enabled, ev.loading, ev.events, cal.loading]);
+
+  if (state === 'unavailable') {
+    return (
+      <Screen title="カレンダー">
+        <p className="text-body text-ink-secondary">
+          Supabase を設定すると、予定を作成・表示できます。
+        </p>
+      </Screen>
+    );
+  }
 
   const loading = ev.loading || cal.loading;
 

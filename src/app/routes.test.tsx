@@ -1,25 +1,36 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import type { EventItem } from '@/data/events';
 
 // カレンダー画面を描画可能にするため auth を guest 固定、データ層は空でモック。
 vi.mock('@/app/auth-context', () => ({ useAuth: () => ({ state: 'guest' }) }));
 vi.mock('@/features/calendars/model/useCalendars', () => ({
   useCalendars: () => ({ calendars: [], loading: false, errorKey: null, pendingDelete: null, dismissError: vi.fn() }),
 }));
-vi.mock('@/features/events/model/useEvents', () => ({
-  useEvents: () => ({
-    events: [],
-    loading: false,
-    errorKey: null,
-    pendingDelete: null,
-    create: vi.fn(),
-    update: vi.fn(),
-    remove: vi.fn(),
-    undoDelete: vi.fn(),
-    dismissError: vi.fn(),
-  }),
-}));
+
+const sampleEvent: EventItem = {
+  id: 'evt-1',
+  calendarId: 'c1',
+  title: 'ディープリンク予定',
+  allDay: false,
+  startsAt: '2026-09-08T01:00:00Z',
+  endsAt: '2026-09-08T02:00:00Z',
+  eventDate: null,
+  note: null,
+  source: 'local',
+  breakMinutes: null,
+  hourlyWage: null,
+  workplaceLabel: null,
+  shiftTemplateId: null,
+  createdAt: '',
+  updatedAt: '',
+};
+
+// `?event=` のテスト(存在する ID / しない ID)のため、events を差し替え可能にする。
+let evState: Record<string, unknown>;
+vi.mock('@/features/events/model/useEvents', () => ({ useEvents: () => evState }));
+
 vi.mock('@/features/shifts/model/useShiftTemplates', () => ({
   useShiftTemplates: () => ({
     templates: [],
@@ -44,6 +55,20 @@ function renderAt(path: string) {
   );
 }
 
+beforeEach(() => {
+  evState = {
+    events: [],
+    loading: false,
+    errorKey: null,
+    pendingDelete: null,
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    undoDelete: vi.fn(),
+    dismissError: vi.fn(),
+  };
+});
+
 describe('CalendarRoute の ?date=', () => {
   it('?date=YYYY-MM-DD でその月を開く', () => {
     renderAt('/calendar?date=2026-12-25');
@@ -60,6 +85,27 @@ describe('CalendarRoute の ?date=', () => {
   it('?date 無しなら今日の月', () => {
     renderAt('/calendar');
     expect(screen.getByRole('button', { name: /年\d+月$/ })).toBeInTheDocument();
+  });
+});
+
+describe('CalendarRoute の ?event=(ディープリンク calendar-app://event/{id} 由来)', () => {
+  it('?event=<id> で該当するローカル予定の編集シートを開く', () => {
+    evState.events = [sampleEvent];
+    renderAt('/calendar?event=evt-1');
+    expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+  });
+
+  it('?event= に存在しない ID なら静かにフォールバックする(エラー・シートなし)', () => {
+    evState.events = [sampleEvent];
+    renderAt('/calendar?event=not-found');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('?event= が無ければ何も開かない', () => {
+    evState.events = [sampleEvent];
+    renderAt('/calendar');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 

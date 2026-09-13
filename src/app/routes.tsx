@@ -9,13 +9,20 @@ import { ShiftTemplatesScreen } from '@/features/shifts/ui/ShiftTemplatesScreen'
 import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
 import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPicker';
 
-/** `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)を CalendarScreen に渡す。 */
+/**
+ * `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)と
+ * `/calendar?event=<id>`(ディープリンク `calendar-app://event/{id}` 由来、AD-16)を
+ * CalendarScreen に渡す。
+ */
 function CalendarRoute() {
   const [params] = useSearchParams();
   const raw = params.get('date');
   // 手書き URL 等の不正値でカレンダー描画が壊れないよう、暦日の形だけ通す。
   const initialDate = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
-  return <CalendarScreen initialDate={initialDate} />;
+  // 形式チェックはしない。存在しない/不正な ID は CalendarScreen 側で
+  // 該当予定が見つからず、静かにフォールバックする(I/O & Edge-Case Matrix)。
+  const initialEventId = params.get('event') ?? undefined;
+  return <CalendarScreen initialDate={initialDate} initialEventId={initialEventId} />;
 }
 
 const routes: RouteObject[] = [
