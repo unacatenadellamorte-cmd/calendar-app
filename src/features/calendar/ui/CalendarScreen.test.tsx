@@ -202,4 +202,70 @@ describe('CalendarScreen', () => {
     expect(screen.getByText(/Supabase を設定すると/)).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: '月' })).not.toBeInTheDocument();
   });
+
+  describe('initialEventId(ディープリンク calendar-app://event/{id} 由来)', () => {
+    it('該当するローカル予定があれば編集シートを1回だけ開く', () => {
+      render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+    });
+
+    it('該当する取り込み予定(source=google)があれば読み取り専用の詳細シートを開く', () => {
+      evState.events = [{ ...sampleEvent, id: 'gx', source: 'google' }];
+      render(<CalendarScreen initialEventId="gx" />);
+      expect(screen.getByRole('dialog', { name: '予定の詳細' })).toBeInTheDocument();
+    });
+
+    it('存在しない ID なら何も開かず静かにフォールバックする(エラー表示なし)', () => {
+      render(<CalendarScreen initialEventId="not-found" />);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      // 通常の月ビューが変わらず表示される。
+      expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
+    });
+
+    it('ev がロード中の間は開かず、ロード完了後に開く', () => {
+      evState.loading = true;
+      const { rerender } = render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.queryByRole('dialog', { name: '予定を編集' })).not.toBeInTheDocument();
+
+      evState = { ...evState, loading: false };
+      rerender(<CalendarScreen initialEventId="e1" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+    });
+
+    it('cal がロード中の間は開かず、ロード完了後に開く(「不明なカレンダー」表示の防止)', () => {
+      calState.loading = true;
+      const { rerender } = render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.queryByRole('dialog', { name: '予定を編集' })).not.toBeInTheDocument();
+
+      calState = { ...calState, loading: false };
+      rerender(<CalendarScreen initialEventId="e1" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+    });
+
+    it('auth 解決前(cold launch, enabled=false)は開かず、解決後に開く', () => {
+      authState = { state: 'loading' };
+      const { rerender } = render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.queryByRole('dialog', { name: '予定を編集' })).not.toBeInTheDocument();
+
+      authState = { state: 'guest' };
+      rerender(<CalendarScreen initialEventId="e1" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+    });
+
+    it('initialEventId が別の値に変わったら、同じマウント内でも再度処理して切り替わる(ラッチの誤固定防止)', async () => {
+      const user = userEvent.setup();
+      const secondEvent = { ...sampleEvent, id: 'e2', title: '別の予定' };
+      evState.events = [sampleEvent, secondEvent];
+      const { rerender } = render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+      expect(screen.getByLabelText('タイトル')).toHaveValue('会議アルファ');
+
+      // 一旦閉じてから、別の予定への2件目のディープリンクを想定。
+      await user.click(screen.getByRole('button', { name: '閉じる' }));
+      rerender(<CalendarScreen initialEventId="e2" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+      expect(screen.getByLabelText('タイトル')).toHaveValue('別の予定');
+    });
+  });
 });

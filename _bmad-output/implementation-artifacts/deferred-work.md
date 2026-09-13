@@ -69,3 +69,7 @@
 - source_spec: `spec-3-3-google-event-sync.md`
   summary: `apply_calendar_sync` の削除差分は「開始時刻が取り込み時間窓内」の行だけを対象にするため、窓の開始より前に始まり窓に重なる予定(複数日タイムド等)が Google 側で削除されても論理削除されず孤児行として残り続ける。
   evidence: 個人カレンダーで「60日以上前に始まってまだ続くタイムド予定」自体が稀で、それが Google 側で消される状況はさらに稀。削除差分の窓判定を `tstzrange(starts_at, ends_at) && tstzrange(p_window_min, p_window_max)`(重なり)へ広げるか、`ends_at` も条件に含める。3.4(取り込み失敗表示・接続解除)で sync ロジックを触るときにまとめて。
+
+- source_spec: `spec-5-1-capacitor-foundation-and-native-projects.md`
+  summary: iOS の Xcode ビルド確認は本ストーリーでは実施していない。`ios/` の雛形生成と `Info.plist` の `CFBundleURLSchemes` 登録はコードとして用意したが、Xcode を開いてのビルド・シミュレータ/実機起動・ディープリンクの動作確認は未実施。
+  evidence: 開発機が Windows のため Xcode が使えず、本ストーリーでは Android のみビルド・エミュレータ(`Pixel_7_API_36`)確認まで完了させた(spec の frozen block に明記の決定)。Mac 環境が確保でき次第、`docs/capacitor-mobile-setup.md` の「iOS(Mac 確保後のフォローアップ)」手順で回収する。
