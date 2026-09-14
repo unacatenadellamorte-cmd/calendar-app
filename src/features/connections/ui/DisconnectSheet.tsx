@@ -4,6 +4,8 @@ import type { DisconnectImpact } from '@/data/connections';
 
 interface DisconnectSheetProps {
   open: boolean;
+  /** シートの見出し文言。呼び出し側が渡す(例: 「Google 接続を解除」)。 */
+  title: string;
   /** 消える件数のプレビュー。取得できていなければ null(件数は「—」)。 */
   impact: DisconnectImpact | null;
   busy: boolean;
@@ -13,11 +15,13 @@ interface DisconnectSheetProps {
 }
 
 /**
- * Google 接続を解除する前の確認シート(Story 3.4、UX-DR13 破壊的操作)。
+ * 接続を解除する前の確認シート(Story 3.4 / 5.3、UX-DR13 破壊的操作)。
+ * Google・端末カレンダーの両方で再利用する(`title` は呼び出し側が渡す)。
  * 消える予定・カレンダーの件数を先に見せ、専用ボタンでのみ確定する。元に戻せない。
  */
 export function DisconnectSheet({
   open,
+  title,
   impact,
   busy,
   errorKey,
@@ -28,7 +32,7 @@ export function DisconnectSheet({
   const calendars = impact ? `${impact.calendars} 件` : '—';
 
   return (
-    <BottomSheet open={open} title="Google 接続を解除" onClose={onClose}>
+    <BottomSheet open={open} title={title} onClose={onClose}>
       <div className="space-y-3">
         <p className="text-body text-ink-primary">
           取り込んだ予定 {events}・カレンダー {calendars} が、この端末と

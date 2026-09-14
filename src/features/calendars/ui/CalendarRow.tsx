@@ -21,6 +21,7 @@ interface CalendarRowProps {
 const SOURCE_LABEL: Record<Calendar['source'], string> = {
   local: 'ローカル',
   google: 'Google',
+  device: '端末',
 };
 
 /**

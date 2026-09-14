@@ -11,9 +11,10 @@ interface EventDetailSheetProps {
 }
 
 /**
- * 取り込んだ予定の読み取り専用詳細(Story 3.3)。
- * Google から取り込んだ予定は編集・削除できない(AD-2)。編集用の EventFormSheet とは
- * 別コンポーネントにして、外部予定に書き込み経路を作らないことを構造で担保する。
+ * 取り込んだ予定の読み取り専用詳細(Story 3.3 / 5.3)。
+ * Google・端末カレンダーから取り込んだ予定は編集・削除できない(AD-2)。編集用の
+ * EventFormSheet とは別コンポーネントにして、外部予定に書き込み経路を作らないことを
+ * 構造で担保する。
  */
 export function EventDetailSheet({ event, calendar, onClose }: EventDetailSheetProps) {
   const when = (() => {
@@ -48,7 +49,9 @@ export function EventDetailSheet({ event, calendar, onClose }: EventDetailSheetP
           )}
 
           <p className="border-t border-border-hairline pt-3 text-meta text-ink-secondary">
-            この予定は Google カレンダーから取り込んだものです。編集はできません。
+            {event.source === 'device'
+              ? 'この予定は端末のカレンダーから取り込んだものです。編集はできません。'
+              : 'この予定は Google カレンダーから取り込んだものです。編集はできません。'}
           </p>
         </div>
       )}

@@ -3,6 +3,7 @@ import { selectActive } from './soft-delete';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
 import { requestDeviceCalendarAccess } from '@/platform/deviceCalendar';
+import { getDisconnectImpact, type DisconnectImpact } from './connections';
 
 /**
  * 端末カレンダー接続の data-access レイヤ(Story 5.2、ARCHITECTURE-SPINE Epic5
@@ -70,5 +71,43 @@ export async function connectDevice(): Promise<Result<void>> {
   } catch (e) {
     if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
     return err(appError('connection/device-unavailable', 'connection/device-unavailable', e));
+  }
+}
+
+/**
+ * 端末カレンダー接続を解除する(Story 5.3)。Google(Story 3.4)と違い保護すべき秘密が
+ * 無いため、専用 RPC は作らず2手のクライアント直接操作で行う:
+ * (1) `calendars` を `external_connection_id` で明示削除(FK cascade が無いため)
+ * (2) `connections` を `id` で削除 ── 新設した RLS(`connections_delete_device`)経由。
+ *     `connection_calendars` / `events` / `sync_state` は既存の on delete cascade で連鎖削除される。
+ * 返り値は解除前に数えた影響件数(`getDisconnectImpact` を流用)。件数プレビューは
+ * UI 用の付随情報にすぎないため、その取得に失敗しても解除処理自体は続行する
+ * (Google 側の設計 ── RPC 内で件数取得が失敗しても解除自体は止まらない ── と揃える)。
+ */
+export async function disconnectDevice(connectionId: string): Promise<Result<DisconnectImpact>> {
+  if (!supabase) return err(UNAVAILABLE);
+  try {
+    const impactResult = await getDisconnectImpact(connectionId);
+    const impact: DisconnectImpact = impactResult.ok ? impactResult.value : { events: 0, calendars: 0 };
+
+    const { error: calendarsError } = await supabase
+      .from('calendars')
+      .delete()
+      .eq('external_connection_id', connectionId);
+    if (calendarsError) {
+      return err(appError('connection/disconnect-failed', 'connection/disconnect-failed', calendarsError));
+    }
+
+    const { error: connectionError } = await supabase.from('connections').delete().eq('id', connectionId);
+    if (connectionError) {
+      return err(
+        appError('connection/disconnect-failed', 'connection/disconnect-failed', connectionError),
+      );
+    }
+
+    return ok(impact);
+  } catch (e) {
+    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
+    return err(appError('connection/disconnect-failed', 'connection/disconnect-failed', e));
   }
 }

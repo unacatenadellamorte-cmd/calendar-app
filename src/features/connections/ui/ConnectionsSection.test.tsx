@@ -12,6 +12,8 @@ const disconnectGoogle = vi.fn();
 const getDisconnectImpact = vi.fn();
 const refetch = vi.fn();
 const connectDevice = vi.fn();
+const disconnectDevice = vi.fn();
+const syncDeviceCalendarsNow = vi.fn();
 const isDeviceCalendarSupported = vi.fn();
 let authState: { state: string } = { state: 'authenticated' };
 let envValue = { hasSupabase: true, hasGoogleOauth: true };
@@ -43,6 +45,10 @@ vi.mock('@/data/google-sync', () => ({
 }));
 vi.mock('@/data/device-connections', () => ({
   connectDevice: () => connectDevice(),
+  disconnectDevice: (...a: unknown[]) => disconnectDevice(...a),
+}));
+vi.mock('@/data/device-sync', () => ({
+  syncDeviceCalendarsNow: () => syncDeviceCalendarsNow(),
 }));
 vi.mock('@/platform/deviceCalendar', () => ({
   isDeviceCalendarSupported: () => isDeviceCalendarSupported(),
@@ -65,6 +71,8 @@ beforeEach(() => {
   getDisconnectImpact.mockReset().mockResolvedValue(ok({ events: 252, calendars: 1 }));
   refetch.mockReset();
   connectDevice.mockReset().mockResolvedValue(ok(undefined));
+  disconnectDevice.mockReset().mockResolvedValue(ok({ events: 12, calendars: 1 }));
+  syncDeviceCalendarsNow.mockReset().mockResolvedValue(ok({ synced: [], errors: [] }));
   isDeviceCalendarSupported.mockReset().mockReturnValue(true);
   authState = { state: 'authenticated' };
   envValue = { hasSupabase: true, hasGoogleOauth: true };
@@ -149,10 +157,22 @@ describe('ConnectionsSection', () => {
     );
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
+    await user.click(await screen.findByRole('button', { name: 'Google の今すぐ取り込み' }));
     expect(await screen.findByText('取り込みました(4 件)')).toBeInTheDocument();
     expect(listSyncState).toHaveBeenCalledTimes(2); // 初回 + 取り込み後
     expect(refetch).toHaveBeenCalled(); // 月/週/リストの予定も取り直す(Epic 3 retro F8)
+  });
+
+  it('「今すぐ取り込み」で全カレンダーが失敗: 「一部」ではなく明確な失敗文言を出す', async () => {
+    getConnection.mockResolvedValue(connected);
+    syncGoogleCalendarsNow.mockResolvedValue(
+      ok({ synced: [], errors: [{ calendar: 'ゴミ', error: 'sync-failed' }] }),
+    );
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Google の今すぐ取り込み' }));
+    expect(await screen.findByText('取り込みに失敗しました')).toBeInTheDocument();
+    expect(screen.queryByText(/一部のカレンダーを取り込めませんでした/)).not.toBeInTheDocument();
   });
 
   it('「今すぐ取り込み」失敗: エラー文言を alert で出す', async () => {
@@ -163,7 +183,7 @@ describe('ConnectionsSection', () => {
     });
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
+    await user.click(await screen.findByRole('button', { name: 'Google の今すぐ取り込み' }));
     await waitFor(() =>
       expect(screen.getByText('取り込みに失敗しました。時間をおいてもう一度お試しください')).toBeInTheDocument(),
     );
@@ -177,7 +197,7 @@ describe('ConnectionsSection', () => {
     });
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(await screen.findByRole('button', { name: '今すぐ取り込み' }));
+    await user.click(await screen.findByRole('button', { name: 'Google の今すぐ取り込み' }));
     await waitFor(() =>
       expect(screen.getByText('オフラインです。接続すると同期します')).toBeInTheDocument(),
     );
@@ -187,7 +207,7 @@ describe('ConnectionsSection', () => {
     getConnection.mockResolvedValue(connected);
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(await screen.findByRole('button', { name: '接続を解除' }));
+    await user.click(await screen.findByRole('button', { name: 'Google の接続を解除' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Google 接続を解除' });
     await waitFor(() => expect(dialog).toHaveTextContent('予定 252 件'));
@@ -212,7 +232,7 @@ describe('ConnectionsSection', () => {
     });
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(await screen.findByRole('button', { name: '接続を解除' }));
+    await user.click(await screen.findByRole('button', { name: 'Google の接続を解除' }));
     const dialog = await screen.findByRole('dialog', { name: 'Google 接続を解除' });
     await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
     await waitFor(() =>
@@ -224,7 +244,7 @@ describe('ConnectionsSection', () => {
   it('未接続 / guest: 「接続を解除」は出さない', async () => {
     render(<ConnectionsSection />); // getConnection = ok(null)
     await screen.findByRole('button', { name: 'Google を接続' });
-    expect(screen.queryByRole('button', { name: '接続を解除' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Google の接続を解除' })).not.toBeInTheDocument();
   });
 
   it('影響件数の取得に失敗しても解除は可能(件数は「—」)', async () => {
@@ -235,7 +255,7 @@ describe('ConnectionsSection', () => {
     });
     const user = userEvent.setup();
     render(<ConnectionsSection />);
-    await user.click(await screen.findByRole('button', { name: '接続を解除' }));
+    await user.click(await screen.findByRole('button', { name: 'Google の接続を解除' }));
     const dialog = await screen.findByRole('dialog', { name: 'Google 接続を解除' });
     expect(dialog).toHaveTextContent('予定 —');
     await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
@@ -288,5 +308,106 @@ describe('ConnectionsSection の端末カレンダーブロック(Story 5.2)', (
     expect(await screen.findByRole('button', { name: 'Google を接続' })).toBeInTheDocument();
     expect(screen.queryByText('端末カレンダーを接続')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '端末カレンダーを接続' })).not.toBeInTheDocument();
+  });
+});
+
+describe('ConnectionsSection の端末カレンダーの取り込み・解除(Story 5.3)', () => {
+  beforeEach(() => {
+    deviceConnectionValue = {
+      connection: { id: 'd1', provider: 'device', createdAt: 'x' },
+      loading: false,
+      errorKey: null,
+      refresh: vi.fn(),
+    };
+  });
+
+  it('「今すぐ取り込み」成功: syncDeviceCalendarsNow を呼び、新規件数を表示して refetch する', async () => {
+    syncDeviceCalendarsNow.mockResolvedValue(
+      ok({ synced: [{ calendar: '仕事', upserted: 3, deleted: 0 }], errors: [] }),
+    );
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    const buttons = await screen.findAllByRole('button', { name: '端末カレンダーの今すぐ取り込み' });
+    // Google ブロックは未接続なのでボタンは端末カレンダー側の1つだけのはず。
+    expect(buttons).toHaveLength(1);
+    await user.click(buttons[0]!);
+    expect(syncDeviceCalendarsNow).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('取り込みました(3 件)')).toBeInTheDocument();
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('「今すぐ取り込み」失敗: エラー文言を alert で出す', async () => {
+    syncDeviceCalendarsNow.mockResolvedValue({
+      ok: false,
+      error: { kind: 'sync/failed', messageKey: 'sync/failed' },
+    });
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '端末カレンダーの今すぐ取り込み' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText('取り込みに失敗しました。時間をおいてもう一度お試しください'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('「接続を解除」→ 確認シートに影響件数、確定で disconnectDevice + refetch + 未接続表示へ', async () => {
+    getDisconnectImpact.mockResolvedValue(ok({ events: 12, calendars: 1 }));
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '端末カレンダーの接続を解除' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '端末カレンダー接続を解除' });
+    await waitFor(() => expect(dialog).toHaveTextContent('予定 12 件'));
+    expect(getDisconnectImpact).toHaveBeenCalledWith('d1');
+
+    // 解除後は connection が null に戻る(接続欄が未接続へ)。
+    deviceConnectionValue.connection = null;
+    await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
+
+    expect(disconnectDevice).toHaveBeenCalledWith('d1');
+    expect(refetch).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '端末カレンダーを接続' })).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/接続を解除しました/)).toBeInTheDocument();
+  });
+
+  it('接続解除が失敗: シートにエラー、接続状態は変わらない', async () => {
+    disconnectDevice.mockResolvedValue({
+      ok: false,
+      error: { kind: 'connection/disconnect-failed', messageKey: 'connection/disconnect-failed' },
+    });
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '端末カレンダーの接続を解除' }));
+    const dialog = await screen.findByRole('dialog', { name: '端末カレンダー接続を解除' });
+    await user.click(within(dialog).getByRole('button', { name: '接続を解除' }));
+    await waitFor(() =>
+      expect(
+        within(dialog).getByText('接続の解除に失敗しました。もう一度お試しください'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText('端末カレンダーに接続中')).toBeInTheDocument();
+  });
+
+  it('「今すぐ取り込み」で全カレンダーが失敗: 「一部」ではなく明確な失敗文言を出す', async () => {
+    syncDeviceCalendarsNow.mockResolvedValue(
+      ok({ synced: [], errors: [{ calendar: '仕事', error: 'sync-failed' }] }),
+    );
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: '端末カレンダーの今すぐ取り込み' }));
+    expect(await screen.findByText('取り込みに失敗しました')).toBeInTheDocument();
+    expect(screen.queryByText(/一部のカレンダーを取り込めませんでした/)).not.toBeInTheDocument();
+  });
+
+  it('Google・端末の両方接続済み: 「今すぐ取り込み」「接続を解除」のアクセシブルネームが区別できる', async () => {
+    getConnection.mockResolvedValue(connected);
+    render(<ConnectionsSection />);
+    expect(await screen.findByRole('button', { name: 'Google の今すぐ取り込み' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '端末カレンダーの今すぐ取り込み' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Google の接続を解除' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '端末カレンダーの接続を解除' })).toBeInTheDocument();
   });
 });

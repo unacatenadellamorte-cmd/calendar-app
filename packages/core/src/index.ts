@@ -36,6 +36,13 @@ export {
   type EventRow,
 } from './google-events';
 
+export {
+  normalizeDeviceEvent,
+  toDeviceEventRow,
+  type DeviceEventRaw,
+  type NormalizedDeviceEvent,
+} from './device-events';
+
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;
 

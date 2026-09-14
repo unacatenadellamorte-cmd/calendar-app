@@ -59,3 +59,34 @@ export async function listDeviceCalendars(): Promise<DeviceCalendar[]> {
   const { result } = await CapacitorCalendar.listCalendars();
   return result.map((c) => ({ id: c.id, title: c.title, color: c.color }));
 }
+
+/** `listEventsInRange` の生イベントのうち、予定取り込み(Story 5.3)が使う分だけ。 */
+export interface DeviceCalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  isAllDay: boolean;
+  /** 開始(ms epoch)。 */
+  startDate: number;
+  /** 終了(ms epoch)。 */
+  endDate: number;
+  /** 所属カレンダーの id。取得できなければ null。 */
+  calendarId: string | null;
+}
+
+/** 指定範囲(ms epoch)に重なる端末上の予定を一覧する(Story 5.3、読み取り専用)。 */
+export async function listDeviceEventsInRange(
+  fromMs: number,
+  toMs: number,
+): Promise<DeviceCalendarEvent[]> {
+  const { result } = await CapacitorCalendar.listEventsInRange({ from: fromMs, to: toMs });
+  return result.map((e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    isAllDay: e.isAllDay,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    calendarId: e.calendarId,
+  }));
+}

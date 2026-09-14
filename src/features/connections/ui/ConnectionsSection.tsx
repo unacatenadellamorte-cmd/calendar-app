@@ -11,20 +11,42 @@ import {
   type DisconnectImpact,
 } from '@/data/connections';
 import { listSyncState } from '@/data/google-sync';
-import { connectDevice } from '@/data/device-connections';
+import { connectDevice, disconnectDevice } from '@/data/device-connections';
 import { isDeviceCalendarSupported } from '@/platform/deviceCalendar';
 import { formatEventTime } from '@/lib/datetime';
 import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
 import { useGoogleSync } from '@/features/connections/model/useGoogleSync';
 import { useDeviceConnection } from '@/features/connections/model/useDeviceConnection';
+import { useDeviceSync } from '@/features/connections/model/useDeviceSync';
 import { DisconnectSheet } from './DisconnectSheet';
 
+/** Google/端末で共通の「今すぐ取り込み」結果表示(構造だけ見るので型は共有しない)。 */
+interface SyncResultLike {
+  synced: { upserted: number }[];
+  errors: unknown[];
+}
+
 /**
- * 設定画面の「カレンダー接続」欄(Story 3.1 / 3.3 / 3.4)。
+ * 「今すぐ取り込み」の結果を1行に整形する。全カレンダーが失敗した場合(`synced` が
+ * 空)は「一部」ではなく明確に失敗したと伝える。
+ */
+function formatSyncResultLine(result: SyncResultLike | null): string | null {
+  if (!result) return null;
+  if (result.errors.length > 0) {
+    if (result.synced.length === 0) return '取り込みに失敗しました';
+    return `一部のカレンダーを取り込めませんでした(${result.errors.length} 件)`;
+  }
+  const added = result.synced.reduce((n, s) => n + s.upserted, 0);
+  return `取り込みました(${added} 件)`;
+}
+
+/**
+ * 設定画面の「カレンダー接続」欄(Story 3.1 / 3.3 / 3.4 / 5.2 / 5.3)。
  * 状態別:
  *  - unavailable / OAuth 未設定: 無効表示
  *  - guest:          ログインへ誘導
  *  - authenticated:  接続中なら email + 取り込むカレンダー導線 + 「今すぐ取り込み」+「接続を解除」、未接続なら「Google を接続」
+ * 端末カレンダーブロックも同じパターン(取り込み・解除は Story 5.3)。
  */
 export function ConnectionsSection() {
   const { state } = useAuth();
@@ -128,14 +150,54 @@ export function ConnectionsSection() {
     refreshDevice();
   };
 
-  const runResultLine = (() => {
-    if (!lastRun) return null;
-    const added = lastRun.synced.reduce((n, s) => n + s.upserted, 0);
-    if (lastRun.errors.length > 0) {
-      return `一部のカレンダーを取り込めませんでした(${lastRun.errors.length} 件)`;
+  const runResultLine = formatSyncResultLine(lastRun);
+
+  // 端末カレンダーの「今すぐ取り込み」(Story 5.3)。フォアグラウンド復帰時の自動取り込みは
+  // src/app/DeviceSyncOnResume.tsx。成功したら月/週/リストの予定を取り直す(refetch)。
+  const onDeviceSyncDone = useCallback(() => {
+    refetch();
+  }, [refetch]);
+  const {
+    syncing: deviceSyncing,
+    lastRun: deviceLastRun,
+    errorKey: deviceSyncErrorKey,
+    runSync: runDeviceSync,
+  } = useDeviceSync(onDeviceSyncDone);
+
+  const deviceRunResultLine = formatSyncResultLine(deviceLastRun);
+
+  // 端末カレンダー接続の解除(Story 5.3)。Google と同じ確認シートを再利用する。
+  const [deviceDisconnectOpen, setDeviceDisconnectOpen] = useState(false);
+  const [deviceImpact, setDeviceImpact] = useState<DisconnectImpact | null>(null);
+  const [deviceDisconnecting, setDeviceDisconnecting] = useState(false);
+  const [deviceDisconnectErrorKey, setDeviceDisconnectErrorKey] = useState<string | null>(null);
+  const [deviceDisconnectedLine, setDeviceDisconnectedLine] = useState<string | null>(null);
+
+  const openDeviceDisconnect = () => {
+    if (!deviceConnection) return;
+    setDeviceImpact(null);
+    setDeviceDisconnectErrorKey(null);
+    setDeviceDisconnectOpen(true);
+    void getDisconnectImpact(deviceConnection.id).then((r) => {
+      if (r.ok) setDeviceImpact(r.value);
+    });
+  };
+
+  const confirmDeviceDisconnect = async () => {
+    if (!deviceConnection) return;
+    setDeviceDisconnecting(true);
+    setDeviceDisconnectErrorKey(null);
+    const result = await disconnectDevice(deviceConnection.id);
+    setDeviceDisconnecting(false);
+    if (!result.ok) {
+      setDeviceDisconnectErrorKey(result.error.messageKey);
+      return;
     }
-    return `取り込みました(${added} 件)`;
-  })();
+    setDeviceDisconnectOpen(false);
+    setDeviceDisconnectedLine(`接続を解除しました(予定 ${result.value.events} 件を削除)`);
+    refreshDevice();
+    refetch();
+  };
 
   return (
     <section aria-labelledby="connections-heading" className="mt-6">
@@ -190,6 +252,7 @@ export function ConnectionsSection() {
               type="button"
               onClick={() => void runSync()}
               disabled={syncing}
+              aria-label="Google の今すぐ取り込み"
               className="mt-2 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-60"
             >
               {syncing ? '取り込み中…' : '今すぐ取り込み'}
@@ -216,6 +279,7 @@ export function ConnectionsSection() {
             <button
               type="button"
               onClick={openDisconnect}
+              aria-label="Google の接続を解除"
               className="mt-3 min-h-11 w-full rounded-sm px-4 text-meta text-danger"
             >
               接続を解除
@@ -287,6 +351,37 @@ export function ConnectionsSection() {
                 ›
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => void runDeviceSync()}
+              disabled={deviceSyncing}
+              aria-label="端末カレンダーの今すぐ取り込み"
+              className="mt-2 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-60"
+            >
+              {deviceSyncing ? '取り込み中…' : '今すぐ取り込み'}
+            </button>
+
+            {deviceSyncErrorKey ? (
+              <p role="alert" className="mt-1 text-meta text-danger">
+                {resolveMessage(deviceSyncErrorKey)}
+              </p>
+            ) : (
+              deviceRunResultLine && (
+                <p role="status" className="mt-1 text-meta text-ink-secondary">
+                  {deviceRunResultLine}
+                </p>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={openDeviceDisconnect}
+              aria-label="端末カレンダーの接続を解除"
+              className="mt-3 min-h-11 w-full rounded-sm px-4 text-meta text-danger"
+            >
+              接続を解除
+            </button>
           </>
         ) : (
           <>
@@ -294,6 +389,11 @@ export function ConnectionsSection() {
             <p className="mt-1 text-meta text-ink-secondary">
               選んだカレンダーを読み取り専用で取り込みます。
             </p>
+            {deviceDisconnectedLine && (
+              <p role="status" className="mt-1 text-meta text-ink-secondary">
+                {deviceDisconnectedLine}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => void onConnectDevice()}
@@ -319,11 +419,22 @@ export function ConnectionsSection() {
 
       <DisconnectSheet
         open={disconnectOpen}
+        title="Google 接続を解除"
         impact={impact}
         busy={disconnecting}
         errorKey={disconnectErrorKey}
         onConfirm={() => void confirmDisconnect()}
         onClose={() => setDisconnectOpen(false)}
+      />
+
+      <DisconnectSheet
+        open={deviceDisconnectOpen}
+        title="端末カレンダー接続を解除"
+        impact={deviceImpact}
+        busy={deviceDisconnecting}
+        errorKey={deviceDisconnectErrorKey}
+        onConfirm={() => void confirmDeviceDisconnect()}
+        onClose={() => setDeviceDisconnectOpen(false)}
       />
     </section>
   );
