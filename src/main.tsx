@@ -5,6 +5,7 @@ import { initTheme } from '@/features/settings/model/useTheme';
 import { AuthProvider } from '@/app/AuthProvider';
 import { AppRoutes } from '@/app/routes';
 import { DeepLinkListener } from '@/app/DeepLinkListener';
+import { DeviceSyncOnResume } from '@/app/DeviceSyncOnResume';
 // Supabase クライアントの初期化(モジュール副作用)。未設定なら警告が1行出るだけ。
 import '@/data/supabase';
 import './styles/global.css';
@@ -23,6 +24,7 @@ createRoot(rootEl).render(
       <BrowserRouter>
         <AppRoutes />
         <DeepLinkListener />
+        <DeviceSyncOnResume />
       </BrowserRouter>
     </AuthProvider>
   </StrictMode>,

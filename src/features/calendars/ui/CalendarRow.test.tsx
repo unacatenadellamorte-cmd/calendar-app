@@ -100,4 +100,14 @@ describe('CalendarRow', () => {
     setup({ calendar: cal({ source: 'google' }), syncError: null });
     expect(screen.queryByText('取り込めませんでした')).not.toBeInTheDocument();
   });
+
+  it('device 行は種別表示に「端末」を出す(Story 5.3)', () => {
+    setup({ calendar: cal({ source: 'device' }) });
+    expect(screen.getByText('端末')).toBeInTheDocument();
+  });
+
+  it('device 行は syncError があっても失敗表示を出さない(sync_state を持たないため)', () => {
+    setup({ calendar: cal({ source: 'device' }), syncError: 'sync-failed', onRetry: vi.fn() });
+    expect(screen.queryByText('取り込めませんでした')).not.toBeInTheDocument();
+  });
 });

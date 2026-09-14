@@ -85,3 +85,13 @@
 - source_spec: `spec-5-2-device-calendar-connect-and-select.md`
   summary: `useDeviceCalendars`/`useGoogleCalendars` の `toggle()`/`refresh()` に mount時以外の `cancelled` ガードが無い。
   evidence: 処理中にコンポーネントがアンマウントされると、非同期処理完了後に setState が呼ばれ得る(React 開発モードの警告対象。実害は稀)。`toggle`/`refresh` 内にも同様の `cancelled` ref を持たせれば直る(Google/device 両方に同じ修正が要る)。
+
+- source_spec: `spec-5-3-device-calendar-sync-and-disconnect.md`
+  summary: 端末カレンダーを選択解除した後、そのカレンダー由来の既存 `events` 行が二度と削除差分の対象にならず `deleted_at` が立たないまま残る(Google の同種処理も同じ設計で、Epic 3 から受容済みのパターン)。
+  evidence: `syncDeviceCalendarsNow`/Google の `get_google_sync_targets` はどちらも `selected=true` の候補しか見ない。選択解除時に `calendars` 行は論理削除され画面には出なくなるが、`events` 行自体は触れられないまま DB に残留する。再選択時に古いデータが復活するリスクもある。Google・device 共通で「選択解除時に紐づく events も論理削除する」処理を足せば直る。
+- source_spec: `spec-5-3-device-calendar-sync-and-disconnect.md`
+  summary: 接続解除の確認シートを開く際、`getDisconnectImpact` が失敗しても件数が「—」のまま無言で残り、確認ボタンはそのまま押せる(Google 側の既存コードと同じ挙動、新規の回帰ではない)。
+  evidence: `ConnectionsSection.tsx` の `openDisconnect`/`openDeviceDisconnect` はどちらも `getDisconnectImpact` の失敗時に何もしない(`if (r.ok) setImpact(...)` のみ)。エラー表示を足すか、失敗時は確認ボタンを無効化する形にすれば直る。
+- source_spec: `spec-5-3-device-calendar-sync-and-disconnect.md`
+  summary: `disconnectDevice` の `calendars`/`connections` 削除がそれぞれ削除件数(count)を確認していない。RLS 不一致等で0件削除でも成功扱いになり得る。
+  evidence: `.delete().eq(...)` の結果は `error` の有無しか見ておらず、0件削除でも `error` は出ない。`.select('id')` を付けて返り値の件数を確認する形にすれば直る。個人利用規模では起きにくいため優先度は低い。

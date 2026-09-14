@@ -22,7 +22,7 @@ import {
  * オフライン時: 読みは IndexedDB キャッシュ、書きは outbox キュー(offline-write.ts)。
  */
 
-export type CalendarSource = 'local' | 'google';
+export type CalendarSource = 'local' | 'google' | 'device';
 
 export interface Calendar {
   id: string;

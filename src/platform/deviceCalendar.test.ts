@@ -18,12 +18,14 @@ const requestReadOnlyCalendarAccess = vi.fn();
 const requestFullCalendarAccess = vi.fn();
 const checkPermission = vi.fn();
 const listCalendars = vi.fn();
+const listEventsInRange = vi.fn();
 vi.mock('@ebarooni/capacitor-calendar', () => ({
   CapacitorCalendar: {
     requestReadOnlyCalendarAccess: (...a: unknown[]) => requestReadOnlyCalendarAccess(...a),
     requestFullCalendarAccess: (...a: unknown[]) => requestFullCalendarAccess(...a),
     checkPermission: (...a: unknown[]) => checkPermission(...a),
     listCalendars: (...a: unknown[]) => listCalendars(...a),
+    listEventsInRange: (...a: unknown[]) => listEventsInRange(...a),
   },
   CalendarPermissionScope: { READ_CALENDAR: 'readCalendar' },
 }));
@@ -32,6 +34,7 @@ const {
   requestDeviceCalendarAccess,
   checkDeviceCalendarPermission,
   listDeviceCalendars,
+  listDeviceEventsInRange,
   isDeviceCalendarSupported,
 } = await import('./deviceCalendar');
 
@@ -42,6 +45,7 @@ beforeEach(() => {
   requestFullCalendarAccess.mockReset();
   checkPermission.mockReset();
   listCalendars.mockReset();
+  listEventsInRange.mockReset();
 });
 
 describe('isDeviceCalendarSupported', () => {
@@ -94,6 +98,38 @@ describe('listDeviceCalendars', () => {
     expect(r).toEqual([
       { id: '1', title: '仕事', color: '#FF0000' },
       { id: '2', title: null, color: null },
+    ]);
+  });
+});
+
+describe('listDeviceEventsInRange', () => {
+  it('from/to を渡し、id/title/description/isAllDay/startDate/endDate/calendarId だけを取り出す', async () => {
+    listEventsInRange.mockResolvedValue({
+      result: [
+        {
+          id: 'e1',
+          title: '会議',
+          description: 'メモ',
+          isAllDay: false,
+          startDate: 1000,
+          endDate: 2000,
+          calendarId: 'cal-a',
+          organizer: '無視される付随フィールド',
+        },
+      ],
+    });
+    const r = await listDeviceEventsInRange(100, 200);
+    expect(listEventsInRange).toHaveBeenCalledWith({ from: 100, to: 200 });
+    expect(r).toEqual([
+      {
+        id: 'e1',
+        title: '会議',
+        description: 'メモ',
+        isAllDay: false,
+        startDate: 1000,
+        endDate: 2000,
+        calendarId: 'cal-a',
+      },
     ]);
   });
 });

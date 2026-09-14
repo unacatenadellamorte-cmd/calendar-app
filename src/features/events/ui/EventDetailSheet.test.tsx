@@ -67,12 +67,29 @@ describe('EventDetailSheet', () => {
     expect(screen.getByText('燃えるゴミの日')).toBeInTheDocument();
   });
 
-  it('編集・削除ボタンを出さない。読み取り専用の注記を出す', () => {
+  it('編集・削除ボタンを出さない。読み取り専用の注記を出す(Google)', () => {
     render(<EventDetailSheet event={baseEvent} calendar={calendar} onClose={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /編集|削除|保存/ })).not.toBeInTheDocument();
     expect(
       screen.getByText('この予定は Google カレンダーから取り込んだものです。編集はできません。'),
     ).toBeInTheDocument();
+  });
+
+  it('source=device なら端末カレンダー由来の注記を出す(Story 5.3)', () => {
+    render(
+      <EventDetailSheet
+        event={{ ...baseEvent, source: 'device' }}
+        calendar={{ ...calendar, source: 'device' }}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /編集|削除|保存/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText('この予定は端末のカレンダーから取り込んだものです。編集はできません。'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('この予定は Google カレンダーから取り込んだものです。編集はできません。'),
+    ).not.toBeInTheDocument();
   });
 
   it('Escape で onClose', async () => {

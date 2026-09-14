@@ -19,7 +19,7 @@ import {
  * オフライン時: 読みは IndexedDB キャッシュ、書きは outbox キュー(offline-write.ts)。
  */
 
-export type EventSource = 'local' | 'google';
+export type EventSource = 'local' | 'google' | 'device';
 
 export interface EventItem {
   id: string;
