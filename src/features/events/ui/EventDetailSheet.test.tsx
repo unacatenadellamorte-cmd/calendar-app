@@ -19,6 +19,7 @@ const baseEvent: EventItem = {
   hourlyWage: null,
   workplaceLabel: null,
   shiftTemplateId: null,
+  reminderMinutes: null,
   createdAt: 'x',
   updatedAt: 'x',
 };
@@ -37,12 +38,26 @@ const calendar: Calendar = {
 
 describe('EventDetailSheet', () => {
   it('event が null なら何も出さない', () => {
-    render(<EventDetailSheet event={null} calendar={undefined} onClose={vi.fn()} />);
+    render(
+      <EventDetailSheet
+        event={null}
+        calendar={undefined}
+        onClose={vi.fn()}
+        onSetReminder={vi.fn()}
+      />,
+    );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('タイトル・日付・カレンダー名を出す(終日)', () => {
-    render(<EventDetailSheet event={baseEvent} calendar={calendar} onClose={vi.fn()} />);
+    render(
+      <EventDetailSheet
+        event={baseEvent}
+        calendar={calendar}
+        onClose={vi.fn()}
+        onSetReminder={vi.fn()}
+      />,
+    );
     expect(screen.getByText('ゴミ収集(可燃)')).toBeInTheDocument();
     expect(screen.getByText('9/15 終日')).toBeInTheDocument();
     expect(screen.getByText('ゴミ収集日')).toBeInTheDocument();
@@ -61,6 +76,7 @@ describe('EventDetailSheet', () => {
         }}
         calendar={calendar}
         onClose={vi.fn()}
+        onSetReminder={vi.fn()}
       />,
     );
     expect(screen.getByText(/〜/)).toBeInTheDocument();
@@ -68,7 +84,14 @@ describe('EventDetailSheet', () => {
   });
 
   it('編集・削除ボタンを出さない。読み取り専用の注記を出す(Google)', () => {
-    render(<EventDetailSheet event={baseEvent} calendar={calendar} onClose={vi.fn()} />);
+    render(
+      <EventDetailSheet
+        event={baseEvent}
+        calendar={calendar}
+        onClose={vi.fn()}
+        onSetReminder={vi.fn()}
+      />,
+    );
     expect(screen.queryByRole('button', { name: /編集|削除|保存/ })).not.toBeInTheDocument();
     expect(
       screen.getByText('この予定は Google カレンダーから取り込んだものです。編集はできません。'),
@@ -81,6 +104,7 @@ describe('EventDetailSheet', () => {
         event={{ ...baseEvent, source: 'device' }}
         calendar={{ ...calendar, source: 'device' }}
         onClose={vi.fn()}
+        onSetReminder={vi.fn()}
       />,
     );
     expect(screen.queryByRole('button', { name: /編集|削除|保存/ })).not.toBeInTheDocument();
@@ -95,8 +119,40 @@ describe('EventDetailSheet', () => {
   it('Escape で onClose', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<EventDetailSheet event={baseEvent} calendar={calendar} onClose={onClose} />);
+    render(
+      <EventDetailSheet
+        event={baseEvent}
+        calendar={calendar}
+        onClose={onClose}
+        onSetReminder={vi.fn()}
+      />,
+    );
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('終日でなければ ReminderPicker(リマインダー)を表示する', () => {
+    const onSetReminder = vi.fn().mockResolvedValue(true);
+    render(
+      <EventDetailSheet
+        event={{ ...baseEvent, allDay: false, eventDate: null, startsAt: '2026-09-15T01:00:00.000Z', endsAt: '2026-09-15T02:00:00.000Z' }}
+        calendar={calendar}
+        onClose={vi.fn()}
+        onSetReminder={onSetReminder}
+      />,
+    );
+    expect(screen.getByText('リマインダー')).toBeInTheDocument();
+  });
+
+  it('終日予定は ReminderPicker を表示しない', () => {
+    render(
+      <EventDetailSheet
+        event={baseEvent}
+        calendar={calendar}
+        onClose={vi.fn()}
+        onSetReminder={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('リマインダー')).not.toBeInTheDocument();
   });
 });

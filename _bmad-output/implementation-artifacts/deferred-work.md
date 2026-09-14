@@ -95,3 +95,22 @@
 - source_spec: `spec-5-3-device-calendar-sync-and-disconnect.md`
   summary: `disconnectDevice` の `calendars`/`connections` 削除がそれぞれ削除件数(count)を確認していない。RLS 不一致等で0件削除でも成功扱いになり得る。
   evidence: `.delete().eq(...)` の結果は `error` の有無しか見ておらず、0件削除でも `error` は出ない。`.select('id')` を付けて返り値の件数を確認する形にすれば直る。個人利用規模では起きにくいため優先度は低い。
+
+- source_spec: `spec-5-4-event-reminders.md`
+  summary: 予定を終日に切り替えても `reminder_minutes` がDB上に残留する。
+  evidence: `update()` は `syncReminderForEvent` を呼ぶため通知自体は正しく cancel され機能的実害(誤通知)は無い。`ReminderPicker` は終日予定では表示されないため可視の不整合も無い。値の残留のみ。切り替え時に `reminder_minutes: null` を同時に書けば直る。
+- source_spec: `spec-5-4-event-reminders.md`
+  summary: `resyncAllReminders` は変更検知をせず全件 cancel→schedule し直す簡便設計(spec Design Notes で意図的に採用)のため、ループ実行中に別操作でユーザーがリマインダーを切ったイベントに、ループが古いスナップショットで到達すると schedule をやり直してしまうことがある。
+  evidence: `resyncAllReminders` は SELECT 時点のスナップショットを1件ずつ awaitでループする。個人規模の件数(数件〜数十件)ではループが一瞬で終わるため実害は小さい。diffベースの再設計をすれば消えるが、spec の簡便設計方針と衝突するため別途 Open Question として扱う。
+- source_spec: `spec-5-4-event-reminders.md`
+  summary: `syncGoogleCalendarsNow`/`syncDeviceCalendarsNow` はどちらも成功後に `resyncAllReminders()` を直列 `await` しており、リマインダー設定済みの予定が多いほど「同期完了」までの体感時間が伸びる。
+  evidence: `reminders.ts` 自身のコメントは「呼び出し側は結果を待たなくてよい」と書いているが実装は待っている。fire-and-forget化はエラー可視性・テストの同期タイミングの設計変更を伴うため、個人規模で実害が出た時点で改めて検討する。
+- source_spec: `spec-5-4-event-reminders.md`
+  summary: 通知IDの導出(`deriveNotificationId`)はUUID先頭8桁が衝突する/parse不能なケースを検出も警告もしない。
+  evidence: アーキテクチャ(AD-15)・spec で明記済みの「衝突は個人規模で許容」という既存の設計方針そのもの。将来ログ出力程度の検知を足す余地はあるが、現状は許容済みリスク。
+- source_spec: `spec-5-4-event-reminders.md`
+  summary: `CalendarScreen` が保持する `editing`/`detailEvent` は `setReminder` 成功後もそのシート表示中は更新されない(内部の `ReminderPicker` 自体の見た目は正しいが、親のイベントオブジェクトの `reminderMinutes` は古いまま)。
+  evidence: 同じシート内でその後タイトル/時刻を編集して保存すると、`update()` の楽観更新が一瞬古い `reminderMinutes` を使うが、サーバ応答で最終的に解消する。実害は薄い。
+- source_spec: `spec-5-4-event-reminders.md`
+  summary: 過去時刻になるリマインダー(例: 5分後に始まる予定に「1時間前」を設定)は `reminder_minutes` がDBに保存されるのに、無言で通知だけスケジュールされない。
+  evidence: spec I/O Matrix の範囲外(想定シナリオに未記載)。保存前に弾くか警告を出すかはUI設計判断が要るため、別途 Open Question として扱う。

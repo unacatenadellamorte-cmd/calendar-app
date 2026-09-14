@@ -15,6 +15,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/invalid-time': '終了は開始より後にしてください',
   'event/invalid-date': '日付を選んでください',
   'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
+  'event/invalid-reminder': 'リマインダーの分数が正しくありません',
   'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',
   'data/offline': 'オフラインです。接続すると同期します',
   'sync/partial': '一部の変更を送信できませんでした',
@@ -42,6 +43,8 @@ const DATA_MESSAGES: Record<string, string> = {
   'connection/device-unavailable': '端末カレンダーに接続できませんでした。もう一度お試しください',
   'connection/calendar-not-found':
     'このカレンダーは一覧に見つかりませんでした。更新してもう一度お試しください',
+  'notification/permission-denied':
+    '通知が許可されていません。端末の設定から許可すると通知が届きます',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };

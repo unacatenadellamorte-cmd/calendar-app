@@ -37,6 +37,8 @@ function toEvent(row: Record<string, unknown>): EventItem {
     hourlyWage: (row.hourly_wage as number | null) ?? null,
     workplaceLabel: (row.workplace_label as string | null) ?? null,
     shiftTemplateId: (row.shift_template_id as string | null) ?? null,
+    // 新規作成直後の行なので常に未設定(リマインダーは setEventReminder で後から設定する)。
+    reminderMinutes: null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };

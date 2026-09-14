@@ -5,11 +5,15 @@ import {
   deleteEvent,
   listEvents,
   restoreEvent,
+  setEventReminder,
   updateEvent,
   type EventItem,
   type EventPatch,
   type NewEventInput,
 } from '@/data/events';
+import { deriveNotificationId } from '@core';
+import { cancelReminder } from '@/platform/reminders';
+import { syncReminderForEvent } from '@/data/reminders';
 
 /** フォームが返す完全な入力を、更新用の patch に変換する。 */
 function inputToPatch(input: NewEventInput): EventPatch {
@@ -104,6 +108,9 @@ export function useEvents(enabled: boolean) {
     if (result.ok) {
       setEvents((es) => sortEvents(es.map((e) => (e.id === current.id ? result.value : e))));
       setErrorKey(null);
+      // 時刻編集でリマインダーが設定済みなら、同じ導出IDで cancel → 新時刻で再スケジュール
+      // (Story 5.4)。reminderMinutes が無ければ syncReminderForEvent 内で cancel のみ。
+      await syncReminderForEvent(result.value);
       return true;
     }
     setEvents((es) => sortEvents(es.map((e) => (e.id === current.id ? current : e))));
@@ -126,6 +133,12 @@ export function useEvents(enabled: boolean) {
         setErrorKey(result.error.messageKey);
         return;
       }
+      // リマインダー未設定でも cancel は無害(Story 5.4)。同じ導出IDで取り消す。
+      try {
+        await cancelReminder(deriveNotificationId(event.id));
+      } catch (e) {
+        console.warn('useEvents: cancelReminder failed', (e as Error)?.message);
+      }
       // 直前の削除の Undo タイマが残っていたら止める(連続削除で孤児タイマが
       // 発火して次の Undo バーを早期に消すのを防ぐ。useShiftTemplates と揃える)。
       if (pendingRef.current) clearTimeout(pendingRef.current.timer);
@@ -136,6 +149,19 @@ export function useEvents(enabled: boolean) {
     [finalize],
   );
 
+  /** リマインダーを設定/解除する(Story 5.4)。source を問わず許可(FR20)。 */
+  const setReminder = useCallback(async (event: EventItem, minutes: number | null) => {
+    const result = await setEventReminder(event.id, minutes);
+    if (!result.ok) {
+      setErrorKey(result.error.messageKey);
+      return false;
+    }
+    setEvents((es) => sortEvents(es.map((e) => (e.id === event.id ? result.value : e))));
+    setErrorKey(null);
+    await syncReminderForEvent(result.value);
+    return true;
+  }, []);
+
   const undoDelete = useCallback(async () => {
     const pending = pendingRef.current;
     if (!pending) return;
@@ -143,8 +169,13 @@ export function useEvents(enabled: boolean) {
     pendingRef.current = null;
     setPendingDelete(null);
     const result = await restoreEvent(pending.event);
-    if (result.ok) setEvents((es) => sortEvents([...es, pending.event]));
-    else setErrorKey(result.error.messageKey);
+    if (result.ok) {
+      setEvents((es) => sortEvents([...es, pending.event]));
+      // 削除時に cancel した通知を、Undo で復元した予定に合わせて再スケジュールする(Story 5.4)。
+      await syncReminderForEvent(pending.event);
+    } else {
+      setErrorKey(result.error.messageKey);
+    }
   }, []);
 
   return {
@@ -157,6 +188,7 @@ export function useEvents(enabled: boolean) {
     addLocal,
     update,
     remove,
+    setReminder,
     undoDelete,
     dismissError,
   };

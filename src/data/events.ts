@@ -39,6 +39,8 @@ export interface EventItem {
   hourlyWage: number | null;
   workplaceLabel: string | null;
   shiftTemplateId: string | null;
+  /** 何分前に通知するか(Story 5.4、FR-20)。未設定は null。終日予定は常に null。 */
+  reminderMinutes: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,7 +89,12 @@ export interface EventRange {
   limit?: number;
 }
 
-interface EventRow {
+/**
+ * `events` テーブルの行形。`resyncAllReminders`(src/data/reminders.ts)が
+ * リマインダー設定済みの予定を SELECT するときも、この形 + `toEvent` を再利用する
+ * (snake↔camel 変換をこのファイルの外で重複させない)。
+ */
+export interface EventRow {
   id: string;
   calendar_id: string;
   title: string;
@@ -101,15 +108,16 @@ interface EventRow {
   hourly_wage: number | null;
   workplace_label: string | null;
   shift_template_id: string | null;
+  reminder_minutes: number | null;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
-const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,created_at,updated_at';
+export const COLUMNS =
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,created_at,updated_at';
 
-function toEvent(row: EventRow): EventItem {
+export function toEvent(row: EventRow): EventItem {
   return {
     id: row.id,
     calendarId: row.calendar_id,
@@ -124,6 +132,7 @@ function toEvent(row: EventRow): EventItem {
     hourlyWage: row.hourly_wage ?? null,
     workplaceLabel: row.workplace_label ?? null,
     shiftTemplateId: row.shift_template_id ?? null,
+    reminderMinutes: row.reminder_minutes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -303,6 +312,60 @@ export async function updateEvent(
     return ok(updated);
   } catch (e) {
     if (isNetworkError(e)) return offlineUpdateEvent(current.id, patch);
+    return err(appError('data/query', 'data/query', e));
+  }
+}
+
+/** `reminder_minutes` の上限(1週間)。マイグレーションの CHECK 制約と同じ値。 */
+const REMINDER_MINUTES_MAX = 10080;
+
+/**
+ * リマインダーの妥当性。問題なければ null。`validateEventInput`/`validateEventPatch` と
+ * 同じパターン ── 表示層向けの messageKey を持つ AppError を返す。DB の CHECK 制約
+ * (0以上10080以下)と同じ範囲をクライアント側でも検証し、生の PostgrestError が
+ * そのまま表示に漏れないようにする。
+ */
+export function validateReminderMinutes(minutes: number | null): AppError | null {
+  if (minutes === null) return null;
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > REMINDER_MINUTES_MAX) {
+    return appError('event/invalid-reminder', 'event/invalid-reminder');
+  }
+  return null;
+}
+
+/**
+ * リマインダー(`reminder_minutes`)だけを書き換える狭い経路(Story 5.4、FR-20)。
+ * `updateEvent` と違い `source` を問わない(取り込み予定にもリマインダーは設定できる。
+ * AD-2 の「取り込み予定は他の列を書けない」という一方向原則は、書く列をこの1つに
+ * 絞ることで維持する)。オフライン時はキューに積まず即座に data/offline を返す
+ * (このアプリの他の書き込みと違い、outbox の再生時に `source!=='local'` チェックへ
+ * 衝突なく載せる仕組みが無いため、狭い経路のまま単純にオンライン専用にする)。
+ */
+export async function setEventReminder(
+  eventId: string,
+  minutes: number | null,
+): Promise<Result<EventItem>> {
+  if (!supabase) return err(UNAVAILABLE);
+  const invalid = validateReminderMinutes(minutes);
+  if (invalid) return err(invalid);
+  if (isOffline()) return err(appError('data/offline', 'data/offline'));
+
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .update({ reminder_minutes: minutes })
+      .eq('id', eventId)
+      .select(COLUMNS)
+      .single();
+    if (error) {
+      if (isNetworkError(error)) return err(appError('data/offline', 'data/offline', error));
+      return err(fromPostgrest(error));
+    }
+    const updated = toEvent(data as EventRow);
+    await cachePut('events', updated);
+    return ok(updated);
+  } catch (e) {
+    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
     return err(appError('data/query', 'data/query', e));
   }
 }

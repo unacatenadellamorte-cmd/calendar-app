@@ -232,12 +232,14 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
         onCreate={(input: NewEventInput) => ev.create(input)}
         onUpdate={(current, input) => ev.update(current, input)}
         onDelete={(event) => void ev.remove(event)}
+        onSetReminder={(event, minutes) => ev.setReminder(event, minutes)}
       />
 
       <EventDetailSheet
         event={detailEvent}
         calendar={detailEvent ? calendarById.get(detailEvent.calendarId) : undefined}
         onClose={() => setDetailEvent(null)}
+        onSetReminder={(event, minutes) => ev.setReminder(event, minutes)}
       />
     </Screen>
   );

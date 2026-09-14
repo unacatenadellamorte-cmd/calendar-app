@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
 import { invokeFn } from './edge';
+import { resyncAllReminders } from './reminders';
 
 /**
  * Google カレンダーの予定取り込み(Story 3.3)。data-access レイヤ。
@@ -44,14 +45,20 @@ function slugToKey(slug: string): string {
   return 'sync/failed';
 }
 
-/** 選択済みの Google カレンダーの予定を今すぐ取り込む(オンライン必須)。 */
-export function syncGoogleCalendarsNow(): Promise<Result<SyncRunResult>> {
-  return invokeFn<SyncRunResult>(
+/**
+ * 選択済みの Google カレンダーの予定を今すぐ取り込む(オンライン必須)。
+ * 成功時は、リマインダー設定済みの全予定を再同期する(Story 5.4、取り込みが
+ * 予定の時刻を書き換え得るため)。resync 自体の失敗はこの呼び出しの結果に影響しない。
+ */
+export async function syncGoogleCalendarsNow(): Promise<Result<SyncRunResult>> {
+  const result = await invokeFn<SyncRunResult>(
     'sync-calendars',
     { scheduled: false },
     slugToKey,
     'sync/failed',
   );
+  if (result.ok) await resyncAllReminders();
+  return result;
 }
 
 /** 自分の取り込み状態を一覧する。オフラインは data/offline。 */

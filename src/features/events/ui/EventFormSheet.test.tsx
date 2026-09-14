@@ -22,6 +22,7 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
   const onCreate = vi.fn().mockResolvedValue(true);
   const onUpdate = vi.fn().mockResolvedValue(true);
   const onClose = vi.fn();
+  const onSetReminder = vi.fn().mockResolvedValue(true);
   render(
     <EventFormSheet
       open
@@ -30,10 +31,11 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
       onClose={onClose}
       onCreate={onCreate}
       onUpdate={onUpdate}
+      onSetReminder={onSetReminder}
       {...overrides}
     />,
   );
-  return { onCreate, onUpdate, onClose };
+  return { onCreate, onUpdate, onClose, onSetReminder };
 }
 
 describe('EventFormSheet', () => {
@@ -98,6 +100,7 @@ describe('EventFormSheet', () => {
       hourlyWage: null,
       workplaceLabel: null,
       shiftTemplateId: null,
+      reminderMinutes: null,
       createdAt: '',
       updatedAt: '',
     };
@@ -106,6 +109,57 @@ describe('EventFormSheet', () => {
     await user.click(screen.getByRole('button', { name: 'この予定を削除' }));
     expect(onDelete).toHaveBeenCalledWith(editing);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('編集中かつ時刻付きなら ReminderPicker を表示する', () => {
+    const editing = {
+      id: 'e9',
+      calendarId: 'c1',
+      title: '古い予定',
+      allDay: false as const,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+      eventDate: null,
+      note: null,
+      source: 'local' as const,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
+      reminderMinutes: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+    setup({ editing });
+    expect(screen.getByText('リマインダー')).toBeInTheDocument();
+  });
+
+  it('編集中でも終日予定なら ReminderPicker を表示しない', () => {
+    const editing = {
+      id: 'e9',
+      calendarId: 'c1',
+      title: '古い予定',
+      allDay: true as const,
+      startsAt: null,
+      endsAt: null,
+      eventDate: '2026-09-08',
+      note: null,
+      source: 'local' as const,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
+      reminderMinutes: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+    setup({ editing });
+    expect(screen.queryByText('リマインダー')).not.toBeInTheDocument();
+  });
+
+  it('新規作成時(editing が null)は ReminderPicker を表示しない', () => {
+    setup();
+    expect(screen.queryByText('リマインダー')).not.toBeInTheDocument();
   });
 
   it('onDelete 未指定なら削除ボタンは出ない', () => {
