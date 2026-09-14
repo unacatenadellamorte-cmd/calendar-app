@@ -51,6 +51,8 @@ export async function offlineCreateEvent(
     hourlyWage: input.shift?.hourlyWage ?? null,
     workplaceLabel: input.shift?.workplaceLabel ?? null,
     shiftTemplateId: input.shift?.shiftTemplateId ?? null,
+    // 新規作成直後の行なので常に未設定(リマインダーは setEventReminder で後から設定する)。
+    reminderMinutes: null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };

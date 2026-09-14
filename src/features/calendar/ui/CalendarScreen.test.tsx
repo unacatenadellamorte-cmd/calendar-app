@@ -37,6 +37,7 @@ const sampleEvent: EventItem = {
   hourlyWage: null,
   workplaceLabel: null,
   shiftTemplateId: null,
+  reminderMinutes: null,
   createdAt: '',
   updatedAt: '',
 };
@@ -89,6 +90,7 @@ beforeEach(() => {
     addLocal: vi.fn(),
     update: vi.fn().mockResolvedValue(true),
     remove: vi.fn(),
+    setReminder: vi.fn().mockResolvedValue(true),
     undoDelete: vi.fn(),
     dismissError: vi.fn(),
   };

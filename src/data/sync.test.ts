@@ -44,6 +44,7 @@ const ev = (id: string): EventItem => ({
   hourlyWage: null,
   workplaceLabel: null,
   shiftTemplateId: null,
+  reminderMinutes: null,
   createdAt: '',
   updatedAt: '',
 });

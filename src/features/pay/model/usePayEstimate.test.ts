@@ -39,6 +39,7 @@ const shiftEvent = (over: Partial<EventItem> = {}): EventItem => ({
   hourlyWage: 1100,
   workplaceLabel: null,
   shiftTemplateId: 't1',
+  reminderMinutes: null,
   createdAt: '',
   updatedAt: '',
   ...over,

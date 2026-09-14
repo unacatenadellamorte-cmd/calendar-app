@@ -43,6 +43,8 @@ export {
   type NormalizedDeviceEvent,
 } from './device-events';
 
+export { deriveNotificationId } from './notification-id';
+
 /** このパッケージのバージョン識別子(ビルド疎通確認用のプレースホルダ)。 */
 export const CORE_VERSION = '0.1.0' as const;
 

@@ -33,6 +33,7 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   hourlyWage: null,
   workplaceLabel: null,
   shiftTemplateId: null,
+  reminderMinutes: null,
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z',
   ...over,

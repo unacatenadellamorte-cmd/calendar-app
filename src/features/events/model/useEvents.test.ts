@@ -8,6 +8,7 @@ const createEvent = vi.fn();
 const updateEvent = vi.fn();
 const deleteEvent = vi.fn();
 const restoreEvent = vi.fn();
+const setEventReminder = vi.fn();
 
 vi.mock('@/data/events', () => ({
   listEvents: (r: unknown) => listEvents(r),
@@ -15,6 +16,17 @@ vi.mock('@/data/events', () => ({
   updateEvent: (c: unknown, p: unknown) => updateEvent(c, p),
   deleteEvent: (c: unknown) => deleteEvent(c),
   restoreEvent: (id: string) => restoreEvent(id),
+  setEventReminder: (id: string, m: number | null) => setEventReminder(id, m),
+}));
+
+const cancelReminder = vi.fn();
+vi.mock('@/platform/reminders', () => ({
+  cancelReminder: (id: number) => cancelReminder(id),
+}));
+
+const syncReminderForEvent = vi.fn();
+vi.mock('@/data/reminders', () => ({
+  syncReminderForEvent: (e: unknown) => syncReminderForEvent(e),
 }));
 
 const { useEvents } = await import('./useEvents');
@@ -33,6 +45,7 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   hourlyWage: null,
   workplaceLabel: null,
   shiftTemplateId: null,
+  reminderMinutes: null,
   createdAt: '2026-09-07T00:00:00Z',
   updatedAt: '2026-09-07T00:00:00Z',
   ...over,
@@ -47,10 +60,20 @@ const timedInput = {
 };
 
 beforeEach(() => {
-  [listEvents, createEvent, updateEvent, deleteEvent, restoreEvent].forEach((f) =>
-    f.mockReset(),
-  );
+  [
+    listEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    restoreEvent,
+    setEventReminder,
+    cancelReminder,
+    syncReminderForEvent,
+  ].forEach((f) => f.mockReset());
   listEvents.mockResolvedValue(ok([ev()]));
+  deleteEvent.mockResolvedValue(ok(undefined));
+  cancelReminder.mockResolvedValue(undefined);
+  syncReminderForEvent.mockResolvedValue(undefined);
   vi.stubGlobal('navigator', { onLine: true });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -88,7 +111,7 @@ describe('useEvents', () => {
     expect(result.current.events.map((e) => e.id)).toContain('local-1');
   });
 
-  it('update の楽観更新は失敗でロールバックする', async () => {
+  it('update の楽観更新は失敗でロールバックする(syncReminderForEvent は呼ばない)', async () => {
     updateEvent.mockResolvedValue(err(appError('data/query', 'data/query')));
     const { result } = renderHook(() => useEvents(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -97,9 +120,21 @@ describe('useEvents', () => {
     });
     expect(result.current.events[0]?.title).toBe('MTG'); // 元に戻る
     expect(result.current.errorKey).toBe('data/query');
+    expect(syncReminderForEvent).not.toHaveBeenCalled();
   });
 
-  it('remove で消え、Undo で戻る', async () => {
+  it('update 成功時は syncReminderForEvent を呼ぶ(時刻編集での cancel→再スケジュール、Story 5.4)', async () => {
+    const updated = ev({ startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' });
+    updateEvent.mockResolvedValue(ok(updated));
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.update(ev(), timedInput);
+    });
+    expect(syncReminderForEvent).toHaveBeenCalledWith(updated);
+  });
+
+  it('remove で消え、Undo で戻る。削除成功時は同じ導出IDで cancelReminder を呼ぶ(Story 5.4)', async () => {
     deleteEvent.mockResolvedValue(ok(undefined));
     restoreEvent.mockResolvedValue(ok(undefined));
     const { result } = renderHook(() => useEvents(true));
@@ -110,12 +145,32 @@ describe('useEvents', () => {
     });
     expect(result.current.events).toHaveLength(0);
     expect(result.current.pendingDelete?.id).toBe('e1');
+    expect(cancelReminder).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await result.current.undoDelete();
     });
     expect(result.current.events).toHaveLength(1);
     expect(result.current.pendingDelete).toBeNull();
+  });
+
+  it('Undo で復元した予定はリマインダーを再スケジュールする(Story 5.4)', async () => {
+    const reminderEvent = ev({ id: 'r1', reminderMinutes: 30 });
+    deleteEvent.mockResolvedValue(ok(undefined));
+    restoreEvent.mockResolvedValue(ok(undefined));
+    listEvents.mockResolvedValue(ok([reminderEvent]));
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.remove(reminderEvent);
+    });
+    syncReminderForEvent.mockClear(); // remove では呼ばない(cancelReminder のみ)ので、ここでリセット
+
+    await act(async () => {
+      await result.current.undoDelete();
+    });
+    expect(syncReminderForEvent).toHaveBeenCalledWith(reminderEvent);
   });
 
   it('create 成功で直前の errorKey をクリアする', async () => {
@@ -169,7 +224,7 @@ describe('useEvents', () => {
     }
   });
 
-  it('remove が external 拒否を返したらリストを戻す', async () => {
+  it('remove が external 拒否を返したらリストを戻す(cancelReminder は呼ばない)', async () => {
     deleteEvent.mockResolvedValue(err(appError('event/not-editable', 'event/not-editable')));
     const { result } = renderHook(() => useEvents(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -178,6 +233,7 @@ describe('useEvents', () => {
     });
     expect(result.current.events).toHaveLength(1);
     expect(result.current.errorKey).toBe('event/not-editable');
+    expect(cancelReminder).not.toHaveBeenCalled();
   });
 
   it('addLocal は作成済み予定を時系列ソートで一覧へ足す', async () => {
@@ -193,5 +249,49 @@ describe('useEvents', () => {
     expect(ids).toContain('s1');
     expect(ids).toContain('s2');
     expect(ids.indexOf('s2')).toBeLessThan(ids.indexOf('s1'));
+  });
+
+  describe('setReminder', () => {
+    it('成功したら setEventReminder → syncReminderForEvent の順に呼び、一覧を更新する', async () => {
+      setEventReminder.mockResolvedValue(ok(ev({ reminderMinutes: 30 })));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let success = false;
+      await act(async () => {
+        success = await result.current.setReminder(ev(), 30);
+      });
+      expect(success).toBe(true);
+      expect(setEventReminder).toHaveBeenCalledWith('e1', 30);
+      expect(syncReminderForEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'e1', reminderMinutes: 30 }),
+      );
+      expect(result.current.events[0]?.reminderMinutes).toBe(30);
+      expect(result.current.errorKey).toBeNull();
+    });
+
+    it('失敗したら errorKey を設定し、syncReminderForEvent を呼ばない', async () => {
+      setEventReminder.mockResolvedValue(err(appError('data/query', 'data/query')));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let success = true;
+      await act(async () => {
+        success = await result.current.setReminder(ev(), 30);
+      });
+      expect(success).toBe(false);
+      expect(result.current.errorKey).toBe('data/query');
+      expect(syncReminderForEvent).not.toHaveBeenCalled();
+    });
+
+    it('null を渡すと解除として setEventReminder(id, null) を呼ぶ', async () => {
+      setEventReminder.mockResolvedValue(ok(ev({ reminderMinutes: null })));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.setReminder(ev({ reminderMinutes: 30 }), null);
+      });
+      expect(setEventReminder).toHaveBeenCalledWith('e1', null);
+    });
   });
 });

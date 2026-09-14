@@ -10,6 +10,7 @@ import {
   todayLocalDate,
   utcIsoToLocalInput,
 } from '@/lib/datetime';
+import { ReminderPicker } from './ReminderPicker';
 
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
@@ -29,6 +30,8 @@ interface EventFormSheetProps {
   onUpdate: (current: EventItem, input: NewEventInput) => Promise<boolean>;
   /** 編集中の予定を削除する(渡されたときだけ削除ボタンを出す)。 */
   onDelete?: (event: EventItem) => void;
+  /** リマインダーを設定/解除する(Story 5.4)。編集時のみ使う。 */
+  onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean>;
 }
 
 interface FormState {
@@ -97,6 +100,7 @@ export function EventFormSheet({
   onCreate,
   onUpdate,
   onDelete,
+  onSetReminder,
 }: EventFormSheetProps) {
   const [form, setForm] = useState<FormState>(() => initialState(editing, calendars, seed));
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -216,6 +220,13 @@ export function EventFormSheet({
             className="rounded-sm border border-border-hairline bg-surface-base px-3 py-2 text-body"
           />
         </label>
+
+        {editing && !editing.allDay && (
+          <ReminderPicker
+            value={editing.reminderMinutes}
+            onChange={(minutes) => onSetReminder(editing, minutes)}
+          />
+        )}
 
         {errorKey && (
           <p role="alert" className="text-meta text-danger">

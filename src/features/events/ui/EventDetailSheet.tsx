@@ -2,12 +2,15 @@ import { BottomSheet } from '@/ui/BottomSheet';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
+import { ReminderPicker } from './ReminderPicker';
 
 interface EventDetailSheetProps {
   /** null なら閉じている。 */
   event: EventItem | null;
   calendar: Calendar | undefined;
   onClose: () => void;
+  /** リマインダーを設定/解除する(Story 5.4)。source を問わず許可(FR20)。 */
+  onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean>;
 }
 
 /**
@@ -16,7 +19,12 @@ interface EventDetailSheetProps {
  * EventFormSheet とは別コンポーネントにして、外部予定に書き込み経路を作らないことを
  * 構造で担保する。
  */
-export function EventDetailSheet({ event, calendar, onClose }: EventDetailSheetProps) {
+export function EventDetailSheet({
+  event,
+  calendar,
+  onClose,
+  onSetReminder,
+}: EventDetailSheetProps) {
   const when = (() => {
     if (!event) return '';
     if (event.allDay && event.eventDate) return formatEventDate(event.eventDate);
@@ -46,6 +54,13 @@ export function EventDetailSheet({ event, calendar, onClose }: EventDetailSheetP
 
           {event.note && (
             <p className="whitespace-pre-wrap text-body text-ink-primary">{event.note}</p>
+          )}
+
+          {!event.allDay && (
+            <ReminderPicker
+              value={event.reminderMinutes}
+              onChange={(minutes) => onSetReminder(event, minutes)}
+            />
           )}
 
           <p className="border-t border-border-hairline pt-3 text-meta text-ink-secondary">

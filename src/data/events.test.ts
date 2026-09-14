@@ -54,6 +54,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   event_date: null,
   note: null,
   source: 'local',
+  reminder_minutes: null,
   created_at: '2026-09-07T00:00:00Z',
   updated_at: '2026-09-07T00:00:00Z',
   ...over,
@@ -261,6 +262,67 @@ describe('events.ts', () => {
     if (!r.ok) expect(r.error.kind).toBe('event/not-editable');
   });
 
+  it('setEventReminder: 負値を拒否する(supabase に触れない)', async () => {
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', -1);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/invalid-reminder');
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('setEventReminder: 非整数(小数)を拒否する', async () => {
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', 10.5);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/invalid-reminder');
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('setEventReminder: 上限(10080分 = 1週間)超えを拒否する', async () => {
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', 10081);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/invalid-reminder');
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('setEventReminder: 0分・上限ちょうど(10080分)は許可する', async () => {
+    queryResult = { data: row({ reminder_minutes: 0 }), error: null };
+    const { setEventReminder } = await importEvents();
+    expect((await setEventReminder('e1', 0)).ok).toBe(true);
+
+    calls.length = 0;
+    from.mockClear();
+    queryResult = { data: row({ reminder_minutes: 10080 }), error: null };
+    expect((await setEventReminder('e1', 10080)).ok).toBe(true);
+  });
+
+  it('setEventReminder: source を問わず reminder_minutes 列だけを update する(Story 5.4)', async () => {
+    queryResult = { data: row({ source: 'google', reminder_minutes: 30 }), error: null };
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', 30);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.reminderMinutes).toBe(30);
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ reminder_minutes: 30 });
+    expect(calls.find((c) => c.method === 'eq')?.args).toEqual(['id', 'e1']);
+  });
+
+  it('setEventReminder: null を渡すと解除する', async () => {
+    queryResult = { data: row({ reminder_minutes: null }), error: null };
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', null);
+    expect(r.ok).toBe(true);
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ reminder_minutes: null });
+  });
+
+  it('setEventReminder: クエリエラーは data/query に正規化する', async () => {
+    queryResult = { data: null, error: { message: 'boom' } };
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', 30);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('data/query');
+  });
+
   it('Supabase 未設定なら unavailable', async () => {
     supabaseValue = null;
     const { listEvents, createEvent } = await importEvents();
@@ -294,6 +356,14 @@ describe('events.ts — オフライン(Story 1.6)', () => {
   beforeEach(() => vi.stubGlobal('navigator', { onLine: false }));
   afterEach(() => vi.unstubAllGlobals());
 
+  it('setEventReminder はオフラインで data/offline を返す(狭い経路、outbox には積まない)', async () => {
+    const { setEventReminder } = await importEvents();
+    const r = await setEventReminder('e1', 30);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('data/offline');
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it('listEvents はネットワーク障害でキャッシュを返す', async () => {
     const { cachePut } = await import('./cache');
     await cachePut('events', {
@@ -301,6 +371,7 @@ describe('events.ts — オフライン(Story 1.6)', () => {
       startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z', eventDate: null,
       note: null, source: 'local',
       breakMinutes: null, hourlyWage: null, workplaceLabel: null, shiftTemplateId: null,
+      reminderMinutes: null,
       createdAt: '', updatedAt: '',
     });
     queryResult = { data: null, error: { message: 'Failed to fetch' } };
