@@ -101,6 +101,15 @@ export function SettingsScreen() {
 
       <section className="mt-6 flex flex-col gap-2">
         <Link
+          to="/profile"
+          className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
+        >
+          プロフィール
+          <span aria-hidden="true" className="text-ink-secondary">
+            ›
+          </span>
+        </Link>
+        <Link
           to="/calendars"
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >

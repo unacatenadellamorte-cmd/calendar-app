@@ -10,6 +10,7 @@ import { QuickShiftScreen } from '@/features/shifts/ui/QuickShiftScreen';
 import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
 import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPicker';
 import { DeviceCalendarPicker } from '@/features/connections/ui/DeviceCalendarPicker';
+import { ProfileScreen } from '@/features/profile/ui/ProfileScreen';
 
 /**
  * `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)と
@@ -41,6 +42,8 @@ const routes: RouteObject[] = [
       { path: 'calendars', element: <CalendarsScreen /> },
       // タブ外。設定から遷移する。
       { path: 'shift-templates', element: <ShiftTemplatesScreen /> },
+      // タブ外。上部アバターアイコン・設定から遷移する。
+      { path: 'profile', element: <ProfileScreen /> },
       // タブ外。カレンダー画面ヘッダーの「シフトを追加」から遷移(月表示タップ再設計でシート→専用ページ化)。
       { path: 'shifts/add', element: <QuickShiftScreen /> },
       // タブ外。Google OAuth のリダイレクト先(Story 3.1)。
