@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    代表予定ウィジェットの AppWidgetProviderInfo(Story 5.6)。
+    表示件数は「高さ」だけで決める(FeaturedEventsWidget.kt の SizeMode.Responsive も
+    3サイズとも幅180dpで統一)。幅を可変にすると SizeMode.Responsive の選択が
+    幅にも引きずられて縦方向だけのリサイズで件数が変わらなくなるため、
+    resizeMode は vertical のみ、幅はレイアウト側の固定値(180dp)に合わせて
+    minWidth=maxResizeWidth=180dp で揃える(横方向へは伸びない)。
+    最小は1件表示分の高さ、最大リサイズで3件表示分の高さ。
+    updatePeriodMillis は OS 側の定期更新で、あくまで補助(AD-12)。
+    本体の更新はイベント駆動(フォアグラウンド復帰・同期完了・予定CRUD直後の
+    `refreshFeaturedWidget()` 呼び出し)。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:maxResizeWidth="180dp"
+    android:maxResizeHeight="180dp"
+    android:resizeMode="vertical"
+    android:widgetCategory="home_screen"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/glance_default_loading_layout" />

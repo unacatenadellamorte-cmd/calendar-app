@@ -46,6 +46,22 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!--
+            ホーム画面ウィジェット(ARCHITECTURE-SPINE Epic5 AD-12、Story 5.6)。
+            `android.appwidget.action.APPWIDGET_UPDATE` は保護ブロードキャスト(システムのみが
+            送信可能)なので `exported="false"` のまま OS からの更新を受け取れる。
+        -->
+        <receiver
+            android:name=".widget.FeaturedEventsWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/featured_events_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

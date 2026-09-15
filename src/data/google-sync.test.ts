@@ -28,6 +28,11 @@ vi.mock('./reminders', () => ({
   resyncAllReminders: (...a: unknown[]) => resyncAllReminders(...a),
 }));
 
+const refreshFeaturedWidget = vi.fn();
+vi.mock('@/platform/widget', () => ({
+  refreshFeaturedWidget: (...a: unknown[]) => refreshFeaturedWidget(...a),
+}));
+
 async function load() {
   return import('./google-sync');
 }
@@ -41,6 +46,8 @@ beforeEach(() => {
   supabaseValue = { from, functions: { invoke } };
   resyncAllReminders.mockReset();
   resyncAllReminders.mockResolvedValue(undefined);
+  refreshFeaturedWidget.mockReset();
+  refreshFeaturedWidget.mockResolvedValue(undefined);
 });
 
 describe('syncGoogleCalendarsNow', () => {
@@ -53,9 +60,11 @@ describe('syncGoogleCalendarsNow', () => {
     expect(invoke).toHaveBeenCalledWith('sync-calendars', { body: { scheduled: false } });
     // 成功時はリマインダー設定済みの全予定を再同期する(Story 5.4)。
     expect(resyncAllReminders).toHaveBeenCalledTimes(1);
+    // 成功時はホーム画面ウィジェットも最新化する(Story 5.6)。
+    expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
   });
 
-  it('関数が reauth-needed を返したら connection/reauth-needed(resync は呼ばない)', async () => {
+  it('関数が reauth-needed を返したら connection/reauth-needed(resync/widget は呼ばない)', async () => {
     invokeResult = {
       data: null,
       error: { context: new Response(JSON.stringify({ error: 'reauth-needed' }), { status: 400 }) },
@@ -65,6 +74,7 @@ describe('syncGoogleCalendarsNow', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('connection/reauth-needed');
     expect(resyncAllReminders).not.toHaveBeenCalled();
+    expect(refreshFeaturedWidget).not.toHaveBeenCalled();
   });
 
   it('not-connected は connection/not-connected', async () => {

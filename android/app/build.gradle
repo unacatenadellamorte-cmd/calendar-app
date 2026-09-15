@@ -1,4 +1,8 @@
 apply plugin: 'com.android.application'
+// Kotlin + Jetpack Compose(Story 5.6)。既存コード(MainActivity.java 等)は Java のまま、
+// ホーム画面ウィジェット(Jetpack Glance)だけが Kotlin/Compose を使う ── 混在は AGP がサポートする。
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
     namespace = "jp.ryo.calendarapp"
@@ -22,6 +26,15 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    buildFeatures {
+        compose true
+    }
+    // capacitor.build.gradle(自動生成、`npx cap sync` の度に上書きされる)が
+    // Java の compileOptions を VERSION_21 に設定するため、Kotlin 側もそれに合わせる
+    // (合わせないと「Inconsistent JVM-target compatibility」でビルドが失敗する)。
+    kotlinOptions {
+        jvmTarget = "21"
+    }
 }
 
 repositories {
@@ -35,6 +48,9 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // ホーム画面ウィジェット(Story 5.6、Jetpack Glance)。minSdk 23 以上が要件で、
+    // 本プロジェクトの minSdk 24 で満たす。
+    implementation "androidx.glance:glance-appwidget:1.2.0"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

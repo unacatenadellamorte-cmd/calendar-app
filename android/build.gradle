@@ -1,7 +1,10 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    
+    // Kotlin + Jetpack Compose(Story 5.6、ホーム画面ウィジェット)。
+    // AGP 8.13.0 との互換を優先して選定(kotlinlang.org/docs/releases.html で現行安定版を確認)。
+    ext.kotlinVersion = '2.4.20'
+
     repositories {
         google()
         mavenCentral()
@@ -9,6 +12,11 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.4'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        // Kotlin 2.0 以降、Compose コンパイラは Kotlin 本体と切り離された専用の Gradle プラグイン
+        // (`org.jetbrains.kotlin.plugin.compose`)になった。`composeOptions.kotlinCompilerExtensionVersion`
+        // は使わない(このプラグインと併用不可)。
+        classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlinVersion"
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

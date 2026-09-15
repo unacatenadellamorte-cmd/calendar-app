@@ -14,6 +14,7 @@ import {
 import { deriveNotificationId } from '@core';
 import { cancelReminder } from '@/platform/reminders';
 import { syncReminderForEvent } from '@/data/reminders';
+import { refreshFeaturedWidget } from '@/platform/widget';
 
 /** フォームが返す完全な入力を、更新用の patch に変換する。 */
 function inputToPatch(input: NewEventInput): EventPatch {
@@ -88,6 +89,9 @@ export function useEvents(enabled: boolean) {
     if (result.ok) {
       setEvents((es) => sortEvents([...es, result.value]));
       setErrorKey(null); // 直前の失敗のエラーバナーを引きずらない
+      // 代表予定が変わり得るのでウィジェットも最新化する(Story 5.6)。
+      // fire-and-forget(`addLocal` と揃える。呼び出し側の他の副作用を待たせない)。
+      void refreshFeaturedWidget();
       return true;
     }
     setErrorKey(result.error.messageKey);
@@ -98,6 +102,8 @@ export function useEvents(enabled: boolean) {
   const addLocal = useCallback((added: EventItem[]) => {
     if (added.length === 0) return;
     setEvents((es) => sortEvents([...es, ...added]));
+    // 呼び出し側は結果を待たない同期関数のため、ウィジェット更新は fire-and-forget(Story 5.6)。
+    void refreshFeaturedWidget();
   }, []);
 
   const update = useCallback(async (current: EventItem, input: NewEventInput) => {
@@ -111,6 +117,8 @@ export function useEvents(enabled: boolean) {
       // 時刻編集でリマインダーが設定済みなら、同じ導出IDで cancel → 新時刻で再スケジュール
       // (Story 5.4)。reminderMinutes が無ければ syncReminderForEvent 内で cancel のみ。
       await syncReminderForEvent(result.value);
+      // 代表予定が変わり得るのでウィジェットも最新化する(Story 5.6)。fire-and-forget。
+      void refreshFeaturedWidget();
       return true;
     }
     setEvents((es) => sortEvents(es.map((e) => (e.id === current.id ? current : e))));
@@ -139,6 +147,9 @@ export function useEvents(enabled: boolean) {
       } catch (e) {
         console.warn('useEvents: cancelReminder failed', (e as Error)?.message);
       }
+      // 代表予定が変わり得るのでウィジェットも最新化する(Story 5.6)。fire-and-forget
+      // (Undo バナー表示〈setPendingDelete〉を待たせない)。
+      void refreshFeaturedWidget();
       // 直前の削除の Undo タイマが残っていたら止める(連続削除で孤児タイマが
       // 発火して次の Undo バーを早期に消すのを防ぐ。useShiftTemplates と揃える)。
       if (pendingRef.current) clearTimeout(pendingRef.current.timer);
@@ -173,6 +184,8 @@ export function useEvents(enabled: boolean) {
       setEvents((es) => sortEvents([...es, pending.event]));
       // 削除時に cancel した通知を、Undo で復元した予定に合わせて再スケジュールする(Story 5.4)。
       await syncReminderForEvent(pending.event);
+      // 代表予定が変わり得るのでウィジェットも最新化する(Story 5.6)。fire-and-forget。
+      void refreshFeaturedWidget();
     } else {
       setErrorKey(result.error.messageKey);
     }

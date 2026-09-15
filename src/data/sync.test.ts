@@ -28,6 +28,11 @@ vi.mock('./calendars', () => ({
   deleteCalendar: (...a: unknown[]) => deleteCalendar(...a),
 }));
 
+const refreshFeaturedWidget = vi.fn();
+vi.mock('@/platform/widget', () => ({
+  refreshFeaturedWidget: (...a: unknown[]) => refreshFeaturedWidget(...a),
+}));
+
 const { flushOutbox } = await import('./sync');
 
 const ev = (id: string): EventItem => ({
@@ -61,6 +66,8 @@ beforeEach(() => {
     reorderCalendars,
     deleteCalendar,
   ].forEach((f) => f.mockReset());
+  refreshFeaturedWidget.mockReset();
+  refreshFeaturedWidget.mockResolvedValue(undefined);
 });
 
 describe('flushOutbox', () => {
@@ -123,5 +130,34 @@ describe('flushOutbox', () => {
     expect(result.interrupted).toBe(true);
     expect(await listOutbox()).toHaveLength(2);
     expect(deleteEvent).not.toHaveBeenCalled();
+  });
+
+  describe('refreshFeaturedWidget 呼び出し(Story 5.6)', () => {
+    it('1件以上反映できたら呼ぶ', async () => {
+      await enqueue({ entity: 'event', op: 'create', targetId: 't1', payload: { id: 't1' } });
+      createEvent.mockResolvedValue(ok(ev('t1')));
+
+      await flushOutbox();
+      expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('0件(全部破棄 or 何も無し)のときは呼ばない', async () => {
+      await enqueue({ entity: 'event', op: 'update', targetId: 'gone', payload: { title: 'z' } });
+      updateEvent.mockResolvedValue(err(appError('data/query', 'data/query', { code: '404' })));
+
+      const result = await flushOutbox();
+      expect(result).toMatchObject({ flushed: 0, dropped: 1 });
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+    });
+
+    it('ネットワーク障害で中断したときは呼ばない', async () => {
+      await enqueue({ entity: 'event', op: 'update', targetId: 'e1', payload: { title: 'a' } });
+      updateEvent.mockResolvedValue(
+        err(appError('data/query', 'data/query', new TypeError('Failed to fetch'))),
+      );
+
+      await flushOutbox();
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+    });
   });
 });
