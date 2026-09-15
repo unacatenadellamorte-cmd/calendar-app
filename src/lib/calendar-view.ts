@@ -94,6 +94,18 @@ export function monthGridDays(year: number, month: number, today: string): DayCe
   return cells;
 }
 
+/**
+ * `monthGridDays` が返す7列×N週のセル配列から、指定日付を含む1週(7セル)だけを抜き出す。
+ * 月表示の折りたたみ(Option C)専用の純関数。`date` が `cells` に無ければ空配列を返す
+ * (例: 月をまたいだ後に古い選択日が残っている場合。呼び出し側でフルグリッドへのフォールバックに使える)。
+ */
+export function weekRowOf(cells: DayCell[], date: string): DayCell[] {
+  const index = cells.findIndex((cell) => cell.date === date);
+  if (index === -1) return [];
+  const rowStart = index - (index % 7);
+  return cells.slice(rowStart, rowStart + 7);
+}
+
 /** 予定がローカル暦日 `date` に出現するか(単日前提。時刻付きは開始日で判定)。 */
 export function eventOccursOnDate(event: EventItem, date: string): boolean {
   if (event.allDay) return event.eventDate === date;
