@@ -60,6 +60,11 @@ vi.mock('./reminders', () => ({
   resyncAllReminders: (...a: unknown[]) => resyncAllReminders(...a),
 }));
 
+const refreshFeaturedWidget = vi.fn();
+vi.mock('@/platform/widget', () => ({
+  refreshFeaturedWidget: (...a: unknown[]) => refreshFeaturedWidget(...a),
+}));
+
 async function load() {
   return import('./device-sync');
 }
@@ -85,6 +90,8 @@ beforeEach(() => {
   listDeviceEventsInRange.mockReset();
   resyncAllReminders.mockReset();
   resyncAllReminders.mockResolvedValue(undefined);
+  refreshFeaturedWidget.mockReset();
+  refreshFeaturedWidget.mockResolvedValue(undefined);
 });
 
 describe('syncDeviceCalendarsNow', () => {
@@ -96,6 +103,7 @@ describe('syncDeviceCalendarsNow', () => {
     if (r.ok) expect(r.value).toEqual({ synced: [], errors: [] });
     expect(listDeviceEventsInRange).not.toHaveBeenCalled();
     expect(resyncAllReminders).not.toHaveBeenCalled();
+    expect(refreshFeaturedWidget).not.toHaveBeenCalled();
   });
 
   it('接続の取得に失敗したらそのまま伝播する', async () => {
@@ -117,6 +125,7 @@ describe('syncDeviceCalendarsNow', () => {
     if (r.ok) expect(r.value).toEqual({ synced: [], errors: [] });
     expect(listDeviceEventsInRange).not.toHaveBeenCalled();
     expect(resyncAllReminders).not.toHaveBeenCalled();
+    expect(refreshFeaturedWidget).not.toHaveBeenCalled();
   });
 
   it('選択済みカレンダーの新規予定を正規化して INSERT する(upsert は使わない)', async () => {
@@ -146,6 +155,8 @@ describe('syncDeviceCalendarsNow', () => {
     expect(calls.some((c) => c.method === 'upsert')).toBe(false);
     // 同期完了後にリマインダー設定済みの全予定を再同期する(Story 5.4)。
     expect(resyncAllReminders).toHaveBeenCalledTimes(1);
+    // 同期完了後にホーム画面ウィジェットも最新化する(Story 5.6)。
+    expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
 
     const insertCall = calls.find((c) => c.table === 'events' && c.method === 'insert');
     expect(insertCall).toBeTruthy();

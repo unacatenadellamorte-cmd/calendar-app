@@ -114,3 +114,16 @@
 - source_spec: `spec-5-4-event-reminders.md`
   summary: 過去時刻になるリマインダー(例: 5分後に始まる予定に「1時間前」を設定)は `reminder_minutes` がDBに保存されるのに、無言で通知だけスケジュールされない。
   evidence: spec I/O Matrix の範囲外(想定シナリオに未記載)。保存前に弾くか警告を出すかはUI設計判断が要るため、別途 Open Question として扱う。
+
+- source_spec: `spec-5-6-home-widget-android.md`
+  summary: **重要・要ユーザー確認**: `android/app/capacitor.build.gradle`/`android/capacitor.settings.gradle` のdiffが、`capacitor-local-notifications`(Story 5.4)・`ebarooni-capacitor-calendar`(Story 5.2)のGradleプロジェクト登録がStory 5.6(`npx cap sync android`実行時)で初めて追加されたことを示している。
+  evidence: baseline(`b72ea62`)時点でこの2エントリがGradle設定に存在しなかった = Story 5.2/5.4のAndroidネイティブモジュールは、少なくともこのリポジトリのコミット履歴上は今まで一度もビルドにリンクされていなかった可能性がある。両ストーリーの記録上の「Android実機確認」がこの2プラグインの実ネイティブコード無しで行われていた可能性があり、端末カレンダー接続(5.2)・ローカル通知スケジューリング(5.4)を今すぐエミュレータで再確認することを推奨する。
+- source_spec: `spec-5-6-home-widget-android.md`
+  summary: TS(`widget.ts`)とKotlin(`FeaturedEventsWidget.kt`)間で `WIDGET_GROUP`/`WIDGET_ITEM_KEY`/受信者FQCNの文字列が別々にハードコードされており、単一の情報源が無い。
+  evidence: コメントで「一致させること」と明記しているだけで、機械的な保証(コード生成・共有定数ファイル等)は無い。将来どちらかの値だけ変更すると、コンパイルエラーにも実行時エラーにもならずウィジェットが無言で「予定なし」を表示し続ける。クロス言語ブリッジに内在する制約で、対策コストが個人アプリの規模に見合わない。
+- source_spec: `spec-5-6-home-widget-android.md`
+  summary: ウィジェットはダークモード非対応(`Color.White`/`Color.Black`/`Color.DarkGray`のハードコード)。
+  evidence: 実装者が仕様のDesign Notesで意図的にスコープ外とした判断。端末がダークモードの場合、ホーム画面の他のウィジェットと調子が合わない見た目になりうる。
+- source_spec: `spec-5-6-home-widget-android.md`
+  summary: このマシン(日本語Windows、OneDriveの非ASCIIパス)では `./gradlew.bat testDebugUnitTest`(Kotlinユニットテストの実行)が完走できない。
+  evidence: Compose/Glance導入でテスト実行時クラスパスが長くなり、GradleがWindowsのコマンドライン長制限を回避するため `@argfile` 経由でクラスパスを渡す方式に切り替わるが、この引数ファイルをJVMのネイティブランチャーがOSのANSIコードページ(CP932)で読み込むため、パス中の日本語(`デスクトップ`/`AI作業場`)が文字化けし全クラスパスエントリが無効になる(新規テストだけでなくAndroid Studio生成の既存スタブも同一エラーで失敗することを確認、コードの問題ではなく環境の問題と特定済み)。コンパイル自体は成功する。恒久対処にはWindowsのシステムロケールをUTF-8に切り替える等、システム全体への変更が要り本ストーリーの範囲を超える。今後Kotlinテストを追加するたびに同じ制約に当たる見込み。

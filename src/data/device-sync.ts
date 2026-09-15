@@ -6,6 +6,7 @@ import { getDeviceConnection } from './device-connections';
 import { listDeviceEventsInRange } from '@/platform/deviceCalendar';
 import { normalizeDeviceEvent, toDeviceEventRow, deletedExternalIds, type EventRow } from '@core';
 import { resyncAllReminders } from './reminders';
+import { refreshFeaturedWidget } from '@/platform/widget';
 
 /**
  * 端末カレンダーの予定取り込み(Story 5.3、ARCHITECTURE-SPINE Epic5 AD-14 / AD-17)。
@@ -189,9 +190,11 @@ async function runSyncDeviceCalendarsNow(): Promise<Result<SyncRunResult>> {
       }
     }
 
-    // リマインダー設定済みの全予定を再同期する(Story 5.4、取り込みが予定の時刻を
-    // 書き換え得るため)。resync 自体の失敗はこの呼び出しの結果に影響しない。
+    // リマインダー設定済みの全予定を再同期し(Story 5.4、取り込みが予定の時刻を
+    // 書き換え得るため)、ホーム画面ウィジェットも最新化する(Story 5.6)。
+    // どちらも自身の内部で失敗を吸収するため、この呼び出しの結果に影響しない。
     await resyncAllReminders();
+    await refreshFeaturedWidget();
 
     return ok({ synced, errors });
   } catch (e) {

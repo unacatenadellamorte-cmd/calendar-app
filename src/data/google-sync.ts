@@ -3,6 +3,7 @@ import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
 import { invokeFn } from './edge';
 import { resyncAllReminders } from './reminders';
+import { refreshFeaturedWidget } from '@/platform/widget';
 
 /**
  * Google カレンダーの予定取り込み(Story 3.3)。data-access レイヤ。
@@ -47,8 +48,9 @@ function slugToKey(slug: string): string {
 
 /**
  * 選択済みの Google カレンダーの予定を今すぐ取り込む(オンライン必須)。
- * 成功時は、リマインダー設定済みの全予定を再同期する(Story 5.4、取り込みが
- * 予定の時刻を書き換え得るため)。resync 自体の失敗はこの呼び出しの結果に影響しない。
+ * 成功時は、リマインダー設定済みの全予定を再同期し(Story 5.4、取り込みが予定の
+ * 時刻を書き換え得るため)、ホーム画面ウィジェットも最新化する(Story 5.6)。
+ * どちらも自身の内部で失敗を吸収するため、この呼び出しの結果には影響しない。
  */
 export async function syncGoogleCalendarsNow(): Promise<Result<SyncRunResult>> {
   const result = await invokeFn<SyncRunResult>(
@@ -57,7 +59,10 @@ export async function syncGoogleCalendarsNow(): Promise<Result<SyncRunResult>> {
     slugToKey,
     'sync/failed',
   );
-  if (result.ok) await resyncAllReminders();
+  if (result.ok) {
+    await resyncAllReminders();
+    await refreshFeaturedWidget();
+  }
   return result;
 }
 

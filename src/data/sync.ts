@@ -14,6 +14,7 @@ import {
 import { createEvent, deleteEvent, updateEvent } from './events';
 import type { EventPatch, NewEventInput } from './events';
 import type { NewCalendarInput } from './calendars';
+import { refreshFeaturedWidget } from '@/platform/widget';
 
 /**
  * オフライン中に溜めた `outbox` を、オンライン復帰時に `seq` 昇順で再生する(AD-9)。
@@ -126,5 +127,9 @@ export async function flushOutbox(): Promise<FlushResult> {
       dropped += 1;
     }
   }
+  // オフライン中に作成/編集/削除された予定がウィジェットに反映されるよう、
+  // 1件以上反映できたときだけ最新化する(google-sync.ts/device-sync.ts と同じ
+  // 「無条件で呼んで失敗は内部で吸収する」パターン)。
+  if (flushed > 0) await refreshFeaturedWidget();
   return { flushed, dropped, interrupted: false };
 }

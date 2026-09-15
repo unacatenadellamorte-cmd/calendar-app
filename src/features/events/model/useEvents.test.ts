@@ -29,6 +29,11 @@ vi.mock('@/data/reminders', () => ({
   syncReminderForEvent: (e: unknown) => syncReminderForEvent(e),
 }));
 
+const refreshFeaturedWidget = vi.fn();
+vi.mock('@/platform/widget', () => ({
+  refreshFeaturedWidget: (...a: unknown[]) => refreshFeaturedWidget(...a),
+}));
+
 const { useEvents } = await import('./useEvents');
 
 const ev = (over: Partial<EventItem> = {}): EventItem => ({
@@ -69,11 +74,13 @@ beforeEach(() => {
     setEventReminder,
     cancelReminder,
     syncReminderForEvent,
+    refreshFeaturedWidget,
   ].forEach((f) => f.mockReset());
   listEvents.mockResolvedValue(ok([ev()]));
   deleteEvent.mockResolvedValue(ok(undefined));
   cancelReminder.mockResolvedValue(undefined);
   syncReminderForEvent.mockResolvedValue(undefined);
+  refreshFeaturedWidget.mockResolvedValue(undefined);
   vi.stubGlobal('navigator', { onLine: true });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -249,6 +256,99 @@ describe('useEvents', () => {
     expect(ids).toContain('s1');
     expect(ids).toContain('s2');
     expect(ids.indexOf('s2')).toBeLessThan(ids.indexOf('s1'));
+  });
+
+  describe('refreshFeaturedWidget 呼び出し(Story 5.6)', () => {
+    it('create 成功で呼ぶ', async () => {
+      createEvent.mockResolvedValue(ok(ev({ id: 'e2' })));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.create(timedInput);
+      });
+      expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('addLocal は同期関数のまま呼ぶ(fire-and-forget)', async () => {
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      act(() => {
+        result.current.addLocal([ev({ id: 's1' })]);
+      });
+      expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('addLocal に空配列を渡しても呼ばない', async () => {
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      act(() => {
+        result.current.addLocal([]);
+      });
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+    });
+
+    it('update 成功で呼ぶ', async () => {
+      updateEvent.mockResolvedValue(ok(ev()));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.update(ev(), timedInput);
+      });
+      expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('update 失敗では呼ばない', async () => {
+      updateEvent.mockResolvedValue(err(appError('data/query', 'data/query')));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.update(ev(), timedInput);
+      });
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+    });
+
+    it('remove 成功で呼ぶ', async () => {
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.remove(ev());
+      });
+      expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('remove が external 拒否で失敗したときは呼ばない', async () => {
+      deleteEvent.mockResolvedValue(err(appError('event/not-editable', 'event/not-editable')));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.remove(ev({ source: 'google' }));
+      });
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+    });
+
+    it('undoDelete 成功で呼ぶ', async () => {
+      restoreEvent.mockResolvedValue(ok(undefined));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.remove(ev());
+      });
+      refreshFeaturedWidget.mockClear(); // remove 分をリセットして undoDelete 分だけ見る
+      await act(async () => {
+        await result.current.undoDelete();
+      });
+      expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('setReminder では呼ばない(表示フィールドを変えないため)', async () => {
+      setEventReminder.mockResolvedValue(ok(ev({ reminderMinutes: 30 })));
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        await result.current.setReminder(ev(), 30);
+      });
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+    });
   });
 
   describe('setReminder', () => {
