@@ -5,6 +5,20 @@ import type { EventItem } from '@/data/events';
 
 // カレンダー画面を描画可能にするため auth を guest 固定、データ層は空でモック。
 vi.mock('@/app/auth-context', () => ({ useAuth: () => ({ state: 'guest' }) }));
+// AppShell がオンボーディング判定に使う。行あり・読み込み済み固定にして
+// 各ルートのテストがオンボーディング待ちで止まらないようにする。
+vi.mock('@/features/profile/model/useProfile', () => ({
+  useProfile: () => ({
+    profile: { id: 'u1', displayName: 'テスト太郎', avatarDataUrl: null },
+    loading: false,
+    errorKey: null,
+    loadErrorKey: null,
+    create: vi.fn(),
+    update: vi.fn(),
+    reload: vi.fn(),
+    dismissError: vi.fn(),
+  }),
+}));
 vi.mock('@/features/calendars/model/useCalendars', () => ({
   useCalendars: () => ({ calendars: [], loading: false, errorKey: null, pendingDelete: null, dismissError: vi.fn() }),
 }));

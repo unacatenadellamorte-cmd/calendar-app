@@ -1,11 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AppRoutes } from '@/app/routes';
 import { AuthProvider } from '@/app/AuthProvider';
 
-// テスト環境では VITE_SUPABASE_URL が無いため AuthProvider は即 'unavailable'(非同期なし)。
+// このマシンでは .env.local に実際の Supabase 認証情報が設定されており、vitest でも
+// (test モードでも .env.local が読み込まれるため)実 URL が見える。実ネットワークに
+// 依存させないよう isAuthAvailable() だけ強制的に false にし、AuthProvider を即
+// 'unavailable' にする(非同期なし。他のテスト環境で .env.local が無い場合と同じ挙動)。
+vi.mock('@/data/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/data/auth')>();
+  return { ...actual, isAuthAvailable: () => false };
+});
 function renderApp(initialPath = '/') {
   return render(
     <AuthProvider>

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">カレンダーアプリ(仮)</string>
-    <string name="title_activity_main">カレンダーアプリ(仮)</string>
+    <string name="app_name">マルチカレンダー</string>
+    <string name="title_activity_main">マルチカレンダー</string>
     <string name="package_name">jp.ryo.calendarapp</string>
     <string name="custom_url_scheme">jp.ryo.calendarapp</string>
 </resources>
