@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { todayLocalDate } from '@/lib/datetime';
-import { addDays, addMonths } from '@/lib/calendar-view';
+import { addDays, addMonths, addYears } from '@/lib/calendar-view';
 import { useCalendarView } from './useCalendarView';
 
 const cal = (over: Partial<Calendar> = {}): Calendar => ({
@@ -65,6 +65,18 @@ describe('useCalendarView', () => {
     act(() => result.current.setView('week'));
     act(() => result.current.goPrev());
     expect(result.current.cursor).toBe(addDays(addMonths(start, 1), -1));
+  });
+
+  it('year では goPrev/goNext が年単位', () => {
+    const { result } = renderHook(() => useCalendarView([], []));
+    const start = result.current.cursor;
+
+    act(() => result.current.setView('year'));
+    act(() => result.current.goNext());
+    expect(result.current.cursor).toBe(addYears(start, 1));
+
+    act(() => result.current.goPrev());
+    expect(result.current.cursor).toBe(start);
   });
 
   it('initialDate を渡すと cursor がその日で始まる', () => {

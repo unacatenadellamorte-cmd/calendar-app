@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DateNav } from './DateNav';
 
-function setup(view: 'month' | 'week' | 'list' = 'month') {
+function setup(view: 'month' | 'week' | 'list' | 'year' = 'month') {
   const fns = {
     onPrev: vi.fn(),
     onNext: vi.fn(),
@@ -23,6 +23,11 @@ describe('DateNav', () => {
   it('week は日付見出し「9月8日(火)」', () => {
     setup('week');
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('9月8日(火)');
+  });
+
+  it('year は年見出し「2026年」', () => {
+    setup('year');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('2026年');
   });
 
   it('month/week は前後ボタンを出し、list は出さない', () => {

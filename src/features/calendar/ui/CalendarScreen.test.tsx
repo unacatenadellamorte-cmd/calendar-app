@@ -126,6 +126,56 @@ describe('CalendarScreen', () => {
     expect(screen.getByText('9月8日(火)')).toBeInTheDocument();
   });
 
+  it('「年」を選ぶと年ビュー(1〜12月のミニグリッド)に切り替わる', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('radio', { name: '年' }));
+    expect(screen.getByRole('radio', { name: '年', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('2026年');
+    expect(screen.getByRole('button', { name: '2026年9月' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2026年9月15日を開く' })).toBeInTheDocument();
+  });
+
+  it('年ビューは表示OFFのカレンダーの予定をドットに出さない(visibleEvents 経由の配線)', async () => {
+    const user = userEvent.setup();
+    const hiddenCalendar = { ...calendar, id: 'c2', name: '非表示', isVisible: false };
+    calState.calendars = [calendar, hiddenCalendar];
+    evState.events = [
+      sampleEvent,
+      {
+        ...sampleEvent,
+        id: 'hidden-ev',
+        calendarId: 'c2',
+        startsAt: '2026-09-20T01:00:00Z',
+        endsAt: '2026-09-20T02:00:00Z',
+      },
+    ];
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('radio', { name: '年' }));
+    const cell = screen.getByRole('button', { name: '2026年9月20日を開く' });
+    expect(cell.querySelector('[aria-hidden="true"]')).not.toBeInTheDocument();
+  });
+
+  it('年ビューで日付セルをタップすると、その日を cursor にして月ビューへ切り替わる', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('radio', { name: '年' }));
+    await user.click(screen.getByRole('button', { name: '2026年12月25日を開く' }));
+    expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2026年12月' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '12月25日を開く' })).toBeInTheDocument();
+  });
+
+  it('年ビューで月見出しをタップすると、その月1日を cursor にして月ビューへ切り替わる', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('radio', { name: '年' }));
+    await user.click(screen.getByRole('button', { name: '2026年3月' }));
+    expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2026年3月' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '3月1日を開く' })).toBeInTheDocument();
+  });
+
   it('月ビューで「他 N 件」をタップするとその日へ移動してリストビューに切り替わる', async () => {
     const user = userEvent.setup();
     evState.events = [0, 1, 2, 3].map((i) => ({
