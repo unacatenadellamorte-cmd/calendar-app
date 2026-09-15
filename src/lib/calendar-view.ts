@@ -66,6 +66,12 @@ export function addMonths(date: string, n: number): string {
   return localDateString(target);
 }
 
+/** 暦日に年数を足した暦日。月日はそのまま(月末クランプ不要、2/29→非閏年は`Date`側の繰り上げに任せる)。 */
+export function addYears(date: string, n: number): string {
+  const { year, month, day } = ymd(date);
+  return localDateString(new Date(year + n, month - 1, day));
+}
+
 /**
  * 指定年月(month は 1–12)の月グリッド。日曜始まり、必要な週数(4–6)ぶんのセル。
  * 先頭・末尾に前後月のはみ出し日を含む。

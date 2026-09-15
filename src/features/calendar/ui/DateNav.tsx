@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ViewMode } from '@/features/calendar/model/useCalendarView';
-import { formatDayTitle, formatMonthTitle } from '@/lib/datetime';
+import { formatDayTitle, formatMonthTitle, formatYearTitle } from '@/lib/datetime';
 
 interface DateNavProps {
   view: ViewMode;
@@ -19,8 +19,13 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
   const [jumpOpen, setJumpOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const stepping = view !== 'list';
-  // week は当日1日なので日付、month / list は月。
-  const title = view === 'week' ? formatDayTitle(cursor) : formatMonthTitle(cursor);
+  // week は当日1日なので日付、year は年、month / list は月。
+  const title =
+    view === 'week'
+      ? formatDayTitle(cursor)
+      : view === 'year'
+        ? formatYearTitle(cursor)
+        : formatMonthTitle(cursor);
 
   useEffect(() => {
     if (jumpOpen) inputRef.current?.focus();

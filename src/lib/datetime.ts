@@ -78,6 +78,12 @@ export function formatMonthTitle(date: string): string {
   return `${y}年${m}月`;
 }
 
+/** ローカル暦日("YYYY-MM-DD")→ "2026年"。 */
+export function formatYearTitle(date: string): string {
+  const [y = 0] = date.split('-').map(Number);
+  return `${y}年`;
+}
+
 /** ローカル暦日("YYYY-MM-DD")→ "9月6日(日)"。 */
 export function formatDayTitle(date: string): string {
   const [, m = 0, d = 0] = date.split('-').map(Number);

@@ -12,9 +12,10 @@ const ITEMS: { value: ViewMode; label: string }[] = [
   // 簡略化)なので、ラベルを実態に合わせて「日」にする。
   { value: 'week', label: '日' },
   { value: 'list', label: 'リスト' },
+  { value: 'year', label: '年' },
 ];
 
-/** 月 / 日 / リストのセグメント切替(内部値は 'week' のまま、表示ラベルのみ「日」)。 */
+/** 月 / 日 / リスト / 年のセグメント切替(内部値は 'week' のまま、表示ラベルのみ「日」)。 */
 export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
   return (
     <div

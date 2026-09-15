@@ -3,6 +3,7 @@ import type { EventItem } from '@/data/events';
 import {
   addDays,
   addMonths,
+  addYears,
   eventOccursOnDate,
   groupEventsByDay,
   layoutDayEvents,
@@ -57,6 +58,17 @@ describe('ymd / addDays / addMonths', () => {
     expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
     expect(addMonths('2026-09-15', 1)).toBe('2026-10-15');
     expect(addMonths('2026-01-15', -1)).toBe('2025-12-15');
+  });
+});
+
+describe('addYears', () => {
+  it('年だけ加算する(月日はそのまま)', () => {
+    expect(addYears('2026-09-15', 1)).toBe('2027-09-15');
+    expect(addYears('2026-09-15', -1)).toBe('2025-09-15');
+  });
+
+  it('うるう年の2/29はうるう年でない年へ加算すると3/1へ繰り上がる', () => {
+    expect(addYears('2024-02-29', 1)).toBe('2025-03-01');
   });
 });
 

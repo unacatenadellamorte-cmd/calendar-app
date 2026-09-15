@@ -20,6 +20,7 @@ import { DateNav } from './DateNav';
 import { MonthView } from './MonthView';
 import { WeekView } from './WeekView';
 import { ListView } from './ListView';
+import { YearView } from './YearView';
 
 interface CalendarScreenProps {
   /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
@@ -29,7 +30,7 @@ interface CalendarScreenProps {
 }
 
 /**
- * カレンダー画面。月 / 日(cursor当日の1日タイムライン、内部値は 'week') / リストの3ビューと日付ナビ。
+ * カレンダー画面。月 / 日(cursor当日の1日タイムライン、内部値は 'week') / リスト / 年の4ビューと日付ナビ。
  * 表示オンのカレンダーの予定だけを描画し、日セル / 空きスロットのタップで追加、
  * チップのタップで編集につなぐ。
  */
@@ -80,6 +81,12 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     // 「他 N 件」→ その日を優先度順(同順は開始時刻順)で一覧できるリストビューへ。
     jumpTo(date);
     setView('list');
+  };
+
+  const openMonthFromYear = (date: string) => {
+    // 年ビューの日付/月見出しタップ→その日/月1日を cursor にして月ビューへ(概観から詳細への操作感を統一)。
+    jumpTo(date);
+    setView('month');
   };
 
   const openQuickShift = (date: string) => {
@@ -196,6 +203,15 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
           today={today}
           onSlotTap={(startLocal) => openCreate({ startLocal })}
           onEventTap={openEdit}
+        />
+      ) : view === 'year' ? (
+        <YearView
+          cursor={cursor}
+          events={visibleEvents}
+          calendarById={calendarById}
+          today={today}
+          onMonthTap={openMonthFromYear}
+          onDayTap={openMonthFromYear}
         />
       ) : (
         <ListView
