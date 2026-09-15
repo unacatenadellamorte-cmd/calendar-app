@@ -9,6 +9,7 @@ import {
   layoutDayEvents,
   makePriorityOf,
   monthGridDays,
+  weekRowOf,
   ymd,
 } from './calendar-view';
 import type { Calendar } from '@/data/calendars';
@@ -89,6 +90,42 @@ describe('monthGridDays', () => {
     expect(cells.every((c) => c.inMonth)).toBe(true);
     expect(cells[0]?.date).toBe('2026-02-01');
     expect(cells[27]?.date).toBe('2026-02-28');
+  });
+});
+
+describe('weekRowOf', () => {
+  it('指定日付を含む1週(7セル)だけを抜き出す', () => {
+    const cells = monthGridDays(2026, 9, '2026-09-08');
+    const row = weekRowOf(cells, '2026-09-08'); // 2026-09-08(火)は9/6(日)始まりの週
+    expect(row).toHaveLength(7);
+    expect(row.map((c) => c.date)).toEqual([
+      '2026-09-06',
+      '2026-09-07',
+      '2026-09-08',
+      '2026-09-09',
+      '2026-09-10',
+      '2026-09-11',
+      '2026-09-12',
+    ]);
+  });
+
+  it('前後月のはみ出し日を含む週も、はみ出しごと1週ぶん抜き出す', () => {
+    const cells = monthGridDays(2026, 9, '2026-09-08');
+    const row = weekRowOf(cells, '2026-08-30'); // 先頭週のはみ出し日
+    expect(row.map((c) => c.date)).toEqual([
+      '2026-08-30',
+      '2026-08-31',
+      '2026-09-01',
+      '2026-09-02',
+      '2026-09-03',
+      '2026-09-04',
+      '2026-09-05',
+    ]);
+  });
+
+  it('指定日付が cells に無ければ空配列を返す', () => {
+    const cells = monthGridDays(2026, 9, '2026-09-08');
+    expect(weekRowOf(cells, '2026-12-25')).toEqual([]);
   });
 });
 

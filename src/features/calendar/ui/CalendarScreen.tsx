@@ -4,16 +4,12 @@ import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { resolveMessage } from '@/data/messages';
 import type { EventItem, NewEventInput } from '@/data/events';
-import { createShifts } from '@/data/shifts';
-import type { ShiftTemplate } from '@/data/shift-templates';
-import { addDays } from '@/lib/calendar-view';
+import { groupEventsByDay, makePriorityOf, monthGridDays, weekRowOf, ymd } from '@/lib/calendar-view';
 import { todayLocalDate } from '@/lib/datetime';
 import { useCalendars } from '@/features/calendars/model/useCalendars';
 import { useEvents } from '@/features/events/model/useEvents';
-import { useShiftTemplates } from '@/features/shifts/model/useShiftTemplates';
 import { EventFormSheet, type EventSeed } from '@/features/events/ui/EventFormSheet';
 import { EventDetailSheet } from '@/features/events/ui/EventDetailSheet';
-import { QuickShiftSheet } from '@/features/shifts/ui/QuickShiftSheet';
 import { useCalendarView } from '@/features/calendar/model/useCalendarView';
 import { ViewSwitcher } from './ViewSwitcher';
 import { DateNav } from './DateNav';
@@ -21,6 +17,7 @@ import { MonthView } from './MonthView';
 import { WeekView } from './WeekView';
 import { ListView } from './ListView';
 import { YearView } from './YearView';
+import { DayEventPanel } from './DayEventPanel';
 
 interface CalendarScreenProps {
   /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
@@ -39,7 +36,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const ev = useEvents(enabled);
-  const sh = useShiftTemplates(enabled);
   const navigate = useNavigate();
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
     useCalendarView(ev.events, cal.calendars, initialDate);
@@ -49,17 +45,19 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   const [editing, setEditing] = useState<EventItem | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
   const [seed, setSeed] = useState<EventSeed | undefined>(undefined);
-  const [quickDate, setQuickDate] = useState<string | null>(null);
-  const [shiftErrorKey, setShiftErrorKey] = useState<string | null>(null);
-
-  const shiftCalendar = useMemo(
-    () => cal.calendars.find((c) => c.isShift),
-    [cal.calendars],
-  );
+  // 月表示: タップした日(選択中)。折りたたみ(その週1行、Option C)+ 下のパネル表示を兼ねる。
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const calendarById = useMemo(
     () => new Map(cal.calendars.map((c) => [c.id, c])),
     [cal.calendars],
+  );
+  // 日ごとの予定グルーピング(優先度順)は MonthView / DayEventPanel の両方が使う派生データなので、
+  // ここで一度だけ計算して props で渡す(calendarById と同じ「呼び出し元で計算」の慣習)。
+  const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
+  const byDay = useMemo(
+    () => groupEventsByDay(visibleEvents, priorityOf),
+    [visibleEvents, priorityOf],
   );
 
   const openCreate = (nextSeed?: EventSeed) => {
@@ -89,22 +87,33 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     setView('month');
   };
 
-  const openQuickShift = (date: string) => {
-    setShiftErrorKey(null);
-    setQuickDate(date);
+  // 月表示の日付タップ: その日を含む週の1行に折りたたみ、下にその日の予定一覧パネルを出す
+  // (クイックシフトシートは開かない。シフト入力は /shifts/add の専用ページに分離)。
+  const selectDay = (date: string) => setSelectedDay(date);
+  // 「月表示に戻る」: 折りたたみ解除。
+  const closeDayPanel = () => setSelectedDay(null);
+  // 月表示の日付ダブルタップ: 折りたたみを解除し、その日を cursor にして「日」ビューへ
+  // (年→月ドリルダウンと同じ jumpTo + setView の再利用。新規UIは作らない)。
+  const openDayView = (date: string) => {
+    setSelectedDay(null);
+    jumpTo(date);
+    setView('week');
   };
 
-  const pickShiftTemplate = async (template: ShiftTemplate, dayCount: number) => {
-    if (!shiftCalendar || !quickDate) return false;
-    const dates = Array.from({ length: dayCount }, (_, i) => addDays(quickDate, i));
-    const result = await createShifts(shiftCalendar.id, template, dates);
-    if (!result.ok) {
-      setShiftErrorKey(result.error.messageKey);
-      return false;
+  // selectedDay(折りたたみ状態)の妥当性を、月送り・ビュー切替・年→月ドリルダウン等の
+  // あらゆる画面状態変化のあとに一律で再評価する(個別の遷移経路をそれぞれ塞がない)。
+  // 月ビューでなくなった、または selectedDay が現在の cursor の月グリッドに
+  // もう含まれない(月を送った等)場合は無効とみなしクリアする。
+  useEffect(() => {
+    if (!selectedDay) return;
+    if (view !== 'month') {
+      setSelectedDay(null);
+      return;
     }
-    ev.addLocal(result.value);
-    return true;
-  };
+    const { year, month } = ymd(cursor);
+    const stillInGrid = weekRowOf(monthGridDays(year, month, today), selectedDay).length > 0;
+    if (!stillInGrid) setSelectedDay(null);
+  }, [view, cursor, today, selectedDay]);
 
   // ディープリンク(`calendar-app://event/{id}`)由来。auth 解決(enabled)・ev/cal のロード完了後に
   // 該当予定を探して openEdit を呼ぶ。見つからなければ何もしない(静かにフォールバック、AD-16)。
@@ -135,9 +144,18 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     <Screen
       title="カレンダー"
       action={
-        <button type="button" onClick={() => openCreate()} className="text-meta text-accent">
-          予定を追加
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/shifts/add')}
+            className="text-meta text-accent"
+          >
+            シフトを追加
+          </button>
+          <button type="button" onClick={() => openCreate()} className="text-meta text-accent">
+            予定を追加
+          </button>
+        </div>
       }
     >
       <div className="mb-3">
@@ -186,15 +204,29 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
       {loading ? (
         <p className="mt-2 text-meta text-ink-secondary">読み込み中…</p>
       ) : view === 'month' ? (
-        <MonthView
-          cursor={cursor}
-          events={visibleEvents}
-          calendarById={calendarById}
-          today={today}
-          onDayTap={openQuickShift}
-          onEventTap={openEdit}
-          onOverflowTap={openOverflow}
-        />
+        <>
+          <MonthView
+            cursor={cursor}
+            byDay={byDay}
+            calendarById={calendarById}
+            today={today}
+            onDayTap={selectDay}
+            onDayDoubleTap={openDayView}
+            onEventTap={openEdit}
+            onOverflowTap={openOverflow}
+            collapsedToWeekOf={selectedDay ?? undefined}
+            onBackToMonth={closeDayPanel}
+          />
+          {selectedDay && (
+            <DayEventPanel
+              date={selectedDay}
+              byDay={byDay}
+              calendarById={calendarById}
+              onEventTap={openEdit}
+              onAddEvent={() => openCreate({ date: selectedDay })}
+            />
+          )}
+        </>
       ) : view === 'week' ? (
         <WeekView
           cursor={cursor}
@@ -222,22 +254,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
           onEventTap={openEdit}
         />
       )}
-
-      <QuickShiftSheet
-        open={quickDate !== null}
-        date={quickDate ?? today}
-        templates={sh.templates}
-        shiftReady={Boolean(shiftCalendar)}
-        errorKey={shiftErrorKey}
-        onClose={() => setQuickDate(null)}
-        onPick={pickShiftTemplate}
-        onAddEvent={() => {
-          const date = quickDate;
-          setQuickDate(null);
-          openCreate(date ? { date } : undefined);
-        }}
-        onCreateTemplate={() => navigate('/shift-templates')}
-      />
 
       <EventFormSheet
         open={sheetOpen}

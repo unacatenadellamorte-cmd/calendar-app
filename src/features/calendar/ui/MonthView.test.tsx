@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
+import { groupEventsByDay, makePriorityOf } from '@/lib/calendar-view';
 import { MonthView } from './MonthView';
 
 const calendar: Calendar = {
@@ -38,22 +39,31 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   ...over,
 });
 
-function setup(events: EventItem[] = []) {
+function toByDay(events: EventItem[], byCalendar = calendarById) {
+  return groupEventsByDay(events, makePriorityOf(byCalendar));
+}
+
+function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof MonthView>[0]> = {}) {
   const onDayTap = vi.fn();
+  const onDayDoubleTap = vi.fn();
   const onEventTap = vi.fn();
   const onOverflowTap = vi.fn();
+  const onBackToMonth = vi.fn();
   render(
     <MonthView
       cursor="2026-09-08"
-      events={events}
+      byDay={toByDay(events)}
       calendarById={calendarById}
       today="2026-09-08"
       onDayTap={onDayTap}
+      onDayDoubleTap={onDayDoubleTap}
       onEventTap={onEventTap}
       onOverflowTap={onOverflowTap}
+      onBackToMonth={onBackToMonth}
+      {...overProps}
     />,
   );
-  return { onDayTap, onEventTap, onOverflowTap };
+  return { onDayTap, onDayDoubleTap, onEventTap, onOverflowTap, onBackToMonth };
 }
 
 describe('MonthView', () => {
@@ -117,20 +127,23 @@ describe('MonthView', () => {
       ['c1', calendar],
       ['c2', { ...calendar, id: 'c2', name: '低優先', priority: 1 }],
     ]);
+    const events = [
+      ev({ id: 'lo0', title: '低0', calendarId: 'c2', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
+      ev({ id: 'lo1', title: '低1', calendarId: 'c2', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' }),
+      ev({ id: 'hi0', title: '高0', calendarId: 'c1', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
+      ev({ id: 'hi1', title: '高1', calendarId: 'c1', startsAt: '2026-09-08T06:00:00Z', endsAt: '2026-09-08T07:00:00Z' }),
+    ];
     render(
       <MonthView
         cursor="2026-09-08"
-        events={[
-          ev({ id: 'lo0', title: '低0', calendarId: 'c2', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
-          ev({ id: 'lo1', title: '低1', calendarId: 'c2', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' }),
-          ev({ id: 'hi0', title: '高0', calendarId: 'c1', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
-          ev({ id: 'hi1', title: '高1', calendarId: 'c1', startsAt: '2026-09-08T06:00:00Z', endsAt: '2026-09-08T07:00:00Z' }),
-        ]}
+        byDay={toByDay(events, twoCals)}
         calendarById={twoCals}
         today="2026-09-08"
         onDayTap={vi.fn()}
+        onDayDoubleTap={vi.fn()}
         onEventTap={vi.fn()}
         onOverflowTap={vi.fn()}
+        onBackToMonth={vi.fn()}
       />,
     );
     expect(screen.getByRole('button', { name: /高0/ })).toBeInTheDocument();
@@ -138,5 +151,54 @@ describe('MonthView', () => {
     expect(screen.getByRole('button', { name: /低0/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /低1/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '他 1 件' })).toBeInTheDocument();
+  });
+
+  it('日セルの日付番号をダブルタップすると onDayDoubleTap(その日) を呼ぶ', async () => {
+    const user = userEvent.setup();
+    const { onDayDoubleTap } = setup();
+    await user.dblClick(screen.getByRole('button', { name: '9月15日を開く' }));
+    expect(onDayDoubleTap).toHaveBeenCalledWith('2026-09-15');
+  });
+
+  it('日付番号ボタンは touch-manipulation で、iOS等のダブルタップズームと衝突しない', () => {
+    setup();
+    expect(screen.getByRole('button', { name: '9月15日を開く' })).toHaveClass(
+      'touch-manipulation',
+    );
+  });
+
+  describe('collapsedToWeekOf(折りたたみ、Option C)', () => {
+    it('指定が無ければフルの月グリッドを描画し、「月表示に戻る」は出さない', () => {
+      setup();
+      // 9月のフル月グリッドには 9/1 と 9/15 の両方が同時に存在する。
+      expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    });
+
+    it('指定した日を含む週の1行(7セル)だけに折りたたむ', () => {
+      setup([], { collapsedToWeekOf: '2026-09-15' });
+      // 9/15(火)を含む週は 9/13(日)〜9/19(土)。同じ月グリッドにしか無い 9/1 は消える。
+      expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '9月13日を開く' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '9月19日を開く' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '9月1日を開く' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    });
+
+    it('「月表示に戻る」を押すと onBackToMonth を呼ぶ', async () => {
+      const user = userEvent.setup();
+      const { onBackToMonth } = setup([], { collapsedToWeekOf: '2026-09-15' });
+      await user.click(screen.getByRole('button', { name: '月表示に戻る' }));
+      expect(onBackToMonth).toHaveBeenCalled();
+    });
+
+    it('折りたたみ対象日が現在の月グリッドに無ければフル表示へフォールバックする', () => {
+      // cursor は9月固定のテストなので、12月の日付は9月グリッドに存在しない。
+      setup([], { collapsedToWeekOf: '2026-12-25' });
+      expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    });
   });
 });

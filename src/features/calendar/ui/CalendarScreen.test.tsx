@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ok } from '@/data/result';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import type { ShiftTemplate } from '@/data/shift-templates';
 
 const navigateMock = vi.fn();
-const createShifts = vi.fn();
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
-vi.mock('@/data/shifts', () => ({ createShifts: (...a: unknown[]) => createShifts(...a) }));
 
 const calendar: Calendar = {
   id: 'c1',
@@ -42,37 +38,18 @@ const sampleEvent: EventItem = {
   updatedAt: '',
 };
 
-const shiftCalendar: Calendar = { ...calendar, id: 'shift', name: 'シフト', isShift: true };
-
-const tpl = (over: Partial<ShiftTemplate> = {}): ShiftTemplate => ({
-  id: 't1',
-  name: '平日',
-  startLocal: '17:00',
-  endLocal: '22:00',
-  breakMinutes: 30,
-  hourlyWage: 1100,
-  workplaceLabel: null,
-  color: '#009E73',
-  createdAt: '',
-  updatedAt: '',
-  ...over,
-});
-
 let authState: { state: string } = { state: 'guest' };
 let calState: Record<string, unknown>;
 let evState: Record<string, unknown>;
-let shState: Record<string, unknown>;
 
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 vi.mock('@/features/calendars/model/useCalendars', () => ({ useCalendars: () => calState }));
 vi.mock('@/features/events/model/useEvents', () => ({ useEvents: () => evState }));
-vi.mock('@/features/shifts/model/useShiftTemplates', () => ({ useShiftTemplates: () => shState }));
 
 const { CalendarScreen } = await import('./CalendarScreen');
 
 beforeEach(() => {
   navigateMock.mockClear();
-  createShifts.mockReset();
   authState = { state: 'guest' };
   calState = {
     calendars: [calendar],
@@ -94,7 +71,6 @@ beforeEach(() => {
     undoDelete: vi.fn(),
     dismissError: vi.fn(),
   };
-  shState = { templates: [], loading: false, errorKey: null };
 });
 
 describe('CalendarScreen', () => {
@@ -192,40 +168,84 @@ describe('CalendarScreen', () => {
     expect(screen.queryByRole('button', { name: '9月15日を開く' })).not.toBeInTheDocument();
   });
 
-  it('月ビューで日セルをタップすると quick-shift シートが開く(テンプレ未登録なら案内)', async () => {
+  it('月ビューで日セルをタップすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月15日を開く' }));
-    expect(screen.getByRole('dialog', { name: '9月15日(火)' })).toBeInTheDocument();
-    expect(screen.getByText(/よく使うシフトを登録すると/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    // 折りたたみ中は同じ月グリッド内でも他の週の日付は消える(9/8を含む週の外)。
+    expect(screen.queryByRole('button', { name: '9月1日を開く' })).not.toBeInTheDocument();
+
+    const panel = screen.getByRole('heading', { name: '9月8日(火)' }).closest('section');
+    expect(panel).not.toBeNull();
+    expect(within(panel as HTMLElement).getByText('会議アルファ')).toBeInTheDocument();
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('quick-shift でテンプレを選ぶと createShifts を呼び、結果を addLocal する', async () => {
+  it('「月表示に戻る」を押すと全体の月グリッドに戻りパネルが閉じる', async () => {
     const user = userEvent.setup();
-    calState.calendars = [calendar, shiftCalendar];
-    shState.templates = [tpl({ id: 't1', name: '平日' })];
-    const created = [{ ...sampleEvent, id: 'shift-1', calendarId: 'shift' }];
-    createShifts.mockResolvedValue(ok(created));
     render(<CalendarScreen />);
+    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    await user.click(screen.getByRole('button', { name: '月表示に戻る' }));
 
-    await user.click(screen.getByRole('button', { name: '9月15日を開く' }));
-    await user.click(screen.getByRole('button', { name: /平日/ }));
-
-    expect(createShifts).toHaveBeenCalledWith(
-      'shift',
-      expect.objectContaining({ id: 't1' }),
-      ['2026-09-15'],
-    );
-    expect(evState.addLocal).toHaveBeenCalledWith(created);
-    expect(screen.queryByRole('dialog', { name: '9月15日(火)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '9月8日(火)' })).not.toBeInTheDocument();
   });
 
-  it('quick-shift の「シフト以外の予定を追加」で予定フォームに切り替わる', async () => {
+  it('パネルの「＋ この日に予定を追加」を押すと、その日をシードした予定フォームが開く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月15日を開く' }));
-    await user.click(screen.getByRole('button', { name: 'シフト以外の予定を追加' }));
+    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    await user.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
+
     expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-09-08T09:00');
+  });
+
+  it('折りたたみ中に月を送ると selectedDay が自動でクリアされる(パネルが宙に浮かない)', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '9月8日(火)' })).not.toBeInTheDocument();
+    // 10月のフル月グリッドに戻っている(パネルだけが古い日付のまま残っていない)。
+    expect(screen.getByRole('button', { name: '10月1日を開く' })).toBeInTheDocument();
+  });
+
+  it('折りたたみ中に別ビューへ切り替えると selectedDay が自動でクリアされ、月ビューに戻ってもパネルは出ない', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    await user.click(screen.getByRole('radio', { name: 'リスト' }));
+    await user.click(screen.getByRole('radio', { name: '月' }));
+
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '9月8日(火)' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+  });
+
+  it('月ビューで日セルをダブルタップすると、その日を cursor にして「日」ビューへ切り替わる(折りたたみ解除)', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.dblClick(screen.getByRole('button', { name: '9月15日を開く' }));
+
+    expect(screen.getByRole('radio', { name: '日', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '7時に予定を追加' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+  });
+
+  it('ヘッダーの「シフトを追加」をタップすると /shifts/add へ遷移する', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('button', { name: 'シフトを追加' }));
+    expect(navigateMock).toHaveBeenCalledWith('/shifts/add');
   });
 
   it('取り込んだ予定(source=google)をタップすると読み取り専用の詳細シートを開く', async () => {

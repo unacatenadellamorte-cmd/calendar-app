@@ -6,6 +6,7 @@ import { SettingsScreen } from '@/features/settings/ui/SettingsScreen';
 import { AuthScreen } from '@/features/auth/ui/AuthScreen';
 import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
 import { ShiftTemplatesScreen } from '@/features/shifts/ui/ShiftTemplatesScreen';
+import { QuickShiftScreen } from '@/features/shifts/ui/QuickShiftScreen';
 import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
 import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPicker';
 import { DeviceCalendarPicker } from '@/features/connections/ui/DeviceCalendarPicker';
@@ -40,6 +41,8 @@ const routes: RouteObject[] = [
       { path: 'calendars', element: <CalendarsScreen /> },
       // タブ外。設定から遷移する。
       { path: 'shift-templates', element: <ShiftTemplatesScreen /> },
+      // タブ外。カレンダー画面ヘッダーの「シフトを追加」から遷移(月表示タップ再設計でシート→専用ページ化)。
+      { path: 'shifts/add', element: <QuickShiftScreen /> },
       // タブ外。Google OAuth のリダイレクト先(Story 3.1)。
       { path: 'connections/google/callback', element: <GoogleCallbackScreen /> },
       // タブ外。設定の接続欄から遷移(Story 3.2)。
