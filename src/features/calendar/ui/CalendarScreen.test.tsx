@@ -110,6 +110,14 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('button', { name: '12月25日を開く' })).toBeInTheDocument();
   });
 
+  it('「日」を選ぶと日ビュー(1日タイムライン)に切り替わる', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('radio', { name: '日' }));
+    expect(screen.getByRole('radio', { name: '日', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '7時に予定を追加' })).toBeInTheDocument();
+  });
+
   it('「リスト」を選ぶとリストビューに切り替わる', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);

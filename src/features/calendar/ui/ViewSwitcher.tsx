@@ -7,11 +7,14 @@ interface ViewSwitcherProps {
 
 const ITEMS: { value: ViewMode; label: string }[] = [
   { value: 'month', label: '月' },
-  { value: 'week', label: '週' },
+  // 内部値は 'week' のまま(WeekView.tsx/ルーティング/localStorage永続キー等を変更しない、
+  // 表示ラベルのみの修正)。WeekView.tsx は実際には cursor 当日の1日タイムライン(v1既知の
+  // 簡略化)なので、ラベルを実態に合わせて「日」にする。
+  { value: 'week', label: '日' },
   { value: 'list', label: 'リスト' },
 ];
 
-/** 月 / 週 / リストのセグメント切替。 */
+/** 月 / 日 / リストのセグメント切替(内部値は 'week' のまま、表示ラベルのみ「日」)。 */
 export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
   return (
     <div
