@@ -1,5 +1,21 @@
 # 先送りにした作業
 
+- source_spec: `spec-secret-mode.md`
+  summary: シークレットモードの解除状態が、バックグラウンド化・アイドルタイムアウトでは自動的に再ロックされない(現状はアプリのフルリロードのみ)。
+  evidence: frozen Always は「アプリ起動・リロードのたびに必ずロック状態に戻る」とだけ約束しており、ユーザーの要望文言も「アプリ立ち上げ時は非表示」のみ。レビュー(Blind Hunter)で「解除したまま放置すると他人にもずっと見えたまま」という実用上のリスクを指摘されたが、意図が定めていない拡張のため今回は見送り。`visibilitychange`イベント等での実装を検討。
+
+- source_spec: `spec-secret-mode.md`
+  summary: `hashPasscode`(`src/lib/passcode.ts`)が`crypto.subtle`未対応環境で未処理の例外を投げる。
+  evidence: レビュー(Edge Case Hunter)指摘。Web Crypto APIはsecure context前提で、Capacitorネイティブ+モダンブラウザというこのアプリの実際の対象環境ではまず起こらないと判断し今回は見送り。将来的に環境が変わった場合の防御ガードとして記録。
+
+- source_spec: `spec-secret-mode.md`
+  summary: `SecretModeSettingsScreen.tsx`のフォーム送信ハンドラがtry/finally無しで`submitting`状態を管理しており、非同期呼び出しが例外を投げるとボタンが固まったままになる。
+  evidence: レビュー(Edge Case Hunter)指摘。`EventFormSheet.tsx`等、このコードベースの既存の送信ハンドラも同じパターン(try/finally無し)を使っており、secret-mode単体の欠陥ではなくコードベース全体の既存規約。ここだけ直すと既存パターンと不整合になるため、送信ハンドラの規約自体を見直す別の機会に回収する。
+
+- source_spec: `spec-secret-mode.md`
+  summary: 上部アバターアイコンのダブルタップでシークレットモードのロック解除/再ロックを切り替えるショートカット(設定画面を開かずに済む)。
+  evidence: シークレットモード本体(予定フラグ+全画面除外+設定画面でのパスコード設定・ON/OFF)のトークン数超過を理由に、ユーザーが分割を選択。既存のアバターアイコンは Part A(プロフィール登録)でシングルタップ=`/profile`遷移の実装済みで、ダブルタップを追加するとこの既存挙動と操作が衝突する(シングルタップが即座に発火しダブルタップの検出を妨げる)。本体が公開する `unlock`/`lock` を呼ぶだけの薄い追加だが、タップ衝突の解決方法(遷移を遅延させる/アバターの役割を変える/鍵バッジ等の別要素にする)は本体とは独立した設計判断が要るため、本体を先に実装してから別specとして着手する。
+
 - source_spec: `spec-1-1-project-foundation-and-app-shell.md`
   summary: `package.json` の `allowScripts`(esbuild / unrs-resolver)が開発環境固有で、CI や他マシンで `npm ci` するとネイティブバイナリの postinstall が走らずビルドできない可能性がある。
   evidence: この環境の npm は install スクリプトを既定でブロックする設定になっており、承認結果が `package.json` の `allowScripts` に書き込まれた。CI は未決定(ARCHITECTURE-SPINE で Deferred)。CI を導入するストーリーで、`.npmrc` や CI 設定でネイティブ依存(esbuild)のビルドを担保する方針を決める。標準的な npm 環境なら現状の `package.json` でそのまま動く。

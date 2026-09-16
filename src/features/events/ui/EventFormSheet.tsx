@@ -42,6 +42,7 @@ interface FormState {
   endLocal: string;
   dateLocal: string;
   note: string;
+  isSecret: boolean;
 }
 
 function initialState(
@@ -66,6 +67,7 @@ function initialState(
       endLocal: seededEnd,
       dateLocal: seed?.date ?? seededStart.slice(0, 10),
       note: '',
+      isSecret: false,
     };
   }
   return {
@@ -76,11 +78,17 @@ function initialState(
     endLocal: editing.endsAt ? utcIsoToLocalInput(editing.endsAt) : nowLocalInput(60),
     dateLocal: editing.eventDate ?? todayLocalDate(),
     note: editing.note ?? '',
+    isSecret: editing.isSecret,
   };
 }
 
 function toInput(form: FormState): NewEventInput {
-  const common = { calendarId: form.calendarId, title: form.title, note: form.note || null };
+  const common = {
+    calendarId: form.calendarId,
+    title: form.title,
+    note: form.note || null,
+    isSecret: form.isSecret,
+  };
   return form.allDay
     ? { ...common, allDay: true, eventDate: form.dateLocal }
     : {
@@ -209,6 +217,16 @@ export function EventFormSheet({
             </label>
           </>
         )}
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.isSecret}
+            onChange={(e) => set('isSecret', e.target.checked)}
+            className="h-5 w-5 accent-[var(--color-accent)]"
+          />
+          <span className="text-body text-ink-primary">シークレット</span>
+        </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">メモ</span>

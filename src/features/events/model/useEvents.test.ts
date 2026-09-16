@@ -51,6 +51,7 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '2026-09-07T00:00:00Z',
   updatedAt: '2026-09-07T00:00:00Z',
   ...over,
@@ -128,6 +129,28 @@ describe('useEvents', () => {
     expect(result.current.events[0]?.title).toBe('MTG'); // 元に戻る
     expect(result.current.errorKey).toBe('data/query');
     expect(syncReminderForEvent).not.toHaveBeenCalled();
+  });
+
+  it('update は isSecret を patch に含める(省略時は false、spec-secret-mode)', async () => {
+    updateEvent.mockResolvedValue(ok(ev()));
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.update(ev(), timedInput);
+    });
+    expect(updateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'e1' }),
+      expect.objectContaining({ isSecret: false }),
+    );
+
+    updateEvent.mockClear();
+    await act(async () => {
+      await result.current.update(ev(), { ...timedInput, isSecret: true });
+    });
+    expect(updateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'e1' }),
+      expect.objectContaining({ isSecret: true }),
+    );
   });
 
   it('update 成功時は syncReminderForEvent を呼ぶ(時刻編集での cancel→再スケジュール、Story 5.4)', async () => {

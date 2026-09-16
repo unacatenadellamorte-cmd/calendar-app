@@ -1,6 +1,7 @@
 import { Link, Outlet } from 'react-router-dom';
 import { BottomTabs } from './BottomTabs';
 import { OnlineProvider } from './OnlineProvider';
+import { SecretModeProvider } from './SecretModeProvider';
 import { ConnectivityBar } from './ConnectivityBar';
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAuth } from './auth-context';
@@ -30,7 +31,8 @@ export function AppShell() {
   const { state } = useAuth();
   const authResolving = state === 'loading';
   const enabled = state === 'guest' || state === 'authenticated';
-  const { profile, loading, errorKey, loadErrorKey, reload, create, update } = useProfile(enabled);
+  const { profile, loading, errorKey, loadErrorKey, reload, create, update } =
+    useProfile(enabled);
 
   const showWaiting = authResolving || (enabled && loading);
   const showProfileError = !showWaiting && enabled && Boolean(loadErrorKey);
@@ -40,44 +42,52 @@ export function AppShell() {
 
   return (
     <OnlineProvider>
-      <div className="mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken">
-        <ConnectivityBar />
-        {showWaiting ? (
-          <p className="px-4 py-8 text-center text-meta text-ink-secondary">読み込み中…</p>
-        ) : showProfileError ? (
-          <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-            <p role="alert" className="text-meta text-danger">
-              {resolveMessage(loadErrorKey!)}
-            </p>
-            <button
-              type="button"
-              onClick={() => void reload()}
-              className="min-h-11 rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
-            >
-              もう一度試す
-            </button>
-          </div>
-        ) : needsOnboarding ? (
-          <OnboardingScreen create={create} errorKey={errorKey} />
-        ) : (
-          <>
-            {profile && (
-              <div className="flex justify-end px-4 pt-3">
-                <Link
-                  to="/profile"
-                  aria-label="プロフィール"
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full"
-                >
-                  <AvatarIcon displayName={profile.displayName} avatarDataUrl={profile.avatarDataUrl} />
-                </Link>
-              </div>
-            )}
-            <Outlet context={outletContext} />
-            <BottomTabs />
-          </>
-        )}
-        <PwaUpdatePrompt />
-      </div>
+      <SecretModeProvider
+        passcodeHash={profile?.secretPasscodeHash ?? null}
+        onChangePasscodeHash={(hash) => update({ secretPasscodeHash: hash })}
+      >
+        <div className="mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken">
+          <ConnectivityBar />
+          {showWaiting ? (
+            <p className="px-4 py-8 text-center text-meta text-ink-secondary">読み込み中…</p>
+          ) : showProfileError ? (
+            <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+              <p role="alert" className="text-meta text-danger">
+                {resolveMessage(loadErrorKey!)}
+              </p>
+              <button
+                type="button"
+                onClick={() => void reload()}
+                className="min-h-11 rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
+              >
+                もう一度試す
+              </button>
+            </div>
+          ) : needsOnboarding ? (
+            <OnboardingScreen create={create} errorKey={errorKey} />
+          ) : (
+            <>
+              {profile && (
+                <div className="flex justify-end px-4 pt-3">
+                  <Link
+                    to="/profile"
+                    aria-label="プロフィール"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full"
+                  >
+                    <AvatarIcon
+                      displayName={profile.displayName}
+                      avatarDataUrl={profile.avatarDataUrl}
+                    />
+                  </Link>
+                </div>
+              )}
+              <Outlet context={outletContext} />
+              <BottomTabs />
+            </>
+          )}
+          <PwaUpdatePrompt />
+        </div>
+      </SecretModeProvider>
     </OnlineProvider>
   );
 }

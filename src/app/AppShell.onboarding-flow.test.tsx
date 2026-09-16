@@ -56,7 +56,12 @@ beforeEach(() => {
 describe('AppShell × OnboardingScreen(実フック、data層のみモック)', () => {
   it('オンボーディングで送信成功すると、AppShell 自身が profile を認識して通常画面へ切り替わる', async () => {
     getProfile.mockResolvedValue(ok(null));
-    const created: Profile = { id: 'u1', displayName: '花子', avatarDataUrl: null };
+    const created: Profile = {
+      id: 'u1',
+      displayName: '花子',
+      avatarDataUrl: null,
+      secretPasscodeHash: null,
+    };
     createProfile.mockResolvedValue(ok(created));
 
     const user = userEvent.setup();
@@ -76,9 +81,19 @@ describe('AppShell × OnboardingScreen(実フック、data層のみモック)', 
   });
 
   it('ProfileScreen で更新すると、AppShell 上部のアバターに即反映される(別インスタンスなら反映されない)', async () => {
-    const existing: Profile = { id: 'u1', displayName: '花子', avatarDataUrl: null };
+    const existing: Profile = {
+      id: 'u1',
+      displayName: '花子',
+      avatarDataUrl: null,
+      secretPasscodeHash: null,
+    };
     getProfile.mockResolvedValue(ok(existing));
-    const updated: Profile = { id: 'u1', displayName: '次郎', avatarDataUrl: null };
+    const updated: Profile = {
+      id: 'u1',
+      displayName: '次郎',
+      avatarDataUrl: null,
+      secretPasscodeHash: null,
+    };
     updateProfile.mockResolvedValue(ok(updated));
 
     const user = userEvent.setup();

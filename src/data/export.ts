@@ -1,5 +1,5 @@
 import { listCalendars, type Calendar } from './calendars';
-import { listEvents, type EventItem } from './events';
+import { hideSecretEvents, listEvents, type EventItem } from './events';
 import { listShiftTemplates, type ShiftTemplate } from './shift-templates';
 import { err, ok, type Result } from './result';
 
@@ -46,9 +46,12 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
     calendars: localCalendars,
     // ローカル予定のうち、書き出すカレンダーに属すものだけ(削除済みカレンダーの
     // 取り残しを含めず、バンドルの参照を自己完結させる)。
-    events: events.value
-      .filter((e) => e.source === 'local' && localIds.has(e.calendarId))
-      .sort((a, b) => eventKey(a).localeCompare(eventKey(b))),
+    // シークレット予定は常に除外する(spec-secret-mode)。`widget.ts` と同じ理由 ──
+    // エクスポートにもロック/解除の概念が無いため `hideSecretEvents(events, false)` で固定する。
+    events: hideSecretEvents(
+      events.value.filter((e) => e.source === 'local' && localIds.has(e.calendarId)),
+      false,
+    ).sort((a, b) => eventKey(a).localeCompare(eventKey(b))),
     shiftTemplates: [...templates.value].sort((a, b) =>
       a.createdAt.localeCompare(b.createdAt),
     ),

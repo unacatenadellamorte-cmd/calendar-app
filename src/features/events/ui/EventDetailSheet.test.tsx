@@ -20,6 +20,7 @@ const baseEvent: EventItem = {
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: 'x',
   updatedAt: 'x',
 };

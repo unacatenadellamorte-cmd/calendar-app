@@ -53,6 +53,7 @@ export async function offlineCreateEvent(
     shiftTemplateId: input.shift?.shiftTemplateId ?? null,
     // 新規作成直後の行なので常に未設定(リマインダーは setEventReminder で後から設定する)。
     reminderMinutes: null,
+    isSecret: input.isSecret ?? false,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };

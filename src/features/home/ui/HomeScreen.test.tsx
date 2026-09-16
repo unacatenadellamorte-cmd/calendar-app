@@ -15,10 +15,12 @@ vi.mock('react-router-dom', async (importOriginal) => {
 let authState: { state: string };
 let calState: Record<string, unknown>;
 let evState: Record<string, unknown>;
+let secretState: { unlocked: boolean };
 
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 vi.mock('@/features/calendars/model/useCalendars', () => ({ useCalendars: () => calState }));
 vi.mock('@/features/events/model/useEvents', () => ({ useEvents: () => evState }));
+vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }));
 
 const { HomeScreen } = await import('./HomeScreen');
 
@@ -50,6 +52,7 @@ const futureEvent = (over: Partial<EventItem>): EventItem => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
   ...over,
@@ -70,6 +73,7 @@ beforeEach(() => {
   authState = { state: 'guest' };
   calState = { calendars: [cal({ id: 'c1' })], loading: false };
   evState = { events: [], loading: false };
+  secretState = { unlocked: false };
 });
 
 describe('HomeScreen', () => {
@@ -120,5 +124,66 @@ describe('HomeScreen', () => {
     setFeaturedCount(2);
     renderHome();
     expect(screen.getAllByRole('button', { name: /予定/ })).toHaveLength(2);
+  });
+
+  describe('シークレット予定の除外(spec-secret-mode)', () => {
+    it('ロック中(unlocked=false)はシークレット予定を代表予定から除外する', () => {
+      evState.events = [
+        futureEvent({ id: 'secret', title: '内緒の予定', isSecret: true }),
+        futureEvent({
+          id: 'normal',
+          title: '普通の予定',
+          startsAt: '2026-12-26T01:00:00Z',
+          endsAt: '2026-12-26T02:00:00Z',
+        }),
+      ];
+      renderHome();
+      expect(screen.queryByRole('button', { name: /内緒の予定/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /普通の予定/ })).toBeInTheDocument();
+    });
+
+    it('解除中(unlocked=true)はシークレット予定も表示する', () => {
+      secretState = { unlocked: true };
+      evState.events = [futureEvent({ id: 'secret', title: '内緒の予定', isSecret: true })];
+      renderHome();
+      expect(screen.getByRole('button', { name: /内緒の予定/ })).toBeInTheDocument();
+    });
+
+    it('ロック中はシークレットのシフトを給料見込み(PayCard/usePayEstimate)の計算から除外する', () => {
+      calState.calendars = [cal({ id: 'c1' }), cal({ id: 'shift1', name: 'バイト', isShift: true })];
+      evState.events = [
+        futureEvent({
+          id: 'shift-e',
+          calendarId: 'shift1',
+          startsAt: '2026-09-10T00:00:00Z', // JST 09:00
+          endsAt: '2026-09-10T08:00:00Z', // JST 17:00、実働8h
+          breakMinutes: 0,
+          hourlyWage: 1000,
+          isSecret: true,
+        }),
+      ];
+      renderHome();
+      expect(screen.getByText('9月のシフトはまだありません')).toBeInTheDocument();
+      expect(screen.queryByText('¥8,000')).not.toBeInTheDocument();
+    });
+
+    it('解除中はシークレットのシフトも給料見込みの計算に含める', () => {
+      secretState = { unlocked: true };
+      calState.calendars = [cal({ id: 'c1' }), cal({ id: 'shift1', name: 'バイト', isShift: true })];
+      evState.events = [
+        futureEvent({
+          id: 'shift-e',
+          calendarId: 'shift1',
+          startsAt: '2026-09-10T00:00:00Z',
+          endsAt: '2026-09-10T08:00:00Z',
+          breakMinutes: 0,
+          hourlyWage: 1000,
+          isSecret: true,
+        }),
+      ];
+      renderHome();
+      expect(screen.getByText('¥8,000')).toBeInTheDocument();
+      expect(screen.getByText('9月 ・ 1件のシフト')).toBeInTheDocument();
+    });
   });
 });

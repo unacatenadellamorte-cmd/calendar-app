@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
-import type { EventItem } from '@/data/events';
+import { useSecretMode } from '@/app/secret-mode-context';
+import { hideSecretEvents, type EventItem } from '@/data/events';
 import { localDateOf } from '@/lib/datetime';
 import { useCalendars } from '@/features/calendars/model/useCalendars';
 import { useEvents } from '@/features/events/model/useEvents';
@@ -20,9 +21,15 @@ export function HomeScreen() {
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const ev = useEvents(enabled);
+  const { unlocked } = useSecretMode();
   const navigate = useNavigate();
   const count = useFeaturedCount();
-  const featured = useFeaturedEvents(ev.events, cal.calendars, count);
+  // ロック中はシークレット予定を代表予定選抜・給料見込みの両方から除外する(spec-secret-mode)。
+  const visibleEvents = useMemo(
+    () => hideSecretEvents(ev.events, unlocked),
+    [ev.events, unlocked],
+  );
+  const featured = useFeaturedEvents(visibleEvents, cal.calendars, count);
   const calendarById = useMemo(
     () => new Map(cal.calendars.map((c) => [c.id, c])),
     [cal.calendars],
@@ -51,7 +58,7 @@ export function HomeScreen() {
       ) : (
         <>
           <CompactCard featured={featured} calendarById={calendarById} onSelect={openDay} />
-          <PayCard events={ev.events} calendars={cal.calendars} />
+          <PayCard events={visibleEvents} calendars={cal.calendars} />
         </>
       )}
     </Screen>

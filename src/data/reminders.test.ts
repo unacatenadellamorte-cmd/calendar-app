@@ -82,6 +82,7 @@ const ev = (over: Record<string, unknown> = {}) => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: 10,
+  isSecret: false,
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z',
   ...over,

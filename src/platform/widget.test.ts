@@ -27,9 +27,11 @@ vi.mock('capacitor-widget-bridge', () => ({
 }));
 
 const listEvents = vi.fn();
-vi.mock('@/data/events', () => ({
-  listEvents: (...a: unknown[]) => listEvents(...a),
-}));
+vi.mock('@/data/events', async (importOriginal) => {
+  // `hideSecretEvents` は実装(pure関数)をそのまま使う。`listEvents` だけ差し替える。
+  const actual = await importOriginal<typeof import('@/data/events')>();
+  return { ...actual, listEvents: (...a: unknown[]) => listEvents(...a) };
+});
 
 const listCalendars = vi.fn();
 vi.mock('@/data/calendars', () => ({
@@ -66,6 +68,7 @@ const ev = (over: Partial<EventItem>): EventItem => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
   ...over,
@@ -128,6 +131,16 @@ describe('buildFeaturedWidgetPayload', () => {
     expect(payload[0]).toMatchObject({ id: 'a1', allDay: true });
     // ローカル00:00の瞬間を UTC ISO にした値と一致する(new Date(2026,8,20).toISOString() と同じ計算)。
     expect(payload[0]!.startsAtIso).toBe(new Date(2026, 8, 20).toISOString());
+  });
+
+  it('シークレット予定は除外する(ロック/解除の概念が無いウィジェットでは常に除外、spec-secret-mode)', () => {
+    const calendars = [cal({})];
+    const events = [
+      ev({ id: 'secret', isSecret: true, startsAt: '2026-09-08T09:00:00.000Z' }),
+      ev({ id: 'normal', isSecret: false, startsAt: '2026-09-08T08:00:00.000Z' }),
+    ];
+    const payload = buildFeaturedWidgetPayload(events, calendars, NOW);
+    expect(payload.map((p) => p.id)).toEqual(['normal']);
   });
 
   it('対象0件なら空配列', () => {

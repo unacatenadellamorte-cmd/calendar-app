@@ -47,6 +47,7 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
   ...over,
@@ -65,6 +66,16 @@ describe('offline-write', () => {
     const outbox = await listOutbox();
     expect(outbox).toHaveLength(1);
     expect(outbox[0]).toMatchObject({ entity: 'event', op: 'create', targetId: 'local-1' });
+  });
+
+  it('offlineCreateEvent: isSecret を省略すると false になる', async () => {
+    const r = await offlineCreateEvent('local-1', timedInput);
+    expect(r.ok && r.value.isSecret).toBe(false);
+  });
+
+  it('offlineCreateEvent: isSecret=true を渡すとそのまま楽観行に反映する(spec-secret-mode)', async () => {
+    const r = await offlineCreateEvent('local-1', { ...timedInput, isSecret: true });
+    expect(r.ok && r.value.isSecret).toBe(true);
   });
 
   it('offlineUpdateEvent はキャッシュ行にマージし outbox に update', async () => {

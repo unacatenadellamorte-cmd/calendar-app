@@ -127,6 +127,15 @@ export function SettingsScreen() {
             ›
           </span>
         </Link>
+        <Link
+          to="/secret-mode"
+          className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
+        >
+          シークレットモード
+          <span aria-hidden="true" className="text-ink-secondary">
+            ›
+          </span>
+        </Link>
       </section>
 
       <DataSection />

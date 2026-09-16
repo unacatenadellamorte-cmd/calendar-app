@@ -22,11 +22,15 @@ beforeEach(() => {
 });
 
 describe('SettingsScreen', () => {
-  it('プロフィール・カレンダー管理・お気に入りシフトへのリンクがある', () => {
+  it('プロフィール・カレンダー管理・お気に入りシフト・シークレットモードへのリンクがある', () => {
     renderSettings();
     expect(screen.getByRole('link', { name: /プロフィール/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /カレンダー管理/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /お気に入りシフト/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /シークレットモード/ })).toHaveAttribute(
+      'href',
+      '/secret-mode',
+    );
   });
 
   it('既定は 3 件が選択されている', () => {
