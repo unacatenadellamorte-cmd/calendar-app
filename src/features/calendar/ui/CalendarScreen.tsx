@@ -233,9 +233,12 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
             onOverflowTap={openOverflow}
             collapsedToWeekOf={selectedDay ?? undefined}
             onBackToMonth={closeDayPanel}
+            onSwipeLeft={goNext}
+            onSwipeRight={goPrev}
           />
           {selectedDay && (
             <DayEventPanel
+              key={selectedDay}
               date={selectedDay}
               byDay={byDay}
               calendarById={calendarById}

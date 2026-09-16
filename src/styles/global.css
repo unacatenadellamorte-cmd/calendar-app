@@ -66,6 +66,38 @@
   }
 }
 
+/* --- アニメーション定義 ---
+ * 画面遷移・シート表示・月送り・日付パネル表示時に使用。
+ * @media (prefers-reduced-motion: reduce) で自動的に無効化される。 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* 数字は桁を揃える */
 .tabular {
   font-variant-numeric: tabular-nums;

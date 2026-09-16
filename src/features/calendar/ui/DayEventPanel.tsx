@@ -23,7 +23,7 @@ export function DayEventPanel({ date, byDay, calendarById, onEventTap, onAddEven
   const dayEvents = byDay.get(date) ?? [];
 
   return (
-    <section className="mt-3">
+    <section className="mt-3 animate-[fade-in_200ms_ease-out]">
       <h3 className="mb-1 text-body font-semibold text-ink-primary">{formatDayTitle(date)}</h3>
       {dayEvents.length === 0 ? (
         <p className="text-meta text-ink-secondary">予定はありません</p>

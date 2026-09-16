@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
@@ -22,6 +22,10 @@ interface MonthViewProps {
   collapsedToWeekOf?: string;
   /** 折りたたみ解除(「月表示に戻る」)。`collapsedToWeekOf` 指定時のみ使う。 */
   onBackToMonth: () => void;
+  /** 左スワイプ(翌月へ)。 */
+  onSwipeLeft?: () => void;
+  /** 右スワイプ(前月へ)。 */
+  onSwipeRight?: () => void;
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -39,6 +43,8 @@ export function MonthView({
   onOverflowTap,
   collapsedToWeekOf,
   onBackToMonth,
+  onSwipeLeft,
+  onSwipeRight,
 }: MonthViewProps) {
   const { year, month } = ymd(cursor);
   const allCells = useMemo(() => monthGridDays(year, month, today), [year, month, today]);
@@ -51,6 +57,43 @@ export function MonthView({
   // ここでの防御を残すことで、そのクリアが反映されるまでの1フレームも壊れた表示にしない。)
   const isCollapsed = Boolean(weekCells && weekCells.length > 0);
   const cells = isCollapsed ? (weekCells as DayCell[]) : allCells;
+
+  // スワイプ検出
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 1) {
+      touchStartRef.current = null;
+      return;
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+
+    // 横方向の移動が縦方向より大きく、かつ50px以上の場合を月送りと判定
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+      if (deltaX > 0) {
+        // 右スワイプ(前月へ)
+        onSwipeRight?.();
+      } else {
+        // 左スワイプ(翌月へ)
+        onSwipeLeft?.();
+      }
+    }
+  };
+
+  const handleTouchCancel = () => {
+    touchStartRef.current = null;
+  };
 
   return (
     <div>
@@ -72,7 +115,14 @@ export function MonthView({
         </button>
       )}
 
-      <div className="grid grid-cols-7 border-t border-l border-border-hairline">
+      <div
+        key={`${year}-${month}`}
+        className="grid grid-cols-7 border-t border-l border-border-hairline animate-[slide-fade_200ms_ease-out]"
+        data-testid="month-grid"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
+      >
         {cells.map((cell) => {
           const dayEvents = byDay.get(cell.date) ?? [];
           const shown = dayEvents.slice(0, MAX_CHIPS);
