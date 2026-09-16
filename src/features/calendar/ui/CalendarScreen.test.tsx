@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
@@ -356,6 +356,44 @@ describe('CalendarScreen', () => {
     render(<CalendarScreen />);
     expect(screen.getByText(/Supabase を設定すると/)).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: '月' })).not.toBeInTheDocument();
+  });
+
+  it('月グリッドでのスワイプでカーソルが移動する(左スワイプで翌月)', () => {
+    render(<CalendarScreen />);
+    const gridContainer = screen.getByTestId('month-grid');
+    expect(screen.getByRole('heading', { name: '2026年9月' })).toBeInTheDocument();
+
+    // 左スワイプ: startX=100, endX=30 → deltaX = -70 (翌月へ)
+    fireEvent.touchStart(gridContainer, {
+      touches: [{ clientX: 100, clientY: 100 }],
+    });
+    fireEvent.touchEnd(gridContainer, {
+      changedTouches: [{ clientX: 30, clientY: 105 }],
+    });
+
+    // 10月が表示される(見出しで判定。月初1日は前後の月のパディングセルとしても
+    // 描画されうるため、日付ボタンの有無ではなく見出しテキストで判定する)
+    expect(screen.getByRole('heading', { name: '2026年10月' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2026年9月' })).not.toBeInTheDocument();
+  });
+
+  it('月グリッドでのスワイプでカーソルが移動する(右スワイプで前月)', () => {
+    render(<CalendarScreen />);
+    const gridContainer = screen.getByTestId('month-grid');
+    expect(screen.getByRole('heading', { name: '2026年9月' })).toBeInTheDocument();
+
+    // 右スワイプ: startX=100, endX=180 → deltaX = +80 (前月へ)
+    fireEvent.touchStart(gridContainer, {
+      touches: [{ clientX: 100, clientY: 100 }],
+    });
+    fireEvent.touchEnd(gridContainer, {
+      changedTouches: [{ clientX: 180, clientY: 105 }],
+    });
+
+    // 8月が表示される(見出しで判定。月初1日は前後の月のパディングセルとしても
+    // 描画されうるため、日付ボタンの有無ではなく見出しテキストで判定する)
+    expect(screen.getByRole('heading', { name: '2026年8月' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2026年9月' })).not.toBeInTheDocument();
   });
 
   describe('initialEventId(ディープリンク calendar-app://event/{id} 由来)', () => {

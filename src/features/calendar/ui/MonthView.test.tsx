@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
@@ -50,7 +50,9 @@ function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof Mo
   const onEventTap = vi.fn();
   const onOverflowTap = vi.fn();
   const onBackToMonth = vi.fn();
-  render(
+  const onSwipeLeft = vi.fn();
+  const onSwipeRight = vi.fn();
+  const utils = render(
     <MonthView
       cursor="2026-09-08"
       byDay={toByDay(events)}
@@ -61,10 +63,12 @@ function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof Mo
       onEventTap={onEventTap}
       onOverflowTap={onOverflowTap}
       onBackToMonth={onBackToMonth}
+      onSwipeLeft={onSwipeLeft}
+      onSwipeRight={onSwipeRight}
       {...overProps}
     />,
   );
-  return { onDayTap, onDayDoubleTap, onEventTap, onOverflowTap, onBackToMonth };
+  return { onDayTap, onDayDoubleTap, onEventTap, onOverflowTap, onBackToMonth, onSwipeLeft, onSwipeRight, container: utils.container };
 }
 
 describe('MonthView', () => {
@@ -200,6 +204,72 @@ describe('MonthView', () => {
       expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('スワイプ検出', () => {
+    it('左スワイプ(横移動が50px以上、縦より大きい)で onSwipeLeft を呼ぶ', () => {
+      const { onSwipeLeft, onSwipeRight } = setup();
+      const gridContainer = screen.getByTestId('month-grid');
+
+      // 左スワイプ: startX=100, endX=30 → deltaX = -70
+      fireEvent.touchStart(gridContainer, {
+        touches: [{ clientX: 100, clientY: 100 }],
+      });
+      fireEvent.touchEnd(gridContainer, {
+        changedTouches: [{ clientX: 30, clientY: 105 }],
+      });
+
+      expect(onSwipeLeft).toHaveBeenCalled();
+      expect(onSwipeRight).not.toHaveBeenCalled();
+    });
+
+    it('右スワイプ(横移動が50px以上、縦より大きい)で onSwipeRight を呼ぶ', () => {
+      const { onSwipeLeft, onSwipeRight } = setup();
+      const gridContainer = screen.getByTestId('month-grid');
+
+      // 右スワイプ: startX=100, endX=180 → deltaX = +80
+      fireEvent.touchStart(gridContainer, {
+        touches: [{ clientX: 100, clientY: 100 }],
+      });
+      fireEvent.touchEnd(gridContainer, {
+        changedTouches: [{ clientX: 180, clientY: 105 }],
+      });
+
+      expect(onSwipeRight).toHaveBeenCalled();
+      expect(onSwipeLeft).not.toHaveBeenCalled();
+    });
+
+    it('縦方向が大きい場合(スクロール操作)は月送りしない', () => {
+      const { onSwipeLeft, onSwipeRight } = setup();
+      const gridContainer = screen.getByTestId('month-grid');
+
+      // 縦スクロール: deltaX = 30, deltaY = 100 → 縦が大きいため月送りなし
+      fireEvent.touchStart(gridContainer, {
+        touches: [{ clientX: 100, clientY: 100 }],
+      });
+      fireEvent.touchEnd(gridContainer, {
+        changedTouches: [{ clientX: 130, clientY: 200 }],
+      });
+
+      expect(onSwipeLeft).not.toHaveBeenCalled();
+      expect(onSwipeRight).not.toHaveBeenCalled();
+    });
+
+    it('横移動が50px未満の場合は月送りしない', () => {
+      const { onSwipeLeft, onSwipeRight } = setup();
+      const gridContainer = screen.getByTestId('month-grid');
+
+      // 小さい移動: deltaX = 30 (50未満)
+      fireEvent.touchStart(gridContainer, {
+        touches: [{ clientX: 100, clientY: 100 }],
+      });
+      fireEvent.touchEnd(gridContainer, {
+        changedTouches: [{ clientX: 130, clientY: 105 }],
+      });
+
+      expect(onSwipeLeft).not.toHaveBeenCalled();
+      expect(onSwipeRight).not.toHaveBeenCalled();
     });
   });
 });

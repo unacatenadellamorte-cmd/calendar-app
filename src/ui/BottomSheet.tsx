@@ -32,7 +32,7 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
         type="button"
         aria-label="閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-black/30"
+        className="absolute inset-0 bg-black/30 animate-[fade-in_150ms_ease-out]"
       />
       <div
         ref={panelRef}
@@ -40,7 +40,7 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative mx-auto w-full max-w-2xl rounded-t-lg bg-surface-base p-4 pb-8 shadow-lg"
+        className="relative mx-auto w-full max-w-2xl rounded-t-lg bg-surface-base p-4 pb-8 shadow-lg animate-[slide-up_200ms_ease-out]"
       >
         <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-border-hairline" />
         <h2 className="text-body font-semibold text-ink-primary">{title}</h2>
