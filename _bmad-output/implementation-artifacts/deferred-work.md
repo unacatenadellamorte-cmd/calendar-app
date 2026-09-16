@@ -40,6 +40,7 @@
 - source_spec: `spec-1-5-calendar-views.md`
   summary: 月 / 週ビューの横スワイプでの日付前後移動は Story 1.5 では実装せず、`‹` `今日` `›` ボタン + 日付ジャンプにとどめた。
   evidence: epic-1-context は「月・週は横スワイプで前後移動」を挙げるが、スワイプはタッチ実機依存で jsdom でのテストが難しく、ボタン + 日付ジャンプで「任意の日付へ移動」の要件は満たせる。1.6(PWA / モバイル最適化)以降で touch ハンドラを追加する。全予定を毎回読む方式もデータ量が増えたら範囲取得へ切り替える(現状は個人利用想定で許容)。
+  status: **月ビューのみ回収済み(2026-09-17、`spec-lightweight-animations.md`)**。素の`touchstart`/`touchend`で左右スワイプ月送りを実装(週ビューは対象外のまま)。
 
 - source_spec: `spec-2-1-calendar-priority.md`
   summary: カレンダー並べ替えのスムーズなタッチドラッグ(長押し→指で移動、自動スクロール)と DnD ライブラリ導入は Story 2.1 では見送り。デスクトップは HTML5 DnD、モバイル・キーボード・スクリーンリーダーは「▲ 上へ / ▼ 下へ」で完結。
@@ -165,3 +166,7 @@
 - source_spec: `spec-year-view.md`
   summary: 年ビューの`goPrev`/`goNext`を連打すると、cursorの年が4桁を割り`Date`コンストラクタの2桁年解釈(19xx年扱い)でずれる。
   evidence: 到達に数百回の連続クリックが要る非現実的な入力。月送りにも同型の理論上の限界があり同様に未対策。対策コストに見合わない。
+
+- source_spec: `spec-lightweight-animations.md`
+  summary: 月ビューの左右スワイプ月送りが、iOS Safari等ブラウザ標準の「画面端からの戻る/進む」エッジスワイプジェスチャーと衝突する可能性が未検討。
+  evidence: レビュー(Blind Hunter)指摘。`touchmove`で`preventDefault`しない設計(縦スクロールを妨げないため)は意図通りだが、その裏で画面端スワイプがブラウザ側のジェスチャーに先取りされうる。現状はAndroidエミュレータでの実機検証のみが範囲内で、iOS対応自体がStory 5.5(iOSウィジェット、未着手)の課題。iOS対応に着手する際にまとめて再考する。
