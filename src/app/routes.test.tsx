@@ -38,6 +38,7 @@ const sampleEvent: EventItem = {
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
 };
@@ -128,5 +129,13 @@ describe('その他のルート', () => {
   it('/shift-templates でお気に入りシフト画面が出る', () => {
     renderAt('/shift-templates');
     expect(screen.getByRole('heading', { level: 1, name: 'お気に入りシフト' })).toBeInTheDocument();
+  });
+
+  it('/secret-mode でシークレットモード設定画面が出る(パスコード未設定なら設定フォーム、spec-secret-mode)', () => {
+    renderAt('/secret-mode');
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'シークレットモード' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('パスコード(4〜8桁の数字)')).toBeInTheDocument();
   });
 });

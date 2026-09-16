@@ -31,6 +31,7 @@ const ev = (id: string): EventItem => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
 });

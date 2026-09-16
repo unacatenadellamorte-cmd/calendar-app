@@ -55,6 +55,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   note: null,
   source: 'local',
   reminder_minutes: null,
+  is_secret: false,
   created_at: '2026-09-07T00:00:00Z',
   updated_at: '2026-09-07T00:00:00Z',
   ...over,
@@ -203,6 +204,44 @@ describe('events.ts', () => {
       starts_at: null,
       ends_at: null,
     });
+  });
+
+  it('createEvent: isSecret を省略すると is_secret=false で insert する', async () => {
+    queryResult = { data: row(), error: null };
+    const { createEvent } = await importEvents();
+    await createEvent({
+      calendarId: 'c1',
+      title: '普通の予定',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({ is_secret: false });
+  });
+
+  it('createEvent: isSecret=true を渡すと is_secret=true で insert する(spec-secret-mode)', async () => {
+    queryResult = { data: row({ is_secret: true }), error: null };
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'c1',
+      title: '秘密の予定',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+      isSecret: true,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.isSecret).toBe(true);
+    expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({ is_secret: true });
+  });
+
+  it('updateEvent: isSecret を渡すと is_secret 列を update する', async () => {
+    queryResult = { data: row({ is_secret: true }), error: null };
+    const { updateEvent } = await importEvents();
+    const r = await updateEvent({ id: 'e1', source: 'local' }, { isSecret: true });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.isSecret).toBe(true);
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ is_secret: true });
   });
 
   it('createEvent: 空タイトルを拒否する', async () => {
@@ -372,6 +411,7 @@ describe('events.ts — オフライン(Story 1.6)', () => {
       note: null, source: 'local',
       breakMinutes: null, hourlyWage: null, workplaceLabel: null, shiftTemplateId: null,
       reminderMinutes: null,
+      isSecret: false,
       createdAt: '', updatedAt: '',
     });
     queryResult = { data: null, error: { message: 'Failed to fetch' } };
@@ -402,5 +442,35 @@ describe('events.ts — オフライン(Story 1.6)', () => {
     expect(r.ok).toBe(true);
     expect((await listOutbox())[0]).toMatchObject({ op: 'delete', targetId: 'e1' });
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe('hideSecretEvents (pure、spec-secret-mode)', () => {
+  const mk = (id: string, isSecret: boolean) => ({
+    id, calendarId: 'c1', title: id, allDay: false,
+    startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z', eventDate: null,
+    note: null, source: 'local' as const,
+    breakMinutes: null, hourlyWage: null, workplaceLabel: null, shiftTemplateId: null,
+    reminderMinutes: null,
+    isSecret,
+    createdAt: '', updatedAt: '',
+  });
+
+  it('unlocked=false ならシークレット予定を除外する', async () => {
+    const { hideSecretEvents } = await importEvents();
+    const events = [mk('e1', false), mk('e2', true), mk('e3', false)];
+    expect(hideSecretEvents(events, false).map((e) => e.id)).toEqual(['e1', 'e3']);
+  });
+
+  it('unlocked=true なら全件そのまま返す', async () => {
+    const { hideSecretEvents } = await importEvents();
+    const events = [mk('e1', false), mk('e2', true)];
+    expect(hideSecretEvents(events, true)).toEqual(events);
+  });
+
+  it('シークレット予定が無ければ何も変わらない', async () => {
+    const { hideSecretEvents } = await importEvents();
+    const events = [mk('e1', false), mk('e2', false)];
+    expect(hideSecretEvents(events, false)).toEqual(events);
   });
 });

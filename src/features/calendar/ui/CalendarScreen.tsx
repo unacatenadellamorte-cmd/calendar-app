@@ -2,9 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
+import { useSecretMode } from '@/app/secret-mode-context';
 import { resolveMessage } from '@/data/messages';
-import type { EventItem, NewEventInput } from '@/data/events';
-import { groupEventsByDay, makePriorityOf, monthGridDays, weekRowOf, ymd } from '@/lib/calendar-view';
+import { hideSecretEvents, type EventItem, type NewEventInput } from '@/data/events';
+import {
+  groupEventsByDay,
+  makePriorityOf,
+  monthGridDays,
+  weekRowOf,
+  ymd,
+} from '@/lib/calendar-view';
 import { todayLocalDate } from '@/lib/datetime';
 import { useCalendars } from '@/features/calendars/model/useCalendars';
 import { useEvents } from '@/features/events/model/useEvents';
@@ -36,9 +43,15 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const ev = useEvents(enabled);
+  const { unlocked } = useSecretMode();
   const navigate = useNavigate();
+  // ロック中はシークレット予定を月・週・年・リストのどのビューからも除外する(spec-secret-mode)。
+  const unlockedEvents = useMemo(
+    () => hideSecretEvents(ev.events, unlocked),
+    [ev.events, unlocked],
+  );
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
-    useCalendarView(ev.events, cal.calendars, initialDate);
+    useCalendarView(unlockedEvents, cal.calendars, initialDate);
   const today = todayLocalDate();
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -123,10 +136,11 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     if (!initialEventId || processedEventIdRef.current === initialEventId) return;
     if (!enabled || ev.loading || cal.loading) return;
     processedEventIdRef.current = initialEventId;
-    const target = ev.events.find((e) => e.id === initialEventId);
+    // ロック中はシークレット予定をディープリンクからも開けない(unlockedEvents で検索する、spec-secret-mode)。
+    const target = unlockedEvents.find((e) => e.id === initialEventId);
     if (target) openEdit(target);
     // openEdit は毎レンダー再生成される関数だが、initialEventId/enabled/ev/cal の変化にのみ追従すればよい。
-  }, [initialEventId, enabled, ev.loading, ev.events, cal.loading]);
+  }, [initialEventId, enabled, ev.loading, unlockedEvents, cal.loading]);
 
   if (state === 'unavailable') {
     return (
@@ -172,7 +186,10 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
       />
 
       {cal.errorKey && (
-        <p role="alert" className="mb-3 flex items-center justify-between text-meta text-danger">
+        <p
+          role="alert"
+          className="mb-3 flex items-center justify-between text-meta text-danger"
+        >
           {resolveMessage(cal.errorKey)}
           <button type="button" onClick={cal.dismissError} className="text-accent">
             閉じる

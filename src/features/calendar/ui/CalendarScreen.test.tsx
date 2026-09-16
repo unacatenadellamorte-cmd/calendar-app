@@ -34,6 +34,7 @@ const sampleEvent: EventItem = {
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
 };
@@ -41,16 +42,19 @@ const sampleEvent: EventItem = {
 let authState: { state: string } = { state: 'guest' };
 let calState: Record<string, unknown>;
 let evState: Record<string, unknown>;
+let secretState: { unlocked: boolean } = { unlocked: false };
 
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 vi.mock('@/features/calendars/model/useCalendars', () => ({ useCalendars: () => calState }));
 vi.mock('@/features/events/model/useEvents', () => ({ useEvents: () => evState }));
+vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }));
 
 const { CalendarScreen } = await import('./CalendarScreen');
 
 beforeEach(() => {
   navigateMock.mockClear();
   authState = { state: 'guest' };
+  secretState = { unlocked: false };
   calState = {
     calendars: [calendar],
     loading: false,
@@ -100,6 +104,77 @@ describe('CalendarScreen', () => {
     await user.click(screen.getByRole('radio', { name: 'リスト' }));
     expect(screen.getByText('会議アルファ')).toBeInTheDocument();
     expect(screen.getByText('9月8日(火)')).toBeInTheDocument();
+  });
+
+  describe('シークレット予定の除外(spec-secret-mode)', () => {
+    it('ロック中(unlocked=false)はリストビューからシークレット予定を除外する', async () => {
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      const user = userEvent.setup();
+      render(<CalendarScreen />);
+      await user.click(screen.getByRole('radio', { name: 'リスト' }));
+      expect(screen.queryByText('会議アルファ')).not.toBeInTheDocument();
+    });
+
+    it('解除中(unlocked=true)はリストビューにシークレット予定も表示する', async () => {
+      secretState = { unlocked: true };
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      const user = userEvent.setup();
+      render(<CalendarScreen />);
+      await user.click(screen.getByRole('radio', { name: 'リスト' }));
+      expect(screen.getByText('会議アルファ')).toBeInTheDocument();
+    });
+
+    it('ロック中(unlocked=false)は月ビュー(既定)からシークレット予定を除外する', () => {
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      render(<CalendarScreen />);
+      expect(screen.queryByText('会議アルファ')).not.toBeInTheDocument();
+    });
+
+    it('解除中(unlocked=true)は月ビューにもシークレット予定を表示する', () => {
+      secretState = { unlocked: true };
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      render(<CalendarScreen />);
+      expect(screen.getByText('会議アルファ')).toBeInTheDocument();
+    });
+
+    it('ロック中(unlocked=false)は週(日)ビューからシークレット予定を除外する', async () => {
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      const user = userEvent.setup();
+      render(<CalendarScreen initialDate="2026-09-08" />);
+      await user.click(screen.getByRole('radio', { name: '日' }));
+      expect(screen.queryByText('会議アルファ')).not.toBeInTheDocument();
+    });
+
+    it('解除中(unlocked=true)は週(日)ビューにもシークレット予定を表示する', async () => {
+      secretState = { unlocked: true };
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      const user = userEvent.setup();
+      render(<CalendarScreen initialDate="2026-09-08" />);
+      await user.click(screen.getByRole('radio', { name: '日' }));
+      expect(screen.getByText('会議アルファ')).toBeInTheDocument();
+    });
+
+    it('ロック中(unlocked=false)は年ビューの「予定あり」ドットからシークレット予定を除外する', async () => {
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      const user = userEvent.setup();
+      render(<CalendarScreen />);
+      await user.click(screen.getByRole('radio', { name: '年' }));
+      expect(
+        screen.queryByRole('button', { name: '2026年9月8日を開く(予定あり)' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '2026年9月8日を開く' })).toBeInTheDocument();
+    });
+
+    it('解除中(unlocked=true)は年ビューの「予定あり」ドットにもシークレット予定を反映する', async () => {
+      secretState = { unlocked: true };
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      const user = userEvent.setup();
+      render(<CalendarScreen />);
+      await user.click(screen.getByRole('radio', { name: '年' }));
+      expect(
+        screen.getByRole('button', { name: '2026年9月8日を開く(予定あり)' }),
+      ).toBeInTheDocument();
+    });
   });
 
   it('「年」を選ぶと年ビュー(1〜12月のミニグリッド)に切り替わる', async () => {
@@ -293,6 +368,19 @@ describe('CalendarScreen', () => {
       evState.events = [{ ...sampleEvent, id: 'gx', source: 'google' }];
       render(<CalendarScreen initialEventId="gx" />);
       expect(screen.getByRole('dialog', { name: '予定の詳細' })).toBeInTheDocument();
+    });
+
+    it('ロック中(unlocked=false)はシークレット予定をディープリンク経由でも開けない(レビュー指摘)', () => {
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('解除中(unlocked=true)ならシークレット予定もディープリンクで開ける', () => {
+      secretState = { unlocked: true };
+      evState.events = [{ ...sampleEvent, isSecret: true }];
+      render(<CalendarScreen initialEventId="e1" />);
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
     });
 
     it('存在しない ID なら何も開かず静かにフォールバックする(エラー表示なし)', () => {

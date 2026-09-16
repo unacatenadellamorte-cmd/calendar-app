@@ -14,6 +14,8 @@ export interface Profile {
   id: string;
   displayName: string;
   avatarDataUrl: string | null;
+  /** シークレットモードのパスコードハッシュ(SHA-256 hex)。未設定は null。spec-secret-mode。 */
+  secretPasscodeHash: string | null;
 }
 
 export interface NewProfileInput {
@@ -24,22 +26,25 @@ export interface NewProfileInput {
 export interface ProfilePatch {
   displayName?: string;
   avatarDataUrl?: string | null;
+  secretPasscodeHash?: string | null;
 }
 
 interface ProfileRow {
   id: string;
   display_name: string;
   avatar_data_url: string | null;
+  secret_passcode_hash: string | null;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
-const COLUMNS = 'id,display_name,avatar_data_url';
+const COLUMNS = 'id,display_name,avatar_data_url,secret_passcode_hash';
 
 function toProfile(row: ProfileRow): Profile {
   return {
     id: row.id,
     displayName: row.display_name,
     avatarDataUrl: row.avatar_data_url,
+    secretPasscodeHash: row.secret_passcode_hash ?? null,
   };
 }
 
@@ -109,6 +114,9 @@ export async function updateProfile(patch: ProfilePatch): Promise<Result<Profile
   }
   if (patch.avatarDataUrl !== undefined) {
     dbPatch.avatar_data_url = patch.avatarDataUrl;
+  }
+  if (patch.secretPasscodeHash !== undefined) {
+    dbPatch.secret_passcode_hash = patch.secretPasscodeHash;
   }
 
   try {

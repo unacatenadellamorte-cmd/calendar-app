@@ -101,6 +101,7 @@ describe('EventFormSheet', () => {
       workplaceLabel: null,
       shiftTemplateId: null,
       reminderMinutes: null,
+      isSecret: false,
       createdAt: '',
       updatedAt: '',
     };
@@ -127,6 +128,7 @@ describe('EventFormSheet', () => {
       workplaceLabel: null,
       shiftTemplateId: null,
       reminderMinutes: null,
+      isSecret: false,
       createdAt: '',
       updatedAt: '',
     };
@@ -150,6 +152,7 @@ describe('EventFormSheet', () => {
       workplaceLabel: null,
       shiftTemplateId: null,
       reminderMinutes: null,
+      isSecret: false,
       createdAt: '',
       updatedAt: '',
     };
@@ -185,5 +188,47 @@ describe('EventFormSheet', () => {
     expect(arg.startsAt).toMatch(/^2026-09-08T\d{2}:00:00/); // UTC ISO
     expect(new Date(arg.startsAt).getTime()).toBeLessThan(new Date(arg.endsAt).getTime());
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('シークレットのチェックを付けて保存すると isSecret: true で onCreate を呼ぶ(spec-secret-mode)', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '秘密の予定');
+    await user.click(screen.getByRole('checkbox', { name: 'シークレット' }));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate.mock.calls[0]![0]).toMatchObject({ isSecret: true });
+  });
+
+  it('シークレットのチェックを付けないと isSecret: false で onCreate を呼ぶ', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '普通の予定');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate.mock.calls[0]![0]).toMatchObject({ isSecret: false });
+  });
+
+  it('編集中はシークレットの現在値をチェック状態に反映する', () => {
+    const editing = {
+      id: 'e9',
+      calendarId: 'c1',
+      title: '秘密の予定',
+      allDay: false as const,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+      eventDate: null,
+      note: null,
+      source: 'local' as const,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
+      reminderMinutes: null,
+      isSecret: true,
+      createdAt: '',
+      updatedAt: '',
+    };
+    setup({ editing });
+    expect(screen.getByRole('checkbox', { name: 'シークレット' })).toBeChecked();
   });
 });

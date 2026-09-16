@@ -9,7 +9,11 @@ const listEvents = vi.fn();
 const listShiftTemplates = vi.fn();
 
 vi.mock('./calendars', () => ({ listCalendars: () => listCalendars() }));
-vi.mock('./events', () => ({ listEvents: () => listEvents() }));
+// `hideSecretEvents` は実装(pure関数)をそのまま使う。`listEvents` だけ差し替える。
+vi.mock('./events', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./events')>();
+  return { ...actual, listEvents: () => listEvents() };
+});
 vi.mock('./shift-templates', () => ({ listShiftTemplates: () => listShiftTemplates() }));
 
 const { buildExportBundle } = await import('./export');
@@ -56,6 +60,7 @@ const ev = (over: Partial<EventItem> = {}): EventItem => ({
   workplaceLabel: null,
   shiftTemplateId: null,
   reminderMinutes: null,
+  isSecret: false,
   createdAt: '',
   updatedAt: '',
   ...over,
@@ -129,6 +134,18 @@ describe('buildExportBundle', () => {
     );
     const r = await buildExportBundle();
     expect(r.ok && r.value.events.map((e) => e.id)).toEqual(['keep']);
+  });
+
+  it('シークレット予定は常に除外する(エクスポートにロック/解除の概念が無いため、spec-secret-mode)', async () => {
+    listCalendars.mockResolvedValue(ok([cal({ id: 'local' })]));
+    listEvents.mockResolvedValue(
+      ok([
+        ev({ id: 'secret', calendarId: 'local', isSecret: true }),
+        ev({ id: 'normal', calendarId: 'local', isSecret: false }),
+      ]),
+    );
+    const r = await buildExportBundle();
+    expect(r.ok && r.value.events.map((e) => e.id)).toEqual(['normal']);
   });
 
   it('予定ゼロでも成功する(events: [])', async () => {

@@ -41,6 +41,8 @@ export interface EventItem {
   shiftTemplateId: string | null;
   /** 何分前に通知するか(Story 5.4、FR-20)。未設定は null。終日予定は常に null。 */
   reminderMinutes: number | null;
+  /** シークレット予定か(ロック中は全画面から除外、spec-secret-mode)。既定 false。 */
+  isSecret: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +73,8 @@ export type NewEventInput = {
   note?: string | null;
   /** シフト実体を作るときだけ。汎用の予定作成では渡さない。 */
   shift?: ShiftAttributes;
+  /** シークレット予定として作成するか(省略時 false)。spec-secret-mode。 */
+  isSecret?: boolean;
 } & (TimedInput | AllDayInput);
 
 export type EventPatch = Partial<{
@@ -81,6 +85,7 @@ export type EventPatch = Partial<{
   startsAt: string | null;
   endsAt: string | null;
   eventDate: string | null;
+  isSecret: boolean;
 }>;
 
 export interface EventRange {
@@ -109,13 +114,14 @@ export interface EventRow {
   workplace_label: string | null;
   shift_template_id: string | null;
   reminder_minutes: number | null;
+  is_secret: boolean;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 export const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
 
 export function toEvent(row: EventRow): EventItem {
   return {
@@ -133,9 +139,18 @@ export function toEvent(row: EventRow): EventItem {
     workplaceLabel: row.workplace_label ?? null,
     shiftTemplateId: row.shift_template_id ?? null,
     reminderMinutes: row.reminder_minutes ?? null,
+    isSecret: row.is_secret ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * ロック中(`unlocked=false`)はシークレット予定を除外する(pure、spec-secret-mode)。
+ * 一覧・月・週・年・ホーム・給料見込みのすべての表示箇所で使う唯一の除外ロジック。
+ */
+export function hideSecretEvents(events: EventItem[], unlocked: boolean): EventItem[] {
+  return unlocked ? events : events.filter((e) => !e.isSecret);
 }
 
 function fromPostgrest(error: PostgrestError): AppError {
@@ -175,6 +190,7 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
     note: input.note?.trim() || null,
     all_day: input.allDay,
     source: 'local' as const,
+    is_secret: input.isSecret ?? false,
   };
   if (input.id) base.id = input.id;
   if (input.shift) {
@@ -295,6 +311,7 @@ export async function updateEvent(
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
   if (patch.eventDate !== undefined) row.event_date = patch.eventDate;
+  if (patch.isSecret !== undefined) row.is_secret = patch.isSecret;
 
   try {
     const { data, error } = await supabase

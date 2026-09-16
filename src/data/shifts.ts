@@ -39,6 +39,8 @@ function toEvent(row: Record<string, unknown>): EventItem {
     shiftTemplateId: (row.shift_template_id as string | null) ?? null,
     // 新規作成直後の行なので常に未設定(リマインダーは setEventReminder で後から設定する)。
     reminderMinutes: null,
+    // シフト作成経路にシークレットトグルは無い(spec-secret-mode Never)。常に false。
+    isSecret: false,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };

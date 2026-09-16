@@ -40,6 +40,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   id: 'u1',
   display_name: 'テスト太郎',
   avatar_data_url: null,
+  secret_passcode_hash: null,
   ...over,
 });
 
@@ -59,7 +60,12 @@ describe('profiles.ts', () => {
     const r = await getProfile();
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value).toEqual({ id: 'u1', displayName: 'テスト太郎', avatarDataUrl: null });
+      expect(r.value).toEqual({
+        id: 'u1',
+        displayName: 'テスト太郎',
+        avatarDataUrl: null,
+        secretPasscodeHash: null,
+      });
     }
     expect(calls.some((c) => c.method === 'maybeSingle')).toBe(true);
   });
@@ -152,6 +158,28 @@ describe('profiles.ts', () => {
     const r = await updateProfile({ displayName: '  次郎  ' });
     expect(r.ok).toBe(true);
     expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ display_name: '次郎' });
+  });
+
+  it('updateProfile: secretPasscodeHash を渡すと更新する(spec-secret-mode)', async () => {
+    const hash = 'a'.repeat(64);
+    queryResult = { data: row({ secret_passcode_hash: hash }), error: null };
+    const { updateProfile } = await importProfiles();
+    const r = await updateProfile({ secretPasscodeHash: hash });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.secretPasscodeHash).toBe(hash);
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({
+      secret_passcode_hash: hash,
+    });
+  });
+
+  it('updateProfile: secretPasscodeHash に null を渡すと解除する', async () => {
+    queryResult = { data: row({ secret_passcode_hash: null }), error: null };
+    const { updateProfile } = await importProfiles();
+    const r = await updateProfile({ secretPasscodeHash: null });
+    expect(r.ok).toBe(true);
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({
+      secret_passcode_hash: null,
+    });
   });
 
   it('updateProfile: 空名は拒否する', async () => {

@@ -15,7 +15,12 @@ vi.mock('@/data/profiles', () => ({
 
 const { useProfile } = await import('./useProfile');
 
-const profile: Profile = { id: 'u1', displayName: '花子', avatarDataUrl: null };
+const profile: Profile = {
+  id: 'u1',
+  displayName: '花子',
+  avatarDataUrl: null,
+  secretPasscodeHash: null,
+};
 
 beforeEach(() => {
   [getProfile, createProfile, updateProfile].forEach((f) => f.mockReset());

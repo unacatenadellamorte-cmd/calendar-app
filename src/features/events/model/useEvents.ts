@@ -18,7 +18,12 @@ import { refreshFeaturedWidget } from '@/platform/widget';
 
 /** フォームが返す完全な入力を、更新用の patch に変換する。 */
 function inputToPatch(input: NewEventInput): EventPatch {
-  const base = { calendarId: input.calendarId, title: input.title, note: input.note ?? null };
+  const base = {
+    calendarId: input.calendarId,
+    title: input.title,
+    note: input.note ?? null,
+    isSecret: input.isSecret ?? false,
+  };
   return input.allDay
     ? { ...base, allDay: true, eventDate: input.eventDate, startsAt: null, endsAt: null }
     : {

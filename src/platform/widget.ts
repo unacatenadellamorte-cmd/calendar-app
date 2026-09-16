@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { WidgetBridgePlugin } from 'capacitor-widget-bridge';
 import { selectFeaturedEvents } from '@core';
-import { listEvents, type EventItem } from '@/data/events';
+import { hideSecretEvents, listEvents, type EventItem } from '@/data/events';
 import { listCalendars, type Calendar } from '@/data/calendars';
 import { EXTERNAL_DEFAULT_COLOR } from '@/data/calendar-colors';
 import { makePriorityOf } from '@/lib/calendar-view';
@@ -57,6 +57,11 @@ function localMidnightIso(dateStr: string): string {
  * ウィジェット用の JSON ペイロードを組み立てる純関数(副作用・I/O なし)。
  * `useFeaturedEvents.ts` と同じレシピ(表示オンのカレンダーの予定だけを対象に
  * `selectFeaturedEvents` へ通す)だが、React フックではなく素の関数として提供する。
+ *
+ * シークレット予定は常に除外する(spec-secret-mode)。ネイティブのホーム画面ウィジェットには
+ * ロック/解除の概念が無く(`SecretModeProvider` の `unlocked` はアプリ内のメモリ state のみで、
+ * ウィジェット側には届かない)、ウィジェットは「アプリを開いていなくても見える」場所なので、
+ * アプリ画面がロック中かどうかに関わらず `hideSecretEvents(events, false)` で固定して除外する。
  */
 export function buildFeaturedWidgetPayload(
   events: EventItem[],
@@ -65,7 +70,10 @@ export function buildFeaturedWidgetPayload(
 ): FeaturedWidgetEventPayload[] {
   const calendarById = new Map(calendars.map((c) => [c.id, c]));
   const visibleIds = new Set(calendars.filter((c) => c.isVisible).map((c) => c.id));
-  const visible = events.filter((e) => visibleIds.has(e.calendarId));
+  const visible = hideSecretEvents(
+    events.filter((e) => visibleIds.has(e.calendarId)),
+    false,
+  );
   const featured = selectFeaturedEvents(visible, makePriorityOf(calendarById), now, WIDGET_LIMIT);
 
   return featured.map((event) => {
