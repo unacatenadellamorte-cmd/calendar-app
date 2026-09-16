@@ -1,5 +1,17 @@
 # 先送りにした作業
 
+- source_spec: `spec-secret-mode-avatar-toggle.md`
+  summary: `SecretModeQuickUnlockSheet.tsx`の送信ハンドラも、`unlock()`が例外を投げると`submitting`が`true`のまま固まる(try/catch/finally未使用)。
+  evidence: レビュー(Blind Hunter・Edge Case Hunter)指摘。`spec-secret-mode.md`の`SecretModeSettingsScreen.tsx`で既にdeferした「送信ハンドラのtry/finally未使用、コードベース全体の既存規約」と同根の問題がこの新規ファイルにも引き継がれた。この story 単体で直すと既存パターンと不整合になるため、送信ハンドラの規約自体を見直す別の機会に回収する。
+
+- source_spec: `spec-secret-mode-avatar-toggle.md`
+  summary: OS/端末側の「タップ調整」等のアクセシビリティ設定で反応速度が遅い場合、約300ms固定のダブルタップ判定が認識されない可能性がある。
+  evidence: レビュー(Blind Hunter)指摘。個人利用アプリで機能を使うのは基本的にユーザー本人であり、既存の設定画面(`/secret-mode`)という代替導線が既にあるため機能自体は失われないと判断し今回は見送り。将来的にタイマー時間を設定可能にする等の対応を検討。
+
+- source_spec: `spec-secret-mode-avatar-toggle.md`
+  summary: `BottomSheet.tsx`が閉じたときに呼び出し元の要素へフォーカスを戻さない(キーボード/スクリーンリーダー利用者がフォーカス位置を見失う)。
+  evidence: レビュー(Blind Hunter)指摘。`BottomSheet.tsx`自体は今回のdiffに含まれておらず、`EventFormSheet`等の既存の全シートに共通する既存挙動。`BottomSheet.tsx`を触る別の機会に回収する。
+
 - source_spec: `spec-secret-mode.md`
   summary: シークレットモードの解除状態が、バックグラウンド化・アイドルタイムアウトでは自動的に再ロックされない(現状はアプリのフルリロードのみ)。
   evidence: frozen Always は「アプリ起動・リロードのたびに必ずロック状態に戻る」とだけ約束しており、ユーザーの要望文言も「アプリ立ち上げ時は非表示」のみ。レビュー(Blind Hunter)で「解除したまま放置すると他人にもずっと見えたまま」という実用上のリスクを指摘されたが、意図が定めていない拡張のため今回は見送り。`visibilitychange`イベント等での実装を検討。
