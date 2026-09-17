@@ -10,6 +10,11 @@ coverage/
 .env.*
 !env.example
 
+# Android署名の秘密情報
+*.jks
+*.keystore
+keystore.properties
+
 # BMAD レンダリングキャッシュ
 _bmad/render/
 

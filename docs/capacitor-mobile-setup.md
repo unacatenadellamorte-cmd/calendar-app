@@ -64,7 +64,7 @@ build to fail on Windows. ... This warning can be disabled by adding the line
 `android/local.properties` は `.gitignore` 対象(各自の環境に依存するため)。無ければ以下の1行を作る。
 
 ```properties
-sdk.dir=C:/Users/Ryo/AppData/Local/Android/Sdk
+sdk.dir=C\:/Users/Ryo/AppData/Local/Android/Sdk
 ```
 
 ### ビルド〜エミュレータ起動〜ディープリンク確認

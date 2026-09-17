@@ -26,6 +26,11 @@ buildscript {
 apply from: "variables.gradle"
 
 allprojects {
+    // OneDriveのロックを避ける場合、生成物を同期対象外へまとめる。
+    def externalBuildRoot = System.getenv('ANDROID_BUILD_ROOT')
+    if (externalBuildRoot) {
+        layout.buildDirectory.set(file("${externalBuildRoot}/${project.name}"))
+    }
     repositories {
         google()
         mavenCentral()
