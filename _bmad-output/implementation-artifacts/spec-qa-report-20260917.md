@@ -2,7 +2,7 @@
 title: 'QAレポート20260917の不具合修正'
 type: bugfix
 created: '2026-09-17'
-status: in-progress
+status: completed
 route: dispatch
 baseline_commit: '621ae93e8ad83abc3402b1cd7a7ff3fdd3e83866'
 context: []
@@ -23,7 +23,7 @@ context: []
 ## Tasks & Acceptance
 - [x] QA各指摘を現行コードとテストで検証し処置を記録。
 - [x] 実在する不具合を所有範囲を分けて修正。
-- [ ] 関連回帰、型検査、アプリlint、Androidビルド、実機で非破壊操作確認。
+- [x] 関連回帰、型検査、アプリlint、Androidビルド、実機で非破壊操作確認。
 Given 外部カレンダー, when ユーザーが直接予定を保存, then 拒否して理由が見える。
 Given フォーム入力中, when データ参照が再取得で変化, then 同じ編集対象なら入力が保持される。
 Given Web月の週一覧, when ブラウザで戻る, then 月へ戻りホームへ離脱しない。
@@ -32,4 +32,4 @@ Given 月の日付, when ダブルタップ, then 日の時間軸へ移る。
 ユーザーの費用方針に従い定型修正を3つのlunaサブエージェントへ分担。メインが履歴・ジェスチャー・統合検証を担当。レポート全体の修正依頼に基づき継続して実装、無関係な未追跡資料は維持。
 
 ## 検証結果
-全110ファイル908テスト、型検査、src/packages lint、Web/Androidビルド成功。実機1.0.10への更新・起動成功。詳細はdocs/qa-fixes-20260917.md。ロック解除後の画面確認待ち。
+全110ファイル908テスト、型検査、src/packages lint、Web/Androidビルド成功。実機1.0.10への更新・起動成功。詳細はdocs/qa-fixes-20260917.md。実機で17日タップ→週一覧、Android戻る→月、ダブルタップ→日表示を確認済み。
