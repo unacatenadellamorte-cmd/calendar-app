@@ -141,23 +141,13 @@ Story 5.1 と同じ理由。下記「iOS(Mac 確保後のフォローアップ)�
 
 ## iOS(Mac 確保後のフォローアップ)
 
-このストーリーでは `npx cap add ios` で `ios/` の雛形生成と `Info.plist` の
-`CFBundleURLSchemes`(`calendar-app`)登録のみ済ませてある(害が無く後戻り不要な作業のため)。
-**Xcode でのビルド確認はしていない**(開発機が Windows のため)。Mac が使えるようになったら:
+Story 5.5でWidgetKit拡張とmacOS CIの検証手順を追加した。
+具体的なコマンド・認証・実機確認は[ iOSビルド検証とClaude連携](ios-ci-and-claude.md)を参照する。
 
-1. `npm run build && npx cap sync ios`
-2. Xcode で `ios/App/App.xcodeproj` を開く(CocoaPods 未導入なら `npx cap sync ios` が
-   `pod install` も面倒を見る想定。エラーが出たら `cd ios/App && pod install` を手動実行)
-3. Signing & Capabilities で自動管理証明書(開発用の暫定署名)を選択
-4. シミュレータ、または実機(Apple Developer Program 未登録でも自分の端末でのデバッグ実行は可能)で起動
-5. 上記 Android と同じディープリンクの4パターンを確認する。iOS でのディープリンク手動起動は:
-   ```
-   xcrun simctl openurl booted "calendar-app://day/2026-09-20"
-   xcrun simctl openurl booted "calendar-app://event/<既存の予定id>"
-   ```
-
-Apple Developer Program 登録の要否は PM(Ryo)判断待ち(PRD §9 item 8)。未登録でもシミュレータ/自分の
-実機での確認は可能なので、このフォローアップ自体は登録前でも進められる。
+このプロジェクトはSwift Package Manager構成。`npm run build` → `npx cap sync ios`で
+プラグイン登録を更新し、RubyスクリプトでWidget Extensionを追加してからXcodeで開く。
+WindowsでのWebテストだけではSwiftや署名を検証できない。macOS CIの成功と実機確認を区別する。
+旧手順の`pod install`はこの構成では使わない。
 
 ---
 

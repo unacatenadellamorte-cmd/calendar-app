@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { hashPasscode } from '@/lib/passcode';
 import { useSecretMode } from './secret-mode-context';
@@ -65,7 +65,7 @@ describe('SecretModeProvider', () => {
     const user = userEvent.setup();
     renderProvider(await hashPasscode('1234'));
     await user.click(screen.getByText('unlock-1234'));
-    expect(screen.getByTestId('unlocked')).toHaveTextContent('true');
+    await waitFor(() => expect(screen.getByTestId('unlocked')).toHaveTextContent('true'));
     expect(screen.getByTestId('error')).toHaveTextContent('');
   });
 
@@ -74,14 +74,16 @@ describe('SecretModeProvider', () => {
     renderProvider(await hashPasscode('1234'));
     await user.click(screen.getByText('unlock-9999'));
     expect(screen.getByTestId('unlocked')).toHaveTextContent('false');
-    expect(screen.getByTestId('error')).toHaveTextContent('secret/incorrect-passcode');
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('secret/incorrect-passcode'),
+    );
   });
 
   it('再ロックはパスコード不要で即座に unlocked=false へ戻す', async () => {
     const user = userEvent.setup();
     renderProvider(await hashPasscode('1234'));
     await user.click(screen.getByText('unlock-1234'));
-    expect(screen.getByTestId('unlocked')).toHaveTextContent('true');
+    await waitFor(() => expect(screen.getByTestId('unlocked')).toHaveTextContent('true'));
     await act(async () => {
       await user.click(screen.getByText('lock'));
     });
@@ -100,7 +102,8 @@ describe('SecretModeProvider', () => {
     const user = userEvent.setup();
     renderProvider(null);
     await user.click(screen.getByText('set-1234'));
-    expect(onChangePasscodeHash).toHaveBeenCalledWith(await hashPasscode('1234'));
+    const expectedHash = await hashPasscode('1234');
+    await waitFor(() => expect(onChangePasscodeHash).toHaveBeenCalledWith(expectedHash));
     expect(screen.getByTestId('error')).toHaveTextContent('');
   });
 
@@ -109,14 +112,18 @@ describe('SecretModeProvider', () => {
     const user = userEvent.setup();
     renderProvider(null);
     await user.click(screen.getByText('set-1234'));
-    expect(screen.getByTestId('error')).toHaveTextContent('secret/save-failed');
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('secret/save-failed'),
+    );
   });
 
   it('dismissError でエラーを消せる', async () => {
     const user = userEvent.setup();
     renderProvider(await hashPasscode('1234'));
     await user.click(screen.getByText('unlock-9999'));
-    expect(screen.getByTestId('error')).toHaveTextContent('secret/incorrect-passcode');
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('secret/incorrect-passcode'),
+    );
     await user.click(screen.getByText('dismiss'));
     expect(screen.getByTestId('error')).toHaveTextContent('');
   });
@@ -125,7 +132,7 @@ describe('SecretModeProvider', () => {
     const user = userEvent.setup();
     const { unmount } = renderProvider(await hashPasscode('1234'));
     await user.click(screen.getByText('unlock-1234'));
-    expect(screen.getByTestId('unlocked')).toHaveTextContent('true');
+    await waitFor(() => expect(screen.getByTestId('unlocked')).toHaveTextContent('true'));
     unmount();
     renderProvider(await hashPasscode('1234'));
     expect(screen.getByTestId('unlocked')).toHaveTextContent('false');

@@ -11,8 +11,12 @@ import type { Calendar } from '@/data/calendars';
  */
 
 const isNativePlatform = vi.fn();
+const getPlatform = vi.fn();
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: (...a: unknown[]) => isNativePlatform(...a) },
+  Capacitor: {
+    isNativePlatform: (...a: unknown[]) => isNativePlatform(...a),
+    getPlatform: () => getPlatform(),
+  },
 }));
 
 const setItem = vi.fn();
@@ -78,7 +82,10 @@ describe('buildFeaturedWidgetPayload', () => {
   const NOW = '2026-09-08T03:00:00.000Z';
 
   it('表示オンのカレンダーの予定を優先度順で最大3件、5フィールドの形に整形する', () => {
-    const calendars = [cal({ id: 'high', priority: 0 }), cal({ id: 'low', name: '私用', priority: 1 })];
+    const calendars = [
+      cal({ id: 'high', priority: 0 }),
+      cal({ id: 'low', name: '私用', priority: 1 }),
+    ];
     const events = [
       ev({ id: 'a', calendarId: 'low', startsAt: '2026-09-08T05:00:00.000Z' }),
       ev({ id: 'b', calendarId: 'high', startsAt: '2026-09-08T09:00:00.000Z' }),
@@ -106,7 +113,10 @@ describe('buildFeaturedWidgetPayload', () => {
   });
 
   it('表示オフのカレンダーの予定は除外する', () => {
-    const calendars = [cal({ id: 'shown', isVisible: true }), cal({ id: 'hidden', isVisible: false })];
+    const calendars = [
+      cal({ id: 'shown', isVisible: true }),
+      cal({ id: 'hidden', isVisible: false }),
+    ];
     const events = [
       ev({ id: 'v', calendarId: 'shown', startsAt: '2026-09-08T09:00:00.000Z' }),
       ev({ id: 'h', calendarId: 'hidden', startsAt: '2026-09-08T08:00:00.000Z' }),
@@ -146,7 +156,11 @@ describe('buildFeaturedWidgetPayload', () => {
   it('対象0件なら空配列', () => {
     const calendars = [cal({})];
     const past = [
-      ev({ id: 'p', startsAt: '2026-09-08T01:00:00.000Z', endsAt: '2026-09-08T02:00:00.000Z' }),
+      ev({
+        id: 'p',
+        startsAt: '2026-09-08T01:00:00.000Z',
+        endsAt: '2026-09-08T02:00:00.000Z',
+      }),
     ];
     const payload = buildFeaturedWidgetPayload(past, calendars, NOW);
     expect(payload).toEqual([]);
@@ -158,6 +172,7 @@ describe('refreshFeaturedWidget', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-08T03:00:00.000Z'));
     isNativePlatform.mockReset();
+    getPlatform.mockReset().mockReturnValue('android');
     setItem.mockReset().mockResolvedValue({ results: true });
     setRegisteredWidgets.mockReset().mockResolvedValue({ results: true });
     reloadAllTimelines.mockReset().mockResolvedValue({ results: true });
@@ -212,8 +227,33 @@ describe('refreshFeaturedWidget', () => {
 
     await refreshFeaturedWidget();
     expect(setItem).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('widget: refreshFeaturedWidget failed', expect.any(String));
+    expect(warn).toHaveBeenCalledWith(
+      'widget: refreshFeaturedWidget failed',
+      expect.any(String),
+    );
     warn.mockRestore();
+  });
+
+  it('iOSではAndroid専用APIが使えなくても共有ストレージへ書き込み再描画する', async () => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue('ios');
+    setRegisteredWidgets.mockRejectedValue(new Error('UNIMPLEMENTED'));
+    listEvents.mockResolvedValue(ok([ev({ id: 'ios-event' })]));
+    listCalendars.mockResolvedValue(ok([cal({})]));
+
+    await refreshFeaturedWidget();
+
+    expect(setRegisteredWidgets).not.toHaveBeenCalled();
+    expect(setItem).toHaveBeenCalledWith({
+      key: 'featuredEvents',
+      group: 'group.jp.ryo.calendarapp.widget',
+      value: expect.any(String),
+    });
+    expect(JSON.parse(setItem.mock.calls[0]![0].value)[0].id).toBe('ios-event');
+    expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
+    expect(setItem.mock.invocationCallOrder[0]).toBeLessThan(
+      reloadAllTimelines.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('listCalendars が失敗したら何も書き込まず、警告ログを出す', async () => {
@@ -224,7 +264,10 @@ describe('refreshFeaturedWidget', () => {
 
     await refreshFeaturedWidget();
     expect(setItem).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('widget: refreshFeaturedWidget failed', expect.any(String));
+    expect(warn).toHaveBeenCalledWith(
+      'widget: refreshFeaturedWidget failed',
+      expect.any(String),
+    );
     warn.mockRestore();
   });
 
