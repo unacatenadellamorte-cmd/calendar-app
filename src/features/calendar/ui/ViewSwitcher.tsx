@@ -1,26 +1,48 @@
+import { t, useLanguage } from '@/i18n';
 import type { ViewMode } from '@/features/calendar/model/useCalendarView';
-
 interface ViewSwitcherProps {
   view: ViewMode;
   onChange: (view: ViewMode) => void;
 }
-
-const ITEMS: { value: ViewMode; label: string }[] = [
-  { value: 'year', label: '年' },
-  { value: 'month', label: '月' },
+const ITEMS: {
+  value: ViewMode;
+  label: string;
+}[] = [
+  {
+    value: 'year',
+    get label() {
+      return t('年');
+    },
+  },
+  {
+    value: 'month',
+    get label() {
+      return t('月');
+    },
+  },
   // 内部値は 'week' のまま(WeekView.tsx/ルーティング/localStorage永続キー等を変更しない、
   // 表示ラベルのみの修正)。WeekView.tsx は実際には cursor 当日の1日タイムライン(v1既知の
   // 簡略化)なので、ラベルを実態に合わせて「日」にする。
-  { value: 'week', label: '日' },
-  { value: 'list', label: 'リスト' },
+  {
+    value: 'week',
+    get label() {
+      return t('日');
+    },
+  },
+  {
+    value: 'list',
+    get label() {
+      return t('リスト');
+    },
+  },
 ];
-
 /** 年 / 月 / 日 / リストのセグメント切替(内部値は 'week' のまま、表示ラベルのみ「日」)。 */
 export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
+  useLanguage();
   return (
     <div
       role="radiogroup"
-      aria-label="表示切替"
+      aria-label={t('表示切替')}
       className="flex overflow-hidden rounded-sm border border-border-hairline text-meta"
     >
       {ITEMS.map(({ value, label }) => {

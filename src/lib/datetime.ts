@@ -1,3 +1,4 @@
+import { getLanguage, getLocale, t } from '@/i18n';
 /**
  * 時刻の変換ヘルパ。保存は UTC の ISO 文字列、入力・表示はユーザーのローカル時刻(AD-7)。
  */
@@ -57,12 +58,22 @@ export function minutesIntoLocalDay(iso: string): number {
 /** 時刻付き予定の表示用ラベル(例 "9/7 14:30")。 */
 export function formatEventTime(startsAtIso: string): string {
   const d = new Date(startsAtIso);
+  if (getLanguage() !== 'ja')
+    return new Intl.DateTimeFormat(getLocale(), {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(d);
   return `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 /** 終日予定の表示用ラベル(例 "9/7 終日")。 */
 export function formatEventDate(eventDate: string): string {
   const [, m, day] = eventDate.split('-');
+  if (getLanguage() !== 'ja')
+    return `${new Intl.DateTimeFormat(getLocale(), { month: 'short', day: 'numeric' }).format(new Date(`${eventDate}T00:00`))} ${t('終日')}`;
   return `${Number(m)}/${Number(day)} 終日`;
 }
 
@@ -75,18 +86,30 @@ export function formatClock(iso: string): string {
 /** ローカル暦日("YYYY-MM-DD")→ "2026年9月"。 */
 export function formatMonthTitle(date: string): string {
   const [y = 0, m = 0] = date.split('-').map(Number);
+  if (getLanguage() !== 'ja')
+    return new Intl.DateTimeFormat(getLocale(), { year: 'numeric', month: 'long' }).format(
+      new Date(y, m - 1, 1),
+    );
   return `${y}年${m}月`;
 }
 
 /** ローカル暦日("YYYY-MM-DD")→ "2026年"。 */
 export function formatYearTitle(date: string): string {
   const [y = 0] = date.split('-').map(Number);
+  if (getLanguage() !== 'ja')
+    return new Intl.DateTimeFormat(getLocale(), { year: 'numeric' }).format(new Date(y, 0, 1));
   return `${y}年`;
 }
 
 /** ローカル暦日("YYYY-MM-DD")→ "9月6日(日)"。 */
 export function formatDayTitle(date: string): string {
   const [, m = 0, d = 0] = date.split('-').map(Number);
+  if (getLanguage() !== 'ja')
+    return new Intl.DateTimeFormat(getLocale(), {
+      month: 'short',
+      day: 'numeric',
+      weekday: 'short',
+    }).format(new Date(`${date}T00:00`));
   const wd = WEEKDAY_JA[new Date(`${date}T00:00`).getDay()] ?? '';
   return `${m}月${d}日(${wd})`;
 }

@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { resolveMessage } from '@/data/messages';
@@ -11,7 +12,6 @@ import {
   utcIsoToLocalInput,
 } from '@/lib/datetime';
 import { ReminderPicker } from './ReminderPicker';
-
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
   /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
@@ -19,7 +19,6 @@ export interface EventSeed {
   /** "YYYY-MM-DDTHH:mm"。この時刻から1時間を既定にする。 */
   startLocal?: string;
 }
-
 interface EventFormSheetProps {
   open: boolean;
   editing: EventItem | null;
@@ -33,7 +32,6 @@ interface EventFormSheetProps {
   /** リマインダーを設定/解除する(Story 5.4)。編集時のみ使う。 */
   onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean>;
 }
-
 interface FormState {
   title: string;
   calendarId: string;
@@ -44,7 +42,6 @@ interface FormState {
   note: string;
   isSecret: boolean;
 }
-
 function initialState(
   editing: EventItem | null,
   calendars: Calendar[],
@@ -81,7 +78,6 @@ function initialState(
     isSecret: editing.isSecret,
   };
 }
-
 function toInput(form: FormState): NewEventInput {
   const common = {
     calendarId: form.calendarId,
@@ -98,7 +94,6 @@ function toInput(form: FormState): NewEventInput {
         endsAt: localInputToUtcIso(form.endLocal),
       };
 }
-
 export function EventFormSheet({
   open,
   editing,
@@ -110,24 +105,26 @@ export function EventFormSheet({
   onDelete,
   onSetReminder,
 }: EventFormSheetProps) {
+  useLanguage();
   const [form, setForm] = useState<FormState>(() => initialState(editing, calendars, seed));
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
   useEffect(() => {
     if (!open) return;
     setForm(initialState(editing, calendars, seed));
     setErrorKey(null);
     setSubmitting(false);
   }, [open, editing, calendars, seed]);
-
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     setErrorKey(null);
   };
-
   return (
-    <BottomSheet open={open} title={editing ? '予定を編集' : '予定を追加'} onClose={onClose}>
+    <BottomSheet
+      open={open}
+      title={editing ? t('予定を編集') : t('予定を追加')}
+      onClose={onClose}
+    >
       <form
         className="flex flex-col gap-4"
         noValidate
@@ -147,7 +144,7 @@ export function EventFormSheet({
         }}
       >
         <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">タイトル</span>
+          <span className="text-meta text-ink-secondary">{t('タイトル')}</span>
           <input
             value={form.title}
             onChange={(e) => set('title', e.target.value)}
@@ -158,7 +155,7 @@ export function EventFormSheet({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">カレンダー</span>
+          <span className="text-meta text-ink-secondary">{t('カレンダー')}</span>
           <select
             value={form.calendarId}
             onChange={(e) => set('calendarId', e.target.value)}
@@ -179,12 +176,12 @@ export function EventFormSheet({
             onChange={(e) => set('allDay', e.target.checked)}
             className="h-5 w-5 accent-[var(--color-accent)]"
           />
-          <span className="text-body text-ink-primary">終日</span>
+          <span className="text-body text-ink-primary">{t('終日')}</span>
         </label>
 
         {form.allDay ? (
           <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-secondary">日付</span>
+            <span className="text-meta text-ink-secondary">{t('日付')}</span>
             <input
               type="date"
               value={form.dateLocal}
@@ -196,7 +193,7 @@ export function EventFormSheet({
         ) : (
           <>
             <label className="flex flex-col gap-1">
-              <span className="text-meta text-ink-secondary">開始</span>
+              <span className="text-meta text-ink-secondary">{t('開始')}</span>
               <input
                 type="datetime-local"
                 value={form.startLocal}
@@ -206,7 +203,7 @@ export function EventFormSheet({
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-meta text-ink-secondary">終了</span>
+              <span className="text-meta text-ink-secondary">{t('終了')}</span>
               <input
                 type="datetime-local"
                 value={form.endLocal}
@@ -225,11 +222,11 @@ export function EventFormSheet({
             onChange={(e) => set('isSecret', e.target.checked)}
             className="h-5 w-5 accent-[var(--color-accent)]"
           />
-          <span className="text-body text-ink-primary">シークレット</span>
+          <span className="text-body text-ink-primary">{t('シークレット')}</span>
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">メモ</span>
+          <span className="text-meta text-ink-secondary">{t('メモ')}</span>
           <textarea
             value={form.note}
             onChange={(e) => set('note', e.target.value)}
@@ -257,7 +254,7 @@ export function EventFormSheet({
           disabled={submitting || calendars.length === 0}
           className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
         >
-          {submitting ? '保存中…' : '保存'}
+          {submitting ? t('保存中…') : t('保存')}
         </button>
 
         {editing && onDelete && (
@@ -269,7 +266,7 @@ export function EventFormSheet({
             }}
             className="min-h-11 text-meta text-danger"
           >
-            この予定を削除
+            {t('この予定を削除')}
           </button>
         )}
       </form>

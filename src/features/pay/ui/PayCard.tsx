@@ -1,34 +1,33 @@
+import { t, useLanguage } from '@/i18n';
 import { useState } from 'react';
 import { formatYen } from '@/lib/money';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { usePayEstimate } from '../model/usePayEstimate';
 import { PayDetailSheet } from './PayDetailSheet';
-
 interface PayCardProps {
   events: EventItem[];
   calendars: Calendar[];
 }
-
 /**
  * 当月の給料見込み(FR-14 / FR-15)。compact-card の下。
  * 実働時間 × 時給の暦月合計を都度計算。前月/翌月の矢印、タップで内訳。静かなトーン。
  */
 export function PayCard({ events, calendars }: PayCardProps) {
+  useLanguage();
   const pay = usePayEstimate(events, calendars);
   const [detailOpen, setDetailOpen] = useState(false);
-
   return (
     <section
-      aria-label={`${pay.monthLabel}の給料見込み`}
+      aria-label={t('{0}の給料見込み', [pay.monthLabel])}
       className="mt-3 rounded-md border border-border-hairline bg-surface-raised"
     >
       <div className="flex items-center justify-between px-4 pt-3 text-meta text-ink-secondary">
-        <span>{pay.monthLabel}の給料見込み</span>
+        <span>{t('{0}の給料見込み', [pay.monthLabel])}</span>
         <span className="flex gap-1">
           <button
             type="button"
-            aria-label="前の月"
+            aria-label={t('前の月')}
             onClick={pay.prev}
             className="h-11 w-9 rounded-sm border border-border-hairline text-ink-secondary"
           >
@@ -36,7 +35,7 @@ export function PayCard({ events, calendars }: PayCardProps) {
           </button>
           <button
             type="button"
-            aria-label="次の月"
+            aria-label={t('次の月')}
             onClick={pay.next}
             disabled={!pay.canNext}
             className="h-11 w-9 rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
@@ -56,8 +55,8 @@ export function PayCard({ events, calendars }: PayCardProps) {
         </span>
         <span className="mt-0.5 text-meta text-ink-secondary">
           {pay.shiftCount === 0
-            ? `${pay.monthLabel}のシフトはまだありません`
-            : `${pay.monthLabel} ・ ${pay.shiftCount}件のシフト`}
+            ? t('{0}のシフトはまだありません', [pay.monthLabel])
+            : t('{0} ・ {1}件のシフト', [pay.monthLabel, pay.shiftCount])}
         </span>
       </button>
 

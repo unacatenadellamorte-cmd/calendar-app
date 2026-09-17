@@ -1,3 +1,4 @@
+import { t } from '@/i18n';
 import { AUTH_MESSAGES } from './auth.errors';
 
 /**
@@ -42,11 +43,13 @@ const DATA_MESSAGES: Record<string, string> = {
   'connection/unavailable': 'この機能は Supabase の設定後に使えます',
   'connection/reauth-needed': 'Google を接続し直してください',
   'connection/not-connected': '先に Google を接続してください',
-  'connection/calendars-failed': 'カレンダー一覧を取得できませんでした。もう一度お試しください',
+  'connection/calendars-failed':
+    'カレンダー一覧を取得できませんでした。もう一度お試しください',
   'connection/disconnect-failed': '接続の解除に失敗しました。もう一度お試しください',
   'connection/permission-denied':
     '端末カレンダーへのアクセスが許可されませんでした。設定から許可してください',
-  'connection/device-unavailable': '端末カレンダーに接続できませんでした。もう一度お試しください',
+  'connection/device-unavailable':
+    '端末カレンダーに接続できませんでした。もう一度お試しください',
   'connection/calendar-not-found':
     'このカレンダーは一覧に見つかりませんでした。更新してもう一度お試しください',
   'notification/permission-denied':
@@ -57,5 +60,5 @@ const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };
 const FALLBACK = 'エラーが発生しました。もう一度お試しください';
 
 export function resolveMessage(messageKey: string): string {
-  return ALL[messageKey] ?? FALLBACK;
+  return t(ALL[messageKey] ?? FALLBACK);
 }

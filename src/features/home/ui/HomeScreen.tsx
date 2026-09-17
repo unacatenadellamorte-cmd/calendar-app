@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
@@ -11,12 +12,12 @@ import { useFeaturedCount } from '@/features/compact/model/featuredCount';
 import { useFeaturedEvents } from '@/features/compact/model/useFeaturedEvents';
 import { CompactCard } from '@/features/compact/ui/CompactCard';
 import { PayCard } from '@/features/pay/ui/PayCard';
-
 /**
  * ホーム。この後の代表予定を優先度順で出すコンパクトビュー。
  * 給料見込みカードは Epic 4 でこの下に追加する。
  */
 export function HomeScreen() {
+  useLanguage();
   const { state } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
@@ -34,7 +35,6 @@ export function HomeScreen() {
     () => new Map(cal.calendars.map((c) => [c.id, c])),
     [cal.calendars],
   );
-
   const openDay = (event: EventItem) => {
     const date = event.allDay
       ? event.eventDate
@@ -43,18 +43,17 @@ export function HomeScreen() {
         : null;
     if (date) navigate(`/calendar?date=${date}`);
   };
-
   return (
     <Screen
-      title="今日"
+      title={t('今日')}
       action={
         <Link to="/calendars" className="text-meta text-accent">
-          カレンダーの並び順 ›
+          {t('カレンダーの並び順 ›')}
         </Link>
       }
     >
       {ev.loading || cal.loading ? (
-        <p className="text-meta text-ink-secondary">読み込み中…</p>
+        <p className="text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : (
         <>
           <CompactCard featured={featured} calendarById={calendarById} onSelect={openDay} />

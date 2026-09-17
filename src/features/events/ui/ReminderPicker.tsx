@@ -1,7 +1,7 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useState } from 'react';
 import { resolveMessage } from '@/data/messages';
 import { requestNotificationPermission } from '@/platform/reminders';
-
 /**
  * リマインダー設定の小さい共有UI(Story 5.4)。`EventFormSheet`/`EventDetailSheet` の
  * 両方から使う。プリセット(10分/30分/1時間前)+ カスタム分数 + 「リマインダーなし」。
@@ -13,35 +13,48 @@ import { requestNotificationPermission } from '@/platform/reminders';
  * `onChange` は呼ぶ ── DB への保存は通知の可否と独立して常に成功させる
  * (spec I/O Matrix「通知権限が無い」行)。
  */
-
-const PRESETS: { label: string; minutes: number }[] = [
-  { label: '10分前', minutes: 10 },
-  { label: '30分前', minutes: 30 },
-  { label: '1時間前', minutes: 60 },
+const PRESETS: {
+  label: string;
+  minutes: number;
+}[] = [
+  {
+    get label() {
+      return t('10分前');
+    },
+    minutes: 10,
+  },
+  {
+    get label() {
+      return t('30分前');
+    },
+    minutes: 30,
+  },
+  {
+    get label() {
+      return t('1時間前');
+    },
+    minutes: 60,
+  },
 ];
-
 /** `data/events.ts` の `REMINDER_MINUTES_MAX`(DB の CHECK 制約)と同じ値。UI側の二重防御。 */
 const REMINDER_MINUTES_MAX = 10080;
-
 interface ReminderPickerProps {
   /** 現在のリマインダー(分)。未設定は null。 */
   value: number | null;
   onChange: (minutes: number | null) => Promise<boolean>;
 }
-
 export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
+  useLanguage();
   const [selected, setSelected] = useState<number | null>(value);
   const [customValue, setCustomValue] = useState('');
   const [warningKey, setWarningKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
   useEffect(() => {
     setSelected(value);
     setCustomValue(
       value !== null && !PRESETS.some((p) => p.minutes === value) ? String(value) : '',
     );
   }, [value]);
-
   const apply = async (minutes: number | null) => {
     setSaving(true);
     setWarningKey(null);
@@ -60,16 +73,14 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
     if (!ok) setSelected(prev);
     setSaving(false);
   };
-
   const customInvalid =
     customValue.trim() !== '' &&
     (!Number.isFinite(Number(customValue)) ||
       Number(customValue) < 0 ||
       Number(customValue) > REMINDER_MINUTES_MAX);
-
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-meta text-ink-secondary">リマインダー</span>
+      <span className="text-meta text-ink-secondary">{t('リマインダー')}</span>
       <div className="flex flex-wrap gap-2">
         {PRESETS.map((p) => (
           <button
@@ -93,12 +104,12 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
           onClick={() => void apply(null)}
           className="min-h-11 rounded-sm border border-border-hairline px-3 text-body text-ink-secondary disabled:opacity-60"
         >
-          リマインダーなし
+          {t('リマインダーなし')}
         </button>
       </div>
 
       <label className="flex items-center gap-2">
-        <span className="text-meta text-ink-secondary">カスタム(分)</span>
+        <span className="text-meta text-ink-secondary">{t('カスタム(分)')}</span>
         <input
           type="number"
           min={0}
@@ -113,7 +124,7 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
           onClick={() => void apply(Math.floor(Number(customValue)))}
           className="min-h-11 rounded-sm border border-border-hairline px-3 text-body text-accent disabled:opacity-60"
         >
-          設定
+          {t('設定')}
         </button>
       </label>
 

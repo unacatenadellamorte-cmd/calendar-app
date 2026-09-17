@@ -1,8 +1,8 @@
+import { t, useLanguage } from '@/i18n';
 import type { CSSProperties } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { formatClock } from '@/lib/datetime';
-
 interface EventChipProps {
   event: EventItem;
   calendar: Calendar | undefined;
@@ -14,16 +14,22 @@ interface EventChipProps {
   /** 月表示では件名を優先し、時刻は読み上げと詳細だけに残す。 */
   showTime?: boolean;
 }
-
 /**
  * 予定チップ。カレンダーの色バー(色だけで意味を運ばないため name/time と併用)+ 時刻 + タイトル。
  * 月ビューと週ビューで共有する。
  */
-export function EventChip({ event, calendar, onTap, style, wrap = false, showTime = true }: EventChipProps) {
-  const time = event.allDay ? '終日' : event.startsAt ? formatClock(event.startsAt) : '';
+export function EventChip({
+  event,
+  calendar,
+  onTap,
+  style,
+  wrap = false,
+  showTime = true,
+}: EventChipProps) {
+  useLanguage();
+  const time = event.allDay ? t('終日') : event.startsAt ? formatClock(event.startsAt) : '';
   const color = calendar?.color ?? 'var(--color-ink-disabled)';
   const label = [time, event.title, calendar?.name].filter(Boolean).join(' ');
-
   return (
     <button
       type="button"
@@ -39,7 +45,9 @@ export function EventChip({ event, calendar, onTap, style, wrap = false, showTim
         'bg-surface-raised px-1.5 py-0.5 text-left text-meta text-ink-primary',
       ].join(' ')}
     >
-      {showTime && time && <span className="flex-none tabular text-ink-secondary">{time}</span>}
+      {showTime && time && (
+        <span className="flex-none tabular text-ink-secondary">{time}</span>
+      )}
       <span className={wrap ? 'min-w-0' : 'truncate'}>{event.title}</span>
     </button>
   );

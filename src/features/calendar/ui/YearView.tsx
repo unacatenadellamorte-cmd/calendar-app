@@ -1,9 +1,10 @@
+import { getLocale } from '@/i18n';
+import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useMemo } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { groupEventsByDay, makePriorityOf, monthGridDays, ymd } from '@/lib/calendar-view';
 import { formatMonthTitle } from '@/lib/datetime';
-
 interface YearViewProps {
   cursor: string;
   events: EventItem[];
@@ -14,10 +15,7 @@ interface YearViewProps {
   /** 日付セルタップ。その日を cursor にして月ビューへ。 */
   onDayTap: (date: string) => void;
 }
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
-
 /**
  * 年ビュー。cursor の年の1〜12月ぶん、既存の `monthGridDays`(日曜始まり)のミニグリッドを縦1列に並べる。
  * 予定は月ビューと同じ優先度規則で日ごとに1件へ代表させ、その色のドットだけを表示する
@@ -35,6 +33,7 @@ export function YearView({
   onMonthTap,
   onDayTap,
 }: YearViewProps) {
+  useLanguage();
   const { year } = ymd(cursor);
   // セル内の1件代表選抜は月ビューと同じ優先度順(Story 2.3 の規則を再利用、年ビュー独自ルールは作らない)。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
@@ -44,11 +43,10 @@ export function YearView({
     () => MONTHS.map((month) => ({ month, cells: monthGridDays(year, month, today) })),
     [year, today],
   );
-
   return (
     <div>
       <div className="grid grid-cols-7 text-center text-meta text-ink-secondary">
-        {WEEKDAYS.map((w) => (
+        {weekdayLabels().map((w) => (
           <div key={w} className="py-1">
             {w}
           </div>
@@ -58,7 +56,6 @@ export function YearView({
       <div className="flex flex-col gap-3">
         {monthsData.map(({ month, cells }) => {
           const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
-
           return (
             <div key={month}>
               <button
@@ -67,17 +64,19 @@ export function YearView({
                 aria-label={formatMonthTitle(monthStart)}
                 className="mb-1 text-body font-semibold text-ink-primary"
               >
-                {month}月
+                {new Intl.DateTimeFormat(getLocale(), { month: 'long' }).format(
+                  new Date(year, month - 1, 1),
+                )}
               </button>
 
               <div className="grid grid-cols-7 border-t border-l border-border-hairline">
                 {cells.map((cell) => {
                   const topEvent = byDay.get(cell.date)?.[0];
                   const dotColor = topEvent
-                    ? (calendarById.get(topEvent.calendarId)?.color ?? 'var(--color-ink-disabled)')
+                    ? (calendarById.get(topEvent.calendarId)?.color ??
+                      'var(--color-ink-disabled)')
                     : undefined;
                   const cellYmd = ymd(cell.date);
-
                   const dayNumber = (
                     <span
                       className={[
@@ -103,7 +102,6 @@ export function YearView({
                     'flex min-h-11 flex-col items-center justify-center gap-0.5 border-r border-b border-border-hairline',
                     cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
                   ].join(' ');
-
                   if (!cell.inMonth) {
                     // はみ出し日。実体(inMonth: true)は隣の月グリッドにある。見た目だけ維持し非インタラクティブに。
                     return (
@@ -113,13 +111,17 @@ export function YearView({
                       </div>
                     );
                   }
-
                   return (
                     <button
                       key={cell.date}
                       type="button"
                       onClick={() => onDayTap(cell.date)}
-                      aria-label={`${cellYmd.year}年${cellYmd.month}月${cellYmd.day}日を開く${topEvent ? '(予定あり)' : ''}`}
+                      aria-label={t('{0}年{1}月{2}日を開く{3}', [
+                        cellYmd.year,
+                        cellYmd.month,
+                        cellYmd.day,
+                        topEvent ? t('(予定あり)') : '',
+                      ])}
                       className={cellClassName}
                     >
                       {dayNumber}

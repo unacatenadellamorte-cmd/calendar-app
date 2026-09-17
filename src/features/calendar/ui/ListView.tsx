@@ -1,10 +1,10 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { groupEventsByDay, makePriorityOf } from '@/lib/calendar-view';
 import { formatDayTitle } from '@/lib/datetime';
 import { EventListItem } from '@/features/events/ui/EventListItem';
-
 interface ListViewProps {
   events: EventItem[];
   calendarById: Map<string, Calendar>;
@@ -13,15 +13,20 @@ interface ListViewProps {
   scrollTo: string;
   onEventTap: (event: EventItem) => void;
 }
-
 /** リストビュー。日ごとの見出し + その日の予定。`scrollTo` の日へ見出しをスクロールする。 */
-export function ListView({ events, calendarById, today, scrollTo, onEventTap }: ListViewProps) {
+export function ListView({
+  events,
+  calendarById,
+  today,
+  scrollTo,
+  onEventTap,
+}: ListViewProps) {
+  useLanguage();
   // 日内の並びは所属カレンダーの優先度順(Story 2.2)。未知は最下位相当。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
   const byDay = useMemo(() => groupEventsByDay(events, priorityOf), [events, priorityOf]);
   const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
   const headerRefs = useRef(new Map<string, HTMLElement>());
-
   useEffect(() => {
     const target = days.find((d) => d >= scrollTo);
     if (!target) return;
@@ -31,11 +36,9 @@ export function ListView({ events, calendarById, today, scrollTo, onEventTap }: 
       // jsdom は scrollIntoView 未実装。無視する。
     }
   }, [days, scrollTo]);
-
   if (days.length === 0) {
-    return <p className="text-meta text-ink-secondary">予定はありません</p>;
+    return <p className="text-meta text-ink-secondary">{t('予定はありません')}</p>;
   }
-
   return (
     <div className="flex flex-col gap-3">
       {days.map((date) => (

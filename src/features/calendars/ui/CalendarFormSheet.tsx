@@ -1,8 +1,8 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
 import type { Calendar } from '@/data/calendars';
-
 interface CalendarFormSheetProps {
   open: boolean;
   /** 編集対象。null なら新規作成。 */
@@ -13,7 +13,6 @@ interface CalendarFormSheetProps {
   onSubmit: (values: { name: string; color: string }) => Promise<boolean>;
   onDelete?: (calendar: Calendar) => void;
 }
-
 export function CalendarFormSheet({
   open,
   editing,
@@ -22,23 +21,21 @@ export function CalendarFormSheet({
   onSubmit,
   onDelete,
 }: CalendarFormSheetProps) {
+  useLanguage();
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(CALENDAR_COLORS[0]!.hex);
   const [submitting, setSubmitting] = useState(false);
-
   useEffect(() => {
     if (!open) return;
     setName(editing?.name ?? '');
     setColor(editing?.color ?? nextUnusedColor(usedColors));
     setSubmitting(false);
   }, [open, editing, usedColors]);
-
   const canDelete = Boolean(editing && !editing.isShift && onDelete);
-
   return (
     <BottomSheet
       open={open}
-      title={editing ? 'カレンダーを編集' : 'カレンダーを作成'}
+      title={editing ? t('カレンダーを編集') : t('カレンダーを作成')}
       onClose={onClose}
     >
       <form
@@ -53,7 +50,7 @@ export function CalendarFormSheet({
         }}
       >
         <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">名前</span>
+          <span className="text-meta text-ink-secondary">{t('名前')}</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -64,13 +61,13 @@ export function CalendarFormSheet({
         </label>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="text-meta text-ink-secondary">色</legend>
+          <legend className="text-meta text-ink-secondary">{t('色')}</legend>
           <div className="flex flex-wrap gap-2">
             {CALENDAR_COLORS.map((c) => (
               <button
                 key={c.id}
                 type="button"
-                aria-label={c.name}
+                aria-label={t(c.name)}
                 aria-pressed={color === c.hex}
                 onClick={() => setColor(c.hex)}
                 className={[
@@ -88,7 +85,7 @@ export function CalendarFormSheet({
           disabled={submitting}
           className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
         >
-          {submitting ? '保存中…' : '保存'}
+          {submitting ? t('保存中…') : t('保存')}
         </button>
 
         {canDelete && editing && (
@@ -97,7 +94,7 @@ export function CalendarFormSheet({
             onClick={() => onDelete?.(editing)}
             className="min-h-11 text-meta text-danger"
           >
-            このカレンダーを削除
+            {t('このカレンダーを削除')}
           </button>
         )}
       </form>

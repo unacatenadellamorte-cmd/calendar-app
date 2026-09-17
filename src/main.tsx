@@ -1,3 +1,4 @@
+import { initLanguage } from '@/i18n';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -13,6 +14,7 @@ import '@/data/supabase';
 import './styles/global.css';
 
 // 保存済みのテーマ選択を、最初のレンダリング前に DOM へ反映する。
+initLanguage();
 initTheme();
 void initBackground();
 

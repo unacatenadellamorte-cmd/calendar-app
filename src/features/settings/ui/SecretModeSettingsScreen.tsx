@@ -1,8 +1,8 @@
+import { t, useLanguage } from '@/i18n';
 import { useState } from 'react';
 import { Screen } from '@/ui/Screen';
 import { resolveMessage } from '@/data/messages';
 import { useSecretMode } from '@/app/secret-mode-context';
-
 /**
  * シークレットモードの設定画面(タブ外、spec-secret-mode)。
  * `hasPasscode===false` ならまずパスコード設定フォームだけを出す(解除トグルは出さない、
@@ -14,29 +14,26 @@ import { useSecretMode } from '@/app/secret-mode-context';
  * 真実源は `useSecretMode()`(AppShell の `SecretModeProvider` 配下)。
  */
 export function SecretModeSettingsScreen() {
+  useLanguage();
   const { hasPasscode, unlocked, errorKey, unlock, lock, setPasscode, dismissError } =
     useSecretMode();
-
   // 初回パスコード設定用(hasPasscode===false のときだけ使う)。
   const [setupInput, setSetupInput] = useState('');
   const [setupSubmitting, setSetupSubmitting] = useState(false);
-
   // 「解除する」入力欄 / 「パスコードを変更」フォームは排他(同時に2つ出さない)。
   const [activeForm, setActiveForm] = useState<'none' | 'unlock' | 'change'>('none');
   const [formInput, setFormInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
   const closeForm = () => {
     setActiveForm('none');
     setFormInput('');
     dismissError();
   };
-
   if (!hasPasscode) {
     return (
-      <Screen title="シークレットモード">
+      <Screen title={t('シークレットモード')}>
         <p className="text-meta text-ink-secondary">
-          見せたくない予定を隠せます。まずロック解除用のパスコードを設定してください。
+          {t('見せたくない予定を隠せます。まずロック解除用のパスコードを設定してください。')}
         </p>
         <form
           className="mt-4 flex flex-col gap-3"
@@ -50,10 +47,14 @@ export function SecretModeSettingsScreen() {
           }}
         >
           <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-secondary">パスコード(4〜8文字の半角英数字)</span>
+            <span className="text-meta text-ink-secondary">
+              {t('パスコード(4〜8文字の半角英数字)')}
+            </span>
             <input
               type="password"
-              inputMode="text" autoCapitalize="none" autoCorrect="off"
+              inputMode="text"
+              autoCapitalize="none"
+              autoCorrect="off"
               autoComplete="off"
               maxLength={8}
               value={setupInput}
@@ -76,18 +77,17 @@ export function SecretModeSettingsScreen() {
             disabled={setupSubmitting || setupInput.trim() === ''}
             className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
           >
-            {setupSubmitting ? '設定中…' : 'パスコードを設定する'}
+            {setupSubmitting ? t('設定中…') : t('パスコードを設定する')}
           </button>
         </form>
       </Screen>
     );
   }
-
   return (
-    <Screen title="シークレットモード">
+    <Screen title={t('シークレットモード')}>
       <section aria-labelledby="secret-mode-heading">
         <h2 id="secret-mode-heading" className="text-body font-semibold text-ink-primary">
-          表示
+          {t('表示')}
         </h2>
         <div
           role="radiogroup"
@@ -111,7 +111,7 @@ export function SecretModeSettingsScreen() {
               !unlocked ? 'text-accent' : 'text-ink-primary',
             ].join(' ')}
           >
-            <span>ロック中(隠す)</span>
+            <span>{t('ロック中(隠す)')}</span>
             {!unlocked && <span aria-hidden="true">✓</span>}
           </button>
           <button
@@ -131,7 +131,7 @@ export function SecretModeSettingsScreen() {
               unlocked ? 'text-accent' : 'text-ink-primary',
             ].join(' ')}
           >
-            <span>解除中(表示)</span>
+            <span>{t('解除中(表示)')}</span>
             {unlocked && <span aria-hidden="true">✓</span>}
           </button>
         </div>
@@ -151,10 +151,12 @@ export function SecretModeSettingsScreen() {
             }}
           >
             <label className="flex flex-col gap-1">
-              <span className="text-meta text-ink-secondary">パスコード</span>
+              <span className="text-meta text-ink-secondary">{t('パスコード')}</span>
               <input
                 type="password"
-                inputMode="text" autoCapitalize="none" autoCorrect="off"
+                inputMode="text"
+                autoCapitalize="none"
+                autoCorrect="off"
                 autoComplete="off"
                 maxLength={8}
                 value={formInput}
@@ -168,14 +170,14 @@ export function SecretModeSettingsScreen() {
                 disabled={submitting || formInput.trim() === ''}
                 className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
               >
-                {submitting ? '確認中…' : '解除する'}
+                {submitting ? t('確認中…') : t('解除する')}
               </button>
               <button
                 type="button"
                 onClick={closeForm}
                 className="min-h-11 px-4 text-body text-ink-secondary"
               >
-                キャンセル
+                {t('キャンセル')}
               </button>
             </div>
           </form>
@@ -200,7 +202,7 @@ export function SecretModeSettingsScreen() {
               }}
               className="min-h-11 text-body text-accent"
             >
-              パスコードを変更
+              {t('パスコードを変更')}
             </button>
           ) : (
             <form
@@ -219,11 +221,13 @@ export function SecretModeSettingsScreen() {
             >
               <label className="flex flex-col gap-1">
                 <span className="text-meta text-ink-secondary">
-                  新しいパスコード(4〜8文字の半角英数字)
+                  {t('新しいパスコード(4〜8文字の半角英数字)')}
                 </span>
                 <input
                   type="password"
-                  inputMode="text" autoCapitalize="none" autoCorrect="off"
+                  inputMode="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   autoComplete="off"
                   maxLength={8}
                   value={formInput}
@@ -244,14 +248,14 @@ export function SecretModeSettingsScreen() {
                   disabled={submitting || formInput.trim() === ''}
                   className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
                 >
-                  {submitting ? '保存中…' : '保存する'}
+                  {submitting ? t('保存中…') : t('保存する')}
                 </button>
                 <button
                   type="button"
                   onClick={closeForm}
                   className="min-h-11 px-4 text-body text-ink-secondary"
                 >
-                  キャンセル
+                  {t('キャンセル')}
                 </button>
               </div>
             </form>

@@ -1,9 +1,9 @@
+import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
 import { EventChip } from './EventChip';
-
 interface MonthViewProps {
   cursor: string;
   /** 日付("YYYY-MM-DD")→ その日の予定(優先度順)。呼び出し元(`CalendarScreen`)で計算済みのものを渡す。 */
@@ -26,10 +26,7 @@ interface MonthViewProps {
   /** 右スワイプ(前月へ)。 */
   onSwipeRight?: () => void;
 }
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const MAX_CHIPS = 3;
-
 /** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
 export function MonthView({
   cursor,
@@ -44,6 +41,7 @@ export function MonthView({
   onSwipeLeft,
   onSwipeRight,
 }: MonthViewProps) {
+  useLanguage();
   const { year, month } = ymd(cursor);
   const allCells = useMemo(() => monthGridDays(year, month, today), [year, month, today]);
   const weekCells: DayCell[] | null = useMemo(
@@ -55,11 +53,16 @@ export function MonthView({
   // ここでの防御を残すことで、そのクリアが反映されるまでの1フレームも壊れた表示にしない。)
   const isCollapsed = Boolean(weekCells && weekCells.length > 0);
   const cells = isCollapsed ? (weekCells as DayCell[]) : allCells;
-
   // スワイプ検出
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartRef = useRef<{
+    x: number;
+    y: number;
+  } | null>(null);
   const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdStartRef = useRef<{ x: number; y: number } | null>(null);
+  const holdStartRef = useRef<{
+    x: number;
+    y: number;
+  } | null>(null);
   const suppressClickRef = useRef(false);
   const cancelHold = () => {
     if (holdRef.current !== null) clearTimeout(holdRef.current);
@@ -76,7 +79,9 @@ export function MonthView({
       event.preventDefault();
       event.stopImmediatePropagation();
     };
-    const reset = () => { suppressClickRef.current = false; };
+    const reset = () => {
+      suppressClickRef.current = false;
+    };
     document.addEventListener('click', suppressClick, true);
     document.addEventListener('pointerdown', reset, true);
     document.addEventListener('keydown', reset, true);
@@ -86,7 +91,6 @@ export function MonthView({
       document.removeEventListener('keydown', reset, true);
     };
   }, []);
-
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 1) {
       touchStartRef.current = null;
@@ -96,7 +100,6 @@ export function MonthView({
     if (!touch) return;
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   };
-
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
     const touch = e.changedTouches[0];
@@ -104,7 +107,6 @@ export function MonthView({
     const deltaX = touch.clientX - touchStartRef.current.x;
     const deltaY = touch.clientY - touchStartRef.current.y;
     touchStartRef.current = null;
-
     // 横方向の移動が縦方向より大きく、かつ50px以上の場合を月送りと判定
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
       if (deltaX > 0) {
@@ -116,15 +118,13 @@ export function MonthView({
       }
     }
   };
-
   const handleTouchCancel = () => {
     touchStartRef.current = null;
   };
-
   return (
     <div>
       <div className="grid grid-cols-7 text-center text-meta text-ink-secondary">
-        {WEEKDAYS.map((w) => (
+        {weekdayLabels().map((w) => (
           <div key={w} className="py-1">
             {w}
           </div>
@@ -132,12 +132,8 @@ export function MonthView({
       </div>
 
       {isCollapsed && (
-        <button
-          type="button"
-          onClick={onBackToMonth}
-          className="mb-1 text-meta text-accent"
-        >
-          月表示に戻る
+        <button type="button" onClick={onBackToMonth} className="mb-1 text-meta text-accent">
+          {t('月表示に戻る')}
         </button>
       )}
 
@@ -153,7 +149,6 @@ export function MonthView({
           const dayEvents = byDay.get(cell.date) ?? [];
           const shown = dayEvents.slice(0, MAX_CHIPS);
           const overflow = dayEvents.length - shown.length;
-
           return (
             <div
               key={cell.date}
@@ -172,7 +167,10 @@ export function MonthView({
               }}
               onPointerMove={(event) => {
                 const start = holdStartRef.current;
-                if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) {
+                if (
+                  start &&
+                  Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10
+                ) {
                   cancelHold();
                   suppressClickRef.current = true;
                 }
@@ -213,7 +211,7 @@ export function MonthView({
                   e.stopPropagation();
                   onDayDoubleTap(cell.date);
                 }}
-                aria-label={`${ymd(cell.date).month}月${cell.day}日を開く`}
+                aria-label={t('{0}月{1}日を開く', [ymd(cell.date).month, cell.day])}
                 className={[
                   // touch-manipulation: iOS Safari 等でダブルタップがブラウザのズームジェスチャーと
                   // 衝突しないよう、このボタン上ではダブルタップジェスチャーをズームに回さない。
@@ -247,7 +245,7 @@ export function MonthView({
                   }}
                   className="self-start px-1 text-meta text-ink-secondary"
                 >
-                  他 {overflow} 件
+                  {t('他 {0} 件', [overflow])}
                 </button>
               )}
             </div>

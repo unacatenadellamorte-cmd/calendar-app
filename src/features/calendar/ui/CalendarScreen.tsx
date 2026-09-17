@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
@@ -27,20 +28,19 @@ import { ListView } from './ListView';
 import { YearView } from './YearView';
 import { DayEventPanel } from './DayEventPanel';
 import { MonthShiftTiles } from './MonthShiftTiles';
-
 interface CalendarScreenProps {
   /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
   initialDate?: string;
   /** ディープリンク(`calendar-app://event/{id}`)由来の「この予定を開く」指定。 */
   initialEventId?: string;
 }
-
 /**
  * カレンダー画面。月 / 日(cursor当日の1日タイムライン、内部値は 'week') / リスト / 年の4ビューと日付ナビ。
  * 表示オンのカレンダーの予定だけを描画し、日セル / 空きスロットのタップで追加、
  * チップのタップで編集につなぐ。
  */
 export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenProps = {}) {
+  useLanguage();
   const { state } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
@@ -55,20 +55,17 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
     useCalendarView(unlockedEvents, cal.calendars, initialDate);
   const today = todayLocalDate();
-
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<EventItem | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
   const [seed, setSeed] = useState<EventSeed | undefined>(undefined);
   // 月表示: タップした日(選択中)。折りたたみ(その週1行、Option C)+ 下のパネル表示を兼ねる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-
   useEffect(() => {
     // 入力・詳細レイヤーが開いている間は、そのレイヤーの戻る処理を優先する。
     if (!selectedDay || view !== 'month' || sheetOpen || detailEvent) return;
     return registerLayerBack(() => setSelectedDay(null));
   }, [selectedDay, view, sheetOpen, detailEvent]);
-
   const calendarById = useMemo(
     () => new Map(cal.calendars.map((c) => [c.id, c])),
     [cal.calendars],
@@ -80,7 +77,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     () => groupEventsByDay(visibleEvents, priorityOf),
     [visibleEvents, priorityOf],
   );
-
   const openCreate = (nextSeed?: EventSeed) => {
     setEditing(null);
     setSeed(nextSeed);
@@ -101,7 +97,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     jumpTo(date);
     setView('month');
   };
-
   // 短いタップは週と当日の一覧、長押しはその日の新規入力を直接開く。
   const openDayPanel = (date: string) => {
     jumpTo(date);
@@ -120,7 +115,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     jumpTo(date);
     setView('week');
   };
-
   // selectedDay(折りたたみ状態)の妥当性を、月送り・ビュー切替・年→月ドリルダウン等の
   // あらゆる画面状態変化のあとに一律で再評価する(個別の遷移経路をそれぞれ塞がない)。
   // 月ビューでなくなった、または selectedDay が現在の cursor の月グリッドに
@@ -135,7 +129,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     const stillInGrid = weekRowOf(monthGridDays(year, month, today), selectedDay).length > 0;
     if (!stillInGrid) setSelectedDay(null);
   }, [view, cursor, today, selectedDay]);
-
   // ディープリンク(`calendar-app://event/{id}`)由来。auth 解決(enabled)・ev/cal のロード完了後に
   // 該当予定を探して openEdit を呼ぶ。見つからなければ何もしない(静かにフォールバック、AD-16)。
   // ラッチは「最後に処理した initialEventId」を保持し、値が変わったら再度処理できるようにする。
@@ -149,22 +142,19 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     if (target) openEdit(target);
     // openEdit は毎レンダー再生成される関数だが、initialEventId/enabled/ev/cal の変化にのみ追従すればよい。
   }, [initialEventId, enabled, ev.loading, unlockedEvents, cal.loading]);
-
   if (state === 'unavailable') {
     return (
-      <Screen title="カレンダー">
+      <Screen title={t('カレンダー')}>
         <p className="text-body text-ink-secondary">
-          Supabase を設定すると、予定を作成・表示できます。
+          {t('Supabase を設定すると、予定を作成・表示できます。')}
         </p>
       </Screen>
     );
   }
-
   const loading = ev.loading || cal.loading;
-
   return (
     <Screen
-      title="カレンダー"
+      title={t('カレンダー')}
       action={
         <div className="flex items-center gap-3">
           <button
@@ -172,10 +162,10 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
             onClick={() => navigate('/shifts/add')}
             className="text-meta text-accent"
           >
-            シフトを追加
+            {t('シフトを追加')}
           </button>
           <button type="button" onClick={() => openCreate()} className="text-meta text-accent">
-            予定を追加
+            {t('予定を追加')}
           </button>
         </div>
       }
@@ -200,7 +190,7 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
         >
           {resolveMessage(cal.errorKey)}
           <button type="button" onClick={cal.dismissError} className="text-accent">
-            閉じる
+            {t('閉じる')}
           </button>
         </p>
       )}
@@ -212,22 +202,22 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
         >
           {resolveMessage(ev.errorKey)}
           <button type="button" onClick={ev.dismissError} className="text-accent">
-            閉じる
+            {t('閉じる')}
           </button>
         </p>
       )}
 
       {ev.pendingDelete && (
         <p className="mb-3 flex items-center justify-between rounded-sm bg-surface-raised px-3 py-2 text-meta text-ink-secondary">
-          「{ev.pendingDelete.title}」を削除しました
+          {t('「{0}」を削除しました', [ev.pendingDelete.title])}
           <button type="button" onClick={() => void ev.undoDelete()} className="text-accent">
-            取り消す
+            {t('取り消す')}
           </button>
         </p>
       )}
 
       {loading ? (
-        <p className="mt-2 text-meta text-ink-secondary">読み込み中…</p>
+        <p className="mt-2 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : view === 'month' ? (
         <>
           <MonthView
@@ -253,8 +243,17 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
               onAddEvent={() => openCreate({ date: selectedDay })}
             />
           )}
-          {!selectedDay && <MonthShiftTiles date={cursor} calendars={cal.calendars} enabled={enabled} onCreated={ev.addLocal}
-            events={visibleEvents} onDateChange={jumpTo} onRemove={ev.remove} />}
+          {!selectedDay && (
+            <MonthShiftTiles
+              date={cursor}
+              calendars={cal.calendars}
+              enabled={enabled}
+              onCreated={ev.addLocal}
+              events={visibleEvents}
+              onDateChange={jumpTo}
+              onRemove={ev.remove}
+            />
+          )}
         </>
       ) : view === 'week' ? (
         <WeekView
@@ -289,7 +288,10 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
         editing={editing}
         seed={seed}
         calendars={cal.calendars}
-        onClose={() => { setSheetOpen(false); setSelectedDay(null); }}
+        onClose={() => {
+          setSheetOpen(false);
+          setSelectedDay(null);
+        }}
         onCreate={(input: NewEventInput) => ev.create(input)}
         onUpdate={(current, input) => ev.update(current, input)}
         onDelete={(event) => void ev.remove(event)}

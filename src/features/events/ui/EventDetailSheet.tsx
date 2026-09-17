@@ -1,9 +1,9 @@
+import { t, useLanguage } from '@/i18n';
 import { BottomSheet } from '@/ui/BottomSheet';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
 import { ReminderPicker } from './ReminderPicker';
-
 interface EventDetailSheetProps {
   /** null なら閉じている。 */
   event: EventItem | null;
@@ -12,7 +12,6 @@ interface EventDetailSheetProps {
   /** リマインダーを設定/解除する(Story 5.4)。source を問わず許可(FR20)。 */
   onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean>;
 }
-
 /**
  * 取り込んだ予定の読み取り専用詳細(Story 3.3 / 5.3)。
  * Google・端末カレンダーから取り込んだ予定は編集・削除できない(AD-2)。編集用の
@@ -25,6 +24,7 @@ export function EventDetailSheet({
   onClose,
   onSetReminder,
 }: EventDetailSheetProps) {
+  useLanguage();
   const when = (() => {
     if (!event) return '';
     if (event.allDay && event.eventDate) return formatEventDate(event.eventDate);
@@ -34,9 +34,8 @@ export function EventDetailSheet({
     }
     return '';
   })();
-
   return (
-    <BottomSheet open={event !== null} title="予定の詳細" onClose={onClose}>
+    <BottomSheet open={event !== null} title={t('予定の詳細')} onClose={onClose}>
       {event && (
         <div className="space-y-3">
           <p className="text-body font-semibold text-ink-primary">{event.title}</p>
@@ -49,7 +48,7 @@ export function EventDetailSheet({
               className="h-3 w-3 flex-none rounded-[3px]"
               style={{ backgroundColor: calendar?.color ?? 'var(--color-ink-disabled)' }}
             />
-            {calendar?.name ?? '不明なカレンダー'}
+            {calendar?.name ?? t('不明なカレンダー')}
           </p>
 
           {event.note && (
@@ -65,8 +64,8 @@ export function EventDetailSheet({
 
           <p className="border-t border-border-hairline pt-3 text-meta text-ink-secondary">
             {event.source === 'device'
-              ? 'この予定は端末のカレンダーから取り込んだものです。編集はできません。'
-              : 'この予定は Google カレンダーから取り込んだものです。編集はできません。'}
+              ? t('この予定は端末のカレンダーから取り込んだものです。編集はできません。')
+              : t('この予定は Google カレンダーから取り込んだものです。編集はできません。')}
           </p>
         </div>
       )}

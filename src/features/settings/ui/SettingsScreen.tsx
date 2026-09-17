@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import { BackgroundSection } from './BackgroundSection';
 import { themePalettes, type PaletteName } from '../model/themePalettes';
 import { Link } from 'react-router-dom';
@@ -12,28 +13,46 @@ import {
 import { AccountSection } from './AccountSection';
 import { DataSection } from './DataSection';
 import { ConnectionsSection } from '@/features/connections/ui/ConnectionsSection';
-
-const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: '端末に合わせる' },
-  { value: 'light', label: 'ライト' },
-  { value: 'dark', label: 'ダーク' },
-  ...Object.entries(themePalettes).map(([value, palette]) => ({ value: value as PaletteName, label: palette.label })),
+const THEME_OPTIONS: {
+  value: ThemePreference;
+  label: string;
+}[] = [
+  {
+    value: 'system',
+    get label() {
+      return t('端末に合わせる');
+    },
+  },
+  {
+    value: 'light',
+    get label() {
+      return t('ライト');
+    },
+  },
+  {
+    value: 'dark',
+    get label() {
+      return t('ダーク');
+    },
+  },
+  ...Object.entries(themePalettes).map(([value, palette]) => ({
+    value: value as PaletteName,
+    label: palette.label,
+  })),
 ];
-
 const FEATURED_COUNT_OPTIONS = Array.from(
   { length: FEATURED_COUNT_MAX - FEATURED_COUNT_MIN + 1 },
   (_, i) => FEATURED_COUNT_MIN + i,
 );
-
 export function SettingsScreen() {
+  useLanguage();
   const { theme, setTheme } = useTheme();
   const featuredCount = useFeaturedCount();
-
   return (
-    <Screen title="設定">
+    <Screen title={t('設定')}>
       <section aria-labelledby="theme-heading" className="mt-2">
         <h2 id="theme-heading" className="text-body font-semibold text-ink-primary">
-          テーマ
+          {t('テーマ')}
         </h2>
         <div
           role="radiogroup"
@@ -57,11 +76,22 @@ export function SettingsScreen() {
               >
                 <span className="flex items-center gap-3">
                   <span aria-hidden="true" className="flex gap-1">
-                    {(opt.value in themePalettes ? themePalettes[opt.value as PaletteName].colors.slice(0, 3).concat([themePalettes[opt.value as PaletteName].colors[6]]) : opt.value === 'dark' ? ['#16181c', '#6aa0ff', '#e6e8eb'] : ['#ffffff', '#2563eb', '#eaf1ff']).map((color, index) => (
-                      <span key={index} className="h-4 w-4 rounded-full border border-border-hairline" style={{ backgroundColor: color }} />
+                    {(opt.value in themePalettes
+                      ? themePalettes[opt.value as PaletteName].colors
+                          .slice(0, 3)
+                          .concat([themePalettes[opt.value as PaletteName].colors[6]])
+                      : opt.value === 'dark'
+                        ? ['#16181c', '#6aa0ff', '#e6e8eb']
+                        : ['#ffffff', '#2563eb', '#eaf1ff']
+                    ).map((color, index) => (
+                      <span
+                        key={index}
+                        className="h-4 w-4 rounded-full border border-border-hairline"
+                        style={{ backgroundColor: color }}
+                      />
                     ))}
                   </span>
-                  {opt.label}
+                  {t(opt.label)}
                 </span>
                 {selected && <span aria-hidden="true">✓</span>}
               </button>
@@ -74,10 +104,10 @@ export function SettingsScreen() {
 
       <section aria-labelledby="featured-count-heading" className="mt-6">
         <h2 id="featured-count-heading" className="text-body font-semibold text-ink-primary">
-          ホームに出す予定の数
+          {t('ホームに出す予定の数')}
         </h2>
         <p className="mt-1 text-meta text-ink-secondary">
-          コンパクトビューに表示する、この後の代表予定の件数
+          {t('コンパクトビューに表示する、この後の代表予定の件数')}
         </p>
         <div
           role="radiogroup"
@@ -99,7 +129,7 @@ export function SettingsScreen() {
                   selected ? 'text-accent' : 'text-ink-primary',
                 ].join(' ')}
               >
-                <span>{n} 件</span>
+                <span>{t('{0} 件', [n])}</span>
                 {selected && <span aria-hidden="true">✓</span>}
               </button>
             );
@@ -116,7 +146,7 @@ export function SettingsScreen() {
           to="/profile"
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >
-          プロフィール
+          {t('プロフィール')}
           <span aria-hidden="true" className="text-ink-secondary">
             ›
           </span>
@@ -125,7 +155,7 @@ export function SettingsScreen() {
           to="/calendars"
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >
-          カレンダー管理
+          {t('カレンダー管理')}
           <span aria-hidden="true" className="text-ink-secondary">
             ›
           </span>
@@ -134,7 +164,7 @@ export function SettingsScreen() {
           to="/shift-templates"
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >
-          お気に入りシフト
+          {t('お気に入りシフト')}
           <span aria-hidden="true" className="text-ink-secondary">
             ›
           </span>
@@ -143,7 +173,7 @@ export function SettingsScreen() {
           to="/secret-mode"
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >
-          シークレットモード
+          {t('シークレットモード')}
           <span aria-hidden="true" className="text-ink-secondary">
             ›
           </span>

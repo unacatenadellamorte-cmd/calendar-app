@@ -1,3 +1,4 @@
+import { t } from '@/i18n';
 import type { AuthError } from '@supabase/supabase-js';
 import { appError, type AppError } from './result';
 
@@ -19,7 +20,7 @@ export const AUTH_MESSAGES: Record<string, string> = {
 
 /** messageKey を日本語文言に解決する。未知のキーは汎用文言。 */
 export function authMessage(messageKey: string): string {
-  return AUTH_MESSAGES[messageKey] ?? AUTH_MESSAGES['auth/unknown']!;
+  return t(AUTH_MESSAGES[messageKey] ?? AUTH_MESSAGES['auth/unknown']!);
 }
 
 /** Supabase の AuthError を AppError に正規化する。 */

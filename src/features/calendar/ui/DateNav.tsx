@@ -1,7 +1,7 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { ViewMode } from '@/features/calendar/model/useCalendarView';
 import { formatDayTitle, formatMonthTitle, formatYearTitle } from '@/lib/datetime';
-
 interface DateNavProps {
   view: ViewMode;
   cursor: string;
@@ -10,12 +10,12 @@ interface DateNavProps {
   onToday: () => void;
   onJump: (date: string) => void;
 }
-
 /**
  * 日付ナビ。`‹` `今日` `›` と、見出しタップで開く日付ジャンプ。
  * list ビューは前後ボタンを出さない(連続スクロールのため)。
  */
 export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateNavProps) {
+  useLanguage();
   const [jumpOpen, setJumpOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const stepping = view !== 'list';
@@ -26,18 +26,16 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
       : view === 'year'
         ? formatYearTitle(cursor)
         : formatMonthTitle(cursor);
-
   useEffect(() => {
     if (jumpOpen) inputRef.current?.focus();
   }, [jumpOpen]);
-
   return (
     <div className="mb-3 flex items-center gap-2">
       {stepping && (
         <button
           type="button"
           onClick={onPrev}
-          aria-label="前へ"
+          aria-label={t('前へ')}
           className="min-h-11 min-w-11 text-ink-secondary"
         >
           ‹
@@ -59,7 +57,7 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
           <input
             ref={inputRef}
             type="date"
-            aria-label="日付を移動"
+            aria-label={t('日付を移動')}
             value={cursor}
             onChange={(e) => {
               if (e.target.value) {
@@ -77,14 +75,14 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
         onClick={onToday}
         className="min-h-11 rounded-sm border border-border-hairline px-3 text-meta text-ink-secondary"
       >
-        今日
+        {t('今日')}
       </button>
 
       {stepping && (
         <button
           type="button"
           onClick={onNext}
-          aria-label="次へ"
+          aria-label={t('次へ')}
           className="min-h-11 min-w-11 text-ink-secondary"
         >
           ›

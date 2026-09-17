@@ -1,3 +1,4 @@
+import { getLocale, useLanguage } from '@/i18n';
 import { useCallback, useMemo, useState } from 'react';
 import { monthlyPayEstimate, type PayableShift } from '@core';
 import type { EventItem } from '@/data/events';
@@ -26,6 +27,7 @@ export interface PayEstimate {
 }
 
 export function usePayEstimate(events: EventItem[], calendars: Calendar[]): PayEstimate {
+  const language = useLanguage();
   const [monthOffset, setMonthOffset] = useState(0);
 
   const prev = useCallback(() => setMonthOffset((n) => n - 1), []);
@@ -39,9 +41,7 @@ export function usePayEstimate(events: EventItem[], calendars: Calendar[]): PayE
     const { year, month } = ymd(monthStart);
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
 
-    const shiftCalendarIds = new Set(
-      calendars.filter((c) => c.isShift).map((c) => c.id),
-    );
+    const shiftCalendarIds = new Set(calendars.filter((c) => c.isShift).map((c) => c.id));
 
     const shifts = events
       .filter(
@@ -65,11 +65,13 @@ export function usePayEstimate(events: EventItem[], calendars: Calendar[]): PayE
     return {
       amount,
       shiftCount,
-      monthLabel: `${month}月`,
+      monthLabel: new Intl.DateTimeFormat(getLocale(language), { month: 'long' }).format(
+        new Date(year, month - 1, 1),
+      ),
       shifts,
       prev,
       next,
       canNext: monthOffset < MAX_FUTURE_MONTHS,
     };
-  }, [events, calendars, monthOffset, prev, next]);
+  }, [events, calendars, monthOffset, prev, next, language]);
 }

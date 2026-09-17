@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
@@ -6,50 +7,47 @@ import { resolveMessage } from '@/data/messages';
 import { formatEventTime } from '@/lib/datetime';
 import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
 import { useGoogleCalendars } from '@/features/connections/model/useGoogleCalendars';
-
 /**
  * `/connections/google/calendars`(Story 3.2)。
  * 接続した Google アカウントのカレンダー候補を出し、取り込む対象を選ぶ。
  * オンにすると source='google' のカレンダーとして一覧・表示に加わる(予定同期は 3.3)。
  */
 export function GoogleCalendarPicker() {
+  useLanguage();
   const navigate = useNavigate();
   const { state } = useAuth();
   const connectionEnabled = env.hasSupabase && env.hasGoogleOauth && state === 'authenticated';
   const { connection, loading: connLoading } = useGoogleConnection(connectionEnabled);
   const enabled = connectionEnabled && !!connection;
-  const { choices, loading, refreshing, errorKey, refresh, toggle } = useGoogleCalendars(enabled);
-
+  const { choices, loading, refreshing, errorKey, refresh, toggle } =
+    useGoogleCalendars(enabled);
   if (connLoading) {
     return (
-      <Screen title="取り込むカレンダー">
-        <p className="mt-4 text-meta text-ink-secondary">読み込み中…</p>
+      <Screen title={t('取り込むカレンダー')}>
+        <p className="mt-4 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       </Screen>
     );
   }
-
   if (!enabled) {
     return (
-      <Screen title="取り込むカレンダー">
+      <Screen title={t('取り込むカレンダー')}>
         <div className="mt-4 rounded-md border border-border-hairline bg-surface-raised p-4">
-          <p className="text-body text-ink-primary">先に Google を接続してください</p>
+          <p className="text-body text-ink-primary">{t('先に Google を接続してください')}</p>
           <button
             type="button"
             onClick={() => navigate('/settings')}
             className="mt-3 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
           >
-            設定へ
+            {t('設定へ')}
           </button>
         </div>
       </Screen>
     );
   }
-
   const selectedCount = choices.filter((c) => c.selected).length;
-
   return (
     <Screen
-      title="取り込むカレンダー"
+      title={t('取り込むカレンダー')}
       action={
         <button
           type="button"
@@ -57,12 +55,14 @@ export function GoogleCalendarPicker() {
           disabled={refreshing}
           className="min-h-11 text-meta text-accent disabled:opacity-60"
         >
-          {refreshing ? '更新中…' : '更新'}
+          {refreshing ? t('更新中…') : t('更新')}
         </button>
       }
     >
       <p className="mt-1 text-meta text-ink-secondary">
-        オンにしたカレンダーの予定を読み取り専用で取り込みます。{selectedCount} 件選択中。
+        {t('オンにしたカレンダーの予定を読み取り専用で取り込みます。{0} 件選択中。', [
+          selectedCount,
+        ])}
       </p>
 
       {errorKey && (
@@ -72,10 +72,10 @@ export function GoogleCalendarPicker() {
       )}
 
       {loading ? (
-        <p className="mt-4 text-meta text-ink-secondary">読み込み中…</p>
+        <p className="mt-4 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : choices.length === 0 ? (
         <p className="mt-4 text-meta text-ink-secondary">
-          取り込めるカレンダーが見つかりませんでした。
+          {t('取り込めるカレンダーが見つかりませんでした。')}
         </p>
       ) : (
         <ul className="mt-3 overflow-hidden rounded-md border border-border-hairline bg-surface-raised">
@@ -91,7 +91,7 @@ export function GoogleCalendarPicker() {
                   style={{ backgroundColor: c.backgroundColor ?? '#7A7A7A' }}
                 />
                 <span className="flex-1 text-body text-ink-primary">
-                  {c.summary || 'Google カレンダー'}
+                  {c.summary || t('Google カレンダー')}
                 </span>
                 <input
                   type="checkbox"
@@ -103,10 +103,10 @@ export function GoogleCalendarPicker() {
               {c.selected && (
                 <p className="px-4 pb-2 pl-10 text-meta text-ink-secondary">
                   {c.lastError
-                    ? '前回は取り込めませんでした'
+                    ? t('前回は取り込めませんでした')
                     : c.lastSyncedAt
-                      ? `最終取り込み: ${formatEventTime(c.lastSyncedAt)}`
-                      : 'まだ取り込んでいません'}
+                      ? t('最終取り込み: {0}', [formatEventTime(c.lastSyncedAt)])
+                      : t('まだ取り込んでいません')}
                 </p>
               )}
             </li>

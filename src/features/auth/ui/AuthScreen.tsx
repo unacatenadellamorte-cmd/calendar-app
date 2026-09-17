@@ -1,14 +1,15 @@
+import { t, useLanguage } from '@/i18n';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { resolveMessage } from '@/data/messages';
 import { useAuthForm } from '@/features/auth/model/useAuthForm';
-
 /**
  * ログイン / アカウント作成画面(タブ外、設定から遷移)。
  * 匿名セッション中はサインアップが「登録(昇格)」になる。
  */
 export function AuthScreen() {
+  useLanguage();
   const { state } = useAuth();
   const navigate = useNavigate();
   const isGuest = state === 'guest';
@@ -16,25 +17,26 @@ export function AuthScreen() {
     isGuest,
     onSuccess: () => navigate('/settings'),
   });
-
   if (state === 'unavailable') {
     return (
-      <Screen title="アカウント">
+      <Screen title={t('アカウント')}>
         <p className="text-body text-ink-secondary">
-          ローカル開発では認証は無効です。Supabase を設定すると利用できます。
+          {t('ローカル開発では認証は無効です。Supabase を設定すると利用できます。')}
         </p>
       </Screen>
     );
   }
-
   const isSignup = form.mode === 'signup';
-  const submitLabel = isSignup ? (isGuest ? '登録する' : 'アカウントを作成') : 'ログイン';
-
+  const submitLabel = isSignup
+    ? isGuest
+      ? t('登録する')
+      : t('アカウントを作成')
+    : t('ログイン');
   return (
-    <Screen title={isSignup ? 'アカウントを作成' : 'ログイン'}>
+    <Screen title={isSignup ? t('アカウントを作成') : t('ログイン')}>
       {isGuest && isSignup && (
         <p className="mt-1 mb-4 text-meta text-ink-secondary">
-          いまのデータはそのまま引き継がれます。
+          {t('いまのデータはそのまま引き継がれます。')}
         </p>
       )}
 
@@ -46,7 +48,7 @@ export function AuthScreen() {
         }}
       >
         <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">メールアドレス</span>
+          <span className="text-meta text-ink-secondary">{t('メールアドレス')}</span>
           <input
             type="email"
             autoComplete="email"
@@ -59,7 +61,7 @@ export function AuthScreen() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">パスワード(6文字以上)</span>
+          <span className="text-meta text-ink-secondary">{t('パスワード(6文字以上)')}</span>
           <input
             type="password"
             autoComplete={isSignup ? 'new-password' : 'current-password'}
@@ -82,7 +84,7 @@ export function AuthScreen() {
           disabled={form.submitting}
           className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
         >
-          {form.submitting ? '処理中…' : submitLabel}
+          {form.submitting ? t('処理中…') : submitLabel}
         </button>
       </form>
 
@@ -91,7 +93,7 @@ export function AuthScreen() {
         onClick={() => setMode(isSignup ? 'signin' : 'signup')}
         className="mt-4 min-h-11 text-meta text-accent"
       >
-        {isSignup ? 'アカウントを持っている場合はログイン' : 'アカウントを作成する'}
+        {isSignup ? t('アカウントを持っている場合はログイン') : t('アカウントを作成する')}
       </button>
     </Screen>
   );
