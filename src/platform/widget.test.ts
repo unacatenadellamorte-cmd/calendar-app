@@ -202,12 +202,12 @@ describe('refreshFeaturedWidget', () => {
     expect(listEvents).toHaveBeenCalledTimes(1);
     expect(listCalendars).toHaveBeenCalledTimes(1);
     expect(setRegisteredWidgets).toHaveBeenCalledWith({
-      widgets: ['jp.ryo.calendarapp.widget.FeaturedEventsWidgetReceiver'],
+      widgets: ['jp.ryo.multicalendar.widget.FeaturedEventsWidgetReceiver'],
     });
     expect(setItem).toHaveBeenCalledTimes(1);
     const arg = setItem.mock.calls[0]![0];
     expect(arg.key).toBe('featuredEvents');
-    expect(arg.group).toBe('group.jp.ryo.calendarapp.widget');
+    expect(arg.group).toBe('group.jp.ryo.multicalendar.widget');
     expect(JSON.parse(arg.value)).toEqual([
       expect.objectContaining({ id: 'e1', schemaVersion: 1 }),
     ]);
@@ -246,7 +246,7 @@ describe('refreshFeaturedWidget', () => {
     expect(setRegisteredWidgets).not.toHaveBeenCalled();
     expect(setItem).toHaveBeenCalledWith({
       key: 'featuredEvents',
-      group: 'group.jp.ryo.calendarapp.widget',
+      group: 'group.jp.ryo.multicalendar.widget',
       value: expect.any(String),
     });
     expect(JSON.parse(setItem.mock.calls[0]![0].value)[0].id).toBe('ios-event');

@@ -39,7 +39,7 @@ end
 widget.build_configurations.each do |config|
   app_settings = app.build_configurations.find { |item| item.name == config.name }.build_settings
   config.build_settings.merge!({
-    'PRODUCT_BUNDLE_IDENTIFIER' => 'jp.ryo.calendarapp.FeaturedEventsWidget',
+    'PRODUCT_BUNDLE_IDENTIFIER' => 'jp.ryo.multicalendar.FeaturedEventsWidget',
     'PRODUCT_NAME' => '$(TARGET_NAME)',
     'SWIFT_VERSION' => '5.0',
     'IPHONEOS_DEPLOYMENT_TARGET' => '15.0',
@@ -59,7 +59,10 @@ widget.build_configurations.each do |config|
   end
 end
 
-app.build_configurations.each { |config| config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements' }
+app.build_configurations.each do |config|
+  config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements'
+  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'jp.ryo.multicalendar'
+end
 app_group = project.main_group.groups.find { |item| item.path == 'App' }
 abort 'Appグループが見つからない' unless app_group
 app_group.new_file('App.entitlements') unless app_group.files.any? { |item| item.path == 'App.entitlements' }

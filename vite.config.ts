@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/api/],
       },
       manifest: {
-        name: 'マルチカレンダー',
-        short_name: 'マルチカレンダー',
+        name: 'Multi calendar',
+        short_name: 'Multi calendar',
         description: '埋もれないカレンダー。優先度が表示に効く予定アプリ。',
         lang: 'ja',
         dir: 'ltr',

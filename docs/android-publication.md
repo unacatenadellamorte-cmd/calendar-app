@@ -9,7 +9,7 @@
 - 公開先: Google Play。開発者アカウントは未登録。
 - 開発者名: Ryo。
 - 公開問い合わせ先: una.catena.della.morte@gmail.com。
-- 現在の名前はマルチカレンダー、識別子は`jp.ryo.calendarapp`。ユーザーは名前または識別子の変更を希望しており、新しい値の回答待ち。Play Consoleのアプリ登録と署名済み提出物の作成は確定後に行う。
+- 2026-09-17ユーザー承認: 名前は「Multi calendar」、識別子は`jp.ryo.multicalendar`に確定。Android/iOSとApp Groupの設定を更新。
 - 現在のversionCodeは1、versionNameは1.0。アップロード済みのversionCodeは再使用しない。
 - targetSdk 36、minSdk 24。API 36は調査時点の新規提出要件を満たす。
 
@@ -50,7 +50,7 @@ Webビルド、Capacitor同期、Androidユニットテスト、release lint、A
 
 ## ストア掲載文の下書き
 
-アプリ名は回答待ち。
+アプリ名: Multi calendar。
 
 短い説明:
 

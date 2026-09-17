@@ -17,10 +17,10 @@ if (project.hasProperty('requireReleaseSigning') && !hasReleaseSigning) {
 }
 
 android {
-    namespace = "jp.ryo.calendarapp"
+    namespace = "jp.ryo.multicalendar"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "jp.ryo.calendarapp"
+        applicationId "jp.ryo.multicalendar"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

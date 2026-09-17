@@ -1,4 +1,4 @@
-package jp.ryo.calendarapp.widget
+package jp.ryo.multicalendar.widget
 
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp

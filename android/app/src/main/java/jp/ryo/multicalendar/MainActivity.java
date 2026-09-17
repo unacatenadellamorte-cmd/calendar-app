@@ -1,4 +1,4 @@
-package jp.ryo.calendarapp;
+package jp.ryo.multicalendar;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -24,7 +24,7 @@
 
             <!--
                 ディープリンク(ARCHITECTURE-SPINE Epic5 AD-16 / AD-18)。
-                スキーム calendar-app:// は jp.ryo.calendarapp から導出した暫定値。
+                スキーム calendar-app:// は識別子変更後も既存リンクとの互換性のため維持する。
                 calendar-app://event/{id} と calendar-app://day/{date} の2形式を受け付ける
                 (ホスト部は限定しない。形式の解釈は src/app/DeepLinkListener.tsx が行う)。
             -->

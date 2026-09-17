@@ -44,7 +44,7 @@ class WidgetTargetTest < Minitest::Test
         target.build_configurations.each do |config|
           ref = config.build_settings.fetch('CODE_SIGN_ENTITLEMENTS')
           plist = Xcodeproj::Plist.read_from_path(File.join(temp, ref))
-          assert_equal ['group.jp.ryo.calendarapp.widget'], plist['com.apple.security.application-groups']
+          assert_equal ['group.jp.ryo.multicalendar.widget'], plist['com.apple.security.application-groups']
         end
       end
       assert app.package_product_dependencies.any? { |product| product.product_name == 'CapApp-SPM' }, '既存SPM依存が消失'

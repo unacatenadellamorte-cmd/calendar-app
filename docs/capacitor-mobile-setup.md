@@ -8,7 +8,7 @@ Epic 5(スマホアプリ化)の基盤ストーリー(5.1)で `@capacitor/core` 
 
 ## 全体像
 
-- プロダクト識別子は暫定 `jp.ryo.calendarapp`(ARCHITECTURE-SPINE Epic5 AD-18)。
+- プロダクト識別子は `jp.ryo.multicalendar`(2026-09-17ユーザー確定)。
   `capacitor.config.ts` の `appId`、Android の `applicationId`/`namespace`
   (`android/app/build.gradle`)、iOS の `PRODUCT_BUNDLE_IDENTIFIER`
   (`ios/App/App.xcodeproj`)はすべてこの値で揃っている。
@@ -84,7 +84,7 @@ cd "$env:LOCALAPPDATA\Android\Sdk\emulator"
 
 # 4. インストールして起動(別ターミナルで)
 adb install -r android\app\build\outputs\apk\debug\app-debug.apk
-adb shell am start -W -n jp.ryo.calendarapp/.MainActivity
+adb shell am start -W -n jp.ryo.multicalendar/.MainActivity
 
 # 5. ディープリンクの動作確認(実装時に以下すべて実機/エミュレータで確認済み)
 adb shell am start -W -a android.intent.action.VIEW -d "calendar-app://day/2026-09-20"
@@ -128,7 +128,7 @@ npx cap sync android
 cd android
 .\gradlew.bat assembleDebug
 adb install -r android\app\build\outputs\apk\debug\app-debug.apk
-adb shell am start -W -n jp.ryo.calendarapp/.MainActivity
+adb shell am start -W -n jp.ryo.multicalendar/.MainActivity
 ```
 
 設定画面の「端末カレンダーを接続」をタップ → OS の権限ダイアログで許可 → 端末のカレンダー
@@ -153,7 +153,7 @@ WindowsでのWebテストだけではSwiftや署名を検証できない。macOS
 
 ## プロダクト識別子を変更するとき
 
-`jp.ryo.calendarapp` は暫定値(AD-18)。正式なプロダクト名が決まったら、以下を**同一 PR で同時に**変更する
+`jp.ryo.multicalendar` は2026-09-17の確定値。将来識別子を変更するときは、以下を**同一 PR で同時に**変更する
 (一部だけ変えると App Group やディープリンクの整合が壊れ、実機で静かに失敗する):
 
 - `capacitor.config.ts` の `appId`
@@ -161,4 +161,4 @@ WindowsでのWebテストだけではSwiftや署名を検証できない。macOS
 - `ios/App/App.xcodeproj` の `PRODUCT_BUNDLE_IDENTIFIER`(2箇所: Debug/Release)
 - `android/app/src/main/AndroidManifest.xml` の intent-filter(`android:scheme`)
 - `ios/App/App/Info.plist` の `CFBundleURLSchemes`
-- (5.2 以降で追加される)App Group ID `group.jp.ryo.calendarapp.widget`
+- (5.2 以降で追加される)App Group ID `group.jp.ryo.multicalendar.widget`

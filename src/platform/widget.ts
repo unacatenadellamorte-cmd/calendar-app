@@ -23,10 +23,10 @@ import { makePriorityOf } from '@/lib/calendar-view';
  * の冒頭で `Capacitor.isNativePlatform()` を確認し、ネイティブでなければ何もせず返す。
  */
 
-const WIDGET_GROUP = 'group.jp.ryo.calendarapp.widget';
+const WIDGET_GROUP = 'group.jp.ryo.multicalendar.widget';
 const WIDGET_ITEM_KEY = 'featuredEvents';
 /** `android/app/src/main/java/jp/ryo/calendarapp/widget/FeaturedEventsWidgetReceiver.kt` と同じ値。 */
-const WIDGET_RECEIVER_FQCN = 'jp.ryo.calendarapp.widget.FeaturedEventsWidgetReceiver';
+const WIDGET_RECEIVER_FQCN = 'jp.ryo.multicalendar.widget.FeaturedEventsWidgetReceiver';
 /** AD-12「常に上限3件を計算する」。ウィジェットの現在サイズでの実際の表示件数はネイティブ側が決める。 */
 const WIDGET_LIMIT = 3;
 

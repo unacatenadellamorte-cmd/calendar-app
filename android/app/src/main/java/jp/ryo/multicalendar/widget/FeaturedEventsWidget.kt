@@ -1,4 +1,4 @@
-package jp.ryo.calendarapp.widget
+package jp.ryo.multicalendar.widget
 
 import android.content.Context
 import android.content.Intent
@@ -58,7 +58,7 @@ class FeaturedEventsWidget : GlanceAppWidget() {
 }
 
 /** iOS App Group 識別子(AD-18)と同じ文字列。Android では SharedPreferences のファイル名として流用する。 */
-internal const val WIDGET_GROUP = "group.jp.ryo.calendarapp.widget"
+internal const val WIDGET_GROUP = "group.jp.ryo.multicalendar.widget"
 internal const val WIDGET_ITEM_KEY = "featuredEvents"
 private const val DEFAULT_COLOR_HEX = "#7A7A7A"
 

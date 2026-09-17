@@ -63,3 +63,9 @@ Androidのユニットテスト、release lint、bundleRelease、提出モード
 ## Review Triage Log
 
 メインセッションで差分と生成物を確認。独立レビューは未実施。OneDriveロックは外部生成先で回避。署名キー未設定で提出版を誤生成しないガードを確認。ユーザーは名前か識別子の変更を希望しており、確定値は回答待ち。
+
+## 2026-09-17 名称・識別子の確定
+
+ユーザー承認により表示名「Multi calendar」、識別子`jp.ryo.multicalendar`に確定。AndroidのJava/Kotlinパッケージとソース配置、iOS本体と拡張、App Group、JSブリッジ、PWA表示を揃えた。App Groupは`group.jp.ryo.multicalendar.widget`。既存ディープリンクの`calendar-app://`は維持する。
+
+Androidの12テスト、release lint、未署名AAB生成が成功。JSブリッジ14テストとRuby生成テスト2件22アサーション成功。iOSの設定同期済みだが、改名後のXcodeビルドは未実施。新AABのSHA256は`75289D15EECAC7E73305B29AC73A9389AA957EA944ECC07ED487AE1B7815A09E`。開発者登録・署名・審査提出と公開阻害事項は引き続き未完了。

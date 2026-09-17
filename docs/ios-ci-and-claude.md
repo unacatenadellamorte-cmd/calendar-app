@@ -29,7 +29,7 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App \
 `add-widget-target.rb`が`project.pbxproj`をxcodeprojライブラリ経由で更新し、
 ターゲット依存・拡張の埋め込み・両ターゲットのApp Groupsを設定する。
 再実行で差分が増えないことをテストする。プロジェクトファイルの手編集は不要。
-App Groupは`group.jp.ryo.calendarapp.widget`、キーは`featuredEvents`。
+App Groupは`group.jp.ryo.multicalendar.widget`、キーは`featuredEvents`。
 `npx cap sync ios`は現在の全プラグインをSPMへ登録するため必須。
 
 `.github/workflows/ios.yml`はPR、mainと作業ブランチへのpush、手動実行で動く。

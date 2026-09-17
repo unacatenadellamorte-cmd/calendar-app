@@ -1,15 +1,12 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * 表示名は「マルチカレンダー」に確定(2026-09-15、ユーザー決定)。
- * プロダクト識別子(`appId` = `jp.ryo.calendarapp`)・App Group ID・ディープリンクスキーム
- * (`calendar-app`, AD-16)は ARCHITECTURE-SPINE Epic5 AD-18 のとおり暫定のまま
- * ── 変更するとアプリの再インストール扱いになる等の影響があるため、表示名とは別に
- * 明示的な決定が要る(この3箇所を変えるときは同一 PR で同時に変更する)。
+ * 2026-09-17のユーザー決定: 表示名は「Multi calendar」、識別子は jp.ryo.multicalendar。
+ * App Groupも同じ識別子に揃える。既存リンクのスキーム calendar-app は維持する。
  */
 const config: CapacitorConfig = {
-  appId: 'jp.ryo.calendarapp',
-  appName: 'マルチカレンダー',
+  appId: 'jp.ryo.multicalendar',
+  appName: 'Multi calendar',
   // Vite のビルド出力(vite.config.ts の既定 outDir)とそろえる。
   webDir: 'dist',
 };
