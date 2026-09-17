@@ -62,7 +62,7 @@ export function SecretModeQuickUnlockSheet({ open, onClose }: SecretModeQuickUnl
           <span className="text-meta text-ink-secondary">パスコード</span>
           <input
             type="password"
-            inputMode="numeric"
+            inputMode="text" autoCapitalize="none" autoCorrect="off"
             autoComplete="off"
             maxLength={8}
             value={input}

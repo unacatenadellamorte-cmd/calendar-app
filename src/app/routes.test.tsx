@@ -136,6 +136,6 @@ describe('その他のルート', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'シークレットモード' }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('パスコード(4〜8桁の数字)')).toBeInTheDocument();
+    expect(screen.getByLabelText('パスコード(4〜8文字の半角英数字)')).toBeInTheDocument();
   });
 });

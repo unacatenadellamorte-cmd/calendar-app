@@ -25,6 +25,7 @@ import { WeekView } from './WeekView';
 import { ListView } from './ListView';
 import { YearView } from './YearView';
 import { DayEventPanel } from './DayEventPanel';
+import { MonthShiftTiles } from './MonthShiftTiles';
 
 interface CalendarScreenProps {
   /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
@@ -100,9 +101,15 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     setView('month');
   };
 
-  // 月表示の日付タップ: その日を含む週の1行に折りたたみ、下にその日の予定一覧パネルを出す
-  // (クイックシフトシートは開かない。シフト入力は /shifts/add の専用ページに分離)。
-  const selectDay = (date: string) => setSelectedDay(date);
+  // 通常タップはカーソル移動。長押しでその週と予定入力パネルを開く。
+  const selectDay = (date: string) => {
+    jumpTo(date);
+    if (selectedDay) setSelectedDay(date);
+  };
+  const openDayPanel = (date: string) => {
+    jumpTo(date);
+    setSelectedDay(date);
+  };
   // 「月表示に戻る」: 折りたたみ解除。
   const closeDayPanel = () => setSelectedDay(null);
   // 月表示の日付ダブルタップ: 折りたたみを解除し、その日を cursor にして「日」ビューへ
@@ -228,6 +235,7 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
             calendarById={calendarById}
             today={today}
             onDayTap={selectDay}
+            onDayLongPress={openDayPanel}
             onDayDoubleTap={openDayView}
             onEventTap={openEdit}
             onOverflowTap={openOverflow}
@@ -246,6 +254,7 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
               onAddEvent={() => openCreate({ date: selectedDay })}
             />
           )}
+          {!selectedDay && <MonthShiftTiles date={cursor} calendars={cal.calendars} enabled={enabled} onCreated={ev.addLocal} />}
         </>
       ) : view === 'week' ? (
         <WeekView

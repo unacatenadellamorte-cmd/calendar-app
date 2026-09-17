@@ -50,10 +50,10 @@ export function SecretModeSettingsScreen() {
           }}
         >
           <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-secondary">パスコード(4〜8桁の数字)</span>
+            <span className="text-meta text-ink-secondary">パスコード(4〜8文字の半角英数字)</span>
             <input
               type="password"
-              inputMode="numeric"
+              inputMode="text" autoCapitalize="none" autoCorrect="off"
               autoComplete="off"
               maxLength={8}
               value={setupInput}
@@ -154,7 +154,7 @@ export function SecretModeSettingsScreen() {
               <span className="text-meta text-ink-secondary">パスコード</span>
               <input
                 type="password"
-                inputMode="numeric"
+                inputMode="text" autoCapitalize="none" autoCorrect="off"
                 autoComplete="off"
                 maxLength={8}
                 value={formInput}
@@ -219,11 +219,11 @@ export function SecretModeSettingsScreen() {
             >
               <label className="flex flex-col gap-1">
                 <span className="text-meta text-ink-secondary">
-                  新しいパスコード(4〜8桁の数字)
+                  新しいパスコード(4〜8文字の半角英数字)
                 </span>
                 <input
                   type="password"
-                  inputMode="numeric"
+                  inputMode="text" autoCapitalize="none" autoCorrect="off"
                   autoComplete="off"
                   maxLength={8}
                   value={formInput}

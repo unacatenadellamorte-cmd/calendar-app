@@ -57,7 +57,8 @@ export function useProfile(enabled: boolean) {
   }, []);
 
   const update = useCallback(async (patch: ProfilePatch) => {
-    const result = await updateProfile(patch);
+    if (!profile) return false;
+    const result = await updateProfile(profile.id, patch);
     if (result.ok) {
       setProfile(result.value);
       setErrorKey(null);
@@ -65,7 +66,7 @@ export function useProfile(enabled: boolean) {
     }
     setErrorKey(result.error.messageKey);
     return false;
-  }, []);
+  }, [profile]);
 
   const dismissError = useCallback(() => setErrorKey(null), []);
 

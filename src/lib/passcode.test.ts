@@ -17,8 +17,10 @@ describe('isValidPasscodeFormat', () => {
     expect(isValidPasscodeFormat('123456789')).toBe(false);
   });
 
-  it('数字以外を含むものは拒否する', () => {
-    expect(isValidPasscodeFormat('12a4')).toBe(false);
+  it('半角英数字を許可し、空白・記号・全角は拒否する', () => {
+    expect(isValidPasscodeFormat('12a4')).toBe(true);
+    expect(isValidPasscodeFormat('AbCd1234')).toBe(true);
+    expect(isValidPasscodeFormat('Ab!4')).toBe(false);
     expect(isValidPasscodeFormat('12 4')).toBe(false);
     expect(isValidPasscodeFormat('１２３４')).toBe(false); // 全角
   });

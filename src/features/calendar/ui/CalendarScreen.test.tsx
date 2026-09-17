@@ -47,6 +47,7 @@ let secretState: { unlocked: boolean } = { unlocked: false };
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 vi.mock('@/features/calendars/model/useCalendars', () => ({ useCalendars: () => calState }));
 vi.mock('@/features/events/model/useEvents', () => ({ useEvents: () => evState }));
+vi.mock('@/features/shifts/model/useShiftTemplates', () => ({ useShiftTemplates: () => ({ templates: [], loading: false, errorKey: null }) }));
 vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }));
 
 const { CalendarScreen } = await import('./CalendarScreen');
@@ -78,6 +79,15 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('タブは年・月・日・リストの順で、日付の通常タップは選択だけを行う', async () => {
+    render(<CalendarScreen />);
+    expect(screen.getAllByRole('radio').map((button) => button.textContent)).toEqual(['年', '月', '日', 'リスト']);
+    await userEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(screen.getByText(/2026-09-08に追加/)).toBeInTheDocument();
+  });
+
   it('既定は月ビュー(日セルの追加ボタンを描画)', () => {
     render(<CalendarScreen />);
     expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
@@ -243,10 +253,9 @@ describe('CalendarScreen', () => {
     expect(screen.queryByRole('button', { name: '9月15日を開く' })).not.toBeInTheDocument();
   });
 
-  it('月ビューで日セルをタップすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
-    const user = userEvent.setup();
+  it('月ビューで日セルを長押し相当のキー操作にすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
 
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
     // 折りたたみ中は同じ月グリッド内でも他の週の日付は消える(9/8を含む週の外)。
@@ -262,7 +271,7 @@ describe('CalendarScreen', () => {
   it('「月表示に戻る」を押すと全体の月グリッドに戻りパネルが閉じる', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
     await user.click(screen.getByRole('button', { name: '月表示に戻る' }));
 
     expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
@@ -273,7 +282,7 @@ describe('CalendarScreen', () => {
   it('パネルの「＋ この日に予定を追加」を押すと、その日をシードした予定フォームが開く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
     await user.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
 
     expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
@@ -283,7 +292,7 @@ describe('CalendarScreen', () => {
   it('折りたたみ中に月を送ると selectedDay が自動でクリアされる(パネルが宙に浮かない)', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '次へ' }));
@@ -297,7 +306,7 @@ describe('CalendarScreen', () => {
   it('折りたたみ中に別ビューへ切り替えると selectedDay が自動でクリアされ、月ビューに戻ってもパネルは出ない', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
     await user.click(screen.getByRole('radio', { name: 'リスト' }));
     await user.click(screen.getByRole('radio', { name: '月' }));
 

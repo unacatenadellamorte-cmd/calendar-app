@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
@@ -72,6 +72,36 @@ function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof Mo
 }
 
 describe('MonthView', () => {
+  it('長押しで日付パネルを開き、離した後のクリックは発火しない', () => {
+    vi.useFakeTimers();
+    try {
+      const onDayLongPress = vi.fn();
+      const { onDayTap } = setup([], { onDayLongPress });
+      const button = screen.getByRole('button', { name: '9月15日を開く' });
+      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      act(() => vi.advanceTimersByTime(500));
+      fireEvent.pointerUp(button);
+      fireEvent.click(button);
+      expect(onDayLongPress).toHaveBeenCalledWith('2026-09-15');
+      expect(onDayTap).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+  it('指を動かした場合やキャンセルでは長押しを発火しない', () => {
+    vi.useFakeTimers();
+    try {
+      const onDayLongPress = vi.fn();
+      setup([], { onDayLongPress });
+      const button = screen.getByRole('button', { name: '9月15日を開く' });
+      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      fireEvent(button, Object.assign(new Event('pointermove', { bubbles: true }), { clientX: 50, clientY: 20 }));
+      act(() => vi.advanceTimersByTime(600));
+      expect(onDayLongPress).not.toHaveBeenCalled();
+      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      fireEvent.pointerCancel(button);
+      act(() => vi.advanceTimersByTime(600));
+      expect(onDayLongPress).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
   it('曜日ヘッダと日セルを描画する', () => {
     setup();
     for (const w of ['日', '月', '火', '水', '木', '金', '土']) {

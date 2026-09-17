@@ -19,7 +19,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/invalid-date': '日付を選んでください',
   'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
   'event/invalid-reminder': 'リマインダーの分数が正しくありません',
-  'secret/invalid-passcode': 'パスコードは数字4〜8桁で入力してください',
+  'secret/invalid-passcode': 'パスコードは半角英数字4〜8文字で入力してください',
   'secret/incorrect-passcode': 'パスコードが違います',
   'secret/save-failed': 'パスコードを保存できませんでした。もう一度お試しください',
   'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',

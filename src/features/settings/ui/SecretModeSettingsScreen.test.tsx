@@ -36,16 +36,16 @@ beforeEach(() => {
 describe('SecretModeSettingsScreen', () => {
   it('パスコード未設定なら設定フォームを出し、ON/OFFトグルは出さない(I/O Matrix)', () => {
     render(<SecretModeSettingsScreen />);
-    expect(screen.getByLabelText('パスコード(4〜8桁の数字)')).toBeInTheDocument();
+    expect(screen.getByLabelText('パスコード(4〜8文字の半角英数字)')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });
 
   it('未設定フォームで入力して送信すると setPasscode を呼ぶ', async () => {
     const user = userEvent.setup();
     render(<SecretModeSettingsScreen />);
-    await user.type(screen.getByLabelText('パスコード(4〜8桁の数字)'), '1234');
+    await user.type(screen.getByLabelText('パスコード(4〜8文字の半角英数字)'), 'Ab12');
     await user.click(screen.getByRole('button', { name: 'パスコードを設定する' }));
-    expect(setPasscode).toHaveBeenCalledWith('1234');
+    expect(setPasscode).toHaveBeenCalledWith('Ab12');
   });
 
   it('未設定フォームで形式不正エラーを表示する', async () => {
@@ -53,10 +53,10 @@ describe('SecretModeSettingsScreen', () => {
     state.errorKey = 'secret/invalid-passcode';
     const user = userEvent.setup();
     render(<SecretModeSettingsScreen />);
-    await user.type(screen.getByLabelText('パスコード(4〜8桁の数字)'), '12');
+    await user.type(screen.getByLabelText('パスコード(4〜8文字の半角英数字)'), '12');
     await user.click(screen.getByRole('button', { name: 'パスコードを設定する' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'パスコードは数字4〜8桁で入力してください',
+      'パスコードは半角英数字4〜8文字で入力してください',
     );
   });
 
@@ -124,7 +124,7 @@ describe('SecretModeSettingsScreen', () => {
     const user = userEvent.setup();
     render(<SecretModeSettingsScreen />);
     await user.click(screen.getByRole('button', { name: 'パスコードを変更' }));
-    await user.type(screen.getByLabelText('新しいパスコード(4〜8桁の数字)'), '5678');
+    await user.type(screen.getByLabelText('新しいパスコード(4〜8文字の半角英数字)'), '5678');
     await user.click(screen.getByRole('button', { name: '保存する' }));
     expect(setPasscode).toHaveBeenCalledWith('5678');
   });
@@ -137,7 +137,7 @@ describe('SecretModeSettingsScreen', () => {
 
   it('パスコード入力欄は type="password"(平文表示しない)', () => {
     render(<SecretModeSettingsScreen />);
-    expect(screen.getByLabelText('パスコード(4〜8桁の数字)')).toHaveAttribute(
+    expect(screen.getByLabelText('パスコード(4〜8文字の半角英数字)')).toHaveAttribute(
       'type',
       'password',
     );

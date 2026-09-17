@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
@@ -11,6 +11,7 @@ interface MonthViewProps {
   calendarById: Map<string, Calendar>;
   today: string;
   onDayTap: (date: string) => void;
+  onDayLongPress?: (date: string) => void;
   /** 日付セルのダブルタップ。その日を cursor にして「日」ビューへ切り替える呼び出し側の配線を想定。 */
   onDayDoubleTap: (date: string) => void;
   onEventTap: (event: EventItem) => void;
@@ -38,6 +39,7 @@ export function MonthView({
   calendarById,
   today,
   onDayTap,
+  onDayLongPress,
   onDayDoubleTap,
   onEventTap,
   onOverflowTap,
@@ -60,6 +62,15 @@ export function MonthView({
 
   // スワイプ検出
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickRef = useRef(false);
+  const cancelHold = () => {
+    if (holdRef.current !== null) clearTimeout(holdRef.current);
+    holdRef.current = null;
+    holdStartRef.current = null;
+  };
+  useEffect(() => cancelHold, [cursor]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 1) {
@@ -131,14 +142,54 @@ export function MonthView({
           return (
             <div
               key={cell.date}
+              onPointerDown={(event) => {
+                cancelHold();
+                suppressClickRef.current = false;
+                if (event.button !== 0 || !event.isPrimary) return;
+                const button = (event.target as HTMLElement).closest('button');
+                if (button && !button.hasAttribute('data-day-button')) return;
+                holdStartRef.current = { x: event.clientX, y: event.clientY };
+                holdRef.current = setTimeout(() => {
+                  holdRef.current = null;
+                  suppressClickRef.current = true;
+                  onDayLongPress?.(cell.date);
+                }, 500);
+              }}
+              onPointerMove={(event) => {
+                const start = holdStartRef.current;
+                if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) {
+                  cancelHold();
+                  suppressClickRef.current = true;
+                }
+              }}
+              onPointerUp={cancelHold}
+              onPointerCancel={cancelHold}
+              onPointerLeave={cancelHold}
+              onContextMenu={(event) => event.preventDefault()}
+              onClickCapture={(event) => {
+                if (suppressClickRef.current) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  suppressClickRef.current = false;
+                }
+              }}
               onClick={() => onDayTap(cell.date)}
               className={[
-                'flex min-h-20 flex-col gap-0.5 border-r border-b border-border-hairline p-1',
+                'flex min-h-20 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-1',
                 cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
+                cell.date === cursor ? 'ring-2 ring-inset ring-accent' : '',
               ].join(' ')}
             >
               <button
                 type="button"
+                data-day-button
+                aria-pressed={cell.date === cursor}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && event.shiftKey) {
+                    event.preventDefault();
+                    onDayLongPress?.(cell.date);
+                  }
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDayTap(cell.date);
