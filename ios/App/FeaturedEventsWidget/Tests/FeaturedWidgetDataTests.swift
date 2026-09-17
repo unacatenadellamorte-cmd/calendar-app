@@ -18,7 +18,7 @@ final class FeaturedWidgetDataTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         XCTAssertEqual(FeaturedWidgetData.read(defaults: defaults), [])
-        let json = #"[{"id":"e1","calendarName":"仕事","colorHex":"#0072B2","startsAtIso":"2026-09-17T01:02:00Z","allDay":false,"schemaVersion":1}]"#
+        let json = ##"[{"id":"e1","calendarName":"仕事","colorHex":"#0072B2","startsAtIso":"2026-09-17T01:02:00Z","allDay":false,"schemaVersion":1}]"##
         defaults.set(json, forKey: "featuredEvents")
         XCTAssertEqual(FeaturedWidgetData.read(defaults: defaults), [event()])
         defaults.set("[]", forKey: "featuredEvents")
