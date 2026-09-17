@@ -14,8 +14,6 @@ interface MonthViewProps {
   onDayLongPress?: (date: string) => void;
   /** 日付セルのダブルタップ。その日を cursor にして「日」ビューへ切り替える呼び出し側の配線を想定。 */
   onDayDoubleTap: (date: string) => void;
-  onEventTap: (event: EventItem) => void;
-  onOverflowTap: (date: string) => void;
   /**
    * 指定があれば、その日を含む週の1行だけに月グリッドを折りたたむ(Option C)。
    * 指定日が現在の `cursor` の月グリッドに含まれない(月を送った等)場合はフル表示へフォールバックする。
@@ -41,8 +39,6 @@ export function MonthView({
   onDayTap,
   onDayLongPress,
   onDayDoubleTap,
-  onEventTap,
-  onOverflowTap,
   collapsedToWeekOf,
   onBackToMonth,
   onSwipeLeft,
@@ -237,7 +233,7 @@ export function MonthView({
                   key={event.id}
                   event={event}
                   calendar={calendarById.get(event.calendarId)}
-                  onTap={onEventTap}
+                  onTap={() => onDayTap(cell.date)}
                   showTime={false}
                 />
               ))}
@@ -247,7 +243,7 @@ export function MonthView({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onOverflowTap(cell.date);
+                    onDayTap(cell.date);
                   }}
                   className="self-start px-1 text-meta text-ink-secondary"
                 >

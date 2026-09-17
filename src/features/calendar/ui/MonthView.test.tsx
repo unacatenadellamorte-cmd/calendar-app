@@ -47,8 +47,6 @@ function toByDay(events: EventItem[], byCalendar = calendarById) {
 function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof MonthView>[0]> = {}) {
   const onDayTap = vi.fn();
   const onDayDoubleTap = vi.fn();
-  const onEventTap = vi.fn();
-  const onOverflowTap = vi.fn();
   const onBackToMonth = vi.fn();
   const onSwipeLeft = vi.fn();
   const onSwipeRight = vi.fn();
@@ -60,15 +58,13 @@ function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof Mo
       today="2026-09-08"
       onDayTap={onDayTap}
       onDayDoubleTap={onDayDoubleTap}
-      onEventTap={onEventTap}
-      onOverflowTap={onOverflowTap}
       onBackToMonth={onBackToMonth}
       onSwipeLeft={onSwipeLeft}
       onSwipeRight={onSwipeRight}
       {...overProps}
     />,
   );
-  return { onDayTap, onDayDoubleTap, onEventTap, onOverflowTap, onBackToMonth, onSwipeLeft, onSwipeRight, container: utils.container };
+  return { onDayTap, onDayDoubleTap, onBackToMonth, onSwipeLeft, onSwipeRight, container: utils.container };
 }
 
 describe('MonthView', () => {
@@ -101,15 +97,14 @@ describe('MonthView', () => {
     try {
       const onDayLongPress = vi.fn();
       const events = Array.from({ length: 4 }, (_, i) => ev({ id: `e${i}`, title: `会議${i}` }));
-      const { onEventTap, onOverflowTap } = setup(events, { onDayLongPress });
+      const { onDayTap } = setup(events, { onDayLongPress });
       const button = screen.getByRole('button', { name: targetType === '予定' ? /会議0/ : '他 1 件' });
       fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
       act(() => vi.advanceTimersByTime(500));
       fireEvent.pointerUp(button);
       fireEvent.click(button);
       expect(onDayLongPress).toHaveBeenCalledExactlyOnceWith('2026-09-08');
-      expect(onEventTap).not.toHaveBeenCalled();
-      expect(onOverflowTap).not.toHaveBeenCalled();
+      expect(onDayTap).not.toHaveBeenCalled();
     } finally { vi.useRealTimers(); }
   });
   it('長押しで日付パネルを開き、離した後のクリックは発火しない', () => {
@@ -159,13 +154,12 @@ describe('MonthView', () => {
     expect(onDayTap).toHaveBeenCalledWith('2026-09-15');
   });
 
-  it('チップをタップすると onEventTap(その予定) を呼ぶ', async () => {
+  it('予定名をタップしてもその日の日付操作を呼ぶ', async () => {
     const user = userEvent.setup();
     const target = ev({ id: 'x', title: '役員会議' });
-    const { onEventTap, onDayTap } = setup([target]);
+    const { onDayTap } = setup([target]);
     await user.click(screen.getByRole('button', { name: /役員会議/ }));
-    expect(onEventTap).toHaveBeenCalledWith(target);
-    expect(onDayTap).not.toHaveBeenCalled();
+    expect(onDayTap).toHaveBeenCalledExactlyOnceWith('2026-09-08');
   });
 
   it('表示中の月グリッド外の予定は描画しない', () => {
@@ -180,7 +174,7 @@ describe('MonthView', () => {
     expect(screen.queryByRole('button', { name: /来月の予定/ })).not.toBeInTheDocument();
   });
 
-  it('同日4件は3件 +「他 1 件」、タップで onOverflowTap を呼ぶ', async () => {
+  it('同日4件は3件 +「他 1 件」、タップでその日の日付操作を呼ぶ', async () => {
     const user = userEvent.setup();
     const sameDay = [0, 1, 2, 3].map((i) =>
       ev({
@@ -190,10 +184,10 @@ describe('MonthView', () => {
         endsAt: `2026-09-08T0${i + 1}:00:00Z`,
       }),
     );
-    const { onOverflowTap } = setup(sameDay);
+    const { onDayTap } = setup(sameDay);
     expect(screen.queryByRole('button', { name: /予定3/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '他 1 件' }));
-    expect(onOverflowTap).toHaveBeenCalledWith('2026-09-08');
+    expect(onDayTap).toHaveBeenCalledExactlyOnceWith('2026-09-08');
   });
 
   it('セルに入りきらない時は優先度の高いカレンダーの予定から見せる', () => {
@@ -216,8 +210,6 @@ describe('MonthView', () => {
         today="2026-09-08"
         onDayTap={vi.fn()}
         onDayDoubleTap={vi.fn()}
-        onEventTap={vi.fn()}
-        onOverflowTap={vi.fn()}
         onBackToMonth={vi.fn()}
       />,
     );

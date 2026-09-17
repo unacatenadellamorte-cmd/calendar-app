@@ -89,12 +89,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     setSeed(undefined);
     setSheetOpen(true);
   };
-  const openOverflow = (date: string) => {
-    // 「他 N 件」→ その日を優先度順(同順は開始時刻順)で一覧できるリストビューへ。
-    jumpTo(date);
-    setView('list');
-  };
-
   const openMonthFromYear = (date: string) => {
     // 年ビューの日付/月見出しタップ→その日/月1日を cursor にして月ビューへ(概観から詳細への操作感を統一)。
     jumpTo(date);
@@ -237,8 +231,6 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
             onDayTap={openDayPanel}
             onDayLongPress={openDayCreate}
             onDayDoubleTap={openDayView}
-            onEventTap={openEdit}
-            onOverflowTap={openOverflow}
             collapsedToWeekOf={selectedDay ?? undefined}
             onBackToMonth={closeDayPanel}
             onSwipeLeft={goNext}

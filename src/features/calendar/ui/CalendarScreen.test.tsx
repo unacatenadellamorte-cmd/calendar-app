@@ -79,6 +79,19 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('予定が詰まった日の予定名タップで週と一覧を開き、一覧から編集できる', async () => {
+    const user = userEvent.setup();
+    evState.events = Array.from({ length: 5 }, (_, i) => ({ ...sampleEvent, id: `busy-${i}`, title: `予定${i}` }));
+    render(<CalendarScreen />);
+    await user.click(screen.getByRole('button', { name: /予定0/ }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
+    const panel = screen.getByRole('heading', { name: '9月8日(火)' }).closest('section')!;
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(5);
+    await user.click(within(panel).getByRole('button', { name: /予定0/ }));
+    expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+  });
   it('予定のある日でも予定チップを長押しすると、その日の新規追加レイヤーを直接開く', () => {
     vi.useFakeTimers();
     try {
@@ -252,7 +265,7 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('button', { name: '3月1日を開く' })).toBeInTheDocument();
   });
 
-  it('月ビューで「他 N 件」をタップするとその日へ移動してリストビューに切り替わる', async () => {
+  it('月ビューで「他 N 件」をタップするとその日の週表示と予定一覧を開く', async () => {
     const user = userEvent.setup();
     evState.events = [0, 1, 2, 3].map((i) => ({
       ...sampleEvent,
@@ -263,9 +276,11 @@ describe('CalendarScreen', () => {
     }));
     render(<CalendarScreen />);
     await user.click(screen.getByRole('button', { name: '他 1 件' }));
-    expect(screen.getByRole('radio', { name: 'リスト', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
     expect(screen.getByText('9月18日(金)')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '9月15日を開く' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '9月1日を開く' })).not.toBeInTheDocument();
   });
 
   it('月ビューで日セルを短くタップすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
