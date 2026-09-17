@@ -61,6 +61,8 @@ Claude連携は通常のビルド検証とは独立している。必要な設�
 4. `.github/workflows/claude.yml`をデフォルトブランチへ反映する。
 5. リポジトリ所有者・メンバー・共同編集者がIssue/PRコメントで`@claude`に依頼すると、macOS上で起動する。
    外部投稿者のコメント、単なるpushでは起動しない。20ターン・30分の上限がある。
+6. 手動の接続確認は`gh workflow run claude.yml --repo unacatenadellamorte-cmd/calendar-app`。
+   この経路では固定の確認文だけを実行し、コード変更やIssueへの依頼投稿は行わない。
 
 Claudeの資格情報とGitHub Appのインストール、実際の起動確認が揃うまでは「連携済み」としない。
 APIキー方式へ変える場合は、公式資料に沿ってシークレット名とAction入力を同時に変更する。

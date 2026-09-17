@@ -1,6 +1,7 @@
 name: Claudeへの開発依頼
 
 on:
+  workflow_dispatch:
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -13,8 +14,9 @@ jobs:
   claude:
     # 公開リポジトリの第三者コメントでは起動しない。
     if: >-
-      contains(github.event.comment.body, '@claude') &&
-      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.comment.body, '@claude') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: macos-15
     timeout-minutes: 30
     permissions:
@@ -43,6 +45,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # 手動実行は認証の疎通確認だけ。コメント起動時は通常の対話モードを使う。
+          prompt: ${{ github.event_name == 'workflow_dispatch' && 'これは接続確認です。ツールを使わず、ファイルやGitHubの状態を変更せず、「Claude接続確認OK」とだけ返してください。' || '' }}
           claude_args: >-
             --max-turns 20
             --append-system-prompt "日本語で応答する。iOS検証手順はdocs/ios-ci-and-claude.mdを参照する。機密情報を表示せず、mainへの直接pushや自動マージをしない。"
