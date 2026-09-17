@@ -168,7 +168,7 @@ function AvatarNav({ profile }: { profile: Profile }) {
 
   return (
     <>
-      <div className="flex justify-end px-4 pt-3">
+      <div className="flex justify-start px-4 pt-3">
         <Link
           to="/profile"
           onClick={handleTap}
