@@ -24,6 +24,7 @@ export function PayCard({ events, calendars }: PayCardProps) {
     >
       <div className="flex items-center justify-between px-4 pt-3 text-meta text-ink-secondary">
         <span>{t('{0}の給料見込み', [pay.monthLabel])}</span>
+        <span className="text-meta text-ink-secondary">{t('概算・目安')}</span>
         <span className="flex gap-1">
           <button
             type="button"

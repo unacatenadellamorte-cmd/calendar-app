@@ -235,6 +235,21 @@ describe('events.ts', () => {
     expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({ is_secret: true });
   });
 
+  it('createEvent: Google カレンダーを指定した書き込みを拒否する', async () => {
+    queryResult = { data: { source: 'google' }, error: null };
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'google-calendar',
+      title: '取り込み先へ書かない',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/calendar-not-writable');
+    expect(calls.some((call) => call.method === 'insert')).toBe(false);
+  });
+
   it('updateEvent: isSecret を渡すと is_secret 列を update する', async () => {
     queryResult = { data: row({ is_secret: true }), error: null };
     const { updateEvent } = await importEvents();
@@ -278,6 +293,18 @@ describe('events.ts', () => {
     expect(r.ok).toBe(true);
     expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ title: '変更後' });
     expect(calls.find((c) => c.method === 'eq')?.args).toEqual(['id', 'e1']);
+  });
+
+  it('updateEvent: local 予定でも外部カレンダーへの移動を拒否する', async () => {
+    queryResult = { data: { source: 'device' }, error: null };
+    const { updateEvent } = await importEvents();
+    const r = await updateEvent(
+      { id: 'e1', source: 'local' },
+      { calendarId: 'device-calendar' },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/calendar-not-writable');
+    expect(calls.some((call) => call.method === 'update')).toBe(false);
   });
 
   it('updateEvent: external は not-editable を返し、supabase に触れない', async () => {
@@ -395,6 +422,20 @@ describe('events.ts — オフライン(Story 1.6)', () => {
   beforeEach(() => vi.stubGlobal('navigator', { onLine: false }));
   afterEach(() => vi.unstubAllGlobals());
 
+  it('createEvent は offline で calendar source を確認できなければ fail closed にする', async () => {
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'missing-calendar',
+      title: '保存先不明',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/calendar-not-writable');
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it('setEventReminder はオフラインで data/offline を返す(狭い経路、outbox には積まない)', async () => {
     const { setEventReminder } = await importEvents();
     const r = await setEventReminder('e1', 30);
@@ -423,6 +464,11 @@ describe('events.ts — オフライン(Story 1.6)', () => {
 
   it('createEvent はオフラインで outbox に積み、楽観行を返す(supabase に触れない)', async () => {
     const { createEvent } = await importEvents();
+    const { cachePut } = await import('./cache');
+    await cachePut('calendars', {
+      id: 'c1', name: '自作', color: '#0072B2', source: 'local', isShift: false,
+      isVisible: true, priority: 0, createdAt: '', updatedAt: '',
+    });
     const { listOutbox } = await import('./outbox');
     const r = await createEvent({
       calendarId: 'c1', title: '打合せ', allDay: false,

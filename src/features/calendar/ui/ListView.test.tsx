@@ -54,6 +54,29 @@ function setup(events: EventItem[]) {
 }
 
 describe('ListView', () => {
+  it('未来の予定がない場合も最古ではなく最も新しい日へスクロールする', () => {
+    const original = HTMLElement.prototype.scrollIntoView;
+    const scrolled: string[] = [];
+    HTMLElement.prototype.scrollIntoView = function () {
+      scrolled.push(this.textContent ?? '');
+    };
+    try {
+      setup([
+        ev({ id: 'old', allDay: true, eventDate: '2026-07-15', startsAt: null, endsAt: null }),
+        ev({
+          id: 'recent',
+          allDay: true,
+          eventDate: '2026-09-07',
+          startsAt: null,
+          endsAt: null,
+        }),
+      ]);
+      expect(scrolled).toEqual(['9月7日(月)']);
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
+
   it('予定を日ごとの見出しでグルーピングする', () => {
     setup([
       ev({ id: 'a', title: '会議アルファ' }),
@@ -87,8 +110,20 @@ describe('ListView', () => {
     render(
       <ListView
         events={[
-          ev({ id: 'low-late', title: '低優先の夕方', calendarId: 'low', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' }),
-          ev({ id: 'high-morning', title: '高優先の朝', calendarId: 'high', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
+          ev({
+            id: 'low-late',
+            title: '低優先の夕方',
+            calendarId: 'low',
+            startsAt: '2026-09-08T09:00:00Z',
+            endsAt: '2026-09-08T10:00:00Z',
+          }),
+          ev({
+            id: 'high-morning',
+            title: '高優先の朝',
+            calendarId: 'high',
+            startsAt: '2026-09-08T00:00:00Z',
+            endsAt: '2026-09-08T01:00:00Z',
+          }),
         ]}
         calendarById={
           new Map<string, Calendar>([

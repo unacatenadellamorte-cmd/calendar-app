@@ -79,6 +79,8 @@ export function BackgroundSection() {
           disabled={busy}
           className="w-full min-w-0 rounded-sm border border-border-hairline bg-surface-raised p-2 text-meta"
           onChange={(event) => {
+            // ファイルを選び直した時点で前回のエラーを消す。
+            setError('');
             const file = event.target.files?.[0];
             event.target.value = '';
             if (file) void change(file);
@@ -94,9 +96,17 @@ export function BackgroundSection() {
         {t('背景画像を解除')}
       </button>
       {error && (
-        <p role="alert" className="mt-2 text-meta text-danger">
-          {t(error)}
-        </p>
+        <div className="mt-2 flex items-start gap-2 text-meta text-danger">
+          <p role="alert">{t(error)}</p>
+          <button
+            type="button"
+            aria-label={t('閉じる')}
+            className="min-h-11 px-2"
+            onClick={() => setError('')}
+          >
+            ×
+          </button>
+        </div>
       )}
       <p role="status" className="text-meta text-ink-secondary">
         {busy ? t('処理中…') : message}

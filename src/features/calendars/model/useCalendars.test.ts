@@ -178,4 +178,100 @@ describe('useCalendars', () => {
     expect(result.current.calendars.map((c) => c.id)).toEqual(['a', 'b']);
     expect(result.current.errorKey).toBe('data/query');
   });
+
+  it('表示切替中に古いreload結果が返っても、楽観反映を巻き戻さない', async () => {
+    let resolveReload!: (value: ReturnType<typeof ok<Calendar[]>>) => void;
+    listCalendars
+      .mockResolvedValueOnce(ok([shift, cal({ isVisible: true })]))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveReload = resolve; }));
+    setCalendarVisible.mockResolvedValue(ok(undefined));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      void result.current.reload();
+      await Promise.resolve();
+      await result.current.toggleVisible(cal({ isVisible: true }));
+    });
+    expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(false);
+    await act(async () => {
+      resolveReload(ok([shift, cal({ isVisible: true })]));
+      await Promise.resolve();
+    });
+    expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(false);
+  });
+
+  it('表示切替の応答前に始まったreloadでもpending値を保持する', async () => {
+    let resolveVisible!: (value: ReturnType<typeof ok<void>>) => void;
+    setCalendarVisible.mockImplementationOnce(() => new Promise((resolve) => { resolveVisible = resolve; }));
+    let resolveReload!: (value: ReturnType<typeof ok<Calendar[]>>) => void;
+    listCalendars
+      .mockResolvedValueOnce(ok([shift, cal({ isVisible: true })]))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveReload = resolve; }));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let toggle!: Promise<void>;
+    act(() => {
+      toggle = result.current.toggleVisible(cal({ isVisible: true }));
+    });
+    await act(async () => {
+      void result.current.reload();
+      await Promise.resolve();
+      resolveReload(ok([shift, cal({ isVisible: true })]));
+      await Promise.resolve();
+    });
+    expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(false);
+    await act(async () => {
+      resolveVisible(ok(undefined));
+      await toggle;
+    });
+  });
+
+  it('reload開始時にpendingだった書込が先に完了しても古い一覧で上書きしない', async () => {
+    let resolveVisible!: (value: ReturnType<typeof ok<void>>) => void;
+    setCalendarVisible.mockImplementationOnce(() => new Promise((resolve) => { resolveVisible = resolve; }));
+    let resolveReload!: (value: ReturnType<typeof ok<Calendar[]>>) => void;
+    listCalendars
+      .mockResolvedValueOnce(ok([shift, cal({ isVisible: true })]))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveReload = resolve; }));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let toggle!: Promise<void>;
+    act(() => {
+      toggle = result.current.toggleVisible(cal({ isVisible: true }));
+    });
+    await act(async () => {
+      void result.current.reload();
+      await Promise.resolve();
+      resolveVisible(ok(undefined));
+      await toggle;
+      resolveReload(ok([shift, cal({ isVisible: true })]));
+      await Promise.resolve();
+    });
+    expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(false);
+  });
+
+  it('同じカレンダーを素早くON/OFFしたら最後の操作を保持する', async () => {
+    const pending: Array<(value: ReturnType<typeof ok<void>>) => void> = [];
+    setCalendarVisible.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const target = cal({ isVisible: true });
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    await act(async () => {
+      first = result.current.toggleVisible(target);
+      second = result.current.toggleVisible(target);
+      await Promise.resolve();
+    });
+    expect(setCalendarVisible).toHaveBeenCalledTimes(1);
+    expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(true);
+    await act(async () => {
+      pending[0]!(ok(undefined));
+      await waitFor(() => expect(setCalendarVisible).toHaveBeenCalledTimes(2));
+      pending[1]!(ok(undefined));
+      await Promise.all([first, second]);
+    });
+    expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(true);
+  });
 });

@@ -8,6 +8,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const requestPermissions = vi.fn();
 const schedule = vi.fn();
 const cancel = vi.fn();
+const isNativePlatform = vi.fn();
+vi.mock('@capacitor/core', () => ({
+  Capacitor: {
+    isNativePlatform: () => isNativePlatform(),
+  },
+}));
 vi.mock('@capacitor/local-notifications', () => ({
   LocalNotifications: {
     requestPermissions: (...a: unknown[]) => requestPermissions(...a),
@@ -23,6 +29,7 @@ beforeEach(() => {
   requestPermissions.mockReset();
   schedule.mockReset();
   cancel.mockReset();
+  isNativePlatform.mockReset();
 });
 
 describe('requestNotificationPermission', () => {
@@ -31,6 +38,16 @@ describe('requestNotificationPermission', () => {
     const r = await requestNotificationPermission();
     expect(r).toBe('granted');
     expect(requestPermissions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('isNotificationSupported', () => {
+  it('ネイティブプラットフォームだけを通知対応として返す', async () => {
+    const { isNotificationSupported } = await import('./reminders');
+    isNativePlatform.mockReturnValue(true);
+    expect(isNotificationSupported()).toBe(true);
+    isNativePlatform.mockReturnValue(false);
+    expect(isNotificationSupported()).toBe(false);
   });
 });
 

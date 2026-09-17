@@ -35,6 +35,8 @@ export function ProfileForm({
   const [processingPhoto, setProcessingPhoto] = useState(false);
   const [photoErrorKey, setPhotoErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [nameError, setNameError] = useState(false);
   const trimmedName = displayName.trim();
   const canSubmit = trimmedName.length > 0 && !submitting && !processingPhoto;
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -43,6 +45,7 @@ export function ProfileForm({
     e.target.value = '';
     if (!file) return;
     setPhotoErrorKey(null);
+    setSaved(false);
     if (file.size > MAX_PHOTO_BYTES) {
       setPhotoErrorKey('profile/photo-too-large');
       return;
@@ -67,8 +70,9 @@ export function ProfileForm({
         if (!canSubmit) return;
         void (async () => {
           setSubmitting(true);
-          await onSubmit({ displayName: trimmedName, avatarDataUrl });
+          const ok = await onSubmit({ displayName: trimmedName, avatarDataUrl });
           setSubmitting(false);
+          setSaved(ok);
         })();
       }}
     >
@@ -101,10 +105,21 @@ export function ProfileForm({
           required
           maxLength={50}
           value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setDisplayName(next);
+            if (next.trim()) setNameError(false);
+            setSaved(false);
+          }}
+          onBlur={() => setNameError(!trimmedName)}
           className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
         />
       </label>
+      {nameError && (
+        <p role="alert" className="text-meta text-danger">
+          {resolveMessage('profile/invalid-name')}
+        </p>
+      )}
 
       <button
         type="submit"
@@ -113,6 +128,11 @@ export function ProfileForm({
       >
         {submitting ? t('処理中…') : submitLabel}
       </button>
+      {saved && (
+        <p role="status" className="text-meta text-ink-secondary">
+          {t('保存しました。')}
+        </p>
+      )}
     </form>
   );
 }

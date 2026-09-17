@@ -51,4 +51,16 @@ describe('ShiftTemplateFormSheet', () => {
     expect(screen.getByLabelText('勤務先ラベル(任意)')).toHaveValue('カフェ');
     expect(screen.getByRole('button', { name: 'このお気に入りシフトを削除' })).toBeInTheDocument();
   });
+
+  it('一覧の再取得で usedColors の配列が変わっても入力中の値を保持する', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const view = render(<ShiftTemplateFormSheet open editing={null} {...base} onSubmit={onSubmit} />);
+    await user.type(screen.getByLabelText('シフト名'), '平日');
+    await user.clear(screen.getByLabelText('休憩(分)'));
+    await user.type(screen.getByLabelText('休憩(分)'), '45');
+    view.rerender(<ShiftTemplateFormSheet open editing={null} {...base} usedColors={['#C6413B']} onSubmit={onSubmit} />);
+    expect(screen.getByLabelText('シフト名')).toHaveValue('平日');
+    expect(screen.getByLabelText('休憩(分)')).toHaveValue(45);
+  });
 });

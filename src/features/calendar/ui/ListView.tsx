@@ -28,7 +28,7 @@ export function ListView({
   const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
   const headerRefs = useRef(new Map<string, HTMLElement>());
   useEffect(() => {
-    const target = days.find((d) => d >= scrollTo);
+    const target = days.find((d) => d >= scrollTo) ?? days.at(-1);
     if (!target) return;
     try {
       headerRefs.current.get(target)?.scrollIntoView({ block: 'start' });
@@ -46,6 +46,7 @@ export function ListView({
           <h3
             ref={(el) => {
               if (el) headerRefs.current.set(date, el);
+              else headerRefs.current.delete(date);
             }}
             className={[
               'sticky top-0 bg-surface-sunken py-1 text-meta font-semibold',

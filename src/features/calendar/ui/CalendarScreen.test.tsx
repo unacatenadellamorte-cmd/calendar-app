@@ -90,6 +90,24 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('折りたたみでDOM位置が変わっても同じ位置の2回目タップで日表示へ進む', () => {
+    render(<CalendarScreen />);
+    const day = screen.getByRole('button', { name: '9月8日を開く' });
+    fireEvent.click(day, { detail: 1, clientX: 150, clientY: 420 });
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    fireEvent(
+      document.body,
+      Object.assign(new Event('pointerdown', { bubbles: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerType: 'touch',
+        clientX: 151,
+        clientY: 420,
+      }),
+    );
+    expect(screen.getByRole('radio', { name: '日' })).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('週一覧でAndroidの戻るを押すと同じ日付の月表示へ戻り、画面遷移しない', () => {
     render(<CalendarScreen />);
     fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));

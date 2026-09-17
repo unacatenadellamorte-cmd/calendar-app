@@ -1,5 +1,5 @@
 import { t, useLanguage } from '@/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { resolveMessage } from '@/data/messages';
 import { validateEventInput, type EventItem, type NewEventInput } from '@/data/events';
@@ -67,9 +67,14 @@ function initialState(
       isSecret: false,
     };
   }
+  // 以前の不具合で外部カレンダーに保存された local 予定は、編集時に
+  // 自作カレンダーへ移せるよう、外部の所属先をそのまま初期値にしない。
+  const currentCalendar = calendars.some((calendar) => calendar.id === editing.calendarId)
+    ? editing.calendarId
+    : firstCalendar;
   return {
     title: editing.title,
-    calendarId: editing.calendarId,
+    calendarId: currentCalendar,
     allDay: editing.allDay,
     startLocal: editing.startsAt ? utcIsoToLocalInput(editing.startsAt) : nowLocalInput(),
     endLocal: editing.endsAt ? utcIsoToLocalInput(editing.endsAt) : nowLocalInput(60),
@@ -106,15 +111,34 @@ export function EventFormSheet({
   onSetReminder,
 }: EventFormSheetProps) {
   useLanguage();
-  const [form, setForm] = useState<FormState>(() => initialState(editing, calendars, seed));
+  // Google/端末カレンダーは読み取り専用。フォームへ渡す候補から外すことで、
+  // 新規作成・local 予定の移動先のどちらでも外部への直接書き込みを防ぐ。
+  const editableCalendars = calendars.filter((calendar) => calendar.source === 'local');
+  const latestPropsRef = useRef({ editing, calendars: editableCalendars, seed });
+  latestPropsRef.current = { editing, calendars: editableCalendars, seed };
+  const [form, setForm] = useState<FormState>(() =>
+    initialState(editing, editableCalendars, seed),
+  );
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setForm(initialState(editing, calendars, seed));
+    const current = latestPropsRef.current;
+    setForm(initialState(current.editing, current.calendars, current.seed));
     setErrorKey(null);
     setSubmitting(false);
-  }, [open, editing, calendars, seed]);
+    // calendars は refetch のたびに配列が新しくなる。ここへ含めると入力中の
+    // タイトル・日時が消えるため、フォームを開く単位(予定ID/seed)だけで初期化する。
+  }, [open, editing?.id, seed?.date, seed?.startLocal]);
+  const firstEditableCalendarId = editableCalendars[0]?.id ?? '';
+  useEffect(() => {
+    // カレンダー取得前にフォームを開いた場合だけ、一覧到着後に所属先を補完する。
+    // 入力値全体は触らず、ユーザーが選択・入力した値も保持する。
+    if (!open || form.calendarId || !firstEditableCalendarId) return;
+    setForm((current) =>
+      current.calendarId ? current : { ...current, calendarId: firstEditableCalendarId },
+    );
+  }, [open, form.calendarId, firstEditableCalendarId]);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     setErrorKey(null);
@@ -131,10 +155,27 @@ export function EventFormSheet({
         onSubmit={async (e) => {
           e.preventDefault();
           if (submitting) return;
-          const input = toInput(form);
-          const invalid = validateEventInput(input);
+          // UTC 変換は空欄・不正値で RangeError になり得るため、変換前の
+          // フォーム値を検証する。これで入力途中でも画面内エラーに留める。
+          const invalid = validateEventInput(
+            form.allDay
+              ? { title: form.title, allDay: true, eventDate: form.dateLocal }
+              : {
+                  title: form.title,
+                  allDay: false,
+                  startsAt: form.startLocal,
+                  endsAt: form.endLocal,
+                },
+          );
           if (invalid) {
             setErrorKey(invalid.messageKey);
+            return;
+          }
+          let input: NewEventInput;
+          try {
+            input = toInput(form);
+          } catch {
+            setErrorKey('event/invalid-time');
             return;
           }
           setSubmitting(true);
@@ -161,7 +202,7 @@ export function EventFormSheet({
             onChange={(e) => set('calendarId', e.target.value)}
             className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           >
-            {calendars.map((c) => (
+            {editableCalendars.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -251,7 +292,7 @@ export function EventFormSheet({
 
         <button
           type="submit"
-          disabled={submitting || calendars.length === 0}
+          disabled={submitting || editableCalendars.length === 0}
           className="min-h-11 rounded-sm bg-accent px-4 text-body font-semibold text-on-accent disabled:opacity-60"
         >
           {submitting ? t('保存中…') : t('保存')}

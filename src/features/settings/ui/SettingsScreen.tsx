@@ -155,7 +155,7 @@ export function SettingsScreen() {
           to="/calendars"
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >
-          {t('カレンダー管理')}
+          {t('カレンダーの並び順')}
           <span aria-hidden="true" className="text-ink-secondary">
             ›
           </span>

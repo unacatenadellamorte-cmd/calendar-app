@@ -266,6 +266,112 @@ describe('useEvents', () => {
     expect(cancelReminder).not.toHaveBeenCalled();
   });
 
+  it('削除中に始まった古い再取得結果で、削除済み予定を再表示しない', async () => {
+    let resolveReload!: (value: unknown) => void;
+    const initial = ev();
+    let listCalls = 0;
+    listEvents.mockImplementation(() => {
+      listCalls += 1;
+      if (listCalls === 1) return Promise.resolve(ok([initial]));
+      if (listCalls === 2) {
+        return new Promise((resolve) => {
+          resolveReload = resolve;
+        });
+      }
+      return Promise.resolve(ok([initial]));
+    });
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let reloadPromise!: Promise<void>;
+    act(() => {
+      reloadPromise = result.current.reload();
+    });
+    await act(async () => {
+      await result.current.remove(initial);
+    });
+
+    // 削除開始前の一覧が遅れて返ってきても、楽観削除を巻き戻さない。
+    resolveReload(ok([initial]));
+    await act(async () => {
+      await reloadPromise;
+    });
+    expect(result.current.events).toEqual([]);
+
+    // 削除完了後に開始した再取得でも、遅延したサーバー応答を一時的に隠す。
+    listEvents.mockResolvedValueOnce(ok([initial]));
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.events).toEqual([]);
+  });
+
+  it('削除の応答待ち中に完了した再取得で、楽観削除を巻き戻さない', async () => {
+    let resolveDelete!: (value: unknown) => void;
+    let resolveReload!: (value: unknown) => void;
+    const initial = ev();
+    listEvents.mockResolvedValueOnce(ok([initial]));
+    deleteEvent.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    listEvents.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveReload = resolve;
+      }),
+    );
+    let removePromise!: Promise<void>;
+    let reloadPromise!: Promise<void>;
+    act(() => {
+      removePromise = result.current.remove(initial);
+      reloadPromise = result.current.reload();
+    });
+    resolveReload(ok([initial]));
+    await act(async () => {
+      // 再取得は削除応答より先に完了する。
+      await reloadPromise;
+    });
+    expect(result.current.events).toEqual([]);
+
+    resolveDelete(ok(undefined));
+    await act(async () => {
+      await removePromise;
+    });
+    expect(result.current.events).toEqual([]);
+  });
+
+  it('削除失敗時は並行して追加された予定を巻き戻さず、対象予定だけ復元する', async () => {
+    let resolveDelete!: (value: unknown) => void;
+    const first = ev({ id: 'first' });
+    const second = ev({ id: 'second' });
+    const added = ev({ id: 'added' });
+    listEvents.mockResolvedValueOnce(ok([first, second]));
+    deleteEvent.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let removePromise!: Promise<void>;
+    act(() => {
+      removePromise = result.current.remove(first);
+      result.current.addLocal([added]);
+    });
+    resolveDelete(err(appError('data/query', 'data/query')));
+    await act(async () => {
+      await removePromise;
+    });
+    expect(result.current.events).toHaveLength(3);
+    expect(result.current.events.map((event) => event.id)).toEqual(
+      expect.arrayContaining(['first', 'second', 'added']),
+    );
+  });
+
   it('addLocal は作成済み予定を時系列ソートで一覧へ足す', async () => {
     const { result } = renderHook(() => useEvents(true));
     await waitFor(() => expect(result.current.loading).toBe(false));

@@ -68,6 +68,9 @@ export function MonthView({
     y: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const lastTap = useRef<{ date: string; x: number; y: number; time: number } | null>(null);
+  const doubleTapRef = useRef(onDayDoubleTap);
+  doubleTapRef.current = onDayDoubleTap;
   const cancelHold = () => {
     if (holdRef.current !== null) clearTimeout(holdRef.current);
     holdRef.current = null;
@@ -86,12 +89,30 @@ export function MonthView({
     const reset = () => {
       suppressClickRef.current = false;
     };
+    // 1回目のタップで週へ折りたたまれても、同じ位置の2回目を元の日付へ渡す。
+    const secondTap = (event: PointerEvent) => {
+      const previous = lastTap.current;
+      if (!previous || event.button !== 0 || !event.isPrimary) return;
+      if (
+        performance.now() - previous.time > 350 ||
+        Math.hypot(event.clientX - previous.x, event.clientY - previous.y) > 24
+      )
+        return;
+      lastTap.current = null;
+      cancelHold();
+      suppressClickRef.current = true;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      doubleTapRef.current(previous.date);
+    };
     document.addEventListener('click', suppressClick, true);
     document.addEventListener('pointerdown', reset, true);
+    document.addEventListener('pointerdown', secondTap, true);
     document.addEventListener('keydown', reset, true);
     return () => {
       document.removeEventListener('click', suppressClick, true);
       document.removeEventListener('pointerdown', reset, true);
+      document.removeEventListener('pointerdown', secondTap, true);
       document.removeEventListener('keydown', reset, true);
     };
   }, []);
@@ -118,6 +139,7 @@ export function MonthView({
     const dy = touch.clientY - start.y;
     if (!swipeAxis.current && Math.max(Math.abs(dx), Math.abs(dy)) > 10) {
       swipeAxis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      lastTap.current = null;
       cancelHold();
       suppressClickRef.current = true;
     }
@@ -233,6 +255,16 @@ export function MonthView({
                     event.preventDefault();
                     event.stopPropagation();
                     suppressClickRef.current = false;
+                  } else if (
+                    event.detail > 0 &&
+                    (event.clientX !== 0 || event.clientY !== 0)
+                  ) {
+                    lastTap.current = {
+                      date: cell.date,
+                      x: event.clientX,
+                      y: event.clientY,
+                      time: performance.now(),
+                    };
                   }
                 }}
                 onClick={() => onDayTap(cell.date)}

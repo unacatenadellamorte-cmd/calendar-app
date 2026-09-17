@@ -38,4 +38,15 @@ describe('背景画像の設定', () => {
     expect(mocks.apply).not.toHaveBeenCalled();
     expect(screen.getByRole('img', { name: '現在の背景画像' })).toBeInTheDocument();
   });
+
+  it('背景保存エラーは閉じる操作で消せる', async () => {
+    mocks.store.mockRejectedValue(new Error('容量不足'));
+    render(<BackgroundSection />);
+    const input = screen.getByLabelText('背景画像を選ぶ');
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { files: [new File(['x'], '背景.png', { type: 'image/png' })] } });
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

@@ -292,5 +292,9 @@
   "橙": "Orange",
   "空": "Sky blue",
   "藍": "Indigo",
-  "桃": "Pink"
+  "桃": "Pink",
+  "保存しました。": "Saved.",
+  "概算・目安": "Estimate",
+  "取り込んだカレンダーには予定を追加できません。自作カレンダーを選んでください": "Events cannot be added to imported calendars. Choose a calendar you created.",
+  "この環境は通知に対応していません。予定は保存されます": "Notifications are not supported in this environment. Your event will still be saved."
 }

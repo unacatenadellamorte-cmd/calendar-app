@@ -19,6 +19,8 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/invalid-time': '終了は開始より後にしてください',
   'event/invalid-date': '日付を選んでください',
   'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
+  'event/calendar-not-writable':
+    '取り込んだカレンダーには予定を追加できません。自作カレンダーを選んでください',
   'event/invalid-reminder': 'リマインダーの分数が正しくありません',
   'secret/invalid-passcode': 'パスコードは半角英数字4〜8文字で入力してください',
   'secret/incorrect-passcode': 'パスコードが違います',
@@ -54,6 +56,8 @@ const DATA_MESSAGES: Record<string, string> = {
     'このカレンダーは一覧に見つかりませんでした。更新してもう一度お試しください',
   'notification/permission-denied':
     '通知が許可されていません。端末の設定から許可すると通知が届きます',
+  'notification/unavailable':
+    'この環境は通知に対応していません。予定は保存されます',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };

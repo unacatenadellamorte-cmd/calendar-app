@@ -1,5 +1,5 @@
 import { t, useLanguage } from '@/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
 import { resolveMessage } from '@/data/messages';
@@ -36,8 +36,15 @@ export function ShiftTemplateFormSheet({
   const [workplace, setWorkplace] = useState('');
   const [color, setColor] = useState<string>(CALENDAR_COLORS[0]!.hex);
   const [submitting, setSubmitting] = useState(false);
+  const initializedKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedKey.current = null;
+      return;
+    }
+    const key = editing ? `editing:${editing.id}` : 'new';
+    if (initializedKey.current === key) return;
+    initializedKey.current = key;
     setName(editing?.name ?? '');
     setStart(editing?.startLocal ?? '09:00');
     setEnd(editing?.endLocal ?? '18:00');
@@ -46,6 +53,7 @@ export function ShiftTemplateFormSheet({
     setWorkplace(editing?.workplaceLabel ?? '');
     setColor(editing?.color ?? nextUnusedColor(usedColors));
     setSubmitting(false);
+  // refetch で新しい配列が届いても、編集中のフォームを初期値へ戻さない。
   }, [open, editing, usedColors]);
   return (
     <BottomSheet

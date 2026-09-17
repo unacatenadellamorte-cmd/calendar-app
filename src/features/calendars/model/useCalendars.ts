@@ -31,21 +31,51 @@ export function useCalendars(enabled: boolean) {
   const pendingRef = useRef<PendingDelete | null>(null);
   /** ロールバック用に現在のリストを常に保持する。 */
   const calendarsRef = useRef<Calendar[]>([]);
+  const reloadGeneration = useRef(0);
+  const visibilityVersion = useRef(0);
+  const visibilityOverrides = useRef(
+    new Map<string, { value: boolean; version: number; pending: boolean }>(),
+  );
+  const visibilityConfirmed = useRef(new Map<string, boolean>());
+  const visibilityQueues = useRef(new Map<string, Promise<void>>());
   calendarsRef.current = calendars;
 
   const reload = useCallback(async () => {
     if (!enabled) return;
+    const generation = ++reloadGeneration.current;
+    const visibilityVersionAtStart = visibilityVersion.current;
+    const pendingAtStart = new Map(
+      [...visibilityOverrides.current.entries()]
+        .filter(([, override]) => override.pending)
+        .map(([id, override]) => [id, override.version]),
+    );
     setLoading(true);
     setErrorKey(null);
     const ensured = await ensureShiftCalendar();
+    if (generation !== reloadGeneration.current) return;
     if (!ensured.ok) {
       setErrorKey(ensured.error.messageKey);
       setLoading(false);
       return;
     }
     const list = await listCalendars();
+    if (generation !== reloadGeneration.current) return;
     if (list.ok) {
-      setCalendars(sortCalendars(list.value));
+      setCalendars(
+        sortCalendars(list.value).map((calendar) => {
+          const override = visibilityOverrides.current.get(calendar.id);
+          if (!override) return calendar;
+          if (
+            override.version <= visibilityVersionAtStart &&
+            !override.pending &&
+            pendingAtStart.get(calendar.id) !== override.version
+          ) {
+            visibilityOverrides.current.delete(calendar.id);
+            return calendar;
+          }
+          return { ...calendar, isVisible: override.value };
+        }),
+      );
     } else {
       setErrorKey(list.error.messageKey);
     }
@@ -120,17 +150,37 @@ export function useCalendars(enabled: boolean) {
   }, []);
 
   const toggleVisible = useCallback(async (calendar: Calendar) => {
-    const next = !calendar.isVisible;
+    const current =
+      visibilityOverrides.current.get(calendar.id)?.value ??
+      visibilityConfirmed.current.get(calendar.id) ??
+      calendarsRef.current.find((item) => item.id === calendar.id)?.isVisible ??
+      calendar.isVisible;
+    const next = !current;
+    const version = ++visibilityVersion.current;
+    visibilityOverrides.current.set(calendar.id, { value: next, version, pending: true });
     setCalendars((cs) =>
       cs.map((c) => (c.id === calendar.id ? { ...c, isVisible: next } : c)),
     );
-    const result = await setCalendarVisible(calendar.id, next);
-    if (!result.ok) {
-      setCalendars((cs) =>
-        cs.map((c) => (c.id === calendar.id ? { ...c, isVisible: calendar.isVisible } : c)),
-      );
-      setErrorKey(result.error.messageKey);
-    }
+    const previous = visibilityQueues.current.get(calendar.id) ?? Promise.resolve();
+    const request = previous.then(async () => {
+      const result = await setCalendarVisible(calendar.id, next);
+      if (result.ok) visibilityConfirmed.current.set(calendar.id, next);
+      const latest = visibilityOverrides.current.get(calendar.id);
+      if (!latest || latest.version !== version) return;
+      latest.pending = false;
+      if (!result.ok) {
+        const confirmed = visibilityConfirmed.current.get(calendar.id) ?? current;
+        setCalendars((cs) =>
+          cs.map((c) => (c.id === calendar.id ? { ...c, isVisible: confirmed } : c)),
+        );
+        visibilityOverrides.current.delete(calendar.id);
+        setErrorKey(result.error.messageKey);
+      } else {
+        // confirmed は最新リクエストでなくても成功時点で更新済み。
+      }
+    });
+    visibilityQueues.current.set(calendar.id, request.catch(() => undefined));
+    await request;
   }, []);
 
   const finalizePendingDelete = useCallback(() => {

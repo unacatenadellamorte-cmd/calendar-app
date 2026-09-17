@@ -160,7 +160,10 @@ export function SecretModeSettingsScreen() {
                 autoComplete="off"
                 maxLength={8}
                 value={formInput}
-                onChange={(e) => setFormInput(e.target.value)}
+                onChange={(e) => {
+                  setFormInput(e.target.value);
+                  dismissError();
+                }}
                 className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
               />
             </label>
@@ -231,7 +234,10 @@ export function SecretModeSettingsScreen() {
                   autoComplete="off"
                   maxLength={8}
                   value={formInput}
-                  onChange={(e) => setFormInput(e.target.value)}
+                  onChange={(e) => {
+                    setFormInput(e.target.value);
+                    dismissError();
+                  }}
                   className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
                 />
               </label>

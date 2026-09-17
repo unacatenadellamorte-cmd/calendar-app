@@ -157,6 +157,41 @@ function fromPostgrest(error: PostgrestError): AppError {
   return appError('data/query', 'data/query', error);
 }
 
+/**
+ * local 予定の書き込み先が自作カレンダーか確認する。
+ * 外部予定の同期経路はこの関数を通らず、Google/端末側の取り込みを壊さない。
+ * オフラインでは local と確認できるキャッシュが無い場合も fail closed にする。
+ */
+async function validateWritableCalendar(calendarId: string): Promise<AppError | null> {
+  if (isOffline()) {
+    const cached = (await cacheGetAll('calendars')).find((calendar) => calendar.id === calendarId);
+    return !cached || cached.source !== 'local'
+      ? appError('event/calendar-not-writable', 'event/calendar-not-writable')
+      : null;
+  }
+
+  try {
+    const { data, error } = await supabase!
+      .from('calendars')
+      .select('source')
+      .eq('id', calendarId)
+      .maybeSingle();
+    if (error) {
+      // source を確認できない状態で外部へ書かない。恒久エラーはそのまま表示する。
+      if (isNetworkError(error)) return appError('data/offline', 'data/offline', error);
+      return fromPostgrest(error);
+    }
+    const source = (data as { source?: string } | null)?.source;
+    if (source !== 'local') {
+      return appError('event/calendar-not-writable', 'event/calendar-not-writable');
+    }
+    return null;
+  } catch (error) {
+    if (isNetworkError(error)) return appError('data/offline', 'data/offline', error);
+    return appError('data/query', 'data/query', error);
+  }
+}
+
 interface EventInputShape {
   title: string;
   allDay?: boolean;
@@ -238,6 +273,8 @@ export async function createEvent(input: NewEventInput): Promise<Result<EventIte
   if (!supabase) return err(UNAVAILABLE);
   const invalid = validateEventInput(input);
   if (invalid) return err(invalid);
+  const calendarError = await validateWritableCalendar(input.calendarId);
+  if (calendarError) return err(calendarError);
   if (isOffline()) return offlineCreateEvent(input.id ?? newLocalId(), input);
 
   try {
@@ -301,6 +338,10 @@ export async function updateEvent(
   }
   const invalid = validateEventPatch(patch);
   if (invalid) return err(invalid);
+  if (patch.calendarId !== undefined) {
+    const calendarError = await validateWritableCalendar(patch.calendarId);
+    if (calendarError) return err(calendarError);
+  }
   if (isOffline()) return offlineUpdateEvent(current.id, patch);
 
   const row: Record<string, unknown> = {};

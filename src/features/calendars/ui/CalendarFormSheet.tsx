@@ -1,5 +1,5 @@
 import { t, useLanguage } from '@/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
 import type { Calendar } from '@/data/calendars';
@@ -25,11 +25,19 @@ export function CalendarFormSheet({
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(CALENDAR_COLORS[0]!.hex);
   const [submitting, setSubmitting] = useState(false);
+  const initializedKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedKey.current = null;
+      return;
+    }
+    const key = editing ? `editing:${editing.id}` : 'new';
+    if (initializedKey.current === key) return;
+    initializedKey.current = key;
     setName(editing?.name ?? '');
     setColor(editing?.color ?? nextUnusedColor(usedColors));
     setSubmitting(false);
+  // 一覧の再取得では配列や要素が新しい参照になるため、開く対象のキーで一度だけ初期化する。
   }, [open, editing, usedColors]);
   const canDelete = Boolean(editing && !editing.isShift && onDelete);
   return (
@@ -75,7 +83,9 @@ export function CalendarFormSheet({
                   color === c.hex ? 'border-accent' : 'border-border-hairline',
                 ].join(' ')}
                 style={{ backgroundColor: c.hex }}
-              />
+              >
+                {color === c.hex && <span aria-hidden="true" className="text-on-accent drop-shadow">✓</span>}
+              </button>
             ))}
           </div>
         </fieldset>

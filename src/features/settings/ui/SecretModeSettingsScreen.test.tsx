@@ -129,6 +129,16 @@ describe('SecretModeSettingsScreen', () => {
     expect(setPasscode).toHaveBeenCalledWith('5678');
   });
 
+  it('パスコード変更フォームで入力を修正すると、前のエラーをすぐ消す', async () => {
+    state = { hasPasscode: true, unlocked: true, errorKey: 'secret/invalid-passcode' };
+    const user = userEvent.setup();
+    render(<SecretModeSettingsScreen />);
+    await user.click(screen.getByRole('button', { name: 'パスコードを変更' }));
+    dismissError.mockClear();
+    await user.type(screen.getByLabelText('新しいパスコード(4〜8文字の半角英数字)'), '5678');
+    expect(dismissError).toHaveBeenCalled();
+  });
+
   it('ロック中(unlocked=false)は「パスコードを変更」導線ごと出さない(レビュー指摘: 現行パスコード確認なしの変更を防ぐ)', () => {
     state = { hasPasscode: true, unlocked: false, errorKey: null };
     render(<SecretModeSettingsScreen />);

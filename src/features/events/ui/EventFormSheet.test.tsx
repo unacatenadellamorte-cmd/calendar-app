@@ -23,7 +23,7 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
   const onUpdate = vi.fn().mockResolvedValue(true);
   const onClose = vi.fn();
   const onSetReminder = vi.fn().mockResolvedValue(true);
-  render(
+  const view = render(
     <EventFormSheet
       open
       editing={null}
@@ -35,7 +35,7 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
       {...overrides}
     />,
   );
-  return { onCreate, onUpdate, onClose, onSetReminder };
+  return { onCreate, onUpdate, onClose, onSetReminder, ...view };
 }
 
 describe('EventFormSheet', () => {
@@ -59,6 +59,85 @@ describe('EventFormSheet', () => {
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(screen.getByRole('alert')).toHaveTextContent('終了は開始より後に');
     expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('開始または終了が空欄でも変換で落とさず時刻エラーを表示する', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '入力途中');
+    await user.clear(screen.getByLabelText('開始'));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('終了は開始より後に');
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('カレンダーの再取得で入力中のフォームをリセットしない', async () => {
+    const user = userEvent.setup();
+    const first = setup();
+    await user.type(screen.getByLabelText('タイトル'), '入力を保持');
+    first.rerender(
+      <EventFormSheet
+        open
+        editing={null}
+        calendars={[{ ...calendars[0]!, updatedAt: 'refetched' }]}
+        onClose={first.onClose}
+        onCreate={first.onCreate}
+        onUpdate={first.onUpdate}
+        onSetReminder={first.onSetReminder}
+      />,
+    );
+    expect(screen.getByLabelText('タイトル')).toHaveValue('入力を保持');
+  });
+
+  it('カレンダー未取得で開いても一覧到着後に自作カレンダーだけ補完する', async () => {
+    const user = userEvent.setup();
+    const first = setup({ calendars: [] });
+    await user.type(screen.getByLabelText('タイトル'), '先に入力');
+    first.rerender(
+      <EventFormSheet
+        open
+        editing={null}
+        calendars={calendars}
+        onClose={first.onClose}
+        onCreate={first.onCreate}
+        onUpdate={first.onUpdate}
+        onSetReminder={first.onSetReminder}
+      />,
+    );
+    expect(screen.getByLabelText('タイトル')).toHaveValue('先に入力');
+    expect(screen.getByRole('combobox', { name: 'カレンダー' })).toHaveValue('c1');
+  });
+
+  it('外部カレンダーは選択肢に出さず、誤登録 local 予定は自作へ移せる', () => {
+    const external: Calendar = {
+      ...calendars[0]!,
+      id: 'g1',
+      name: 'Google取り込み',
+      source: 'google',
+    };
+    const local: Calendar = { ...calendars[0]!, id: 'c2', name: '自作' };
+    const editing = {
+      id: 'e1',
+      calendarId: external.id,
+      title: '誤登録',
+      allDay: false as const,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+      eventDate: null,
+      note: null,
+      source: 'local' as const,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
+      reminderMinutes: null,
+      isSecret: false,
+      createdAt: '',
+      updatedAt: '',
+    };
+    setup({ calendars: [external, local], editing });
+    expect(screen.queryByRole('option', { name: 'Google取り込み' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'カレンダー' })).toHaveValue('c2');
   });
 
   it('終日で日付未入力なら「日付を選んで」を出す', async () => {

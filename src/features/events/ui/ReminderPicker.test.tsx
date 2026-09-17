@@ -4,13 +4,17 @@ import userEvent from '@testing-library/user-event';
 import { ReminderPicker } from './ReminderPicker';
 
 const requestNotificationPermission = vi.fn();
+const isNotificationSupported = vi.fn();
 vi.mock('@/platform/reminders', () => ({
   requestNotificationPermission: () => requestNotificationPermission(),
+  isNotificationSupported: () => isNotificationSupported(),
 }));
 
 beforeEach(() => {
   requestNotificationPermission.mockReset();
   requestNotificationPermission.mockResolvedValue('granted');
+  isNotificationSupported.mockReset();
+  isNotificationSupported.mockReturnValue(true);
 });
 
 describe('ReminderPicker', () => {
@@ -40,14 +44,54 @@ describe('ReminderPicker', () => {
     expect(onChange).toHaveBeenCalledWith(10);
   });
 
-  it('通知許可の要求が例外を投げても onChange は呼ばれる(denied 扱い)', async () => {
+  it('通知許可の要求が例外を投げても onChange は呼ばれ、拒否を表示する', async () => {
     requestNotificationPermission.mockRejectedValue(new Error('unavailable'));
     const user = userEvent.setup();
     const onChange = vi.fn().mockResolvedValue(true);
     render(<ReminderPicker value={null} onChange={onChange} />);
     await user.click(screen.getByRole('button', { name: '10分前' }));
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(10));
-    expect(screen.getByRole('alert')).toHaveTextContent('通知が許可');
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('通知が許可'));
+  });
+
+  it('通知許可の応答が保留でも選択状態を先に反映し、許可後に一度だけ保存する', async () => {
+    let resolvePermission!: (value: string) => void;
+    requestNotificationPermission.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePermission = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    const onChange = vi.fn().mockResolvedValue(true);
+    render(<ReminderPicker value={null} onChange={onChange} />);
+    await user.click(screen.getByRole('button', { name: '10分前' }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '10分前' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    resolvePermission('granted');
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+  });
+
+  it('Web版など通知非対応でも保存し、通知非対応を表示する', async () => {
+    isNotificationSupported.mockReturnValue(false);
+    const user = userEvent.setup();
+    const onChange = vi.fn().mockResolvedValue(true);
+    render(<ReminderPicker value={null} onChange={onChange} />);
+    await user.click(screen.getByRole('button', { name: '10分前' }));
+    expect(onChange).toHaveBeenCalledWith(10);
+    expect(requestNotificationPermission).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('通知に対応していません');
+  });
+
+  it('保存の Promise が例外でも saving を解除してエラーを表示する', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn().mockRejectedValue(new Error('保存失敗'));
+    render(<ReminderPicker value={null} onChange={onChange} />);
+    await user.click(screen.getByRole('button', { name: '10分前' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('読み込みに失敗'));
+    expect(screen.getByRole('button', { name: '10分前' })).not.toBeDisabled();
   });
 
   it('「リマインダーなし」は設定済みのときだけ押せて、押すと onChange(null) を呼ぶ(許可要求はしない)', async () => {

@@ -1,4 +1,5 @@
 import type { PermissionState } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 /**
@@ -16,6 +17,11 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 export async function requestNotificationPermission(): Promise<PermissionState> {
   const { display } = await LocalNotifications.requestPermissions();
   return display;
+}
+
+/** Web版では Local Notifications が使えないため、保存と通知表示を分離する。 */
+export function isNotificationSupported(): boolean {
+  return Capacitor.isNativePlatform();
 }
 
 export interface ScheduleReminderOptions {

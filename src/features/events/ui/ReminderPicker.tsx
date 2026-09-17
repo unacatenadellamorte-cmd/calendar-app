@@ -1,11 +1,15 @@
 import { t, useLanguage } from '@/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { resolveMessage } from '@/data/messages';
-import { requestNotificationPermission } from '@/platform/reminders';
+import {
+  isNotificationSupported,
+  requestNotificationPermission,
+} from '@/platform/reminders';
 /**
  * リマインダー設定の小さい共有UI(Story 5.4)。`EventFormSheet`/`EventDetailSheet` の
  * 両方から使う。プリセット(10分/30分/1時間前)+ カスタム分数 + 「リマインダーなし」。
- * 選択したら即座に `onChange` で保存する(フォームの「保存」ボタンとは独立。
+ * 選択状態は即座に反映し、Web版ではそのまま `onChange` で保存する。Native版は
+ * 通知許可の結果を受けてから一度だけ保存する(フォームの「保存」ボタンとは独立。
  * `EventDetailSheet` では唯一の書き込み可能な項目になる)。
  *
  * 通知許可はリマインダーをオンにする操作のたびに要求する(既に確定していれば
@@ -49,6 +53,7 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
   const [customValue, setCustomValue] = useState('');
   const [warningKey, setWarningKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const operationRef = useRef(0);
   useEffect(() => {
     setSelected(value);
     setCustomValue(
@@ -58,18 +63,32 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
   const apply = async (minutes: number | null) => {
     setSaving(true);
     setWarningKey(null);
-    if (minutes !== null) {
-      let perm: string;
-      try {
-        perm = await requestNotificationPermission();
-      } catch {
-        perm = 'denied';
-      }
-      if (perm !== 'granted') setWarningKey('notification/permission-denied');
-    }
     const prev = selected;
+    const operation = ++operationRef.current;
+    // 選択状態と DB 保存は通知許可から独立させる。Web版は通知非対応を
+    // 即時に表示し、予定の保存だけは完了させる。
     setSelected(minutes);
-    const ok = await onChange(minutes);
+    let permission: string | null = null;
+    if (minutes !== null && !isNotificationSupported()) {
+      setWarningKey('notification/unavailable');
+    } else if (minutes !== null) {
+      // Native版は許可結果を待ってから一度だけ保存する。選択表示は先に
+      // 更新し、許可待ちの間はボタンを無効にして古い値の競合を防ぐ。
+      try {
+        permission = await requestNotificationPermission();
+      } catch {
+        permission = 'denied';
+      }
+      if (operation !== operationRef.current) return;
+      if (permission !== 'granted') setWarningKey('notification/permission-denied');
+    }
+    let ok = false;
+    try {
+      ok = await onChange(minutes);
+    } catch {
+      if (operation === operationRef.current) setWarningKey('data/query');
+    }
+    if (operation !== operationRef.current) return;
     if (!ok) setSelected(prev);
     setSaving(false);
   };
