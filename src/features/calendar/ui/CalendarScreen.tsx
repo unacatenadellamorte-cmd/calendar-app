@@ -254,7 +254,8 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
               onAddEvent={() => openCreate({ date: selectedDay })}
             />
           )}
-          {!selectedDay && <MonthShiftTiles date={cursor} calendars={cal.calendars} enabled={enabled} onCreated={ev.addLocal} />}
+          {!selectedDay && <MonthShiftTiles date={cursor} calendars={cal.calendars} enabled={enabled} onCreated={ev.addLocal}
+            events={visibleEvents} onDateChange={jumpTo} onRemove={ev.remove} />}
         </>
       ) : view === 'week' ? (
         <WeekView
