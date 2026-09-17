@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { paletteTokens, themePalettes, type PaletteName } from './themePalettes';
 
 /** テーマの選択肢。'system' は端末設定に追従する。 */
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type ThemePreference = 'system' | 'light' | 'dark' | PaletteName;
 
 const STORAGE_KEY = 'calendar-app.theme';
-const VALID: readonly ThemePreference[] = ['system', 'light', 'dark'];
+const VALID: readonly ThemePreference[] = ['system', 'light', 'dark', 'sakura', 'leaf', 'ocean', 'lavender'];
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (VALID as readonly string[]).includes(value);
@@ -23,6 +24,12 @@ export function readStoredTheme(): ThemePreference {
 /** ルート要素の data-theme 属性を更新する。'system' 時は属性を外して端末追従に戻す。 */
 export function applyTheme(preference: ThemePreference): void {
   const root = document.documentElement;
+  paletteTokens.forEach((token) => root.style.removeProperty(`--color-${token}`));
+  if (preference in themePalettes) {
+    const palette = themePalettes[preference as PaletteName];
+    paletteTokens.forEach((token, index) => root.style.setProperty(`--color-${token}`, palette.colors[index]!));
+  }
+  root.style.colorScheme = preference === 'system' ? 'light dark' : preference === 'dark' ? 'dark' : 'light';
   if (preference === 'system') {
     root.removeAttribute('data-theme');
   } else {

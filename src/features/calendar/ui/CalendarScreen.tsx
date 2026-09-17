@@ -290,7 +290,7 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
         editing={editing}
         seed={seed}
         calendars={cal.calendars}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => { setSheetOpen(false); setSelectedDay(null); }}
         onCreate={(input: NewEventInput) => ev.create(input)}
         onUpdate={(current, input) => ev.update(current, input)}
         onDelete={(event) => void ev.remove(event)}

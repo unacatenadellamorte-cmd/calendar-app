@@ -28,6 +28,16 @@ describe('readStoredTheme', () => {
 });
 
 describe('applyTheme', () => {
+  it('追加配色を保存値から復元し、標準テーマへ戻すと配色を解除する', () => {
+    for (const theme of ['sakura', 'leaf', 'ocean', 'lavender'] as const) {
+      window.localStorage.setItem('calendar-app.theme', theme);
+      applyTheme(readStoredTheme());
+      expect(document.documentElement.dataset.theme).toBe(theme);
+      expect(document.documentElement.style.getPropertyValue('--color-accent')).not.toBe('');
+    }
+    applyTheme('system');
+    expect(document.documentElement.style.getPropertyValue('--color-accent')).toBe('');
+  });
   it('light / dark は data-theme を設定し、system は属性を外す', () => {
     applyTheme('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');

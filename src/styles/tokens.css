@@ -47,7 +47,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme]) {
     --color-surface-base: #16181c;
     --color-surface-sunken: #0f1113;
     --color-surface-raised: #1e2126;

@@ -82,22 +82,22 @@ export function MonthShiftTiles({ date, calendars, enabled, onCreated, events, o
 
   return (
     <section className="mt-4" aria-label="登録シフト">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col items-start gap-2">
         <h2 className="text-body font-semibold">登録シフト</h2>
-        <div className="flex items-center gap-1" role="group" aria-label="シフトの日付移動と削除">
+        <div className="order-first flex items-center justify-center gap-2" role="group" aria-label="シフトの日付移動と削除">
           <button type="button" aria-label="前日に移動" title="前日に移動" disabled={busy}
             onClick={() => onDateChange(addDays(date, -1))}
-            className="flex h-9 w-9 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40">←</button>
-          <button type="button" aria-label="翌日に移動" title="翌日に移動" disabled={busy}
-            onClick={() => onDateChange(addDays(date, 1))}
-            className="flex h-9 w-9 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40">→</button>
+            className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"><svg aria-hidden="true" width="42" height="24" viewBox="0 0 42 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M38 12H4m9-8-9 8 9 8" /></svg></button>
           <button type="button" aria-label="選択日のシフトを削除" title="選択日のシフトを削除"
             disabled={busy || dayShifts.length === 0} onClick={requestDelete}
-            className="flex h-9 w-9 items-center justify-center rounded-sm border border-border-hairline text-danger disabled:opacity-40">
-            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-danger disabled:opacity-40">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
             </svg>
           </button>
+          <button type="button" aria-label="翌日に移動" title="翌日に移動" disabled={busy}
+            onClick={() => onDateChange(addDays(date, 1))}
+            className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"><svg aria-hidden="true" width="42" height="24" viewBox="0 0 42 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12h34m-9-8 9 8-9 8" /></svg></button>
         </div>
       </div>
       <p className="mt-1 text-meta text-ink-secondary">{date}に追加 · 日付をタップして選択、長押しで予定入力</p>

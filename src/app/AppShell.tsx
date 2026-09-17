@@ -51,7 +51,7 @@ export function AppShell() {
         passcodeHash={profile?.secretPasscodeHash ?? null}
         onChangePasscodeHash={(hash) => update({ secretPasscodeHash: hash })}
       >
-        <div className="mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken pt-[env(safe-area-inset-top)]">
+        <div className="app-shell mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken pt-[env(safe-area-inset-top)]">
           <ConnectivityBar />
           {showWaiting ? (
             <p className="px-4 py-8 text-center text-meta text-ink-secondary">読み込み中…</p>

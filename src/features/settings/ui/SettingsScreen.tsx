@@ -1,3 +1,5 @@
+import { BackgroundSection } from './BackgroundSection';
+import { themePalettes, type PaletteName } from '../model/themePalettes';
 import { Link } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useTheme, type ThemePreference } from '@/features/settings/model/useTheme';
@@ -15,6 +17,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: '端末に合わせる' },
   { value: 'light', label: 'ライト' },
   { value: 'dark', label: 'ダーク' },
+  ...Object.entries(themePalettes).map(([value, palette]) => ({ value: value as PaletteName, label: palette.label })),
 ];
 
 const FEATURED_COUNT_OPTIONS = Array.from(
@@ -52,13 +55,22 @@ export function SettingsScreen() {
                   selected ? 'text-accent' : 'text-ink-primary',
                 ].join(' ')}
               >
-                <span>{opt.label}</span>
+                <span className="flex items-center gap-3">
+                  <span aria-hidden="true" className="flex gap-1">
+                    {(opt.value in themePalettes ? themePalettes[opt.value as PaletteName].colors.slice(0, 3).concat([themePalettes[opt.value as PaletteName].colors[6]]) : opt.value === 'dark' ? ['#16181c', '#6aa0ff', '#e6e8eb'] : ['#ffffff', '#2563eb', '#eaf1ff']).map((color, index) => (
+                      <span key={index} className="h-4 w-4 rounded-full border border-border-hairline" style={{ backgroundColor: color }} />
+                    ))}
+                  </span>
+                  {opt.label}
+                </span>
                 {selected && <span aria-hidden="true">✓</span>}
               </button>
             );
           })}
         </div>
       </section>
+
+      <BackgroundSection />
 
       <section aria-labelledby="featured-count-heading" className="mt-6">
         <h2 id="featured-count-heading" className="text-body font-semibold text-ink-primary">
