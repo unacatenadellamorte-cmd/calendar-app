@@ -1,4 +1,4 @@
-import { useRoutes, useSearchParams, type RouteObject } from 'react-router-dom';
+import { useLocation, useRoutes, useSearchParams, type RouteObject } from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { HomeScreen } from '@/features/home/ui/HomeScreen';
 import { CalendarScreen } from '@/features/calendar/ui/CalendarScreen';
@@ -12,6 +12,7 @@ import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPi
 import { DeviceCalendarPicker } from '@/features/connections/ui/DeviceCalendarPicker';
 import { ProfileScreen } from '@/features/profile/ui/ProfileScreen';
 import { SecretModeSettingsScreen } from '@/features/settings/ui/SecretModeSettingsScreen';
+import { isValidLocalDate } from '@/lib/datetime';
 
 /**
  * `/calendar?date=YYYY-MM-DD`(ホームの代表予定タップ等)と
@@ -20,13 +21,24 @@ import { SecretModeSettingsScreen } from '@/features/settings/ui/SecretModeSetti
  */
 function CalendarRoute() {
   const [params] = useSearchParams();
+  const location = useLocation();
   const raw = params.get('date');
   // 手書き URL 等の不正値でカレンダー描画が壊れないよう、暦日の形だけ通す。
-  const initialDate = raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+  const initialDate = raw && isValidLocalDate(raw) ? raw : undefined;
   // 形式チェックはしない。存在しない/不正な ID は CalendarScreen 側で
   // 該当予定が見つからず、静かにフォールバックする(I/O & Edge-Case Matrix)。
   const initialEventId = params.get('event') ?? undefined;
-  return <CalendarScreen initialDate={initialDate} initialEventId={initialEventId} />;
+  const rawCreate = params.get('create');
+  const initialCreateDate = rawCreate && isValidLocalDate(rawCreate) ? rawCreate : undefined;
+  return (
+    <CalendarScreen
+      initialDate={initialDate}
+      initialEventId={initialEventId}
+      initialCreateDate={initialCreateDate}
+      // location.key は同じ日付を同じウィジェットから再度開いたときの要求識別子になる。
+      initialRequestKey={initialCreateDate ? location.key : undefined}
+    />
+  );
 }
 
 const routes: RouteObject[] = [

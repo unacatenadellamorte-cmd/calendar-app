@@ -2,7 +2,6 @@ package jp.ryo.multicalendar.widget
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
@@ -163,14 +162,24 @@ private fun parseColor(hex: String): Color = try {
  * 無ければ今日(`calendar-app://day/{today}`)。既存のディープリンク intent-filter
  * (AndroidManifest.xml、Story 5.1、無変更)経由で MainActivity が開く。
  */
-private fun deepLinkIntent(event: FeaturedWidgetEvent?): Intent {
+private fun deepLinkIntent(context: Context, event: FeaturedWidgetEvent?): Intent {
     // event.id は通常 UUID で実害は無いはずだが、URI に埋め込む値は防御的にエンコードする。
-    val uri = if (event != null && event.id.isNotEmpty()) {
-        Uri.parse("calendar-app://event/${Uri.encode(event.id)}")
+    return if (event != null && event.id.isNotEmpty()) {
+        widgetDeepLinkIntent(context, "event", event.id)
     } else {
-        Uri.parse("calendar-app://day/${Uri.encode(todayLocalDate())}")
+        widgetDeepLinkIntent(context, "day", todayLocalDate())
     }
-    return Intent(Intent.ACTION_VIEW, uri)
+}
+
+@Composable
+private fun AddEventButton(context: Context) {
+    Text(
+        text = "＋",
+        style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color(0xFF0072B2))),
+        modifier = GlanceModifier
+            .clickable(actionStartActivity(createWidgetIntent(context, todayWidgetDay())))
+            .padding(2.dp),
+    )
 }
 
 @Composable
@@ -180,36 +189,32 @@ private fun FeaturedEventsContent() {
     val events = readFeaturedEvents(context)
     val visibleRows = events.take(maxRowsFor(size))
 
-    var containerModifier = GlanceModifier
-        .fillMaxSize()
-        .background(Color.White)
-        .padding(12.dp)
-    if (visibleRows.isEmpty()) {
-        // 0件時はウィジェット全体のタップで今日へ(I/O Matrix「ウィジェットタップ(0件)」)。
-        containerModifier = containerModifier.clickable(actionStartActivity(deepLinkIntent(null)))
-    }
-
-    Column(modifier = containerModifier) {
-        if (visibleRows.isEmpty()) {
-            Text(
-                text = "この後の予定はありません",
-                style = TextStyle(fontSize = 13.sp, color = ColorProvider(Color.DarkGray)),
-            )
-        } else {
+    // 追加ボタンは予定の右に置き、小さい40dp表示でも予定を押し出さない。
+    Row(modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(4.dp)) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            if (visibleRows.isEmpty()) {
+                Text(
+                    text = "この後の予定はありません",
+                    style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.DarkGray)),
+                    maxLines = 1,
+                    modifier = GlanceModifier.clickable(actionStartActivity(deepLinkIntent(context, null))),
+                )
+            }
             visibleRows.forEachIndexed { index, event ->
                 if (index > 0) Spacer(modifier = GlanceModifier.height(6.dp))
-                FeaturedEventRow(event)
+                FeaturedEventRow(context, event)
             }
         }
+        AddEventButton(context)
     }
 }
 
 @Composable
-private fun FeaturedEventRow(event: FeaturedWidgetEvent) {
+private fun FeaturedEventRow(context: Context, event: FeaturedWidgetEvent) {
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .clickable(actionStartActivity(deepLinkIntent(event))),
+            .clickable(actionStartActivity(deepLinkIntent(context, event))),
     ) {
         Spacer(
             modifier = GlanceModifier

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOnline } from '@/app/online-context';
+import { refreshFeaturedWidget } from '@/platform/widget';
 import {
   createCalendar,
   deleteCalendar,
@@ -101,6 +102,7 @@ export function useCalendars(enabled: boolean) {
   const create = useCallback(async (input: NewCalendarInput) => {
     const result = await createCalendar(input);
     if (result.ok) {
+      void refreshFeaturedWidget();
       setCalendars((cs) => sortCalendars([...cs, result.value]));
       setErrorKey(null); // 直前の失敗のエラーバナーを引きずらない
       return true;
@@ -120,6 +122,7 @@ export function useCalendars(enabled: boolean) {
     setCalendars(optimistic);
     const result = await reorderCalendars(orderedIds);
     if (result.ok) {
+      void refreshFeaturedWidget();
       setCalendars(sortCalendars(result.value));
     } else {
       setCalendars(snapshot);
@@ -130,6 +133,7 @@ export function useCalendars(enabled: boolean) {
   const rename = useCallback(async (id: string, name: string) => {
     const result = await renameCalendar(id, name);
     if (result.ok) {
+      void refreshFeaturedWidget();
       setCalendars((cs) => cs.map((c) => (c.id === id ? result.value : c)));
       setErrorKey(null);
       return true;
@@ -141,6 +145,7 @@ export function useCalendars(enabled: boolean) {
   const recolor = useCallback(async (id: string, color: string) => {
     const result = await recolorCalendar(id, color);
     if (result.ok) {
+      void refreshFeaturedWidget();
       setCalendars((cs) => cs.map((c) => (c.id === id ? result.value : c)));
       setErrorKey(null);
       return true;
@@ -164,6 +169,7 @@ export function useCalendars(enabled: boolean) {
     const previous = visibilityQueues.current.get(calendar.id) ?? Promise.resolve();
     const request = previous.then(async () => {
       const result = await setCalendarVisible(calendar.id, next);
+      if (result.ok) void refreshFeaturedWidget();
       if (result.ok) visibilityConfirmed.current.set(calendar.id, next);
       const latest = visibilityOverrides.current.get(calendar.id);
       if (!latest || latest.version !== version) return;
@@ -195,6 +201,7 @@ export function useCalendars(enabled: boolean) {
         setErrorKey(result.error.messageKey);
         return;
       }
+      void refreshFeaturedWidget();
       setCalendars((cs) => cs.filter((c) => c.id !== calendar.id));
       // 直前の削除の Undo タイマが残っていたら止める(連続削除で孤児タイマが
       // 発火して次の Undo バーを早期に消すのを防ぐ。useShiftTemplates と揃える)。
@@ -216,6 +223,7 @@ export function useCalendars(enabled: boolean) {
     setPendingDelete(null);
     const result = await restoreCalendar(pending.calendar);
     if (result.ok) {
+      void refreshFeaturedWidget();
       setCalendars((cs) => sortCalendars([...cs, pending.calendar]));
     } else {
       setErrorKey(result.error.messageKey);

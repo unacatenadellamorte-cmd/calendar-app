@@ -62,6 +62,28 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/featured_events_widget_info" />
         </receiver>
+        <receiver
+            android:name=".widget.WeekEventsWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_week_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/week_events_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.MonthEventsWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_month_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/month_events_widget_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

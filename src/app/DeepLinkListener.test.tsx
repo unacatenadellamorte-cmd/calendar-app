@@ -32,6 +32,16 @@ afterEach(() => {
 });
 
 describe('DeepLinkListener', () => {
+  it('create リンクは実在する日付だけを /calendar?create= へ変換する', () => {
+    render(<DeepLinkListener />);
+    capturedHandler?.('calendar-app://create/2026-02-28');
+    expect(navigateMock).toHaveBeenCalledWith('/calendar?create=2026-02-28');
+    navigateMock.mockClear();
+    capturedHandler?.('calendar-app://create/2026-02-29');
+    capturedHandler?.('calendar-app://create/2026-13-01');
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('calendar-app://event/{id} を /calendar?event={id} へ変換して navigate し、直後に ?event= をクエリから取り除く', () => {
     vi.useFakeTimers();
     render(<DeepLinkListener />);

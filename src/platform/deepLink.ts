@@ -16,20 +16,68 @@ import { LocalNotifications, type ActionPerformed } from '@capacitor/local-notif
  * (呼び出し時に該当プラットフォームがなければ何もしない)。
  */
 export function onDeepLink(handler: (url: string) => void): () => void {
-  const listenerHandle = App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
-    handler(event.url);
-  });
-  const notificationListenerHandle = LocalNotifications.addListener(
-    'localNotificationActionPerformed',
-    (action: ActionPerformed) => {
-      const eventId = (action.notification.extra as { eventId?: unknown } | undefined)?.eventId;
-      if (typeof eventId === 'string' && eventId) {
-        handler(`calendar-app://event/${eventId}`);
-      }
-    },
-  );
+  let active = true;
+  // 冷起動時に同じ URL が appUrlOpen と getLaunchUrl の両方から届く実装差を吸収する。
+  // getLaunchUrl が解決するまでに届いた warm URL だけを一時的に記録し、通常の同日再タップは
+  // getLaunchUrl の解決後ならそのまま通す。
+  let launchResolved = false;
+  let warmUrlReceivedBeforeLaunch = false;
+  const deliverWarmUrl = (url: string) => {
+    if (!active) return;
+    if (!launchResolved) warmUrlReceivedBeforeLaunch = true;
+    handler(url);
+  };
+
+  let listenerHandle: Promise<{ remove: () => void }> | undefined;
+  try {
+    listenerHandle = App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
+      deliverWarmUrl(event.url);
+    });
+    void listenerHandle.catch(() => undefined);
+  } catch {
+    // Web や未実装の Capacitor ランタイムでは購読できないことがある。
+  }
+
+  let notificationListenerHandle: Promise<{ remove: () => void }> | undefined;
+  try {
+    notificationListenerHandle = LocalNotifications.addListener(
+      'localNotificationActionPerformed',
+      (action: ActionPerformed) => {
+        if (!active) return;
+        const eventId = (action.notification.extra as { eventId?: unknown } | undefined)?.eventId;
+        if (typeof eventId === 'string' && eventId) {
+          handler(`calendar-app://event/${eventId}`);
+        }
+      },
+    );
+    void notificationListenerHandle.catch(() => undefined);
+  } catch {
+    // Web では通知プラグインが未実装でも、カレンダー画面自体は使えるようにする。
+  }
+
+  // getLaunchUrl がない Web 実装もある。呼び出しは常に購読登録後に行い、競合時の URL を拾う。
+  void (async () => {
+    try {
+      if (typeof App.getLaunchUrl !== 'function') return;
+      const launch = await App.getLaunchUrl();
+      // warm が一件でも先に届いた場合は、遅れて返る launch URL を採用しない。
+      // 起動時に別 URL が返る実装では、古い launch URL が warm 遷移を上書きし得るため。
+      if (!active || !launch?.url || warmUrlReceivedBeforeLaunch) return;
+      handler(launch.url);
+    } catch {
+      // Web / 起動 URL 非対応環境では静かに無視する。
+    } finally {
+      launchResolved = true;
+    }
+  })();
+
   return () => {
-    void listenerHandle.then((listener) => listener.remove());
-    void notificationListenerHandle.then((listener) => listener.remove());
+    active = false;
+    const remove = (handle: Promise<{ remove: () => void }> | undefined) => {
+      if (!handle) return;
+      void handle.then((listener) => listener.remove()).catch(() => undefined);
+    };
+    remove(listenerHandle);
+    remove(notificationListenerHandle);
   };
 }

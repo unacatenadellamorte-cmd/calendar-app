@@ -104,6 +104,19 @@ describe('CalendarRoute の ?date=', () => {
   });
 });
 
+describe('CalendarRoute の ?create=', () => {
+  it('実在する日付なら指定日の予定追加シートを開く', () => {
+    renderAt('/calendar?create=2026-12-25');
+    expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-12-25T09:00');
+  });
+
+  it('存在しない日付ならクエリを無視してシートを開かない', () => {
+    renderAt('/calendar?create=2026-02-29');
+    expect(screen.queryByRole('dialog', { name: '予定を追加' })).not.toBeInTheDocument();
+  });
+});
+
 describe('CalendarRoute の ?event=(ディープリンク calendar-app://event/{id} 由来)', () => {
   it('?event=<id> で該当するローカル予定の編集シートを開く', () => {
     evState.events = [sampleEvent];

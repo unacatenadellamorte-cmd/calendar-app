@@ -44,6 +44,21 @@ export function todayLocalDate(): string {
   return localDateString(new Date());
 }
 
+/** 実在するローカル暦日("YYYY-MM-DD")かを判定する。 */
+export function isValidLocalDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year = 0, month = 0, day = 0] = value.split('-').map(Number);
+  // Date.UTC は 0〜99 年を 1900 年代として扱うため、基準年を作ってから暦年だけ置き換える。
+  if (year < 1) return false;
+  const date = new Date(Date.UTC(2000, month - 1, day));
+  date.setUTCFullYear(year);
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
 /** UTC ISO の指す瞬間が属すローカル暦日("YYYY-MM-DD")。 */
 export function localDateOf(iso: string): string {
   return localDateString(new Date(iso));

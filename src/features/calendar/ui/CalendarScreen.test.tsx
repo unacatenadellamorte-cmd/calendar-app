@@ -639,4 +639,50 @@ describe('CalendarScreen', () => {
       expect(screen.getByLabelText('タイトル')).toHaveValue('別の予定');
     });
   });
+
+  describe('initialCreateDate(ウィジェット calendar-app://create/{date} 由来)', () => {
+    it('ロード済みなら指定日をシードした新規入力を一度だけ開き、クエリを消費する', () => {
+      const { rerender } = render(
+        <CalendarScreen initialCreateDate="2026-12-25" initialRequestKey="request-1" />,
+      );
+      expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+      expect(screen.getByLabelText('開始')).toHaveValue('2026-12-25T09:00');
+      expect(navigateMock).toHaveBeenCalledWith('/calendar', { replace: true });
+
+      rerender(<CalendarScreen initialCreateDate="2026-12-25" initialRequestKey="request-1" />);
+      expect(screen.getAllByRole('dialog', { name: '予定を追加' })).toHaveLength(1);
+      expect(navigateMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('認証・データロード中はリンクを保持し、準備後に開く', () => {
+      authState = { state: 'loading' };
+      evState.loading = true;
+      calState.loading = true;
+      const { rerender } = render(
+        <CalendarScreen initialCreateDate="2026-12-25" initialRequestKey="request-2" />,
+      );
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(navigateMock).not.toHaveBeenCalled();
+
+      authState = { state: 'guest' };
+      evState = { ...evState, loading: false };
+      calState = { ...calState, loading: false };
+      rerender(
+        <CalendarScreen initialCreateDate="2026-12-25" initialRequestKey="request-2" />,
+      );
+      expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledWith('/calendar', { replace: true });
+    });
+
+    it('同じ日付でも要求キーが変われば閉じた後に再度開ける', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <CalendarScreen initialCreateDate="2026-12-25" initialRequestKey="request-3" />,
+      );
+      await user.click(screen.getByRole('button', { name: '閉じる' }));
+      rerender(<CalendarScreen initialCreateDate="2026-12-25" initialRequestKey="request-4" />);
+      expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });

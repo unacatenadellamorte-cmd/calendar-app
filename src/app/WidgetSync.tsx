@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { onAppResume } from '@/platform/appLifecycle';
 import { refreshFeaturedWidget } from '@/platform/widget';
+import { useAuth } from './auth-context';
+import { useLanguage } from '@/i18n';
 
 /**
  * フォアグラウンド復帰のたびにホーム画面ウィジェットを最新化する、非表示コンポーネント
@@ -11,6 +13,18 @@ import { refreshFeaturedWidget } from '@/platform/widget';
  * 警告ログのみ(投げない)を担うため、ここでは呼ぶだけでよい。
  */
 export function WidgetSync() {
-  useEffect(() => onAppResume(() => void refreshFeaturedWidget()), []);
+  const { state, session } = useAuth();
+  const language = useLanguage();
+  const userId = session?.user.id ?? null;
+
+  useEffect(() => {
+    if (state !== 'guest' && state !== 'authenticated') return;
+    void refreshFeaturedWidget();
+  }, [state, userId, language]);
+
+  useEffect(() => {
+    if (state !== 'guest' && state !== 'authenticated') return;
+    return onAppResume(() => void refreshFeaturedWidget());
+  }, [state]);
   return null;
 }

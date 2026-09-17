@@ -42,7 +42,7 @@ vi.mock('@/data/calendars', () => ({
   listCalendars: (...a: unknown[]) => listCalendars(...a),
 }));
 
-const { buildFeaturedWidgetPayload, refreshFeaturedWidget } = await import('./widget');
+const { buildFeaturedWidgetPayload, buildCalendarOverviewPayload, refreshFeaturedWidget } = await import('./widget');
 
 const cal = (over: Partial<Calendar>): Calendar => ({
   id: 'c1',
@@ -63,7 +63,7 @@ const ev = (over: Partial<EventItem>): EventItem => ({
   title: '会議',
   allDay: false,
   startsAt: '2026-09-08T06:00:00.000Z',
-  endsAt: '2026-09-08T07:00:00.000Z',
+  endsAt: '2026-09-08T23:00:00.000Z',
   eventDate: null,
   note: null,
   source: 'local',
@@ -202,15 +202,26 @@ describe('refreshFeaturedWidget', () => {
     expect(listEvents).toHaveBeenCalledTimes(1);
     expect(listCalendars).toHaveBeenCalledTimes(1);
     expect(setRegisteredWidgets).toHaveBeenCalledWith({
-      widgets: ['jp.ryo.multicalendar.widget.FeaturedEventsWidgetReceiver'],
+      widgets: [
+        'jp.ryo.multicalendar.widget.FeaturedEventsWidgetReceiver',
+        'jp.ryo.multicalendar.widget.WeekEventsWidgetReceiver',
+        'jp.ryo.multicalendar.widget.MonthEventsWidgetReceiver',
+      ],
     });
-    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(setItem).toHaveBeenCalledTimes(2);
     const arg = setItem.mock.calls[0]![0];
     expect(arg.key).toBe('featuredEvents');
     expect(arg.group).toBe('group.jp.ryo.multicalendar.widget');
     expect(JSON.parse(arg.value)).toEqual([
       expect.objectContaining({ id: 'e1', schemaVersion: 1 }),
     ]);
+    const overviewArg = setItem.mock.calls[1]![0];
+    expect(overviewArg.key).toBe('calendarOverview');
+    expect(JSON.parse(overviewArg.value)).toMatchObject({
+      schemaVersion: 1,
+      language: 'ja',
+      events: [expect.objectContaining({ id: 'e1', title: '会議', startDate: '2026-09-08', endDate: '2026-09-09' })],
+    });
     expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
 
     const order = [setRegisteredWidgets, setItem, reloadAllTimelines].map(
@@ -280,7 +291,7 @@ describe('refreshFeaturedWidget', () => {
     await expect(refreshFeaturedWidget()).resolves.toBeUndefined();
   });
 
-  it('実行中に再度呼ばれても新たな listEvents/listCalendars は起こさず、進行中の Promise を共有する(device-sync.ts の inFlight と同じガード)', async () => {
+  it('実行中に更新要求が来たら、完了後にもう一度取り直して途中の変更を捨てない', async () => {
     isNativePlatform.mockReturnValue(true);
     let resolveEvents!: (v: unknown) => void;
     listEvents.mockReturnValue(
@@ -297,11 +308,33 @@ describe('refreshFeaturedWidget', () => {
     resolveEvents(ok([ev({ id: 'e1', startsAt: '2026-09-08T06:00:00.000Z' })]));
     await Promise.all([first, second]);
 
-    expect(listEvents).toHaveBeenCalledTimes(1);
-    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(listEvents).toHaveBeenCalledTimes(2);
+    expect(setItem).toHaveBeenCalledTimes(4);
 
+    expect(listEvents).toHaveBeenCalledTimes(2);
     // 完了後に呼べば新たな実行が起こる(使い回しっぱなしにならない)。
     await refreshFeaturedWidget();
-    expect(listEvents).toHaveBeenCalledTimes(2);
+    expect(listEvents).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('buildCalendarOverviewPayload', () => {
+  it('表示中かつ公開の予定を全件、ローカル日付の範囲順で整形する', () => {
+    const calendars = [cal({ id: 'c1' }), cal({ id: 'off', isVisible: false })];
+    const events = [
+      ev({ id: 'overnight', startsAt: '2026-09-08T14:00:00.000Z', endsAt: '2026-09-09T15:00:00.000Z' }),
+      ev({ id: 'secret', isSecret: true }),
+      ev({ id: 'hidden', calendarId: 'off' }),
+      ev({ id: 'all-day', allDay: true, startsAt: null, endsAt: null, eventDate: '2026-09-07' }),
+      ev({ id: 'bad', startsAt: 'invalid' }),
+    ];
+    const payload = buildCalendarOverviewPayload(events, calendars, '2026-09-08T00:00:00.000Z', 'en');
+    expect(payload).toMatchObject({ schemaVersion: 1, updatedAtIso: '2026-09-08T00:00:00.000Z', language: 'en' });
+    expect(payload.events.map((event) => event.id)).toEqual(['all-day', 'overnight']);
+    expect(payload.events[1]).toMatchObject({
+      startDate: '2026-09-08',
+      endDate: '2026-09-09',
+      startsAtIso: '2026-09-08T14:00:00.000Z',
+    });
   });
 });

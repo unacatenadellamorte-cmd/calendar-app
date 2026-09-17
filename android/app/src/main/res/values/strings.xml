@@ -4,4 +4,6 @@
     <string name="title_activity_main">Multi calendar</string>
     <string name="package_name">jp.ryo.multicalendar</string>
     <string name="custom_url_scheme">jp.ryo.multicalendar</string>
+    <string name="widget_week_label">週の予定</string>
+    <string name="widget_month_label">月の予定</string>
 </resources>

@@ -3,6 +3,11 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { ok, err, appError } from '@/data/result';
 import type { Calendar } from '@/data/calendars';
 
+const refreshFeaturedWidget = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/platform/widget', () => ({
+  refreshFeaturedWidget: () => refreshFeaturedWidget(),
+}));
+
 const listCalendars = vi.fn();
 const ensureShiftCalendar = vi.fn();
 const createCalendar = vi.fn();
@@ -44,6 +49,7 @@ const cal = (over: Partial<Calendar> = {}): Calendar => ({
 const shift = cal({ id: 's1', name: 'シフト', isShift: true });
 
 beforeEach(() => {
+  refreshFeaturedWidget.mockClear();
   [
     listCalendars,
     ensureShiftCalendar,
@@ -273,5 +279,17 @@ describe('useCalendars', () => {
       await Promise.all([first, second]);
     });
     expect(result.current.calendars.find((item) => item.id === 'c1')?.isVisible).toBe(true);
+  });
+});
+
+
+describe('ウィジェットへの表示設定反映', () => {
+  it('表示切替の保存完了後に最新の共有データへ更新する', async () => {
+    setCalendarVisible.mockResolvedValue(ok(undefined));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    refreshFeaturedWidget.mockClear();
+    await act(async () => { await result.current.toggleVisible(cal()); });
+    expect(refreshFeaturedWidget).toHaveBeenCalled();
   });
 });

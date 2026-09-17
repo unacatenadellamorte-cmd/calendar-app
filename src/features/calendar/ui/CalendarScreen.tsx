@@ -13,7 +13,7 @@ import {
   weekRowOf,
   ymd,
 } from '@/lib/calendar-view';
-import { todayLocalDate } from '@/lib/datetime';
+import { isValidLocalDate, todayLocalDate } from '@/lib/datetime';
 import { useCalendars } from '@/features/calendars/model/useCalendars';
 import { useEvents } from '@/features/events/model/useEvents';
 import { EventFormSheet, type EventSeed } from '@/features/events/ui/EventFormSheet';
@@ -34,13 +34,22 @@ interface CalendarScreenProps {
   initialDate?: string;
   /** ディープリンク(`calendar-app://event/{id}`)由来の「この予定を開く」指定。 */
   initialEventId?: string;
+  /** ウィジェットの新規作成リンク(`calendar-app://create/{date}`)由来の指定日。 */
+  initialCreateDate?: string;
+  /** 同じ日付のリンクを繰り返し処理するための要求識別子。 */
+  initialRequestKey?: string;
 }
 /**
  * カレンダー画面。月 / 日(cursor当日の1日タイムライン、内部値は 'week') / リスト / 年の4ビューと日付ナビ。
  * 表示オンのカレンダーの予定だけを描画し、日セル / 空きスロットのタップで追加、
  * チップのタップで編集につなぐ。
  */
-export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenProps = {}) {
+export function CalendarScreen({
+  initialDate,
+  initialEventId,
+  initialCreateDate,
+  initialRequestKey,
+}: CalendarScreenProps = {}) {
   useLanguage();
   const { state } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
@@ -64,6 +73,15 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   const [editing, setEditing] = useState<EventItem | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
   const [seed, setSeed] = useState<EventSeed | undefined>(undefined);
+  // enabled が false→true になった描画では、データフックの再取得 effect がまだ
+  // loading=true を反映していないことがある。create リンクをその描画で消費しないための世代待ち。
+  const enabledAtRenderRef = useRef(enabled);
+  const authJustResolved = enabled && !enabledAtRenderRef.current;
+  const [waitingForAuthData, setWaitingForAuthData] = useState(false);
+  useEffect(() => {
+    if (authJustResolved) setWaitingForAuthData(true);
+    enabledAtRenderRef.current = enabled;
+  }, [authJustResolved, enabled]);
   // 月表示: タップした日(選択中)。折りたたみ(その週1行、Option C)+ 下のパネル表示を兼ねる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   useEffect(() => {
@@ -147,6 +165,37 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     if (target) openEdit(target);
     // openEdit は毎レンダー再生成される関数だが、initialEventId/enabled/ev/cal の変化にのみ追従すればよい。
   }, [initialEventId, enabled, ev.loading, unlockedEvents, cal.loading]);
+  // ウィジェットの create リンクは、認証と予定・カレンダーのロードが済んでから消費する。
+  // それまではルートのクエリに残るため、冷起動直後のリンクを失わない。
+  const processedCreateRequestRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!initialCreateDate || !isValidLocalDate(initialCreateDate)) return;
+    const requestKey = initialRequestKey ?? initialCreateDate;
+    if (processedCreateRequestRef.current === requestKey) return;
+    if (!enabled || authJustResolved || waitingForAuthData) {
+      if (waitingForAuthData && !ev.loading && !cal.loading) setWaitingForAuthData(false);
+      return;
+    }
+    if (ev.loading || cal.loading) return;
+
+    processedCreateRequestRef.current = requestKey;
+    setDetailEvent(null);
+    setSelectedDay(null);
+    jumpTo(initialCreateDate);
+    openCreate({ date: initialCreateDate });
+    // 先に作成シートを開く要求を出し、処理済みのクエリだけ履歴から消費する。
+    navigate('/calendar', { replace: true });
+  }, [
+    initialCreateDate,
+    initialRequestKey,
+    enabled,
+    ev.loading,
+    cal.loading,
+    authJustResolved,
+    waitingForAuthData,
+    jumpTo,
+    navigate,
+  ]);
   if (state === 'unavailable') {
     return (
       <Screen title={t('カレンダー')}>

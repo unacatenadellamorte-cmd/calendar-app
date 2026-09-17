@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_week_label">Multi calendar · 周</string>
+    <string name="widget_month_label">Multi calendar · 月</string>
+</resources>

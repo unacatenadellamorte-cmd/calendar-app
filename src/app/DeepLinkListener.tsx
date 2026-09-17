@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onDeepLink } from '@/platform/deepLink';
+import { isValidLocalDate } from '@/lib/datetime';
 
 /**
  * ディープリンクの唯一の受け口(ARCHITECTURE-SPINE Epic5 AD-16)。
- * `calendar-app://event/{id}` と `calendar-app://day/{date}` の2形式だけを解釈し、
- * 既存のルーティング(`/calendar?event=` / `/calendar?date=`)へ委ねる。
+ * `calendar-app://event/{id}`、`calendar-app://day/{date}`、
+ * `calendar-app://create/{date}` の形式だけを解釈し、既存のルーティングへ委ねる。
  * 未知のスキーム/ホスト部は静かに無視する(現在の画面のまま何もしない、クラッシュしない)。
  *
  * `<BrowserRouter>` の内側、`<AppRoutes />` と並べて配置する(src/main.tsx)。
@@ -15,7 +16,10 @@ export function DeepLinkListener() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    return onDeepLink((url) => {
+    let disposed = false;
+    const consumeTimers = new Set<ReturnType<typeof setTimeout>>();
+    const unsubscribe = onDeepLink((url) => {
+      if (disposed) return;
       const to = toInternalRoute(url);
       if (!to) return;
       navigate(to);
@@ -24,9 +28,19 @@ export function DeepLinkListener() {
         // 同じ予定シートが再度開いてしまうため、遷移後にクエリを取り除く(replace で
         // 履歴に残さない)。React 18 のバッチングで直後に同期実行すると、CalendarScreen が
         // ?event= 付きの状態を一度も描画できず開かなくなるため、次の macrotask まで遅らせる。
-        setTimeout(() => navigate('/calendar', { replace: true }), 0);
+        const timer = setTimeout(() => {
+          consumeTimers.delete(timer);
+          if (!disposed) navigate('/calendar', { replace: true });
+        }, 0);
+        consumeTimers.add(timer);
       }
     });
+    return () => {
+      disposed = true;
+      for (const timer of consumeTimers) clearTimeout(timer);
+      consumeTimers.clear();
+      unsubscribe();
+    };
   }, [navigate]);
 
   return null;
@@ -35,6 +49,7 @@ export function DeepLinkListener() {
 /**
  * `calendar-app://event/{id}` → `/calendar?event={id}`
  * `calendar-app://day/{date}` → `/calendar?date={date}`
+ * `calendar-app://create/{date}` → `/calendar?create={date}`
  * それ以外(未知のスキーム/ホスト、パース不能、空値)は null。
  */
 function toInternalRoute(url: string): string | null {
@@ -55,6 +70,9 @@ function toInternalRoute(url: string): string | null {
 
   if (kind === 'event') return `/calendar?event=${encodeURIComponent(value)}`;
   if (kind === 'day') return `/calendar?date=${encodeURIComponent(value)}`;
+  if (kind === 'create' && isValidLocalDate(value)) {
+    return `/calendar?create=${encodeURIComponent(value)}`;
+  }
   return null;
 }
 
