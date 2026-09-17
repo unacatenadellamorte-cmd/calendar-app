@@ -72,6 +72,46 @@ function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof Mo
 }
 
 describe('MonthView', () => {
+  it('長押し後に指の下へ移動したセル外のボタンも誤タップせず、次の操作は受け付ける', () => {
+    vi.useFakeTimers();
+    try {
+      setup([ev()], { onDayLongPress: vi.fn() });
+      const otherTap = vi.fn();
+      render(<button onClick={otherTap}>移動後の予定</button>);
+      const chip = screen.getByRole('button', { name: /会議/ });
+      fireEvent(chip, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      act(() => vi.advanceTimersByTime(500));
+      const other = screen.getByRole('button', { name: '移動後の予定' });
+      fireEvent.pointerUp(other);
+      fireEvent.click(other);
+      expect(otherTap).not.toHaveBeenCalled();
+      fireEvent.pointerDown(other);
+      fireEvent.click(other);
+      expect(otherTap).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
+  it('月の予定欄は時刻でなく件名を表示し、時刻は読み上げに残す', () => {
+    setup([ev()]);
+    const chip = screen.getByRole('button', { name: /会議/ });
+    expect(chip).toHaveTextContent(/^会議$/);
+    expect(chip.getAttribute('aria-label')).toMatch(/\d+:\d+/);
+  });
+  it.each(['予定', '他の件数'])('%sの上を長押ししても日付の追加操作へ進み、短いタップと混同しない', (targetType) => {
+    vi.useFakeTimers();
+    try {
+      const onDayLongPress = vi.fn();
+      const events = Array.from({ length: 4 }, (_, i) => ev({ id: `e${i}`, title: `会議${i}` }));
+      const { onEventTap, onOverflowTap } = setup(events, { onDayLongPress });
+      const button = screen.getByRole('button', { name: targetType === '予定' ? /会議0/ : '他 1 件' });
+      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      act(() => vi.advanceTimersByTime(500));
+      fireEvent.pointerUp(button);
+      fireEvent.click(button);
+      expect(onDayLongPress).toHaveBeenCalledExactlyOnceWith('2026-09-08');
+      expect(onEventTap).not.toHaveBeenCalled();
+      expect(onOverflowTap).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
   it('長押しで日付パネルを開き、離した後のクリックは発火しない', () => {
     vi.useFakeTimers();
     try {

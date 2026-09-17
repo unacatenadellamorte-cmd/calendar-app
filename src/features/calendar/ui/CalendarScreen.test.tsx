@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { act, render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
@@ -79,13 +79,28 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
-  it('タブは年・月・日・リストの順で、日付の通常タップは選択だけを行う', async () => {
+  it('予定のある日でも予定チップを長押しすると、その日の新規追加レイヤーを直接開く', () => {
+    vi.useFakeTimers();
+    try {
+      render(<CalendarScreen />);
+      const chip = screen.getByRole('button', { name: /会議アルファ/ });
+      fireEvent(chip, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      act(() => vi.advanceTimersByTime(500));
+      fireEvent.pointerUp(chip);
+      fireEvent.click(chip);
+      expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+      expect(screen.getByLabelText('タイトル')).toHaveValue('');
+      expect(screen.getByLabelText('開始')).toHaveValue('2026-09-08T09:00');
+      expect(screen.queryByRole('dialog', { name: '予定を編集' })).not.toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
+  });
+  it('タブは年・月・日・リストの順で、日付の通常タップは週と予定一覧を開く', async () => {
     render(<CalendarScreen />);
     expect(screen.getAllByRole('radio').map((button) => button.textContent)).toEqual(['年', '月', '日', 'リスト']);
     await userEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
     expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
-    expect(screen.getByText(/2026-09-08に追加/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
   });
 
   it('既定は月ビュー(日セルの追加ボタンを描画)', () => {
@@ -253,9 +268,9 @@ describe('CalendarScreen', () => {
     expect(screen.queryByRole('button', { name: '9月15日を開く' })).not.toBeInTheDocument();
   });
 
-  it('月ビューで日セルを長押し相当のキー操作にすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
+  it('月ビューで日セルを短くタップすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
     render(<CalendarScreen />);
-    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
 
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
     // 折りたたみ中は同じ月グリッド内でも他の週の日付は消える(9/8を含む週の外)。
@@ -271,7 +286,7 @@ describe('CalendarScreen', () => {
   it('「月表示に戻る」を押すと全体の月グリッドに戻りパネルが閉じる', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(screen.getByRole('button', { name: '月表示に戻る' }));
 
     expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
@@ -282,7 +297,7 @@ describe('CalendarScreen', () => {
   it('パネルの「＋ この日に予定を追加」を押すと、その日をシードした予定フォームが開く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
 
     expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
@@ -292,7 +307,7 @@ describe('CalendarScreen', () => {
   it('折りたたみ中に月を送ると selectedDay が自動でクリアされる(パネルが宙に浮かない)', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '次へ' }));
@@ -306,7 +321,7 @@ describe('CalendarScreen', () => {
   it('折りたたみ中に別ビューへ切り替えると selectedDay が自動でクリアされ、月ビューに戻ってもパネルは出ない', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter', shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(screen.getByRole('radio', { name: 'リスト' }));
     await user.click(screen.getByRole('radio', { name: '月' }));
 

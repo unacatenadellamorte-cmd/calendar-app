@@ -71,6 +71,25 @@ export function MonthView({
     holdStartRef.current = null;
   };
   useEffect(() => cancelHold, [cursor]);
+  useEffect(() => {
+    // 長押しで週へ折りたたむと、指の下に別の予定ボタンが移動してくる。
+    // そのためセル内だけでなく、画面全体で直後のクリックを一度抑止する。
+    const suppressClick = (event: MouseEvent) => {
+      if (!suppressClickRef.current) return;
+      suppressClickRef.current = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    const reset = () => { suppressClickRef.current = false; };
+    document.addEventListener('click', suppressClick, true);
+    document.addEventListener('pointerdown', reset, true);
+    document.addEventListener('keydown', reset, true);
+    return () => {
+      document.removeEventListener('click', suppressClick, true);
+      document.removeEventListener('pointerdown', reset, true);
+      document.removeEventListener('keydown', reset, true);
+    };
+  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 1) {
@@ -146,8 +165,8 @@ export function MonthView({
                 cancelHold();
                 suppressClickRef.current = false;
                 if (event.button !== 0 || !event.isPrimary) return;
-                const button = (event.target as HTMLElement).closest('button');
-                if (button && !button.hasAttribute('data-day-button')) return;
+                // 予定や「他N件」の上でも、その日付の長押しとして扱う。
+                // 短いタップは子ボタンへ渡し、長押し後のクリックだけを抑止する。
                 holdStartRef.current = { x: event.clientX, y: event.clientY };
                 holdRef.current = setTimeout(() => {
                   holdRef.current = null;
@@ -175,7 +194,7 @@ export function MonthView({
               }}
               onClick={() => onDayTap(cell.date)}
               className={[
-                'flex min-h-20 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-1',
+                'flex min-h-20 min-w-0 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-1',
                 cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
                 cell.date === cursor ? 'ring-2 ring-inset ring-accent' : '',
               ].join(' ')}
@@ -219,6 +238,7 @@ export function MonthView({
                   event={event}
                   calendar={calendarById.get(event.calendarId)}
                   onTap={onEventTap}
+                  showTime={false}
                 />
               ))}
 

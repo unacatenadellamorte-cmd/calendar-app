@@ -11,13 +11,15 @@ interface EventChipProps {
   style?: CSSProperties;
   /** true でタイトルを折り返す(週ビューの縦長チップ)。既定は1行省略。 */
   wrap?: boolean;
+  /** 月表示では件名を優先し、時刻は読み上げと詳細だけに残す。 */
+  showTime?: boolean;
 }
 
 /**
  * 予定チップ。カレンダーの色バー(色だけで意味を運ばないため name/time と併用)+ 時刻 + タイトル。
  * 月ビューと週ビューで共有する。
  */
-export function EventChip({ event, calendar, onTap, style, wrap = false }: EventChipProps) {
+export function EventChip({ event, calendar, onTap, style, wrap = false, showTime = true }: EventChipProps) {
   const time = event.allDay ? '終日' : event.startsAt ? formatClock(event.startsAt) : '';
   const color = calendar?.color ?? 'var(--color-ink-disabled)';
   const label = [time, event.title, calendar?.name].filter(Boolean).join(' ');
@@ -37,7 +39,7 @@ export function EventChip({ event, calendar, onTap, style, wrap = false }: Event
         'bg-surface-raised px-1.5 py-0.5 text-left text-meta text-ink-primary',
       ].join(' ')}
     >
-      {time && <span className="flex-none tabular text-ink-secondary">{time}</span>}
+      {showTime && time && <span className="flex-none tabular text-ink-secondary">{time}</span>}
       <span className={wrap ? 'min-w-0' : 'truncate'}>{event.title}</span>
     </button>
   );

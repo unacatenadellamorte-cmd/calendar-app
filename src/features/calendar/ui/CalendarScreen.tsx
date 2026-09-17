@@ -101,14 +101,14 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
     setView('month');
   };
 
-  // 通常タップはカーソル移動。長押しでその週と予定入力パネルを開く。
-  const selectDay = (date: string) => {
-    jumpTo(date);
-    if (selectedDay) setSelectedDay(date);
-  };
+  // 短いタップは週と当日の一覧、長押しはその日の新規入力を直接開く。
   const openDayPanel = (date: string) => {
     jumpTo(date);
     setSelectedDay(date);
+  };
+  const openDayCreate = (date: string) => {
+    jumpTo(date);
+    openCreate({ date });
   };
   // 「月表示に戻る」: 折りたたみ解除。
   const closeDayPanel = () => setSelectedDay(null);
@@ -234,8 +234,8 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
             byDay={byDay}
             calendarById={calendarById}
             today={today}
-            onDayTap={selectDay}
-            onDayLongPress={openDayPanel}
+            onDayTap={openDayPanel}
+            onDayLongPress={openDayCreate}
             onDayDoubleTap={openDayView}
             onEventTap={openEdit}
             onOverflowTap={openOverflow}

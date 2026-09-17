@@ -84,7 +84,7 @@ export function MonthShiftTiles({ date, calendars, enabled, onCreated, events, o
     <section className="mt-4" aria-label="登録シフト">
       <div className="flex flex-col items-start gap-2">
         <h2 className="text-body font-semibold">登録シフト</h2>
-        <div className="order-first flex items-center justify-center gap-2" role="group" aria-label="シフトの日付移動と削除">
+        <div className="order-first flex w-full items-center justify-center gap-2" role="group" aria-label="シフトの日付移動と削除">
           <button type="button" aria-label="前日に移動" title="前日に移動" disabled={busy}
             onClick={() => onDateChange(addDays(date, -1))}
             className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"><svg aria-hidden="true" width="42" height="24" viewBox="0 0 42 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M38 12H4m9-8-9 8 9 8" /></svg></button>
@@ -100,7 +100,7 @@ export function MonthShiftTiles({ date, calendars, enabled, onCreated, events, o
             className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"><svg aria-hidden="true" width="42" height="24" viewBox="0 0 42 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12h34m-9-8 9 8-9 8" /></svg></button>
         </div>
       </div>
-      <p className="mt-1 text-meta text-ink-secondary">{date}に追加 · 日付をタップして選択、長押しで予定入力</p>
+      <p className="mt-1 text-meta text-ink-secondary">{date}に追加 · 日付をタップで週と予定一覧、長押しで予定追加</p>
       {(error || shifts.errorKey) && <p role="alert" className="mt-2 text-meta text-danger">{resolveMessage(error ?? shifts.errorKey!)}</p>}
       {shifts.loading ? <p className="text-meta">読み込み中…</p> : shifts.templates.length === 0 ? (
         <button type="button" className="mt-2 inline-block text-accent" onClick={() => navigate('/shift-templates')}>お気に入りシフトを登録する</button>
