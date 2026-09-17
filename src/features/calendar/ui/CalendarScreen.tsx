@@ -18,6 +18,7 @@ import { useEvents } from '@/features/events/model/useEvents';
 import { EventFormSheet, type EventSeed } from '@/features/events/ui/EventFormSheet';
 import { EventDetailSheet } from '@/features/events/ui/EventDetailSheet';
 import { useCalendarView } from '@/features/calendar/model/useCalendarView';
+import { registerLayerBack } from '@/platform/layerBack';
 import { ViewSwitcher } from './ViewSwitcher';
 import { DateNav } from './DateNav';
 import { MonthView } from './MonthView';
@@ -61,6 +62,12 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   const [seed, setSeed] = useState<EventSeed | undefined>(undefined);
   // 月表示: タップした日(選択中)。折りたたみ(その週1行、Option C)+ 下のパネル表示を兼ねる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 入力・詳細レイヤーが開いている間は、そのレイヤーの戻る処理を優先する。
+    if (!selectedDay || view !== 'month' || sheetOpen || detailEvent) return;
+    return registerLayerBack(() => setSelectedDay(null));
+  }, [selectedDay, view, sheetOpen, detailEvent]);
 
   const calendarById = useMemo(
     () => new Map(cal.calendars.map((c) => [c.id, c])),

@@ -5,6 +5,11 @@ import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 
 const navigateMock = vi.fn();
+const backHandlers = vi.hoisted(() => new Set<() => void>());
+vi.mock('@/platform/layerBack', () => ({ registerLayerBack: (handler: () => void) => {
+  backHandlers.add(handler);
+  return () => { backHandlers.delete(handler); };
+} }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
 
 const calendar: Calendar = {
@@ -79,6 +84,28 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('週一覧でAndroidの戻るを押すと同じ日付の月表示へ戻り、画面遷移しない', () => {
+    render(<CalendarScreen />);
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    expect(backHandlers.size).toBe(1);
+    act(() => Array.from(backHandlers).at(-1)?.());
+    expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(backHandlers.size).toBe(0);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+  it('週一覧から予定入力を開いたときは入力レイヤーだけが戻るを受け取る', () => {
+    render(<CalendarScreen />);
+    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
+    expect(backHandlers.size).toBe(1);
+    act(() => Array.from(backHandlers).at(-1)?.());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+    expect(backHandlers.size).toBe(0);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
   it('予定が詰まった日の予定名タップで週と一覧を開き、一覧から編集できる', async () => {
     const user = userEvent.setup();
     evState.events = Array.from({ length: 5 }, (_, i) => ({ ...sampleEvent, id: `busy-${i}`, title: `予定${i}` }));
