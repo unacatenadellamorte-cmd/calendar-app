@@ -39,6 +39,15 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('OnlineProvider', () => {
+  it('件数取得中に画面を破棄したら、取得後に送信を始めない', async () => {
+    let resolveCount!: (count: number) => void;
+    outboxCount.mockReturnValue(new Promise<number>((resolve) => { resolveCount = resolve; }));
+    const view = render(<OnlineProvider><Probe /></OnlineProvider>);
+    view.unmount();
+    await act(async () => { resolveCount(1); });
+    expect(flushOutbox).not.toHaveBeenCalled();
+  });
+
   it('既定はオンライン。未送信ゼロなら flush しない', async () => {
     await renderProvider();
     expect(screen.getByTestId('online')).toHaveTextContent('true');

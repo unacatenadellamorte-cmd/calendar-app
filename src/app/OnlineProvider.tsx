@@ -14,24 +14,30 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
   const [flushing, setFlushing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const runningRef = useRef(false);
+  // 破棄された画面の非同期処理が、後から状態を更新しないようにする。
+  const generationRef = useRef(0);
 
   const refreshPending = useCallback(async () => {
+    const generation = generationRef.current;
     try {
-      setPendingCount(await outboxCount());
+      const count = await outboxCount();
+      if (generation === generationRef.current) setPendingCount(count);
     } catch {
       // IndexedDB が使えない環境では未送信件数は 0 のまま。
     }
   }, []);
 
   const runFlush = useCallback(async () => {
+    const generation = generationRef.current;
     if (runningRef.current) return;
     // 未送信が無ければ何もしない(毎回の起動で「送信中…」が瞬く のを避ける)。
     let pending = 0;
     try {
       pending = await outboxCount();
     } catch {
-      // ignore
+      // 件数を読めない場合は送信しない。
     }
+    if (generation !== generationRef.current) return;
     setPendingCount(pending);
     if (pending === 0) return;
 
@@ -39,13 +45,15 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     setFlushing(true);
     try {
       const result = await flushOutbox();
+      if (generation !== generationRef.current) return;
       if (result.dropped > 0) setSyncNotice(resolveMessage('sync/partial'));
       await refreshPending();
+      if (generation !== generationRef.current) return;
       if (result.flushed > 0) setSyncNonce((n) => n + 1);
     } catch {
       // ネットワーク障害など。次の online イベントで再試行する。
     } finally {
-      setFlushing(false);
+      if (generation === generationRef.current) setFlushing(false);
       runningRef.current = false;
     }
   }, [refreshPending]);
@@ -65,6 +73,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     // 起動時にオンラインなら、前回の取りこぼしを流す。
     if (typeof navigator !== 'undefined' && navigator.onLine) void runFlush();
     return () => {
+      generationRef.current += 1;
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
     };
