@@ -1,0 +1,87 @@
+name: iOSビルド検証
+
+on:
+  push:
+    branches: [main, 'feature/ios-widget-ci']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web側の回帰検証
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # 本番データへ接続しない。ビルドされたアプリはお試しモードで確認する。
+      VITE_SUPABASE_URL: ''
+      VITE_SUPABASE_ANON_KEY: ''
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  ios:
+    name: Swift検証と署名なしシミュレータビルド
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      BUNDLE_GEMFILE: ${{ github.workspace }}/scripts/ios/Gemfile
+      VITE_SUPABASE_URL: ''
+      VITE_SUPABASE_ANON_KEY: ''
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - run: xcodebuild -version
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: ターゲット生成と再実行の安全性を検証
+        run: bundle exec ruby scripts/ios/test-widget-target.rb
+      - name: ウィジェットをXcodeプロジェクトに追加
+        run: bundle exec ruby scripts/ios/add-widget-target.rb
+      - name: Swiftの共有データ契約を検証
+        run: swift test --package-path ios/App/FeaturedEventsWidget
+      - name: アプリとウィジェットをビルド
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/DerivedData \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee ios-build.log
+          test -d ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app/PlugIns/FeaturedEventsWidget.appex
+      - name: ビルドログを保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: ios-build.log
+          if-no-files-found: ignore
+          retention-days: 7

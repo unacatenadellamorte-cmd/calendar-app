@@ -74,7 +74,12 @@ export function buildFeaturedWidgetPayload(
     events.filter((e) => visibleIds.has(e.calendarId)),
     false,
   );
-  const featured = selectFeaturedEvents(visible, makePriorityOf(calendarById), now, WIDGET_LIMIT);
+  const featured = selectFeaturedEvents(
+    visible,
+    makePriorityOf(calendarById),
+    now,
+    WIDGET_LIMIT,
+  );
 
   return featured.map((event) => {
     const calendar = calendarById.get(event.calendarId);
@@ -113,7 +118,10 @@ async function runRefreshFeaturedWidget(): Promise<void> {
 
     // setRegisteredWidgets はプラグインの静的フィールドに保持されるだけでプロセス再起動で
     // リセットされるため、毎回呼ぶ(冪等)。
-    await WidgetBridgePlugin.setRegisteredWidgets({ widgets: [WIDGET_RECEIVER_FQCN] });
+    // iOS プラグインにはこの Android 専用メソッドが無い。
+    if (Capacitor.getPlatform() === 'android') {
+      await WidgetBridgePlugin.setRegisteredWidgets({ widgets: [WIDGET_RECEIVER_FQCN] });
+    }
     await WidgetBridgePlugin.setItem({
       key: WIDGET_ITEM_KEY,
       group: WIDGET_GROUP,
