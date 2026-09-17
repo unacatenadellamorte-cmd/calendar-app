@@ -44,7 +44,10 @@ function toByDay(events: EventItem[], byCalendar = calendarById) {
   return groupEventsByDay(events, makePriorityOf(byCalendar));
 }
 
-function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof MonthView>[0]> = {}) {
+function setup(
+  events: EventItem[] = [],
+  overProps: Partial<Parameters<typeof MonthView>[0]> = {},
+) {
   const onDayTap = vi.fn();
   const onDayDoubleTap = vi.fn();
   const onBackToMonth = vi.fn();
@@ -64,7 +67,14 @@ function setup(events: EventItem[] = [], overProps: Partial<Parameters<typeof Mo
       {...overProps}
     />,
   );
-  return { onDayTap, onDayDoubleTap, onBackToMonth, onSwipeLeft, onSwipeRight, container: utils.container };
+  return {
+    onDayTap,
+    onDayDoubleTap,
+    onBackToMonth,
+    onSwipeLeft,
+    onSwipeRight,
+    container: utils.container,
+  };
 }
 
 describe('MonthView', () => {
@@ -75,7 +85,15 @@ describe('MonthView', () => {
       const otherTap = vi.fn();
       render(<button onClick={otherTap}>移動後の予定</button>);
       const chip = screen.getByRole('button', { name: /会議/ });
-      fireEvent(chip, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      fireEvent(
+        chip,
+        Object.assign(new Event('pointerdown', { bubbles: true }), {
+          button: 0,
+          isPrimary: true,
+          clientX: 20,
+          clientY: 20,
+        }),
+      );
       act(() => vi.advanceTimersByTime(500));
       const other = screen.getByRole('button', { name: '移動後の予定' });
       fireEvent.pointerUp(other);
@@ -84,7 +102,9 @@ describe('MonthView', () => {
       fireEvent.pointerDown(other);
       fireEvent.click(other);
       expect(otherTap).toHaveBeenCalledOnce();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('月の予定欄は時刻でなく件名を表示し、時刻は読み上げに残す', () => {
     setup([ev()]);
@@ -92,34 +112,61 @@ describe('MonthView', () => {
     expect(chip).toHaveTextContent(/^会議$/);
     expect(chip.getAttribute('aria-label')).toMatch(/\d+:\d+/);
   });
-  it.each(['予定', '他の件数'])('%sの上を長押ししても日付の追加操作へ進み、短いタップと混同しない', (targetType) => {
-    vi.useFakeTimers();
-    try {
-      const onDayLongPress = vi.fn();
-      const events = Array.from({ length: 4 }, (_, i) => ev({ id: `e${i}`, title: `会議${i}` }));
-      const { onDayTap } = setup(events, { onDayLongPress });
-      const button = screen.getByRole('button', { name: targetType === '予定' ? /会議0/ : '他 1 件' });
-      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
-      act(() => vi.advanceTimersByTime(500));
-      fireEvent.pointerUp(button);
-      fireEvent.click(button);
-      expect(onDayLongPress).toHaveBeenCalledExactlyOnceWith('2026-09-08');
-      expect(onDayTap).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
-  });
+  it.each(['予定', '他の件数'])(
+    '%sの上を長押ししても日付の追加操作へ進み、短いタップと混同しない',
+    (targetType) => {
+      vi.useFakeTimers();
+      try {
+        const onDayLongPress = vi.fn();
+        const events = Array.from({ length: 4 }, (_, i) =>
+          ev({ id: `e${i}`, title: `会議${i}` }),
+        );
+        const { onDayTap } = setup(events, { onDayLongPress });
+        const button = screen.getByRole('button', {
+          name: targetType === '予定' ? /会議0/ : '他 1 件',
+        });
+        fireEvent(
+          button,
+          Object.assign(new Event('pointerdown', { bubbles: true }), {
+            button: 0,
+            isPrimary: true,
+            clientX: 20,
+            clientY: 20,
+          }),
+        );
+        act(() => vi.advanceTimersByTime(500));
+        fireEvent.pointerUp(button);
+        fireEvent.click(button);
+        expect(onDayLongPress).toHaveBeenCalledExactlyOnceWith('2026-09-08');
+        expect(onDayTap).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
   it('長押しで日付パネルを開き、離した後のクリックは発火しない', () => {
     vi.useFakeTimers();
     try {
       const onDayLongPress = vi.fn();
       const { onDayTap } = setup([], { onDayLongPress });
       const button = screen.getByRole('button', { name: '9月15日を開く' });
-      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      fireEvent(
+        button,
+        Object.assign(new Event('pointerdown', { bubbles: true }), {
+          button: 0,
+          isPrimary: true,
+          clientX: 20,
+          clientY: 20,
+        }),
+      );
       act(() => vi.advanceTimersByTime(500));
       fireEvent.pointerUp(button);
       fireEvent.click(button);
       expect(onDayLongPress).toHaveBeenCalledWith('2026-09-15');
       expect(onDayTap).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('指を動かした場合やキャンセルでは長押しを発火しない', () => {
     vi.useFakeTimers();
@@ -127,24 +174,46 @@ describe('MonthView', () => {
       const onDayLongPress = vi.fn();
       setup([], { onDayLongPress });
       const button = screen.getByRole('button', { name: '9月15日を開く' });
-      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
-      fireEvent(button, Object.assign(new Event('pointermove', { bubbles: true }), { clientX: 50, clientY: 20 }));
+      fireEvent(
+        button,
+        Object.assign(new Event('pointerdown', { bubbles: true }), {
+          button: 0,
+          isPrimary: true,
+          clientX: 20,
+          clientY: 20,
+        }),
+      );
+      fireEvent(
+        button,
+        Object.assign(new Event('pointermove', { bubbles: true }), {
+          clientX: 50,
+          clientY: 20,
+        }),
+      );
       act(() => vi.advanceTimersByTime(600));
       expect(onDayLongPress).not.toHaveBeenCalled();
-      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      fireEvent(
+        button,
+        Object.assign(new Event('pointerdown', { bubbles: true }), {
+          button: 0,
+          isPrimary: true,
+          clientX: 20,
+          clientY: 20,
+        }),
+      );
       fireEvent.pointerCancel(button);
       act(() => vi.advanceTimersByTime(600));
       expect(onDayLongPress).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('曜日ヘッダと日セルを描画する', () => {
     setup();
     for (const w of ['日', '月', '火', '水', '木', '金', '土']) {
       expect(screen.getByText(w)).toBeInTheDocument();
     }
-    expect(
-      screen.getByRole('button', { name: '9月15日を開く' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
   });
 
   it('日セルの日付番号をタップすると onDayTap(その日) を呼ぶ', async () => {
@@ -197,10 +266,34 @@ describe('MonthView', () => {
       ['c2', { ...calendar, id: 'c2', name: '低優先', priority: 1 }],
     ]);
     const events = [
-      ev({ id: 'lo0', title: '低0', calendarId: 'c2', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
-      ev({ id: 'lo1', title: '低1', calendarId: 'c2', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' }),
-      ev({ id: 'hi0', title: '高0', calendarId: 'c1', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
-      ev({ id: 'hi1', title: '高1', calendarId: 'c1', startsAt: '2026-09-08T06:00:00Z', endsAt: '2026-09-08T07:00:00Z' }),
+      ev({
+        id: 'lo0',
+        title: '低0',
+        calendarId: 'c2',
+        startsAt: '2026-09-08T00:00:00Z',
+        endsAt: '2026-09-08T01:00:00Z',
+      }),
+      ev({
+        id: 'lo1',
+        title: '低1',
+        calendarId: 'c2',
+        startsAt: '2026-09-08T01:00:00Z',
+        endsAt: '2026-09-08T02:00:00Z',
+      }),
+      ev({
+        id: 'hi0',
+        title: '高0',
+        calendarId: 'c1',
+        startsAt: '2026-09-08T05:00:00Z',
+        endsAt: '2026-09-08T06:00:00Z',
+      }),
+      ev({
+        id: 'hi1',
+        title: '高1',
+        calendarId: 'c1',
+        startsAt: '2026-09-08T06:00:00Z',
+        endsAt: '2026-09-08T07:00:00Z',
+      }),
     ];
     render(
       <MonthView
@@ -270,6 +363,42 @@ describe('MonthView', () => {
   });
 
   describe('スワイプ検出', () => {
+    it('横ドラッグに追従し、閾値未満とキャンセルでは元へ戻る', () => {
+      const { onSwipeLeft, onSwipeRight } = setup();
+      const grid = screen.getByTestId('month-grid');
+      const layer = screen.getByTestId('month-slide').firstElementChild as HTMLElement;
+      fireEvent.touchStart(grid, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(grid, { touches: [{ clientX: 70, clientY: 101 }] });
+      expect(layer.style.transform).toBe('translateX(-30px)');
+      fireEvent.touchEnd(grid, { changedTouches: [{ clientX: 70, clientY: 101 }] });
+      expect(layer.style.transform).toBe('translateX(0px)');
+      expect(onSwipeLeft).not.toHaveBeenCalled();
+      fireEvent.touchStart(grid, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(grid, { touches: [{ clientX: 190, clientY: 101 }] });
+      fireEvent.touchCancel(grid);
+      expect(layer.style.transform).toBe('translateX(0px)');
+      fireEvent.touchEnd(grid, { changedTouches: [{ clientX: 190, clientY: 101 }] });
+      expect(onSwipeRight).not.toHaveBeenCalled();
+    });
+
+    it('縦に動き始めたスクロールと複数の指では月送りしない', () => {
+      const { onSwipeLeft, onSwipeRight } = setup();
+      const grid = screen.getByTestId('month-grid');
+      fireEvent.touchStart(grid, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(grid, { touches: [{ clientX: 102, clientY: 130 }] });
+      fireEvent.touchEnd(grid, { changedTouches: [{ clientX: 250, clientY: 140 }] });
+      expect(onSwipeRight).not.toHaveBeenCalled();
+      fireEvent.touchStart(grid, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(grid, {
+        touches: [
+          { clientX: 10, clientY: 100 },
+          { clientX: 150, clientY: 110 },
+        ],
+      });
+      fireEvent.touchEnd(grid, { changedTouches: [{ clientX: 10, clientY: 100 }] });
+      expect(onSwipeLeft).not.toHaveBeenCalled();
+    });
+
     it('左スワイプ(横移動が50px以上、縦より大きい)で onSwipeLeft を呼ぶ', () => {
       const { onSwipeLeft, onSwipeRight } = setup();
       const gridContainer = screen.getByTestId('month-grid');

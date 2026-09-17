@@ -26,6 +26,39 @@ export interface PayEstimate {
   canNext: boolean;
 }
 
+export interface MonthlyPayEstimate {
+  amount: number;
+  shiftCount: number;
+  shifts: EventItem[];
+}
+
+/** 指定した暦月のシフト金額を、ホームとカレンダーで共通に集計する。 */
+export function calculateMonthlyPay(
+  events: EventItem[],
+  calendars: Calendar[],
+  month: string,
+): MonthlyPayEstimate {
+  const shiftCalendarIds = new Set(calendars.filter((c) => c.isShift).map((c) => c.id));
+  const shifts = events
+    .filter(
+      (e) =>
+        !e.allDay &&
+        e.startsAt !== null &&
+        shiftCalendarIds.has(e.calendarId) &&
+        localDateOf(e.startsAt).startsWith(month),
+    )
+    .sort((a, b) => (a.startsAt ?? '').localeCompare(b.startsAt ?? ''));
+
+  const payable: PayableShift[] = shifts.map((e) => ({
+    startsAt: e.startsAt as string,
+    endsAt: e.endsAt ?? (e.startsAt as string),
+    breakMinutes: e.breakMinutes ?? 0,
+    hourlyWage: e.hourlyWage ?? 0,
+  }));
+  const { amount, shiftCount } = monthlyPayEstimate(payable);
+  return { amount, shiftCount, shifts };
+}
+
 export function usePayEstimate(events: EventItem[], calendars: Calendar[]): PayEstimate {
   const language = useLanguage();
   const [monthOffset, setMonthOffset] = useState(0);
@@ -41,34 +74,15 @@ export function usePayEstimate(events: EventItem[], calendars: Calendar[]): PayE
     const { year, month } = ymd(monthStart);
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
 
-    const shiftCalendarIds = new Set(calendars.filter((c) => c.isShift).map((c) => c.id));
-
-    const shifts = events
-      .filter(
-        (e) =>
-          !e.allDay &&
-          e.startsAt !== null &&
-          shiftCalendarIds.has(e.calendarId) &&
-          localDateOf(e.startsAt).startsWith(prefix),
-      )
-      .sort((a, b) => (a.startsAt ?? '').localeCompare(b.startsAt ?? ''));
-
-    const payable: PayableShift[] = shifts.map((e) => ({
-      startsAt: e.startsAt as string,
-      endsAt: e.endsAt ?? (e.startsAt as string),
-      breakMinutes: e.breakMinutes ?? 0,
-      hourlyWage: e.hourlyWage ?? 0,
-    }));
-
-    const { amount, shiftCount } = monthlyPayEstimate(payable);
+    const estimate = calculateMonthlyPay(events, calendars, prefix);
 
     return {
-      amount,
-      shiftCount,
+      amount: estimate.amount,
+      shiftCount: estimate.shiftCount,
       monthLabel: new Intl.DateTimeFormat(getLocale(language), { month: 'long' }).format(
         new Date(year, month - 1, 1),
       ),
-      shifts,
+      shifts: estimate.shifts,
       prev,
       next,
       canNext: monthOffset < MAX_FUTURE_MONTHS,

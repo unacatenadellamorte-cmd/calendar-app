@@ -57,6 +57,16 @@ describe('DateNav', () => {
     expect(screen.queryByRole('button', { name: '次へ' })).not.toBeInTheDocument();
   });
 
+  it('月表示だけ金額を見出し右に表示する', () => {
+    const fns = { onPrev: vi.fn(), onNext: vi.fn(), onToday: vi.fn(), onJump: vi.fn() };
+    const { rerender } = render(
+      <DateNav view="month" cursor="2026-09-08" monthPayAmount={15400} {...fns} />,
+    );
+    expect(screen.getByText('¥15,400')).toBeInTheDocument();
+    rerender(<DateNav view="week" cursor="2026-09-08" monthPayAmount={15400} {...fns} />);
+    expect(screen.queryByText('¥15,400')).not.toBeInTheDocument();
+  });
+
   it('前へ / 次へ / 今日 のボタンがコールバックを呼ぶ', async () => {
     const user = userEvent.setup();
     const { onPrev, onNext, onToday } = setup('month');

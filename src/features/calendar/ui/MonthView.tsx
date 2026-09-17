@@ -1,9 +1,10 @@
 import { t, useLanguage, weekdayLabels } from '@/i18n';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
 import { EventChip } from './EventChip';
+import { MonthSlide } from './MonthSlide';
 interface MonthViewProps {
   cursor: string;
   /** 日付("YYYY-MM-DD")→ その日の予定(優先度順)。呼び出し元(`CalendarScreen`)で計算済みのものを渡す。 */
@@ -53,6 +54,9 @@ export function MonthView({
   // ここでの防御を残すことで、そのクリアが反映されるまでの1フレームも壊れた表示にしない。)
   const isCollapsed = Boolean(weekCells && weekCells.length > 0);
   const cells = isCollapsed ? (weekCells as DayCell[]) : allCells;
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const swipeAxis = useRef<'x' | 'y' | null>(null);
   // スワイプ検出
   const touchStartRef = useRef<{
     x: number;
@@ -93,22 +97,56 @@ export function MonthView({
   }, []);
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 1) {
-      touchStartRef.current = null;
+      handleTouchCancel();
+      cancelHold();
       return;
     }
+    swipeAxis.current = null;
     const touch = e.touches[0];
     if (!touch) return;
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    const touch = e.touches[0];
+    if (!start || !touch) return;
+    if (e.touches.length !== 1) {
+      handleTouchCancel();
+      return;
+    }
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (!swipeAxis.current && Math.max(Math.abs(dx), Math.abs(dy)) > 10) {
+      swipeAxis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      cancelHold();
+      suppressClickRef.current = true;
+    }
+    if (swipeAxis.current === 'x') {
+      setDragging(true);
+      const width = e.currentTarget.getBoundingClientRect().width || 400;
+      setDragOffset(Math.max(-width, Math.min(width, dx)));
+    }
+  };
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
     const touch = e.changedTouches[0];
-    if (!touch) return;
+    if (!touch) {
+      handleTouchCancel();
+      return;
+    }
     const deltaX = touch.clientX - touchStartRef.current.x;
     const deltaY = touch.clientY - touchStartRef.current.y;
     touchStartRef.current = null;
+    setDragging(false);
+    setDragOffset(0);
     // 横方向の移動が縦方向より大きく、かつ50px以上の場合を月送りと判定
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+    if (
+      swipeAxis.current !== 'y' &&
+      Math.abs(deltaX) > Math.abs(deltaY) &&
+      Math.abs(deltaX) > 50
+    ) {
+      cancelHold();
+      suppressClickRef.current = true;
       if (deltaX > 0) {
         // 右スワイプ(前月へ)
         onSwipeRight?.();
@@ -120,6 +158,10 @@ export function MonthView({
   };
   const handleTouchCancel = () => {
     touchStartRef.current = null;
+    swipeAxis.current = null;
+    setDragging(false);
+    setDragOffset(0);
+    cancelHold();
   };
   return (
     <div>
@@ -137,121 +179,129 @@ export function MonthView({
         </button>
       )}
 
-      <div
-        key={`${year}-${month}`}
-        className="grid grid-cols-7 border-t border-l border-border-hairline animate-[slide-fade_200ms_ease-out]"
-        data-testid="month-grid"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
+      <MonthSlide
+        monthKey={cursor.slice(0, 7)}
+        offset={dragOffset}
+        dragging={dragging}
+        contentVersion={byDay}
       >
-        {cells.map((cell) => {
-          const dayEvents = byDay.get(cell.date) ?? [];
-          const shown = dayEvents.slice(0, MAX_CHIPS);
-          const overflow = dayEvents.length - shown.length;
-          return (
-            <div
-              key={cell.date}
-              onPointerDown={(event) => {
-                cancelHold();
-                suppressClickRef.current = false;
-                if (event.button !== 0 || !event.isPrimary) return;
-                // 予定や「他N件」の上でも、その日付の長押しとして扱う。
-                // 短いタップは子ボタンへ渡し、長押し後のクリックだけを抑止する。
-                holdStartRef.current = { x: event.clientX, y: event.clientY };
-                holdRef.current = setTimeout(() => {
-                  holdRef.current = null;
-                  suppressClickRef.current = true;
-                  onDayLongPress?.(cell.date);
-                }, 500);
-              }}
-              onPointerMove={(event) => {
-                const start = holdStartRef.current;
-                if (
-                  start &&
-                  Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10
-                ) {
+        <div
+          key={`${year}-${month}`}
+          className="grid grid-cols-7 border-t border-l border-border-hairline touch-pan-y"
+          data-testid="month-grid"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
+        >
+          {cells.map((cell) => {
+            const dayEvents = byDay.get(cell.date) ?? [];
+            const shown = dayEvents.slice(0, MAX_CHIPS);
+            const overflow = dayEvents.length - shown.length;
+            return (
+              <div
+                key={cell.date}
+                onPointerDown={(event) => {
                   cancelHold();
-                  suppressClickRef.current = true;
-                }
-              }}
-              onPointerUp={cancelHold}
-              onPointerCancel={cancelHold}
-              onPointerLeave={cancelHold}
-              onContextMenu={(event) => event.preventDefault()}
-              onClickCapture={(event) => {
-                if (suppressClickRef.current) {
-                  event.preventDefault();
-                  event.stopPropagation();
                   suppressClickRef.current = false;
-                }
-              }}
-              onClick={() => onDayTap(cell.date)}
-              className={[
-                'flex min-h-20 min-w-0 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-1',
-                cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
-                cell.date === cursor ? 'ring-2 ring-inset ring-accent' : '',
-              ].join(' ')}
-            >
-              <button
-                type="button"
-                data-day-button
-                aria-pressed={cell.date === cursor}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && event.shiftKey) {
-                    event.preventDefault();
+                  if (event.button !== 0 || !event.isPrimary) return;
+                  // 予定や「他N件」の上でも、その日付の長押しとして扱う。
+                  // 短いタップは子ボタンへ渡し、長押し後のクリックだけを抑止する。
+                  holdStartRef.current = { x: event.clientX, y: event.clientY };
+                  holdRef.current = setTimeout(() => {
+                    holdRef.current = null;
+                    suppressClickRef.current = true;
                     onDayLongPress?.(cell.date);
+                  }, 500);
+                }}
+                onPointerMove={(event) => {
+                  const start = holdStartRef.current;
+                  if (
+                    start &&
+                    Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10
+                  ) {
+                    cancelHold();
+                    suppressClickRef.current = true;
                   }
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDayTap(cell.date);
+                onPointerUp={cancelHold}
+                onPointerCancel={cancelHold}
+                onPointerLeave={cancelHold}
+                onContextMenu={(event) => event.preventDefault()}
+                onClickCapture={(event) => {
+                  if (suppressClickRef.current) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    suppressClickRef.current = false;
+                  }
                 }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onDayDoubleTap(cell.date);
-                }}
-                aria-label={t('{0}月{1}日を開く', [ymd(cell.date).month, cell.day])}
+                onClick={() => onDayTap(cell.date)}
                 className={[
-                  // touch-manipulation: iOS Safari 等でダブルタップがブラウザのズームジェスチャーと
-                  // 衝突しないよう、このボタン上ではダブルタップジェスチャーをズームに回さない。
-                  'touch-manipulation self-start rounded-full px-1 text-meta tabular',
-                  cell.isToday
-                    ? 'bg-accent font-semibold text-on-accent'
-                    : cell.inMonth
-                      ? 'text-ink-secondary'
-                      : 'text-ink-disabled',
+                  'flex min-h-20 min-w-0 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-1',
+                  cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
+                  cell.date === cursor ? 'ring-2 ring-inset ring-accent' : '',
                 ].join(' ')}
               >
-                {cell.day}
-              </button>
-
-              {shown.map((event) => (
-                <EventChip
-                  key={event.id}
-                  event={event}
-                  calendar={calendarById.get(event.calendarId)}
-                  onTap={() => onDayTap(cell.date)}
-                  showTime={false}
-                />
-              ))}
-
-              {overflow > 0 && (
                 <button
                   type="button"
+                  data-day-button
+                  aria-pressed={cell.date === cursor}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && event.shiftKey) {
+                      event.preventDefault();
+                      onDayLongPress?.(cell.date);
+                    }
+                  }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onDayTap(cell.date);
                   }}
-                  className="self-start px-1 text-meta text-ink-secondary"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    onDayDoubleTap(cell.date);
+                  }}
+                  aria-label={t('{0}月{1}日を開く', [ymd(cell.date).month, cell.day])}
+                  className={[
+                    // touch-manipulation: iOS Safari 等でダブルタップがブラウザのズームジェスチャーと
+                    // 衝突しないよう、このボタン上ではダブルタップジェスチャーをズームに回さない。
+                    'touch-manipulation self-start rounded-full px-1 text-meta tabular',
+                    cell.isToday
+                      ? 'bg-accent font-semibold text-on-accent'
+                      : cell.inMonth
+                        ? 'text-ink-secondary'
+                        : 'text-ink-disabled',
+                  ].join(' ')}
                 >
-                  {t('他 {0} 件', [overflow])}
+                  {cell.day}
                 </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+                {shown.map((event) => (
+                  <EventChip
+                    key={event.id}
+                    event={event}
+                    calendar={calendarById.get(event.calendarId)}
+                    onTap={() => onDayTap(cell.date)}
+                    showTime={false}
+                  />
+                ))}
+
+                {overflow > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDayTap(cell.date);
+                    }}
+                    className="self-start px-1 text-meta text-ink-secondary"
+                  >
+                    {t('他 {0} 件', [overflow])}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </MonthSlide>
     </div>
   );
 }

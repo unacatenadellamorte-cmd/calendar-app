@@ -6,10 +6,14 @@ import type { Calendar } from '@/data/calendars';
 
 const navigateMock = vi.fn();
 const backHandlers = vi.hoisted(() => new Set<() => void>());
-vi.mock('@/platform/layerBack', () => ({ registerLayerBack: (handler: () => void) => {
-  backHandlers.add(handler);
-  return () => { backHandlers.delete(handler); };
-} }));
+vi.mock('@/platform/layerBack', () => ({
+  registerLayerBack: (handler: () => void) => {
+    backHandlers.add(handler);
+    return () => {
+      backHandlers.delete(handler);
+    };
+  },
+}));
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
 
 const calendar: Calendar = {
@@ -52,7 +56,9 @@ let secretState: { unlocked: boolean } = { unlocked: false };
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 vi.mock('@/features/calendars/model/useCalendars', () => ({ useCalendars: () => calState }));
 vi.mock('@/features/events/model/useEvents', () => ({ useEvents: () => evState }));
-vi.mock('@/features/shifts/model/useShiftTemplates', () => ({ useShiftTemplates: () => ({ templates: [], loading: false, errorKey: null }) }));
+vi.mock('@/features/shifts/model/useShiftTemplates', () => ({
+  useShiftTemplates: () => ({ templates: [], loading: false, errorKey: null }),
+}));
 vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }));
 
 const { CalendarScreen } = await import('./CalendarScreen');
@@ -90,7 +96,10 @@ describe('CalendarScreen', () => {
     expect(backHandlers.size).toBe(1);
     act(() => Array.from(backHandlers).at(-1)?.());
     expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
     expect(backHandlers.size).toBe(0);
     expect(navigateMock).not.toHaveBeenCalled();
@@ -108,7 +117,11 @@ describe('CalendarScreen', () => {
   });
   it('予定が詰まった日の予定名タップで週と一覧を開き、一覧から編集できる', async () => {
     const user = userEvent.setup();
-    evState.events = Array.from({ length: 5 }, (_, i) => ({ ...sampleEvent, id: `busy-${i}`, title: `予定${i}` }));
+    evState.events = Array.from({ length: 5 }, (_, i) => ({
+      ...sampleEvent,
+      id: `busy-${i}`,
+      title: `予定${i}`,
+    }));
     render(<CalendarScreen />);
     await user.click(screen.getByRole('button', { name: /予定0/ }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -124,7 +137,15 @@ describe('CalendarScreen', () => {
     try {
       render(<CalendarScreen />);
       const chip = screen.getByRole('button', { name: /会議アルファ/ });
-      fireEvent(chip, Object.assign(new Event('pointerdown', { bubbles: true }), { button: 0, isPrimary: true, clientX: 20, clientY: 20 }));
+      fireEvent(
+        chip,
+        Object.assign(new Event('pointerdown', { bubbles: true }), {
+          button: 0,
+          isPrimary: true,
+          clientX: 20,
+          clientY: 20,
+        }),
+      );
       act(() => vi.advanceTimersByTime(500));
       fireEvent.pointerUp(chip);
       fireEvent.click(chip);
@@ -132,13 +153,23 @@ describe('CalendarScreen', () => {
       expect(screen.getByLabelText('タイトル')).toHaveValue('');
       expect(screen.getByLabelText('開始')).toHaveValue('2026-09-08T09:00');
       expect(screen.queryByRole('dialog', { name: '予定を編集' })).not.toBeInTheDocument();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('タブは年・月・日・リストの順で、日付の通常タップは週と予定一覧を開く', async () => {
     render(<CalendarScreen />);
-    expect(screen.getAllByRole('radio').map((button) => button.textContent)).toEqual(['年', '月', '日', 'リスト']);
+    expect(screen.getAllByRole('radio').map((button) => button.textContent)).toEqual([
+      '年',
+      '月',
+      '日',
+      'リスト',
+    ]);
     await userEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
-    expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '9月8日を開く' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
   });
@@ -153,6 +184,54 @@ describe('CalendarScreen', () => {
     render(<CalendarScreen initialDate="2026-12-25" />);
     expect(screen.getByRole('button', { name: '2026年12月' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '12月25日を開く' })).toBeInTheDocument();
+  });
+
+  it('月見出しの金額は表示月に追従し、表示OFFでもシフトカレンダーを集計する', async () => {
+    const user = userEvent.setup();
+    calState.calendars = [{ ...calendar, id: 'shift', isShift: true, isVisible: false }];
+    evState.events = [
+      {
+        ...sampleEvent,
+        calendarId: 'shift',
+        startsAt: '2026-09-08T00:00:00Z',
+        endsAt: '2026-09-08T08:00:00Z',
+        breakMinutes: 60,
+        hourlyWage: 1100,
+      },
+    ];
+    render(<CalendarScreen />);
+    expect(screen.getByText('¥7,700')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    expect(screen.getByText('¥0')).toBeInTheDocument();
+  });
+
+  it('ロック中は秘密シフトの金額を除外し、解除・再ロックに即時追従する', () => {
+    calState.calendars = [{ ...calendar, isShift: true }];
+    evState.events = [
+      {
+        ...sampleEvent,
+        isSecret: true,
+        startsAt: '2026-09-08T00:00:00Z',
+        endsAt: '2026-09-08T08:00:00Z',
+        breakMinutes: 60,
+        hourlyWage: 1100,
+      },
+    ];
+    const { rerender } = render(<CalendarScreen />);
+    expect(screen.getByText('¥0')).toBeInTheDocument();
+    secretState = { unlocked: true };
+    rerender(<CalendarScreen />);
+    expect(screen.getByText('¥7,700')).toBeInTheDocument();
+    secretState = { unlocked: false };
+    rerender(<CalendarScreen />);
+    expect(screen.getByText('¥0')).toBeInTheDocument();
+    expect(screen.queryByText('¥7,700')).not.toBeInTheDocument();
+  });
+
+  it('予定またはカレンダーのロード中は未確定の¥0を表示しない', () => {
+    evState.loading = true;
+    render(<CalendarScreen />);
+    expect(screen.queryByText('¥0')).not.toBeInTheDocument();
   });
 
   it('「日」を選ぶと日ビュー(1日タイムライン)に切り替わる', async () => {
@@ -400,7 +479,9 @@ describe('CalendarScreen', () => {
     await user.click(screen.getByRole('button', { name: /ゴミ収集/ }));
     expect(screen.getByRole('dialog', { name: '予定の詳細' })).toBeInTheDocument();
     expect(
-      screen.getByText('この予定は Google カレンダーから取り込んだものです。編集はできません。'),
+      screen.getByText(
+        'この予定は Google カレンダーから取り込んだものです。編集はできません。',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '削除' })).not.toBeInTheDocument();
   });

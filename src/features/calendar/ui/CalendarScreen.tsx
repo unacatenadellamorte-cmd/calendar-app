@@ -28,6 +28,7 @@ import { ListView } from './ListView';
 import { YearView } from './YearView';
 import { DayEventPanel } from './DayEventPanel';
 import { MonthShiftTiles } from './MonthShiftTiles';
+import { calculateMonthlyPay } from '@/features/pay/model/usePayEstimate';
 interface CalendarScreenProps {
   /** ホームの代表予定タップ等で「この日を開く」指定(`?date=` 由来)。 */
   initialDate?: string;
@@ -54,6 +55,10 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
   );
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
     useCalendarView(unlockedEvents, cal.calendars, initialDate);
+  const monthPay = useMemo(
+    () => calculateMonthlyPay(unlockedEvents, cal.calendars, cursor.slice(0, 7)),
+    [unlockedEvents, cal.calendars, cursor],
+  );
   const today = todayLocalDate();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<EventItem | null>(null);
@@ -181,6 +186,7 @@ export function CalendarScreen({ initialDate, initialEventId }: CalendarScreenPr
         onNext={goNext}
         onToday={goToday}
         onJump={jumpTo}
+        monthPayAmount={view === 'month' && !loading ? monthPay.amount : undefined}
       />
 
       {cal.errorKey && (
