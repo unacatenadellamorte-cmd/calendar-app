@@ -16,18 +16,17 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
-import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 
-/** 今週(日曜始まり)を表示するウィジェット。予定データはcalendarOverviewだけを読む。 */
+/** 今週(日曜始まり)を横7列で表示するウィジェット。予定データはcalendarOverviewだけを読む。 */
 class WeekEventsWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
@@ -44,7 +43,7 @@ private fun WeekEventsContent() {
     val today = todayWidgetDay()
     val days = weekWidgetDays(today)
     Column(
-        modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(8.dp),
+        modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(6.dp),
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth().height(24.dp)) {
             Text(
@@ -54,8 +53,24 @@ private fun WeekEventsContent() {
             )
             AddWeekButton(context, today)
         }
-        days.forEach { day ->
-            WeekDayRow(context, overview, day, day == today, GlanceModifier.defaultWeight())
+        // 月表示を日付タップで折りたたんだ時と同じ、日曜始まりの曜日見出し。
+        Row(modifier = GlanceModifier.fillMaxWidth().height(20.dp)) {
+            days.forEach { day ->
+                Text(
+                    text = widgetWeekdayLabel(day, overview.language),
+                    style = TextStyle(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorProvider(Color.DarkGray),
+                    ),
+                    modifier = GlanceModifier.defaultWeight().padding(1.dp),
+                )
+            }
+        }
+        Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+            days.forEach { day ->
+                WeekDayCell(context, overview, day, day == today, GlanceModifier.defaultWeight())
+            }
         }
     }
 }
@@ -70,35 +85,34 @@ private fun AddWeekButton(context: Context, today: WidgetDay) {
 }
 
 @Composable
-private fun WeekDayRow(
+private fun WeekDayCell(
     context: Context,
     overview: CalendarOverview,
     day: WidgetDay,
     isToday: Boolean,
-    rowModifier: GlanceModifier,
+    cellModifier: GlanceModifier,
 ) {
     val events = eventsForWidgetDay(overview.events, day)
-    val summary = events.joinToString("・") { shortWidgetTitle(it.title.ifBlank { it.calendarName }, 18) }
-    Row(
-        modifier = rowModifier
-            .fillMaxWidth()
+    val summary = events.joinToString("・") { shortWidgetTitle(it.title.ifBlank { it.calendarName }, 7) }
+    Column(
+        modifier = cellModifier
+            .fillMaxHeight()
             .background(if (isToday) Color(0xFFEAF4FF) else Color.Transparent)
             .clickable(actionStartActivity(dayWidgetIntent(context, day)))
-            .padding(2.dp),
+            .padding(1.dp),
     ) {
         Text(
-            text = "${widgetWeekdayLabel(day, overview.language)} ${day.day}",
+            text = day.day.toString(),
             style = TextStyle(
                 fontSize = 10.sp,
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                 color = ColorProvider(if (isToday) Color(0xFF005A9C) else Color.DarkGray),
             ),
-            modifier = GlanceModifier.width(42.dp),
         )
         Text(
             text = if (summary.isBlank()) "" else summary,
             style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color.Black)),
-            maxLines = 1,
+            maxLines = 2,
             modifier = GlanceModifier.defaultWeight(),
         )
         Text(

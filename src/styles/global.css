@@ -127,11 +127,51 @@
   background-attachment: fixed;
 }
 :root[data-background='custom'] .app-shell {
-  background-color: color-mix(in srgb, var(--color-surface-sunken) 82%, transparent);
+  background-color: transparent;
 }
 
-:root[data-background='custom'] .app-screen {
+/* 背景画像時はアプリシェルを透明にし、各面を一層だけ約60%不透明にする。 */
+:root[data-background='custom'] .app-shell .bg-surface-base {
+  background-color: color-mix(in srgb, var(--color-surface-base) 60%, transparent);
+}
+:root[data-background='custom'] .app-shell .bg-surface-raised {
+  background-color: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
+}
+:root[data-background='custom'] .app-shell .bg-surface-sunken {
+  background-color: color-mix(in srgb, var(--color-surface-sunken) 60%, transparent);
+}
+/* 同じ詳細度の面指定より後で、画面全体の重なりを取り除く。 */
+:root[data-background='custom'] .app-shell .app-screen {
   background-color: transparent;
+}
+/* 月セル内のチップはセル面に重ねず、写真の見え方を二重に濃くしない。 */
+:root[data-background='custom'] .app-shell .month-event-chip {
+  background-color: transparent;
+}
+.month-event-title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.month-event-title > span {
+  display: block;
+  width: max-content;
+}
+.month-event-title.is-marquee > span {
+  animation: month-event-marquee var(--month-marquee-duration) ease-in-out infinite alternate;
+}
+@keyframes month-event-marquee {
+  0%, 12% { transform: translateX(0); }
+  88%, 100% { transform: translateX(calc(-1 * var(--month-marquee-distance))); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .month-event-title.is-marquee > span {
+    animation: none;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: 100%;
+  }
 }
 
 /* 月のページ送り。旧月と新月を同じ速度で横に移動する。 */

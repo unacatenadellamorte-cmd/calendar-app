@@ -10,6 +10,11 @@ import { resolveMessage } from '@/data/messages';
 import { useShiftTemplates } from '@/features/shifts/model/useShiftTemplates';
 import { addDays, eventOccursOnDate } from '@/lib/calendar-view';
 import { BottomSheet } from '@/ui/BottomSheet';
+import { ShiftTemplateFormSheet } from '@/features/shifts/ui/ShiftTemplateFormSheet';
+import type { NewShiftTemplateInput } from '@/data/shift-templates';
+
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_PX = 8;
 export function MonthShiftTiles({
   date,
   calendars,
@@ -36,6 +41,12 @@ export function MonthShiftTiles({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
   const dayShifts = events.filter(
     (event) =>
       event.source === 'local' &&
@@ -45,10 +56,37 @@ export function MonthShiftTiles({
   );
   const closeDelete = useCallback(() => setDeleteOpen(false), []);
   useEffect(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    pointerStart.current = null;
+    longPressTriggered.current = false;
+    suppressClick.current = false;
     setDeleteOpen(false);
+    setEditOpen(false);
+    setEditingTemplate(null);
     setNotice('');
     setError(null);
   }, [date]);
+  useEffect(() => {
+    const captureClick = (event: MouseEvent) => {
+      if (!suppressClick.current) return;
+      suppressClick.current = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    const resetSuppression = () => {
+      suppressClick.current = false;
+    };
+    document.addEventListener('click', captureClick, true);
+    document.addEventListener('pointerdown', resetSuppression, true);
+    document.addEventListener('keydown', resetSuppression, true);
+    return () => {
+      document.removeEventListener('click', captureClick, true);
+      document.removeEventListener('pointerdown', resetSuppression, true);
+      document.removeEventListener('keydown', resetSuppression, true);
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
   const remove = async (event: EventItem) => {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -195,7 +233,59 @@ export function MonthShiftTiles({
               key={template.id}
               type="button"
               disabled={busy || !calendar}
-              onClick={() => void pick(template)}
+              onClick={() => {
+                if (longPressTriggered.current || suppressClick.current) {
+                  longPressTriggered.current = false;
+                  suppressClick.current = false;
+                  return;
+                }
+                void pick(template);
+              }}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || event.isPrimary === false) return;
+                pointerStart.current = { x: event.clientX, y: event.clientY };
+                longPressTriggered.current = false;
+                suppressClick.current = false;
+                longPressTimer.current = setTimeout(() => {
+                  longPressTimer.current = null;
+                  longPressTriggered.current = true;
+                  suppressClick.current = true;
+                  setEditingTemplate(template);
+                  shifts.dismissError();
+                  setEditOpen(true);
+                }, LONG_PRESS_MS);
+              }}
+              onPointerMove={(event) => {
+                const start = pointerStart.current;
+                if (
+                  start &&
+                  (Math.abs(event.clientX - start.x) > LONG_PRESS_MOVE_PX ||
+                    Math.abs(event.clientY - start.y) > LONG_PRESS_MOVE_PX)
+                ) {
+                  if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                  suppressClick.current = true;
+                }
+              }}
+              onPointerUp={() => {
+                pointerStart.current = null;
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+              }}
+              onPointerLeave={() => {
+                if (pointerStart.current) suppressClick.current = true;
+                pointerStart.current = null;
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+              }}
+              onPointerCancel={() => {
+                pointerStart.current = null;
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+                longPressTriggered.current = false;
+                suppressClick.current = false;
+              }}
+              onContextMenu={(event) => event.preventDefault()}
               aria-label={t('{0}を{1}に追加', [template.name, date])}
               className="flex aspect-square min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-border-hairline border-t-2 bg-surface-raised p-1 disabled:opacity-50"
               style={{ borderTopColor: template.color }}
@@ -243,6 +333,25 @@ export function MonthShiftTiles({
           ))}
         </div>
       </BottomSheet>
+      <ShiftTemplateFormSheet
+        open={editOpen}
+        editing={editingTemplate}
+        usedColors={shifts.templates.map((item) => item.color)}
+        errorKey={shifts.errorKey}
+        onClose={() => {
+          setEditOpen(false);
+          setEditingTemplate(null);
+        }}
+        onSubmit={(values: NewShiftTemplateInput) => {
+          if (!editingTemplate) return Promise.resolve(false);
+          return shifts.update(editingTemplate, values);
+        }}
+        onDelete={(template) => {
+          setEditOpen(false);
+          setEditingTemplate(null);
+          void shifts.remove(template);
+        }}
+      />
     </section>
   );
 }

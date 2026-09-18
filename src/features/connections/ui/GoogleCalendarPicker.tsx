@@ -55,7 +55,7 @@ export function GoogleCalendarPicker() {
           disabled={refreshing}
           className="min-h-11 text-meta text-accent disabled:opacity-60"
         >
-          {refreshing ? t('更新中…') : t('更新')}
+          {refreshing ? t('同期中') : t('更新')}
         </button>
       }
     >

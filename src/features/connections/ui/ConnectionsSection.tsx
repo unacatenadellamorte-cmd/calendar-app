@@ -106,6 +106,10 @@ export function ConnectionsSection() {
     refetch();
   }, [reloadSyncState, refetch]);
   const { syncing, lastRun, errorKey: syncErrorKey, runSync } = useGoogleSync(onSyncDone);
+  const startGoogleSync = () => {
+    setActionErrorKey(null);
+    void runSync();
+  };
   useEffect(() => {
     if (connection) void reloadSyncState();
   }, [connection, reloadSyncState]);
@@ -240,12 +244,12 @@ export function ConnectionsSection() {
 
             <button
               type="button"
-              onClick={() => void runSync()}
+              onClick={startGoogleSync}
               disabled={syncing}
               aria-label={t('Google の今すぐ取り込み')}
               className="mt-2 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-60"
             >
-              {syncing ? t('取り込み中…') : t('今すぐ取り込み')}
+              {syncing ? t('同期中') : t('今すぐ取り込み')}
             </button>
 
             <p className="mt-2 text-meta text-ink-secondary">
@@ -254,7 +258,11 @@ export function ConnectionsSection() {
                 : t('まだ取り込んでいません')}
             </p>
 
-            {syncErrorKey ? (
+            {syncing ? (
+              <p role="status" className="mt-1 text-meta text-ink-secondary">
+                {t('同期中')}
+              </p>
+            ) : syncErrorKey ? (
               <p role="alert" className="mt-1 text-meta text-danger">
                 {resolveMessage(syncErrorKey)}
               </p>
@@ -296,7 +304,7 @@ export function ConnectionsSection() {
           </>
         )}
 
-        {(actionErrorKey ?? errorKey) && (
+        {!syncing && (actionErrorKey ?? errorKey) && (
           <p role="alert" className="mt-2 text-meta text-danger">
             {resolveMessage(actionErrorKey ?? errorKey!)}
           </p>

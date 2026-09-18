@@ -76,6 +76,8 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
         aria-label={title}
         tabIndex={-1}
         style={{
+          paddingBottom:
+            'calc(1rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))',
           transform: `translateY(${closing ? '100%' : `${offset}px`})`,
           transition: closing || offset === 0 ? 'transform 180ms ease-out' : 'none',
         }}

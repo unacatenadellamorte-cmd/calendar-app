@@ -269,7 +269,7 @@ export function MonthView({
                 }}
                 onClick={() => onDayTap(cell.date)}
                 className={[
-                  'flex min-h-20 min-w-0 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-1',
+                  'month-cell flex min-h-20 min-w-0 select-none flex-col gap-0.5 border-r border-b border-border-hairline p-0.5',
                   cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
                   cell.date === cursor ? 'ring-2 ring-inset ring-accent' : '',
                 ].join(' ')}
@@ -314,6 +314,7 @@ export function MonthView({
                     calendar={calendarById.get(event.calendarId)}
                     onTap={() => onDayTap(cell.date)}
                     showTime={false}
+                    month
                   />
                 ))}
 

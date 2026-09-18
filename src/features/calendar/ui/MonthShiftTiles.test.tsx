@@ -11,8 +11,14 @@ const template: ShiftTemplate = { id: 't1', name: '夜勤', startLocal: '22:00',
 const calendar: Calendar = { id: 'shift', name: 'シフト', color: '#009E73', source: 'local', isShift: true, isVisible: true, priority: 0, createdAt: '', updatedAt: '' };
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('@/data/shifts', () => ({ createShifts: (...args: unknown[]) => createShifts(...args) }));
-vi.mock('@/features/shifts/model/useShiftTemplates', () => ({ useShiftTemplates: () => ({ templates: [template], loading: false, errorKey: null }) }));
-beforeEach(() => createShifts.mockReset());
+const updateTemplate = vi.fn().mockResolvedValue(true);
+const removeTemplate = vi.fn();
+vi.mock('@/features/shifts/model/useShiftTemplates', () => ({ useShiftTemplates: () => ({ templates: [template], loading: false, errorKey: null, update: updateTemplate, remove: removeTemplate, dismissError: vi.fn() }) }));
+beforeEach(() => {
+  createShifts.mockReset();
+  updateTemplate.mockReset().mockResolvedValue(true);
+  removeTemplate.mockReset();
+});
 
 const event = (over: Partial<EventItem> = {}): EventItem => ({
   id: 'e1', calendarId: 'shift', title: '夜勤', allDay: false,
@@ -23,6 +29,53 @@ const event = (over: Partial<EventItem> = {}): EventItem => ({
 });
 
 describe('月表示のシフトタイル', () => {
+  it('短押しは追加し、500ms長押しは編集だけを開く', () => {
+    vi.useFakeTimers();
+    try {
+      const onCreated = vi.fn();
+      createShifts.mockResolvedValue(ok([]));
+      render(<MonthShiftTiles date="2026-09-08" calendars={[calendar]} enabled events={[]}
+        onDateChange={vi.fn()} onRemove={vi.fn()} onCreated={onCreated} />);
+      const button = screen.getByRole('button', { name: '夜勤を2026-09-08に追加' });
+      fireEvent.click(button);
+      expect(createShifts).toHaveBeenCalledTimes(1);
+      createShifts.mockClear();
+      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), {
+        button: 0, isPrimary: true, clientX: 20, clientY: 20,
+      }));
+      act(() => vi.advanceTimersByTime(500));
+      expect(screen.getByRole('dialog', { name: 'お気に入りシフトを編集' })).toBeInTheDocument();
+      fireEvent.pointerUp(button);
+      fireEvent.click(button);
+      expect(createShifts).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('移動・右クリック・日付変更では長押し編集を起こさず、次の操作を通す', () => {
+    vi.useFakeTimers();
+    try {
+      const onDateChange = vi.fn();
+      render(<MonthShiftTiles date="2026-09-08" calendars={[calendar]} enabled events={[]}
+        onDateChange={onDateChange} onRemove={vi.fn()} onCreated={vi.fn()} />);
+      const button = screen.getByRole('button', { name: '夜勤を2026-09-08に追加' });
+      fireEvent(button, Object.assign(new Event('pointerdown', { bubbles: true }), {
+        button: 0, isPrimary: true, clientX: 20, clientY: 20,
+      }));
+      fireEvent(button, Object.assign(new Event('pointermove', { bubbles: true }), {
+        button: 0, isPrimary: true, clientX: 40, clientY: 20,
+      }));
+      act(() => vi.advanceTimersByTime(500));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      fireEvent.pointerDown(button, { button: 2, isPrimary: false });
+      fireEvent.pointerUp(button);
+      fireEvent.click(screen.getByRole('button', { name: '翌日に移動' }));
+      expect(onDateChange).toHaveBeenCalledWith('2026-09-09');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('矢印は月境界をまたいで1日ずつ選択日を動かす', () => {
     const onDateChange = vi.fn();
     render(<MonthShiftTiles date="2026-09-01" calendars={[calendar]} enabled events={[]}

@@ -215,6 +215,7 @@
   "時給は0以上で入力してください": "Ingrese el salario por hora como 0 o más.",
   "更新": "actualizar",
   "更新中…": "Actualizando...",
+  "同期中": "Sincronizando",
   "書き出し中…": "Exportador...",
   "最終取り込み: {0}": "Captura final: {0}",
   "月": "mes",

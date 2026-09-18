@@ -215,6 +215,7 @@
   "時給は0以上で入力してください": "Hourly pay must be 0 or more",
   "更新": "Refresh",
   "更新中…": "Updating…",
+  "同期中": "Syncing",
   "書き出し中…": "Exporting…",
   "最終取り込み: {0}": "Last import: {0}",
   "月": "Month",

@@ -163,6 +163,21 @@ describe('ConnectionsSection', () => {
     expect(refetch).toHaveBeenCalled(); // 月/週/リストの予定も取り直す(Epic 3 retro F8)
   });
 
+  it('取り込み中は残留したオフライン表示を隠し、完了後に通常表示へ戻す', async () => {
+    getConnection.mockResolvedValue(connected);
+    let resolveSync!: (value: unknown) => void;
+    syncGoogleCalendarsNow.mockReturnValue(new Promise((resolve) => { resolveSync = resolve; }));
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    const button = await screen.findByRole('button', { name: 'Google の今すぐ取り込み' });
+    await user.click(button);
+    await waitFor(() => expect(screen.getAllByText('同期中')).toHaveLength(2));
+    expect(screen.queryByText('オフラインです。接続すると同期します')).not.toBeInTheDocument();
+    resolveSync(ok({ synced: [], errors: [] }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Google の今すぐ取り込み' })).toBeInTheDocument());
+    expect(screen.queryByText('同期中')).not.toBeInTheDocument();
+  });
+
   it('「今すぐ取り込み」で全カレンダーが失敗: 「一部」ではなく明確な失敗文言を出す', async () => {
     getConnection.mockResolvedValue(connected);
     syncGoogleCalendarsNow.mockResolvedValue(

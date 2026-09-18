@@ -78,10 +78,13 @@ class WidgetRenderingTest {
                 host,
                 ComponentName(context, WeekEventsWidgetReceiver::class.java),
                 180,
-                240,
+                140,
                 boundIds,
                 title,
             )
+            layoutForAssertions(week, 180, 140)
+            saveBitmap(week, "widget-week.png", 180, 140)
+            assertWeekButtonsAreHorizontal(week)
             val month = renderProvider(
                 host,
                 ComponentName(context, MonthEventsWidgetReceiver::class.java),
@@ -97,7 +100,6 @@ class WidgetRenderingTest {
             assertPlus(month)
             assertText(month, title)
             assertText(month, today.day.toString())
-            saveBitmap(week, "widget-week.png", 180, 240)
             saveBitmap(month, "widget-month.png", 250, 280)
         } finally {
             boundIds.forEach { host.deleteAppWidgetId(it) }
@@ -150,6 +152,37 @@ class WidgetRenderingTest {
         assertTrue("text '＋' was not rendered", findText(root, "＋") || findText(root, "+"))
     }
 
+    private fun assertWeekButtonsAreHorizontal(root: View) {
+        val textViews = mutableListOf<TextBox>()
+        // ウィンドウ未接続の描画用Viewなので、親からの配置座標を積算する。
+        collectTextViews(root, textViews, -root.left, -root.top)
+        val weekButtons = textViews
+            .filter { it.text == "＋" || it.text == "+" }
+            .groupBy { it.top }
+            .values
+            .maxByOrNull { it.size }
+            ?: emptyList()
+        assertTrue("週の各日に追加ボタンが7個ない", weekButtons.size >= 7)
+        assertTrue(
+            "週の追加ボタンがウィジェット領域外にある",
+            weekButtons.all { it.left >= 0 && it.right <= root.width && it.top >= 0 && it.bottom <= root.height },
+        )
+        assertTrue("週の追加ボタンが横方向に並んでいない: $weekButtons", weekButtons.map { it.left }.distinct().size >= 7)
+    }
+
+    private data class TextBox(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int)
+
+    private fun collectTextViews(view: View, result: MutableList<TextBox>, parentLeft: Int, parentTop: Int) {
+        val left = parentLeft + view.left
+        val top = parentTop + view.top
+        if (view is TextView) {
+            result += TextBox(view.text?.toString().orEmpty(), left, top, left + view.width, top + view.height)
+        }
+        if (view is android.view.ViewGroup) {
+            for (index in 0 until view.childCount) collectTextViews(view.getChildAt(index), result, left - view.scrollX, top - view.scrollY)
+        }
+    }
+
     private fun findText(view: View, expected: String): Boolean {
         if (view is TextView && view.text?.toString()?.contains(expected) == true) return true
         if (view is android.view.ViewGroup) {
@@ -160,18 +193,28 @@ class WidgetRenderingTest {
 
     private fun saveBitmap(view: AppWidgetHostView, name: String, widthDp: Int, heightDp: Int) {
         runOnMain {
-            val density = context.resources.displayMetrics.density
-            val width = (widthDp * density).toInt().coerceAtLeast(view.width)
-            val height = (heightDp * density).toInt().coerceAtLeast(view.height)
-            view.measure(
-                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
-            )
-            view.layout(0, 0, width, height)
+            layoutView(view, widthDp, heightDp)
+            val width = view.width
+            val height = view.height
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             FileOutputStream(File(context.cacheDir, name)).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
+    }
+
+    private fun layoutForAssertions(view: AppWidgetHostView, widthDp: Int, heightDp: Int) {
+        runOnMain { layoutView(view, widthDp, heightDp) }
+    }
+
+    private fun layoutView(view: AppWidgetHostView, widthDp: Int, heightDp: Int) {
+        val density = context.resources.displayMetrics.density
+        val width = (widthDp * density).toInt().coerceAtLeast(view.width)
+        val height = (heightDp * density).toInt().coerceAtLeast(view.height)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        view.layout(0, 0, width, height)
     }
 
     private fun waitUntil(label: String, condition: () -> Boolean) {

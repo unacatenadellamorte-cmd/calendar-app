@@ -9,8 +9,10 @@ class CalendarOverviewTest {
     @Test
     fun `週は日曜始まりで月境界をまたぐ`() {
         val days = weekWidgetDays(WidgetDay(2026, 9, 16)) // 水曜
+        assertEquals(7, days.size)
         assertEquals("2026-09-13", days.first().toKey())
         assertEquals("2026-09-19", days.last().toKey())
+        assertEquals(listOf("日", "月", "火", "水", "木", "金", "土"), days.map { widgetWeekdayLabel(it, "ja") })
     }
 
     @Test

@@ -38,7 +38,8 @@ export function BottomTabs() {
   return (
     <nav
       aria-label={t('メインナビゲーション')}
-      className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border-hairline bg-surface-base pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border-hairline bg-surface-base"
+      style={{ paddingBottom: 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))' }}
     >
       {TABS.map((tab) => (
         <NavLink
