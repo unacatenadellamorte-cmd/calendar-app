@@ -297,5 +297,21 @@
   "保存しました。": "Saved.",
   "概算・目安": "Estimate",
   "取り込んだカレンダーには予定を追加できません。自作カレンダーを選んでください": "Events cannot be added to imported calendars. Choose a calendar you created.",
-  "この環境は通知に対応していません。予定は保存されます": "Notifications are not supported in this environment. Your event will still be saved."
+  "この環境は通知に対応していません。予定は保存されます": "Notifications are not supported in this environment. Your event will still be saved.",
+  "場所": "Location",
+  "予定URL": "Event URL",
+  "地図アプリ": "Map app",
+  "Google Maps": "Google Maps",
+  "Apple Maps": "Apple Maps",
+  "標準の地図アプリ": "Default map app",
+  "地図を開けませんでした": "Could not open the map",
+  "リンクを開けませんでした": "Could not open the link",
+  "場所は1000文字までで入力してください": "Enter a location of 1000 characters or fewer.",
+  "予定URLはhttpまたはhttpsのURLを入力してください": "Enter an http or https URL for the event.",
+  "背景画像の範囲を調整": "Adjust background image area",
+  "背景画像の切り出し範囲": "Background image crop area",
+  "背景画像プレビュー": "Background image preview",
+  "画像を指で動かせます。矢印キーでも調整できます。": "Drag the image with your finger. You can also adjust it with the arrow keys.",
+  "拡大": "Zoom in",
+  "この範囲で設定": "Set this area"
 }

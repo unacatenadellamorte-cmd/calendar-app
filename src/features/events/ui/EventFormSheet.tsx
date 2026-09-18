@@ -40,6 +40,8 @@ interface FormState {
   endLocal: string;
   dateLocal: string;
   note: string;
+  location: string;
+  url: string;
   isSecret: boolean;
 }
 function initialState(
@@ -64,6 +66,8 @@ function initialState(
       endLocal: seededEnd,
       dateLocal: seed?.date ?? seededStart.slice(0, 10),
       note: '',
+      location: '',
+      url: '',
       isSecret: false,
     };
   }
@@ -80,6 +84,8 @@ function initialState(
     endLocal: editing.endsAt ? utcIsoToLocalInput(editing.endsAt) : nowLocalInput(60),
     dateLocal: editing.eventDate ?? todayLocalDate(),
     note: editing.note ?? '',
+    location: editing.location ?? '',
+    url: editing.url ?? '',
     isSecret: editing.isSecret,
   };
 }
@@ -88,6 +94,8 @@ function toInput(form: FormState): NewEventInput {
     calendarId: form.calendarId,
     title: form.title,
     note: form.note || null,
+    location: form.location.trim() || null,
+    url: form.url.trim() || null,
     isSecret: form.isSecret,
   };
   return form.allDay
@@ -274,6 +282,28 @@ export function EventFormSheet({
             maxLength={2000}
             rows={2}
             className="rounded-sm border border-border-hairline bg-surface-base px-3 py-2 text-body"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-meta text-ink-secondary">{t('場所')}</span>
+          <input
+            value={form.location}
+            onChange={(e) => set('location', e.target.value)}
+            maxLength={1000}
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-meta text-ink-secondary">{t('予定URL')}</span>
+          <input
+            type="url"
+            value={form.url}
+            onChange={(e) => set('url', e.target.value)}
+            maxLength={2048}
+            placeholder="https://"
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
         </label>
 

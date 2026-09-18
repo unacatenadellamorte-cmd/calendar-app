@@ -80,7 +80,7 @@ describe('buildExportBundle', () => {
     );
     listEvents.mockResolvedValue(
       ok([
-        ev({ id: 'late', calendarId: 'a', startsAt: '2026-09-09T00:00:00Z', endsAt: '2026-09-09T01:00:00Z' }),
+        ev({ id: 'late', calendarId: 'a', location: '東京駅', url: 'https://example.com', startsAt: '2026-09-09T00:00:00Z', endsAt: '2026-09-09T01:00:00Z' }),
         ev({ id: 'early', calendarId: 'b', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
       ]),
     );
@@ -91,6 +91,7 @@ describe('buildExportBundle', () => {
     expect(r.value.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(r.value.calendars.map((c) => c.id)).toEqual(['a', 'b']);
     expect(r.value.events.map((e) => e.id)).toEqual(['early', 'late']);
+    expect(r.value.events.find((e) => e.id === 'late')).toMatchObject({ location: '東京駅', url: 'https://example.com' });
   });
 
   it('お気に入りシフトのテンプレを createdAt 順で含める', async () => {

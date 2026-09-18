@@ -33,6 +33,8 @@ export interface EventItem {
   /** 終日予定の日付(YYYY-MM-DD)。時刻付きなら null。 */
   eventDate: string | null;
   note: string | null;
+  location?: string | null;
+  url?: string | null;
   source: EventSource;
   /** シフト属性(AD-8)。シフト実体以外はすべて null。 */
   breakMinutes: number | null;
@@ -75,6 +77,8 @@ export type NewEventInput = {
   shift?: ShiftAttributes;
   /** シークレット予定として作成するか(省略時 false)。spec-secret-mode。 */
   isSecret?: boolean;
+  location?: string | null;
+  url?: string | null;
 } & (TimedInput | AllDayInput);
 
 export type EventPatch = Partial<{
@@ -86,6 +90,8 @@ export type EventPatch = Partial<{
   endsAt: string | null;
   eventDate: string | null;
   isSecret: boolean;
+  location?: string | null;
+  url?: string | null;
 }>;
 
 export interface EventRange {
@@ -115,13 +121,15 @@ export interface EventRow {
   shift_template_id: string | null;
   reminder_minutes: number | null;
   is_secret: boolean;
+  location?: string | null;
+  event_url?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 export const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,location,event_url,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
 
 export function toEvent(row: EventRow): EventItem {
   return {
@@ -133,6 +141,8 @@ export function toEvent(row: EventRow): EventItem {
     endsAt: row.ends_at,
     eventDate: row.event_date,
     note: row.note,
+    location: row.location ?? null,
+    url: row.event_url ?? null,
     source: row.source,
     breakMinutes: row.break_minutes ?? null,
     hourlyWage: row.hourly_wage ?? null,
@@ -143,6 +153,11 @@ export function toEvent(row: EventRow): EventItem {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** 旧キャッシュ(新列を持たない行)も読み出し時に同じ nullable 形へ揃える。 */
+function normalizeCachedEvent(event: EventItem): EventItem {
+  return { ...event, location: event.location ?? null, url: event.url ?? null };
 }
 
 /**
@@ -198,12 +213,31 @@ interface EventInputShape {
   startsAt?: string | null;
   endsAt?: string | null;
   eventDate?: string | null;
+  location?: string | null;
+  url?: string | null;
+}
+
+const LOCATION_MAX = 1000;
+const URL_MAX = 2048;
+function validEventUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && Boolean(parsed.hostname);
+  } catch {
+    return false;
+  }
 }
 
 /** 入力の妥当性。問題なければ null。表示層向けの messageKey を持つ AppError を返す。 */
 export function validateEventInput(input: EventInputShape): AppError | null {
   if (input.title.trim().length < 1 || input.title.trim().length > 200) {
     return appError('event/invalid-title', 'event/invalid-title');
+  }
+  if ((input.location?.trim().length ?? 0) > LOCATION_MAX) {
+    return appError('event/invalid-location', 'event/invalid-location');
+  }
+  if (input.url && (input.url.trim().length > URL_MAX || !validEventUrl(input.url.trim()))) {
+    return appError('event/invalid-url', 'event/invalid-url');
   }
   if (input.allDay) {
     if (!input.eventDate) return appError('event/invalid-date', 'event/invalid-date');
@@ -223,6 +257,8 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
     calendar_id: input.calendarId,
     title: input.title.trim(),
     note: input.note?.trim() || null,
+    location: input.location?.trim() || null,
+    event_url: input.url?.trim() || null,
     all_day: input.allDay,
     source: 'local' as const,
     is_secret: input.isSecret ?? false,
@@ -241,7 +277,7 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
 
 export async function listEvents(range: EventRange = {}): Promise<Result<EventItem[]>> {
   if (!supabase) return err(UNAVAILABLE);
-  if (isOffline()) return ok(await cacheGetAll('events'));
+  if (isOffline()) return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
   let query = selectActive('events', COLUMNS)
     .order('all_day', { ascending: true })
     .order('starts_at', { ascending: true, nullsFirst: false })
@@ -256,7 +292,7 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
   try {
     const { data, error } = await query;
     if (error) {
-      if (isNetworkError(error)) return ok(await cacheGetAll('events'));
+      if (isNetworkError(error)) return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
       return err(fromPostgrest(error));
     }
     const mapped = (data as unknown as EventRow[]).map(toEvent);
@@ -264,7 +300,7 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
     else for (const row of mapped) await cachePut('events', row);
     return ok(mapped);
   } catch (e) {
-    if (isNetworkError(e)) return ok(await cacheGetAll('events'));
+    if (isNetworkError(e)) return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
     return err(appError('data/query', 'data/query', e));
   }
 }
@@ -302,6 +338,13 @@ export function validateEventPatch(patch: EventPatch): AppError | null {
     const t = patch.title.trim();
     if (t.length < 1 || t.length > 200)
       return appError('event/invalid-title', 'event/invalid-title');
+  }
+  if ((patch.location?.trim().length ?? 0) > LOCATION_MAX) {
+    return appError('event/invalid-location', 'event/invalid-location');
+  }
+  if (patch.url !== undefined && patch.url !== null &&
+      (patch.url.trim().length > URL_MAX || !validEventUrl(patch.url.trim()))) {
+    return appError('event/invalid-url', 'event/invalid-url');
   }
   const touchesTime =
     patch.allDay !== undefined ||
@@ -348,6 +391,8 @@ export async function updateEvent(
   if (patch.calendarId !== undefined) row.calendar_id = patch.calendarId;
   if (patch.title !== undefined) row.title = patch.title.trim();
   if (patch.note !== undefined) row.note = patch.note?.trim() || null;
+  if (patch.location !== undefined) row.location = patch.location?.trim() || null;
+  if (patch.url !== undefined) row.event_url = patch.url?.trim() || null;
   if (patch.allDay !== undefined) row.all_day = patch.allDay;
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;

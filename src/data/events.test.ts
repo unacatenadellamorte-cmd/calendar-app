@@ -121,6 +121,20 @@ describe('events.ts', () => {
     });
   });
 
+  it('createEvent: location/event_url を専用列へ保存し、読み出しで null を正規化する', async () => {
+    queryResult = { data: row({ location: '東京駅', event_url: 'https://zoom.us/j/123' }), error: null };
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'c1', title: '会議', location: '  東京駅  ', url: 'https://zoom.us/j/123',
+      allDay: false, startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toMatchObject({ location: '東京駅', url: 'https://zoom.us/j/123' });
+    expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({
+      location: '東京駅', event_url: 'https://zoom.us/j/123',
+    });
+  });
+
   it('createEvent: input.shift があるとシフト属性列を insert し、toEvent が写す', async () => {
     queryResult = {
       data: row({
@@ -183,6 +197,28 @@ describe('events.ts', () => {
     expect(Object.keys(updateRow)).toEqual(
       expect.not.arrayContaining(['break_minutes', 'hourly_wage', 'workplace_label', 'shift_template_id']),
     );
+  });
+
+  it('updateEvent: location/url の更新を送り、旧 patch の省略では列を送らない', async () => {
+    queryResult = { data: row({ location: '新宿', event_url: 'https://example.com' }), error: null };
+    const { updateEvent } = await importEvents();
+    await updateEvent({ id: 'e1', source: 'local' }, { location: '新宿', url: 'https://example.com' });
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toMatchObject({
+      location: '新宿', event_url: 'https://example.com',
+    });
+    calls.length = 0;
+    queryResult = { data: row(), error: null };
+    await updateEvent({ id: 'e1', source: 'local' }, { title: '旧形式' });
+    expect(calls.find((c) => c.method === 'update')?.args[0]).not.toHaveProperty('event_url');
+    expect(calls.find((c) => c.method === 'update')?.args[0]).not.toHaveProperty('location');
+  });
+
+  it('location/url は長さと scheme を検証する', async () => {
+    const { createEvent } = await importEvents();
+    const base = { calendarId: 'c1', title: 'x', allDay: true as const, eventDate: '2026-09-08' };
+    expect((await createEvent({ ...base, location: 'x'.repeat(1001) })).ok).toBe(false);
+    expect((await createEvent({ ...base, url: 'javascript:alert(1)' })).ok).toBe(false);
+    expect(from).not.toHaveBeenCalled();
   });
 
   it('createEvent: 終日は event_date のみ、時刻は null', async () => {
@@ -459,7 +495,10 @@ describe('events.ts — オフライン(Story 1.6)', () => {
     const { listEvents } = await importEvents();
     const r = await listEvents();
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value.map((e) => e.title)).toEqual(['キャッシュ予定']);
+    if (r.ok) {
+      expect(r.value.map((e) => e.title)).toEqual(['キャッシュ予定']);
+      expect(r.value[0]).toMatchObject({ location: null, url: null });
+    }
   });
 
   it('createEvent はオフラインで outbox に積み、楽観行を返す(supabase に触れない)', async () => {
@@ -471,11 +510,11 @@ describe('events.ts — オフライン(Story 1.6)', () => {
     });
     const { listOutbox } = await import('./outbox');
     const r = await createEvent({
-      calendarId: 'c1', title: '打合せ', allDay: false,
+      calendarId: 'c1', title: '打合せ', location: '会議室A', url: 'https://example.com', allDay: false,
       startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z',
     });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value.id).toMatch(/^[0-9a-f-]{36}$/);
+    if (r.ok) expect(r.value).toMatchObject({ location: '会議室A', url: 'https://example.com' });
     expect(from).not.toHaveBeenCalled();
     const outbox = await listOutbox();
     expect(outbox[0]).toMatchObject({ entity: 'event', op: 'create' });

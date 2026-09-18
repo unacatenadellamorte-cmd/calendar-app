@@ -1,4 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@capacitor/core', () => ({
+  SystemBarsStyle: { Dark: 'DARK', Light: 'LIGHT', Default: 'DEFAULT' },
+  SystemBars: { setStyle: vi.fn().mockResolvedValue(undefined) },
+  Capacitor: { isNativePlatform: vi.fn(() => true) },
+}));
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { applyTheme, readStoredTheme } from './useTheme';
 
 afterEach(() => {
@@ -45,5 +51,16 @@ describe('applyTheme', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     applyTheme('system');
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+  });
+  it('濃色テーマはSystemBarsへ白アイコン用のDARKを渡す', () => {
+    const setStyle = vi.mocked(SystemBars.setStyle);
+    setStyle.mockClear();
+    applyTheme('dark');
+    expect(setStyle).toHaveBeenCalledWith({ style: SystemBarsStyle.Dark });
+    applyTheme('system');
+    expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Dark });
+    applyTheme('light');
+    expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Dark });
+    expect(Capacitor.isNativePlatform).toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ import {
 import { AccountSection } from './AccountSection';
 import { DataSection } from './DataSection';
 import { ConnectionsSection } from '@/features/connections/ui/ConnectionsSection';
+import { MapAppSection } from './MapAppSection';
 const THEME_OPTIONS: {
   value: ThemePreference;
   label: string;
@@ -140,6 +141,8 @@ export function SettingsScreen() {
       <AccountSection />
 
       <ConnectionsSection />
+
+      <MapAppSection />
 
       <section className="mt-6 flex flex-col gap-2">
         <Link

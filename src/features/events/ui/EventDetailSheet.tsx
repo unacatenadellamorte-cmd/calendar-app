@@ -4,6 +4,7 @@ import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
 import { ReminderPicker } from './ReminderPicker';
+import { openExternalUrl, openMap } from '@/platform/externalLinks';
 interface EventDetailSheetProps {
   /** null なら閉じている。 */
   event: EventItem | null;
@@ -53,6 +54,29 @@ export function EventDetailSheet({
 
           {event.note && (
             <p className="whitespace-pre-wrap text-body text-ink-primary">{event.note}</p>
+          )}
+
+          {event.location && (
+            <button
+              type="button"
+              className="block text-left text-body text-accent underline"
+              onClick={() => void openMap(event.location!).then((ok) => {
+                if (!ok) window.alert(t('地図を開けませんでした'));
+              })}
+            >
+              {event.location}
+            </button>
+          )}
+          {event.url && (
+            <button
+              type="button"
+              className="block max-w-full break-all text-left text-body text-accent underline"
+              onClick={() => void openExternalUrl(event.url!).then((ok) => {
+                if (!ok) window.alert(t('リンクを開けませんでした'));
+              })}
+            >
+              {event.url}
+            </button>
           )}
 
           {!event.allDay && (

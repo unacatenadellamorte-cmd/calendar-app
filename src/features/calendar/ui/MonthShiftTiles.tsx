@@ -146,7 +146,7 @@ export function MonthShiftTiles({
             title={t('前日に移動')}
             disabled={busy}
             onClick={() => onDateChange(addDays(date, -1))}
-            className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
+            className="shift-control shift-control-prev flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
           >
             <svg
               aria-hidden="true"
@@ -168,7 +168,7 @@ export function MonthShiftTiles({
             title={t('選択日のシフトを削除')}
             disabled={busy || dayShifts.length === 0}
             onClick={requestDelete}
-            className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-danger disabled:opacity-40"
+            className="shift-control shift-control-delete flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-danger disabled:opacity-40"
           >
             <svg
               aria-hidden="true"
@@ -190,7 +190,7 @@ export function MonthShiftTiles({
             title={t('翌日に移動')}
             disabled={busy}
             onClick={() => onDateChange(addDays(date, 1))}
-            className="flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
+            className="shift-control shift-control-next flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
           >
             <svg
               aria-hidden="true"
@@ -208,7 +208,7 @@ export function MonthShiftTiles({
           </button>
         </div>
       </div>
-      <p className="mt-1 text-meta text-ink-secondary">
+      <p className="shift-description mt-1 rounded-sm px-2 py-1 text-meta text-ink-secondary">
         {t('{0}に追加 · 日付をタップで週と予定一覧、長押しで予定追加', [date])}
       </p>
       {(error || shifts.errorKey) && (

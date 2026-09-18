@@ -7,9 +7,16 @@ interface BottomSheetProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  dismissible?: boolean;
 }
 /** 下へ引いて閉じられるレイヤー。本文のスクロールとハンドル操作は分離する。 */
-export function BottomSheet({ open, title, onClose, children }: BottomSheetProps) {
+export function BottomSheet({
+  open,
+  title,
+  onClose,
+  children,
+  dismissible = true,
+}: BottomSheetProps) {
   useLanguage();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -19,7 +26,9 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [offset, setOffset] = useState(0);
   const [closing, setClosing] = useState(false);
-  const dismiss = useCallback(() => closeRef.current(), []);
+  const dismiss = useCallback(() => {
+    if (dismissible) closeRef.current();
+  }, [dismissible]);
   useEffect(() => {
     if (!open) return;
     setOffset(0);
@@ -92,21 +101,25 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
           }}
           className="flex min-h-11 w-full shrink-0 touch-none flex-col items-center justify-center gap-1"
           onPointerDown={(e) => {
+            if (!dismissible) return;
             suppressClick.current = false;
             startY.current = e.clientY;
             e.currentTarget.setPointerCapture?.(e.pointerId);
           }}
           onPointerMove={(e) => {
-            if (startY.current !== null) setOffset(Math.max(0, e.clientY - startY.current));
+            if (dismissible && startY.current !== null) setOffset(Math.max(0, e.clientY - startY.current));
           }}
           onPointerUp={(e) => {
             const distance = startY.current === null ? 0 : e.clientY - startY.current;
             startY.current = null;
             suppressClick.current = Math.abs(distance) > 5;
-            if (distance >= 64) {
+            if (dismissible && distance >= 64) {
               setClosing(true);
               timer.current = setTimeout(dismiss, 180);
-            } else setOffset(0);
+            } else {
+              setOffset(0);
+              setClosing(false);
+            }
           }}
           onPointerCancel={() => {
             startY.current = null;

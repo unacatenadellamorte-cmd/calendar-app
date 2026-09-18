@@ -38,7 +38,7 @@ export function BottomTabs() {
   return (
     <nav
       aria-label={t('メインナビゲーション')}
-      className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border-hairline bg-surface-base"
+      className="app-bottom-tabs fixed inset-x-0 bottom-0 z-10 flex border-t border-border-hairline bg-surface-base"
       style={{ paddingBottom: 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))' }}
     >
       {TABS.map((tab) => (

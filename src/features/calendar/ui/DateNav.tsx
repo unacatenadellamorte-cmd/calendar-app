@@ -41,13 +41,13 @@ export function DateNav({
     if (jumpOpen) inputRef.current?.focus();
   }, [jumpOpen]);
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="calendar-date-nav mb-3 flex flex-wrap items-center gap-2 rounded-md px-2 py-1">
       {stepping && (
         <button
           type="button"
           onClick={onPrev}
           aria-label={t('前へ')}
-          className="min-h-11 min-w-11 text-ink-secondary"
+          className="calendar-date-button min-h-11 min-w-11 rounded-sm text-ink-secondary"
         >
           ‹
         </button>
@@ -67,7 +67,7 @@ export function DateNav({
         {view === 'month' && monthPayAmount !== undefined && (
           <span
             aria-label={t('{0}の給料見込み', [title])}
-            className="shrink-0 tabular text-meta font-semibold text-ink-secondary"
+            className="calendar-pay shrink-0 tabular text-meta font-semibold text-ink-secondary"
           >
             {formatYen(monthPayAmount)}
           </span>
@@ -84,7 +84,7 @@ export function DateNav({
                 setJumpOpen(false);
               }
             }}
-            className="mt-1 min-h-11 basis-full rounded-sm border border-border-hairline bg-surface-base px-2 text-body"
+            className="mt-1 min-h-11 basis-full rounded-sm border border-border-hairline bg-surface-base px-2 text-body text-ink-primary"
           />
         )}
       </div>
@@ -92,7 +92,7 @@ export function DateNav({
       <button
         type="button"
         onClick={onToday}
-        className="min-h-11 rounded-sm border border-border-hairline px-3 text-meta text-ink-secondary"
+        className="calendar-today-button min-h-11 rounded-sm border border-border-hairline px-3 text-meta text-ink-secondary"
       >
         {t('今日')}
       </button>
@@ -102,7 +102,7 @@ export function DateNav({
           type="button"
           onClick={onNext}
           aria-label={t('次へ')}
-          className="min-h-11 min-w-11 text-ink-secondary"
+          className="calendar-date-button min-h-11 min-w-11 rounded-sm text-ink-secondary"
         >
           ›
         </button>

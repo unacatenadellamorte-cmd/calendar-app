@@ -43,7 +43,7 @@ export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
     <div
       role="radiogroup"
       aria-label={t('表示切替')}
-      className="flex overflow-hidden rounded-sm border border-border-hairline text-meta"
+      className="calendar-view-switcher flex overflow-hidden rounded-sm border border-border-hairline text-meta"
     >
       {ITEMS.map(({ value, label }) => {
         const active = view === value;
@@ -55,7 +55,7 @@ export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
             aria-checked={active}
             onClick={() => onChange(value)}
             className={[
-              'min-h-11 px-3',
+              'calendar-view-option min-h-11 px-3',
               active ? 'bg-accent-weak font-semibold text-accent' : 'text-ink-secondary',
             ].join(' ')}
           >

@@ -22,6 +22,8 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/calendar-not-writable':
     '取り込んだカレンダーには予定を追加できません。自作カレンダーを選んでください',
   'event/invalid-reminder': 'リマインダーの分数が正しくありません',
+  'event/invalid-location': '場所は1000文字までで入力してください',
+  'event/invalid-url': '予定URLはhttpまたはhttpsのURLを入力してください',
   'secret/invalid-passcode': 'パスコードは半角英数字4〜8文字で入力してください',
   'secret/incorrect-passcode': 'パスコードが違います',
   'secret/save-failed': 'パスコードを保存できませんでした。もう一度お試しください',

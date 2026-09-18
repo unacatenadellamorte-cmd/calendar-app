@@ -14,7 +14,7 @@ interface ScreenProps {
 export function Screen({ title, action, children }: ScreenProps) {
   return (
     <div className="app-screen flex min-h-[100dvh] flex-col bg-surface-sunken animate-[fade-in_200ms_ease-out]">
-      <header className="flex items-baseline justify-between px-4 pt-3 pb-4">
+      <header className="screen-header flex items-baseline justify-between rounded-b-md px-4 pt-3 pb-4">
         <h1 className="text-title font-semibold text-ink-primary">{title}</h1>
         {action}
       </header>

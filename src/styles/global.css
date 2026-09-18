@@ -17,6 +17,8 @@
   --color-on-accent: var(--color-on-accent);
   --color-border-hairline: var(--color-border-hairline);
   --color-danger: var(--color-danger);
+  --color-chrome-surface: var(--color-chrome-surface);
+  --color-chrome-ink: var(--color-chrome-ink);
 
   --font-sans: var(--font-family-base);
 
@@ -120,33 +122,98 @@
 }
 
 /* 写真の上にテーマ色を重ね、文字の読みやすさを保つ。 */
-:root[data-background='custom'] body {
+:root[data-background='custom'][data-background-screen='photo'] body {
   background-image: var(--app-background-image);
   background-position: center;
   background-size: cover;
   background-attachment: fixed;
 }
-:root[data-background='custom'] .app-shell {
+:root[data-background='custom'][data-background-screen='photo'] .app-shell {
   background-color: transparent;
 }
 
 /* 背景画像時はアプリシェルを透明にし、各面を一層だけ約60%不透明にする。 */
-:root[data-background='custom'] .app-shell .bg-surface-base {
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .bg-surface-base {
   background-color: color-mix(in srgb, var(--color-surface-base) 60%, transparent);
 }
-:root[data-background='custom'] .app-shell .bg-surface-raised {
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .bg-surface-raised {
   background-color: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
 }
-:root[data-background='custom'] .app-shell .bg-surface-sunken {
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .bg-surface-sunken {
   background-color: color-mix(in srgb, var(--color-surface-sunken) 60%, transparent);
 }
 /* 同じ詳細度の面指定より後で、画面全体の重なりを取り除く。 */
-:root[data-background='custom'] .app-shell .app-screen {
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .app-screen {
   background-color: transparent;
 }
 /* 月セル内のチップはセル面に重ねず、写真の見え方を二重に濃くしない。 */
-:root[data-background='custom'] .app-shell .month-event-chip {
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .month-event-chip {
   background-color: transparent;
+}
+
+/* 写真を使う画面でも、操作の基準になる面と端末ステータスバーは完全不透明にする。 */
+.app-status-bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  background: var(--color-chrome-surface);
+  color: var(--color-chrome-ink);
+  border-bottom: 1px solid var(--color-border-hairline);
+  pointer-events: none;
+}
+.screen-header,
+.calendar-date-nav,
+.app-bottom-tabs {
+  background-color: var(--color-chrome-surface);
+  color: var(--color-chrome-ink);
+}
+.calendar-date-nav { color: var(--color-chrome-ink); }
+.screen-header h1,
+.screen-header a,
+.screen-header button { color: var(--color-chrome-ink); }
+.calendar-date-nav h2,
+.calendar-date-nav h2 button,
+.calendar-date-nav h2 span,
+.calendar-date-nav .calendar-pay { color: var(--color-chrome-ink); }
+.calendar-view-switcher { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
+.calendar-view-option[aria-checked='false'] { color: var(--color-chrome-ink); }
+.app-bottom-tabs a:not([aria-current='page']) { color: color-mix(in srgb, var(--color-chrome-ink) 78%, transparent); }
+.app-bottom-tabs a[aria-current='page'] {
+  color: var(--color-chrome-ink);
+  background-color: color-mix(in srgb, var(--color-chrome-ink) 15%, transparent);
+  font-weight: 700;
+  box-shadow: inset 0 3px var(--color-chrome-ink);
+}
+.calendar-today-button,
+.calendar-date-button { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
+.shift-description { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
+.shift-control { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
+.shift-control-prev, .shift-control-next { color: var(--color-chrome-ink); }
+.shift-control-delete { color: #ffb4ab; }
+
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .screen-header,
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .calendar-date-nav,
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .app-bottom-tabs,
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .shift-description,
+:root[data-background='custom'][data-background-screen='photo'] .app-shell .shift-control {
+  background-color: var(--color-chrome-surface);
+}
+
+/* 画像を保存していても、ホーム/月以外は通常の不透明面を使う。 */
+:root[data-background='custom']:not([data-background-screen='photo']) .app-shell,
+:root[data-background='custom']:not([data-background-screen='photo']) .app-shell .app-screen,
+:root[data-background='custom']:not([data-background-screen='photo']) .app-shell .bg-surface-sunken {
+  background-color: var(--color-surface-sunken);
+}
+:root[data-background='custom']:not([data-background-screen='photo']) .app-shell .bg-surface-base {
+  background-color: var(--color-surface-base);
+}
+:root[data-background='custom']:not([data-background-screen='photo']) .app-shell .bg-surface-raised {
+  background-color: var(--color-surface-raised);
+}
+:root[data-background='custom']:not([data-background-screen='photo']) .app-shell .app-bottom-tabs {
+  background-color: var(--color-chrome-surface);
 }
 .month-event-title {
   min-width: 0;

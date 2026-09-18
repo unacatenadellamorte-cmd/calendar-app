@@ -297,5 +297,21 @@
   "保存しました。": "Guardado.",
   "概算・目安": "Importe estimado",
   "取り込んだカレンダーには予定を追加できません。自作カレンダーを選んでください": "No se pueden añadir eventos a calendarios importados. Elige un calendario que hayas creado.",
-  "この環境は通知に対応していません。予定は保存されます": "Este entorno no admite notificaciones. El evento se guardará."
+  "この環境は通知に対応していません。予定は保存されます": "Este entorno no admite notificaciones. El evento se guardará.",
+  "場所": "Ubicación",
+  "予定URL": "URL del evento",
+  "地図アプリ": "Aplicación de mapas",
+  "Google Maps": "Google Maps",
+  "Apple Maps": "Apple Maps",
+  "標準の地図アプリ": "Aplicación de mapas predeterminada",
+  "地図を開けませんでした": "No se pudo abrir el mapa",
+  "リンクを開けませんでした": "No se pudo abrir el enlace",
+  "場所は1000文字までで入力してください": "Introduce una ubicación de 1000 caracteres como máximo.",
+  "予定URLはhttpまたはhttpsのURLを入力してください": "Introduce una URL http o https para el evento.",
+  "背景画像の範囲を調整": "Ajustar el área de la imagen de fondo",
+  "背景画像の切り出し範囲": "Área de recorte de la imagen de fondo",
+  "背景画像プレビュー": "Vista previa de la imagen de fondo",
+  "画像を指で動かせます。矢印キーでも調整できます。": "Mueve la imagen con el dedo. También puedes ajustarla con las teclas de flecha.",
+  "拡大": "Ampliar",
+  "この範囲で設定": "Usar esta área"
 }

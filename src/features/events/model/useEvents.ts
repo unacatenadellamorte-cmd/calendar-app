@@ -22,6 +22,8 @@ function inputToPatch(input: NewEventInput): EventPatch {
     calendarId: input.calendarId,
     title: input.title,
     note: input.note ?? null,
+    location: input.location ?? null,
+    url: input.url ?? null,
     isSecret: input.isSecret ?? false,
   };
   return input.allDay

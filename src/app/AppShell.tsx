@@ -1,6 +1,6 @@
 import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BottomTabs } from './BottomTabs';
 import { OnlineProvider } from './OnlineProvider';
 import { SecretModeProvider } from './SecretModeProvider';
@@ -34,6 +34,17 @@ import type { ProfileOutletContext } from './profile-outlet-context';
  */
 export function AppShell() {
   useLanguage();
+  const location = useLocation();
+  useEffect(() => {
+    // 保存済み画像(data-background)とは分けて、写真を見せる画面だけを指定する。
+    const root = document.documentElement;
+    const photoScreen = location.pathname === '/' || location.pathname === '/calendar';
+    if (photoScreen) root.dataset.backgroundScreen = 'photo';
+    else delete root.dataset.backgroundScreen;
+    return () => {
+      delete root.dataset.backgroundScreen;
+    };
+  }, [location.pathname]);
   const { state } = useAuth();
   const authResolving = state === 'loading';
   const enabled = state === 'guest' || state === 'authenticated';
@@ -53,6 +64,7 @@ export function AppShell() {
           className="app-shell mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken"
           style={{ paddingTop: 'var(--safe-area-inset-top, env(safe-area-inset-top, 0px))' }}
         >
+          <div className="app-status-bar" aria-hidden="true" />
           <ConnectivityBar />
           {showWaiting ? (
             <p className="px-4 py-8 text-center text-meta text-ink-secondary">

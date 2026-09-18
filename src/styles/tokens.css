@@ -20,6 +20,8 @@
   --color-on-accent: #ffffff;
   --color-border-hairline: #e3e6eb;
   --color-danger: #be3b30;
+  --color-chrome-surface: #243447;
+  --color-chrome-ink: #ffffff;
 
   /* --- typography --- */
   --font-family-base:
@@ -59,6 +61,8 @@
     --color-on-accent: #0f1113;
     --color-border-hairline: #2a2e35;
     --color-danger: #e3776b;
+    --color-chrome-surface: #090b0f;
+    --color-chrome-ink: #ffffff;
   }
 }
 
@@ -74,4 +78,6 @@
   --color-on-accent: #0f1113;
   --color-border-hairline: #2a2e35;
   --color-danger: #e3776b;
+  --color-chrome-surface: #090b0f;
+  --color-chrome-ink: #ffffff;
 }

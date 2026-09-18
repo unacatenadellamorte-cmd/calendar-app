@@ -269,6 +269,18 @@ describe('EventFormSheet', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('場所と予定URLを保存入力として onCreate に渡す', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), 'オンライン会議');
+    await user.type(screen.getByLabelText('場所'), '東京駅');
+    await user.type(screen.getByLabelText('予定URL'), 'https://zoom.us/j/123');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate.mock.calls[0]![0]).toMatchObject({
+      location: '東京駅', url: 'https://zoom.us/j/123',
+    });
+  });
+
   it('シークレットのチェックを付けて保存すると isSecret: true で onCreate を呼ぶ(spec-secret-mode)', async () => {
     const user = userEvent.setup();
     const { onCreate } = setup();
