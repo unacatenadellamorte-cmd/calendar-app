@@ -313,5 +313,16 @@
   "背景画像プレビュー": "Aperçu de l’image d’arrière-plan",
   "画像を指で動かせます。矢印キーでも調整できます。": "Déplacez l’image avec le doigt. Vous pouvez aussi l’ajuster avec les touches fléchées.",
   "拡大": "Agrandir",
-  "この範囲で設定": "Utiliser cette zone"
+  "この範囲で設定": "Utiliser cette zone",
+  "地図を開く": "Ouvrir la carte",
+  "リンクを開く": "Ouvrir le lien",
+  "画像を指で動かせます。2本指で拡大縮小できます。矢印キーでも調整できます。": "Déplacez l’image avec un doigt, pincez avec deux doigts pour zoomer ou dézoomer, ou utilisez les flèches.",
+  "予定": "Événement",
+  "追加": "Ajouter",
+  "月予定の文字サイズ": "Taille du texte des événements mensuels",
+  "小": "Petit",
+  "中": "Moyen",
+  "大": "Grand",
+  "＋シフト": "+ Équipe",
+  "＋予定": "+ Événement"
 }

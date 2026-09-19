@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
@@ -41,9 +42,12 @@ class MonthEventsWidget : GlanceAppWidget() {
 private fun MonthEventsContent() {
     val context = LocalContext.current
     val overview = readCalendarOverview(context)
+    val size = LocalSize.current
+    val fontScale = context.resources.configuration.fontScale
     val today = todayWidgetDay()
     val days = monthWidgetDays(today)
     val rows = days.chunked(7)
+    val cellHeightDp = monthCellHeightDp(size.height.value, rows.size)
     Column(
         modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(6.dp),
     ) {
@@ -70,7 +74,17 @@ private fun MonthEventsContent() {
         }
         rows.forEach { row ->
             Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                row.forEach { day -> MonthDayCell(context, overview, today, day, GlanceModifier.defaultWeight()) }
+                row.forEach { day ->
+                    MonthDayCell(
+                        context,
+                        overview,
+                        today,
+                        day,
+                        cellHeightDp,
+                        fontScale,
+                        GlanceModifier.defaultWeight(),
+                    )
+                }
             }
         }
     }
@@ -82,10 +96,13 @@ private fun MonthDayCell(
     overview: CalendarOverview,
     today: WidgetDay,
     day: WidgetDay,
+    cellHeightDp: Float,
+    fontScale: Float,
     cellModifier: GlanceModifier,
 ) {
     val events = eventsForWidgetDay(overview.events, day)
-    val title = events.firstOrNull()?.let { shortWidgetTitle(it.title.ifBlank { it.calendarName }, 7) } ?: ""
+    val visibleEvents = events.take(monthVisibleEventCount(cellHeightDp, events.size, fontScale))
+    val overflowCount = events.size - visibleEvents.size
     val isToday = day == today
     val inCurrentMonth = day.month == today.month && day.year == today.year
     Column(
@@ -95,23 +112,33 @@ private fun MonthDayCell(
             .clickable(actionStartActivity(createWidgetIntent(context, day)))
             .padding(2.dp),
     ) {
-        Text(
-            text = day.day.toString(),
-            style = TextStyle(
-                fontSize = 10.sp,
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = ColorProvider(
-                    when {
-                        isToday -> Color(0xFF005A9C)
-                        inCurrentMonth -> Color.Black
-                        else -> Color.LightGray
-                    },
-                ),
-            ),
-        )
-        if (title.isNotBlank()) {
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
             Text(
-                text = "• $title",
+                text = day.day.toString(),
+                style = TextStyle(
+                    fontSize = 10.sp,
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = ColorProvider(
+                        when {
+                            isToday -> Color(0xFF005A9C)
+                            inCurrentMonth -> Color.Black
+                            else -> Color.LightGray
+                        },
+                    ),
+                ),
+                modifier = GlanceModifier.defaultWeight(),
+            )
+            if (overflowCount > 0) {
+                Text(
+                    text = widgetOverflowCountText(overflowCount),
+                    style = TextStyle(fontSize = 7.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color.DarkGray)),
+                    maxLines = 1,
+                )
+            }
+        }
+        visibleEvents.forEach { event ->
+            Text(
+                text = "• ${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
                 style = TextStyle(fontSize = 7.sp, color = ColorProvider(Color(0xFF0072B2))),
                 maxLines = 1,
             )

@@ -55,10 +55,23 @@ function setup(events: EventItem[]) {
 
 describe('ListView', () => {
   it('未来の予定がない場合も最古ではなく最も新しい日へスクロールする', () => {
-    const original = HTMLElement.prototype.scrollIntoView;
-    const scrolled: string[] = [];
-    HTMLElement.prototype.scrollIntoView = function () {
-      scrolled.push(this.textContent ?? '');
+    const original = HTMLElement.prototype.scrollTo;
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    const scrolled: { target: HTMLElement; top: number }[] = [];
+    HTMLElement.prototype.scrollTo = function (options) {
+      scrolled.push({ target: this, top: typeof options === 'number' ? options : options?.top ?? 0 });
+    };
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return {
+        top:
+          this.getAttribute('data-testid') === 'list-scroll-region'
+            ? 100
+            : this.textContent?.includes('9月7日')
+              ? 250
+              : 500,
+        bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0,
+        toJSON: () => ({}),
+      };
     };
     try {
       setup([
@@ -71,9 +84,13 @@ describe('ListView', () => {
           endsAt: null,
         }),
       ]);
-      expect(scrolled).toEqual(['9月7日(月)']);
+      const region = screen.getByTestId('list-scroll-region');
+      expect(scrolled).toHaveLength(1);
+      expect(scrolled[0]?.target).toBe(region);
+      expect(scrolled[0]?.top).toBe(150);
     } finally {
-      HTMLElement.prototype.scrollIntoView = original;
+      HTMLElement.prototype.scrollTo = original;
+      HTMLElement.prototype.getBoundingClientRect = originalRect;
     }
   });
 

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { initBackground } from '@/features/settings/model/backgroundImage';
 import { initTheme } from '@/features/settings/model/useTheme';
+import { initMonthEventSize } from '@/features/settings/model/monthEventSize';
 import { AuthProvider } from '@/app/AuthProvider';
 import { AppRoutes } from '@/app/routes';
 import { DeepLinkListener } from '@/app/DeepLinkListener';
@@ -16,6 +17,7 @@ import './styles/global.css';
 // 保存済みのテーマ選択を、最初のレンダリング前に DOM へ反映する。
 initLanguage();
 initTheme();
+initMonthEventSize();
 void initBackground();
 
 const rootEl = document.getElementById('root');

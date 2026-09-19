@@ -221,6 +221,35 @@
   overflow: hidden;
   white-space: nowrap;
 }
+.month-event-chip {
+  font-size: var(--month-event-font-size, 8px);
+}
+.app-screen-contained {
+  height: calc(100dvh - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  min-height: 0;
+}
+.app-screen-contained > header { flex-shrink: 0; }
+.app-screen-contained > main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}
+.app-screen-contained > main > :not(.calendar-list-scroll) { flex-shrink: 0; }
+.app-screen-contained .calendar-list-scroll {
+  flex: 1 1 0%;
+  max-height: none;
+}
+/* 接続状況の通知が増えても、その高さを引いた残りだけをリストに渡す。 */
+.app-shell:has(> .app-screen-contained) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+}
+.app-shell:has(> .app-screen-contained) > :not(.app-screen-contained) { flex-shrink: 0; }
+.app-shell > .app-screen-contained { height: auto; flex: 1 1 0%; }
 .month-event-title > span {
   display: block;
   width: max-content;

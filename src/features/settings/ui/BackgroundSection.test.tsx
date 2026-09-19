@@ -69,6 +69,61 @@ describe('背景画像の切り出し編集', () => {
     );
     expect(mocks.apply).toHaveBeenCalledWith(expect.any(Blob));
   });
+  it.each(['pointerup', 'pointercancel', 'lostpointercapture'] as const)(
+    '%sで2本指から1本に戻ると移動へ復帰する',
+    async (releaseType) => {
+      await openCrop();
+      const canvas = screen.getByRole('application', { name: '背景画像の切り出し範囲' });
+      Object.defineProperty(canvas, 'getBoundingClientRect', {
+        value: () => ({ width: 200, height: 100, top: 0, left: 0, right: 200, bottom: 100 }),
+      });
+      const pointer = (
+        type:
+          'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel' | 'lostpointercapture',
+        pointerId: number,
+        clientX: number,
+      ) => {
+        const event = new Event(type, { bubbles: true });
+        Object.defineProperty(event, 'pointerId', { value: pointerId });
+        Object.defineProperty(event, 'button', { value: 0 });
+        Object.defineProperty(event, 'clientX', { value: clientX });
+        Object.defineProperty(event, 'clientY', { value: 20 });
+        fireEvent(canvas, event);
+      };
+      pointer('pointerdown', 1, 20);
+      pointer('pointerdown', 2, 40);
+      pointer('pointermove', 2, 100);
+      expect(
+        Number((screen.getByLabelText('拡大') as HTMLInputElement).value),
+      ).toBeGreaterThan(1);
+      pointer(releaseType, 2, 100);
+      pointer('pointermove', 1, 30);
+      fireEvent.click(screen.getByRole('button', { name: 'この範囲で設定' }));
+      await waitFor(() => expect(mocks.prepare).toHaveBeenCalled());
+      const [, cropPosition] = mocks.prepare.mock.calls.at(-1)!;
+      expect(cropPosition.zoom).toBeGreaterThan(1);
+      expect(cropPosition.x).toBeLessThan(0);
+    },
+  );
+  it('倍率を1〜3に制限し、保存中は編集操作を固定する', async () => {
+    await openCrop();
+    const slider = screen.getByLabelText('拡大') as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: '3' } });
+    expect(slider.value).toBe('3');
+    fireEvent.change(slider, { target: { value: '1' } });
+    expect(slider.value).toBe('1');
+    let resolvePrepare!: (value: Blob) => void;
+    mocks.prepare.mockReturnValueOnce(
+      new Promise<Blob>((resolve) => {
+        resolvePrepare = resolve;
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'この範囲で設定' }));
+    await waitFor(() => expect(screen.getByLabelText('拡大')).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeDisabled();
+    resolvePrepare(new Blob(['保存']));
+    await waitFor(() => expect(mocks.store).toHaveBeenCalled());
+  });
   it('不正なMIMEや容量超過ではdecodeを開始しない', async () => {
     render(<BackgroundSection />);
     const input = screen.getByLabelText('背景画像を選ぶ');

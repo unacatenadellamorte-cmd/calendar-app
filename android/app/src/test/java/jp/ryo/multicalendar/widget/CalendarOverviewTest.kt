@@ -52,6 +52,20 @@ class CalendarOverviewTest {
     }
 
     @Test
+    fun `月セルは利用可能高に応じて超過行を予約する`() {
+        val fiveRows = monthCellHeightDp(280f, 5)
+        val sixRows = monthCellHeightDp(280f, 6)
+        val tallSixRows = monthCellHeightDp(420f, 6)
+        assertEquals(2, monthVisibleEventCount(fiveRows, 3))
+        assertEquals(2, monthVisibleEventCount(fiveRows, 4))
+        assertEquals(2, monthVisibleEventCount(sixRows, 3))
+        assertTrue(monthVisibleEventCount(tallSixRows, 3) >= 2)
+        assertEquals(0, monthEventLineCapacity(10f))
+        assertEquals(0, monthEventLineCapacity(sixRows, 2f))
+        assertEquals("+2", widgetOverflowCountText(2))
+    }
+
+    @Test
     fun `短いタイトルは最大長を超えない`() {
         assertEquals("会議", shortWidgetTitle("会議", 7))
         assertEquals("123456…", shortWidgetTitle("123456789", 7))

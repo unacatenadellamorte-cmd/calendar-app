@@ -15,6 +15,7 @@ import { AvatarIcon } from '@/features/profile/ui/AvatarIcon';
 import { OnboardingScreen } from '@/features/profile/ui/OnboardingScreen';
 import type { Profile } from '@/data/profiles';
 import type { ProfileOutletContext } from './profile-outlet-context';
+import { ProfileHeaderProvider } from '@/ui/profile-header-context';
 /**
  * アプリシェル。単一カラム。接続状態バーを最上部に、現在ルートの画面を Outlet に、
  * 下タブバーを常時表示。SW 更新プロンプトは最前面に浮かせる。
@@ -87,8 +88,9 @@ export function AppShell() {
             <OnboardingScreen create={create} errorKey={errorKey} />
           ) : (
             <>
-              {profile && <AvatarNav profile={profile} />}
-              <Outlet context={outletContext} />
+              <ProfileHeaderProvider value={profile ? <AvatarNav profile={profile} /> : null}>
+                <Outlet context={outletContext} />
+              </ProfileHeaderProvider>
               <BottomTabs />
             </>
           )}
@@ -125,7 +127,7 @@ const AVATAR_TAP_WINDOW_MS = 300;
  * 扱われ、意図せず`/profile`へ遷移してしまう)。アンマウント時は両タイマーとも
  * `clearTimeout`(`useEvents` の削除 Undo タイマーと同じパターン)。
  */
-function AvatarNav({ profile }: { profile: Profile }) {
+export function AvatarNav({ profile }: { profile: Profile }) {
   useLanguage();
   const navigate = useNavigate();
   const { unlocked, hasPasscode, lock } = useSecretMode();
@@ -183,7 +185,7 @@ function AvatarNav({ profile }: { profile: Profile }) {
   };
   return (
     <>
-      <div className="flex justify-start px-4 pt-3">
+      <div className="flex shrink-0 items-center">
         <Link
           to="/profile"
           onClick={handleTap}

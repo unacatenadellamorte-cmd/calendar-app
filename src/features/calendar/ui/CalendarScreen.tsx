@@ -198,7 +198,7 @@ export function CalendarScreen({
   ]);
   if (state === 'unavailable') {
     return (
-      <Screen title={t('カレンダー')}>
+      <Screen title={t('カレンダー')} showProfileHeader>
         <p className="text-body text-ink-secondary">
           {t('Supabase を設定すると、予定を作成・表示できます。')}
         </p>
@@ -209,6 +209,9 @@ export function CalendarScreen({
   return (
     <Screen
       title={t('カレンダー')}
+      showProfileHeader
+      mainClassName="!px-2"
+      contained={view === 'list'}
       action={
         <div className="flex items-center gap-3">
           <button
@@ -216,10 +219,10 @@ export function CalendarScreen({
             onClick={() => navigate('/shifts/add')}
             className="text-meta text-accent"
           >
-            {t('シフトを追加')}
+            {t('＋シフト')}
           </button>
           <button type="button" onClick={() => openCreate()} className="text-meta text-accent">
-            {t('予定を追加')}
+            {t('＋予定')}
           </button>
         </div>
       }

@@ -49,20 +49,26 @@ class WidgetRenderingTest {
         val today = todayWidgetDay()
         val todayKey = today.toKey()
         val title = "検証予定"
+        val secondTitle = "二件目"
+        val thirdTitle = "三件目"
         val fixture = JSONObject().apply {
             put("schemaVersion", 1)
             put("updatedAtIso", "2026-01-01T00:00:00.000Z")
             put("language", "en")
-            put("events", JSONArray().put(JSONObject().apply {
-                put("id", "widget-smoke-event")
-                put("title", title)
-                put("calendarName", "Widget smoke")
-                put("colorHex", "#0072B2")
-                put("startDate", todayKey)
-                put("endDate", todayKey)
-                put("startsAtIso", "2026-01-01T00:00:00.000Z")
-                put("allDay", true)
-            }))
+            put("events", JSONArray().apply {
+                listOf(title, secondTitle, thirdTitle).forEachIndexed { index, eventTitle ->
+                    put(JSONObject().apply {
+                        put("id", "widget-smoke-event-$index")
+                        put("title", eventTitle)
+                        put("calendarName", "Widget smoke")
+                        put("colorHex", "#0072B2")
+                        put("startDate", todayKey)
+                        put("endDate", todayKey)
+                        put("startsAtIso", "2026-01-01T00:00:00.000Z")
+                        put("allDay", true)
+                    })
+                }
+            })
         }
         val host = AppWidgetHost(context, hostId)
         val boundIds = mutableListOf<Int>()
@@ -84,8 +90,8 @@ class WidgetRenderingTest {
             )
             layoutForAssertions(week, 180, 140)
             saveBitmap(week, "widget-week.png", 180, 140)
-            assertWeekButtonsAreHorizontal(week)
-            val month = renderProvider(
+            assertWeekHasOnlyHeaderAddButton(week)
+            val monthMin = renderProvider(
                 host,
                 ComponentName(context, MonthEventsWidgetReceiver::class.java),
                 250,
@@ -93,14 +99,35 @@ class WidgetRenderingTest {
                 boundIds,
                 title,
             )
+            layoutForAssertions(monthMin, 250, 280)
+            assertPlus(monthMin)
+            assertText(monthMin, title)
+            assertText(monthMin, secondTitle)
+            assertText(monthMin, "+1")
+            assertTextViewsFitParent(monthMin, listOf(title, secondTitle, "+1"))
+            saveBitmap(monthMin, "widget-month-min.png", 250, 280)
+
+            val month = renderProvider(
+                host,
+                ComponentName(context, MonthEventsWidgetReceiver::class.java),
+                250,
+                420,
+                boundIds,
+                title,
+            )
 
             assertPlus(week)
             assertText(week, title)
+            assertText(week, secondTitle)
+            assertText(week, thirdTitle)
             assertText(week, today.day.toString())
             assertPlus(month)
             assertText(month, title)
+            assertText(month, secondTitle)
+            assertText(month, thirdTitle)
             assertText(month, today.day.toString())
-            saveBitmap(month, "widget-month.png", 250, 280)
+            assertTextViewsFitParent(month, listOf(title, secondTitle, thirdTitle))
+            saveBitmap(month, "widget-month.png", 250, 420)
         } finally {
             boundIds.forEach { host.deleteAppWidgetId(it) }
             runOnMain { host.stopListening() }
@@ -148,26 +175,36 @@ class WidgetRenderingTest {
         assertTrue("text '$expected' was not rendered", findText(root, expected))
     }
 
+    private fun assertTextViewsFitParent(root: View, expected: List<String>) {
+        expected.forEach { text ->
+            assertTrue("text '$text' has no bounded TextView", findBoundedText(root, text))
+        }
+    }
+
+    private fun findBoundedText(view: View, expected: String): Boolean {
+        if (view is TextView && view.text?.toString()?.contains(expected) == true) {
+            val parent = view.parent as? View
+            return parent != null && view.left >= 0 && view.top >= 0 &&
+                view.right <= parent.width && view.bottom <= parent.height
+        }
+        if (view is android.view.ViewGroup) {
+            for (index in 0 until view.childCount) {
+                if (findBoundedText(view.getChildAt(index), expected)) return true
+            }
+        }
+        return false
+    }
+
     private fun assertPlus(root: View) {
         assertTrue("text '＋' was not rendered", findText(root, "＋") || findText(root, "+"))
     }
 
-    private fun assertWeekButtonsAreHorizontal(root: View) {
+    private fun assertWeekHasOnlyHeaderAddButton(root: View) {
         val textViews = mutableListOf<TextBox>()
         // ウィンドウ未接続の描画用Viewなので、親からの配置座標を積算する。
         collectTextViews(root, textViews, -root.left, -root.top)
-        val weekButtons = textViews
-            .filter { it.text == "＋" || it.text == "+" }
-            .groupBy { it.top }
-            .values
-            .maxByOrNull { it.size }
-            ?: emptyList()
-        assertTrue("週の各日に追加ボタンが7個ない", weekButtons.size >= 7)
-        assertTrue(
-            "週の追加ボタンがウィジェット領域外にある",
-            weekButtons.all { it.left >= 0 && it.right <= root.width && it.top >= 0 && it.bottom <= root.height },
-        )
-        assertTrue("週の追加ボタンが横方向に並んでいない: $weekButtons", weekButtons.map { it.left }.distinct().size >= 7)
+        val addButtons = textViews.filter { it.text == "＋" || it.text == "+" }
+        assertTrue("週の日付ごとの追加ボタンが残っている: $addButtons", addButtons.size == 1)
     }
 
     private data class TextBox(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int)

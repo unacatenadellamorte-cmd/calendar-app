@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Calendar } from '@/data/calendars';
 import { EventFormSheet } from './EventFormSheet';
+import { openMap, openExternalUrl } from '@/platform/externalLinks';
+vi.mock('@/platform/externalLinks', async (original) => ({
+  ...await original<typeof import('@/platform/externalLinks')>(),
+  openMap: vi.fn().mockResolvedValue(true),
+  openExternalUrl: vi.fn().mockResolvedValue(true),
+}));
 
 const calendars: Calendar[] = [
   {
@@ -39,6 +45,67 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
 }
 
 describe('EventFormSheet', () => {
+  it('保存済みのローカル予定を開き直すと場所とURLを開ける（保存は行わない）', async () => {
+    const user = userEvent.setup();
+    const { onCreate, onUpdate } = setup({ editing: {
+      id: 'saved', calendarId: 'c1', title: '打合せ', source: 'local',
+      allDay: true, eventDate: '2026-09-19', startsAt: null, endsAt: null,
+      note: null, location: '京都駅', url: 'https://zoom.us/j/123',
+      breakMinutes: null, hourlyWage: null, workplaceLabel: null,
+      shiftTemplateId: null, reminderMinutes: null, isSecret: false,
+      createdAt: '', updatedAt: '',
+    } });
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    expect(openMap).toHaveBeenCalledWith('京都駅');
+    await user.click(screen.getByRole('button', { name: 'リンクを開く' }));
+    expect(openExternalUrl).toHaveBeenCalledWith('https://zoom.us/j/123');
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('地図起動失敗は入力を消さず画面内に表示する', async () => {
+    const user = userEvent.setup();
+    setup();
+    vi.mocked(openMap).mockResolvedValueOnce(false);
+    await user.type(screen.getByLabelText('場所'), '京都駅');
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('地図を開けませんでした');
+    expect(screen.getByLabelText('場所')).toHaveValue('京都駅');
+  });
+
+  it('危険なURLは起動操作を出さず保存前にも拒否する', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '会議');
+    await user.type(screen.getByLabelText('予定URL'), 'javascript:alert(1)');
+    expect(screen.queryByRole('button', { name: 'リンクを開く' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('httpまたはhttps');
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('リンク起動の失敗を入力を保持して表示する', async () => {
+    const user = userEvent.setup();
+    setup();
+    vi.mocked(openExternalUrl).mockResolvedValueOnce(false);
+    await user.type(screen.getByLabelText('予定URL'), 'https://example.com');
+    await user.click(screen.getByRole('button', { name: 'リンクを開く' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('リンクを開けませんでした');
+    expect(screen.getByLabelText('予定URL')).toHaveValue('https://example.com');
+  });
+
+  it('後の起動が成功したら先の遅い失敗結果を表示しない', async () => {
+    const user = userEvent.setup();
+    setup();
+    let finishFirst!: (ok: boolean) => void;
+    vi.mocked(openMap).mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }));
+    await user.type(screen.getByLabelText('場所'), '京都駅');
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    await act(async () => { finishFirst(false); });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('空タイトルでは保存せずバリデーションメッセージを出す', async () => {
     const user = userEvent.setup();
     const { onCreate } = setup();

@@ -115,11 +115,6 @@ private fun WeekDayCell(
             maxLines = 2,
             modifier = GlanceModifier.defaultWeight(),
         )
-        Text(
-            text = "＋",
-            style = TextStyle(fontSize = 14.sp, color = ColorProvider(Color(0xFF0072B2))),
-            modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, day))),
-        )
     }
 }
 

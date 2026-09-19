@@ -14,6 +14,10 @@ import { AccountSection } from './AccountSection';
 import { DataSection } from './DataSection';
 import { ConnectionsSection } from '@/features/connections/ui/ConnectionsSection';
 import { MapAppSection } from './MapAppSection';
+import {
+  useMonthEventSize,
+  type MonthEventSize,
+} from '@/features/settings/model/monthEventSize';
 const THEME_OPTIONS: {
   value: ThemePreference;
   label: string;
@@ -45,12 +49,18 @@ const FEATURED_COUNT_OPTIONS = Array.from(
   { length: FEATURED_COUNT_MAX - FEATURED_COUNT_MIN + 1 },
   (_, i) => FEATURED_COUNT_MIN + i,
 );
+const MONTH_EVENT_SIZE_OPTIONS: { value: MonthEventSize; label: string; description: string }[] = [
+  { value: 'small', label: '小', description: '8px' },
+  { value: 'medium', label: '中', description: '10px' },
+  { value: 'large', label: '大', description: '12px' },
+];
 export function SettingsScreen() {
   useLanguage();
   const { theme, setTheme } = useTheme();
   const featuredCount = useFeaturedCount();
+  const { monthEventSize, setMonthEventSize } = useMonthEventSize();
   return (
-    <Screen title={t('設定')}>
+    <Screen title={t('設定')} showProfileHeader>
       <section aria-labelledby="theme-heading" className="mt-2">
         <h2 id="theme-heading" className="text-body font-semibold text-ink-primary">
           {t('テーマ')}
@@ -102,6 +112,35 @@ export function SettingsScreen() {
       </section>
 
       <BackgroundSection />
+
+      <section aria-labelledby="month-event-size-heading" className="mt-6">
+        <h2 id="month-event-size-heading" className="text-body font-semibold text-ink-primary">
+          {t('月予定の文字サイズ')}
+        </h2>
+        <div
+          role="radiogroup"
+          aria-labelledby="month-event-size-heading"
+          className="mt-3 overflow-hidden rounded-md border border-border-hairline bg-surface-raised"
+        >
+          {MONTH_EVENT_SIZE_OPTIONS.map((option, index) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={monthEventSize === option.value}
+              onClick={() => setMonthEventSize(option.value)}
+              className={[
+                'flex min-h-11 w-full items-center justify-between px-4 text-left text-body',
+                index > 0 ? 'border-t border-border-hairline' : '',
+                monthEventSize === option.value ? 'text-accent' : 'text-ink-primary',
+              ].join(' ')}
+            >
+              <span>{t(option.label)}</span>
+              <span className="text-meta text-ink-secondary">{option.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section aria-labelledby="featured-count-heading" className="mt-6">
         <h2 id="featured-count-heading" className="text-body font-semibold text-ink-primary">

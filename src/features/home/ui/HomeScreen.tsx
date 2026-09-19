@@ -46,6 +46,7 @@ export function HomeScreen() {
   return (
     <Screen
       title={t('今日')}
+      showProfileHeader
       action={
         <Link to="/calendars" className="text-meta text-accent">
           {t('カレンダーの並び順 ›')}

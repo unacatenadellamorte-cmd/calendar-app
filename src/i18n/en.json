@@ -313,5 +313,16 @@
   "背景画像プレビュー": "Background image preview",
   "画像を指で動かせます。矢印キーでも調整できます。": "Drag the image with your finger. You can also adjust it with the arrow keys.",
   "拡大": "Zoom in",
-  "この範囲で設定": "Set this area"
+  "この範囲で設定": "Set this area",
+  "地図を開く": "Open map",
+  "リンクを開く": "Open link",
+  "画像を指で動かせます。2本指で拡大縮小できます。矢印キーでも調整できます。": "Drag the image with one finger, pinch with two fingers to zoom, or use the arrow keys.",
+  "予定": "Event",
+  "追加": "Add",
+  "月予定の文字サイズ": "Month event text size",
+  "小": "Small",
+  "中": "Medium",
+  "大": "Large",
+  "＋シフト": "+ Shift",
+  "＋予定": "+ Event"
 }

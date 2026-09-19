@@ -479,10 +479,10 @@ describe('CalendarScreen', () => {
     expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
   });
 
-  it('ヘッダーの「シフトを追加」をタップすると /shifts/add へ遷移する', async () => {
+  it('ヘッダーの「＋シフト」をタップすると /shifts/add へ遷移する', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    await user.click(screen.getByRole('button', { name: 'シフトを追加' }));
+    await user.click(screen.getByRole('button', { name: '＋シフト' }));
     expect(navigateMock).toHaveBeenCalledWith('/shifts/add');
   });
 

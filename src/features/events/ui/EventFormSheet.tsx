@@ -12,6 +12,7 @@ import {
   utcIsoToLocalInput,
 } from '@/lib/datetime';
 import { ReminderPicker } from './ReminderPicker';
+import { isAllowedExternalUrl, openExternalUrl, openMap } from '@/platform/externalLinks';
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
   /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
@@ -128,15 +129,19 @@ export function EventFormSheet({
     initialState(editing, editableCalendars, seed),
   );
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const launchRequest = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
     if (!open) return;
     const current = latestPropsRef.current;
     setForm(initialState(current.editing, current.calendars, current.seed));
     setErrorKey(null);
+    setLaunchError(null);
     setSubmitting(false);
     // calendars は refetch のたびに配列が新しくなる。ここへ含めると入力中の
     // タイトル・日時が消えるため、フォームを開く単位(予定ID/seed)だけで初期化する。
+    return () => { launchRequest.current += 1; };
   }, [open, editing?.id, seed?.date, seed?.startLocal]);
   const firstEditableCalendarId = editableCalendars[0]?.id ?? '';
   useEffect(() => {
@@ -167,9 +172,11 @@ export function EventFormSheet({
           // フォーム値を検証する。これで入力途中でも画面内エラーに留める。
           const invalid = validateEventInput(
             form.allDay
-              ? { title: form.title, allDay: true, eventDate: form.dateLocal }
+              ? { title: form.title, allDay: true, eventDate: form.dateLocal, location: form.location, url: form.url.trim() || null }
               : {
                   title: form.title,
+                  location: form.location,
+                  url: form.url.trim() || null,
                   allDay: false,
                   startsAt: form.startLocal,
                   endsAt: form.endLocal,
@@ -295,6 +302,22 @@ export function EventFormSheet({
           />
         </label>
 
+        {form.location.trim() && (
+          <button
+            type="button"
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-raised px-3 text-accent"
+            onClick={() => {
+              const request = ++launchRequest.current;
+              setLaunchError(null);
+              void openMap(form.location).then((ok) => {
+                if (request === launchRequest.current && !ok) setLaunchError('地図を開けませんでした');
+              });
+            }}
+          >
+            {t('地図を開く')}
+          </button>
+        )}
+
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('予定URL')}</span>
           <input
@@ -306,6 +329,23 @@ export function EventFormSheet({
             className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
         </label>
+
+        {isAllowedExternalUrl(form.url) && (
+          <button
+            type="button"
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-raised px-3 text-accent"
+            onClick={() => {
+              const request = ++launchRequest.current;
+              setLaunchError(null);
+              void openExternalUrl(form.url).then((ok) => {
+                if (request === launchRequest.current && !ok) setLaunchError('リンクを開けませんでした');
+              });
+            }}
+          >
+            {t('リンクを開く')}
+          </button>
+        )}
+        {launchError && <p role="alert" className="text-meta text-danger">{t(launchError)}</p>}
 
         {editing && !editing.allDay && (
           <ReminderPicker

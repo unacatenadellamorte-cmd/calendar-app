@@ -10,6 +10,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.floor
 
 /** JS側が保存する、週/月表示用の共有データ。日付はローカル日付の両端を含む。 */
 internal const val CALENDAR_OVERVIEW_KEY = "calendarOverview"
@@ -160,6 +161,22 @@ internal fun widgetText(language: String, key: String): String {
         else -> key
     }
 }
+
+/** 月グリッドのセル高。外側余白・見出し・曜日行を除いた利用可能領域を返す。 */
+internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int): Float =
+    ((totalHeightDp - 12f - 24f - 20f) / rowCount.coerceAtLeast(1)).coerceAtLeast(0f)
+
+/** 日付行と上下余白を除き、セル内に収まるテキスト行数を求める。 */
+internal fun monthEventLineCapacity(cellHeightDp: Float, fontScale: Float = 1f): Int {
+    val scale = fontScale.coerceAtLeast(0.5f)
+    return floor((cellHeightDp - 16f * scale) / (10f * scale)).toInt().coerceAtLeast(0)
+}
+
+/** 超過件数は日付行に表示するため、イベント行の実容量までタイトルを描く。 */
+internal fun monthVisibleEventCount(cellHeightDp: Float, eventCount: Int, fontScale: Float = 1f): Int =
+    eventCount.coerceAtLeast(0).coerceAtMost(monthEventLineCapacity(cellHeightDp, fontScale))
+
+internal fun widgetOverflowCountText(count: Int): String = "+$count"
 
 internal fun widgetWeekdayLabel(day: WidgetDay, language: String): String {
     val labels = when (language.lowercase(Locale.US).substringBefore('-')) {

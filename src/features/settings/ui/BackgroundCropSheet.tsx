@@ -1,6 +1,7 @@
 import { t, useLanguage } from '@/i18n';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { useEffect, useRef, useState } from 'react';
+import { formatMonthTitle } from '@/lib/datetime';
 import { getCropGeometry, type CropPosition } from '../model/cropGeometry';
 
 interface Props {
@@ -13,6 +14,14 @@ interface Props {
   onCancel: () => void;
   onConfirm: (position: CropPosition, frameAspect: number) => void;
   error?: string;
+}
+type PointerPoint = { x: number; y: number };
+function firstTwo(points: Map<number, PointerPoint>): [PointerPoint, PointerPoint] | null {
+  const values = [...points.values()];
+  return values.length >= 2 ? [values[0]!, values[1]!] : null;
+}
+function firstPoint(points: Map<number, PointerPoint>): PointerPoint | null {
+  return [...points.values()][0] ?? null;
 }
 
 export function BackgroundCropSheet({
@@ -29,10 +38,20 @@ export function BackgroundCropSheet({
   useLanguage();
   const [position, setPosition] = useState<CropPosition>({ zoom: 1, x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ distance: number; zoom: number } | null>(null);
   useEffect(() => {
     drag.current = null;
+    pointers.current.clear();
+    pinch.current = null;
     if (open) setPosition({ zoom: 1, x: 0, y: 0 });
   }, [open, file]);
+  useEffect(() => {
+    if (!busy) return;
+    drag.current = null;
+    pointers.current.clear();
+    pinch.current = null;
+  }, [busy]);
   const change = (patch: Partial<CropPosition>) =>
     setPosition((current) => ({ ...current, ...patch }));
   const move = (dx: number, dy: number) =>
@@ -43,6 +62,23 @@ export function BackgroundCropSheet({
   const crop = imageSize
     ? getCropGeometry(imageSize.width, imageSize.height, frameAspect, position)
     : null;
+  const releasePointer = (pointerId: number) => {
+    if (!pointers.current.has(pointerId)) return;
+    pointers.current.delete(pointerId);
+    if (pointers.current.size >= 2) {
+      const pair = firstTwo(pointers.current);
+      if (!pair) return;
+      const [a, b] = pair;
+      pinch.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom: position.zoom };
+    } else pinch.current = null;
+    if (pointers.current.size === 1) {
+      const point = firstPoint(pointers.current);
+      if (!point) return;
+      drag.current = { x: position.x, y: position.y, px: point.x, py: point.y };
+      return;
+    }
+    drag.current = null;
+  };
 
   return (
     <BottomSheet
@@ -89,8 +125,20 @@ export function BackgroundCropSheet({
             }
           }}
           onPointerDown={(event) => {
-            if (busy || event.button !== 0 || !event.isPrimary) return;
+            if (busy || (event.button !== undefined && event.button !== 0)) return;
+            pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
             event.currentTarget.setPointerCapture?.(event.pointerId);
+            if (pointers.current.size === 2) {
+              const pair = firstTwo(pointers.current);
+              if (!pair) return;
+              const [a, b] = pair;
+              pinch.current = {
+                distance: Math.hypot(a.x - b.x, a.y - b.y),
+                zoom: position.zoom,
+              };
+              drag.current = null;
+              return;
+            }
             drag.current = {
               x: position.x,
               y: position.y,
@@ -99,7 +147,25 @@ export function BackgroundCropSheet({
             };
           }}
           onPointerMove={(event) => {
-            if (busy || !drag.current) return;
+            if (busy || !pointers.current.has(event.pointerId)) return;
+            pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            if (pointers.current.size >= 2 && pinch.current) {
+              const pair = firstTwo(pointers.current);
+              if (!pair) return;
+              const [a, b] = pair;
+              const distance = Math.hypot(a.x - b.x, a.y - b.y);
+              change({
+                zoom: Math.max(
+                  1,
+                  Math.min(
+                    3,
+                    (pinch.current.zoom * distance) / Math.max(1, pinch.current.distance),
+                  ),
+                ),
+              });
+              return;
+            }
+            if (!drag.current) return;
             const rect = event.currentTarget.getBoundingClientRect();
             change({
               x: Math.max(
@@ -118,11 +184,14 @@ export function BackgroundCropSheet({
               ),
             });
           }}
-          onPointerUp={() => {
-            drag.current = null;
+          onPointerUp={(event) => {
+            releasePointer(event.pointerId);
           }}
-          onPointerCancel={() => {
-            drag.current = null;
+          onPointerCancel={(event) => {
+            releasePointer(event.pointerId);
+          }}
+          onLostPointerCapture={(event) => {
+            releasePointer(event.pointerId);
           }}
         >
           {previewUrl && crop && imageSize && (
@@ -139,10 +208,63 @@ export function BackgroundCropSheet({
               }}
             />
           )}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex flex-col p-2 text-[8px]"
+            style={{
+              color: 'var(--color-ink-primary)',
+            }}
+          >
+            <div
+              className="mb-1 flex items-center justify-between rounded-sm px-1 py-0.5 font-semibold"
+              style={{
+                backgroundColor: 'var(--color-chrome-surface)',
+                color: 'var(--color-chrome-ink)',
+              }}
+            >
+              <span>{formatMonthTitle('2026-09-01')}</span>
+              <span>{t('予定')}</span>
+            </div>
+            <div className="grid flex-1 grid-cols-7 grid-rows-5 gap-px">
+              {Array.from({ length: 35 }, (_, index) => (
+                <span
+                  key={index}
+                  className="rounded-[1px] border border-border-hairline p-px"
+                  style={{
+                    backgroundColor:
+                      'color-mix(in srgb, var(--color-surface-base) 60%, transparent)',
+                  }}
+                >
+                  {index + 1 <= 30 ? index + 1 : ''}
+                  {index % 7 === 2 && index < 28 ? (
+                    <i
+                      className="block truncate rounded-sm px-px"
+                      style={{
+                        backgroundColor: 'var(--color-chrome-surface)',
+                        color: 'var(--color-chrome-ink)',
+                      }}
+                    >
+                      {t('予定')}
+                    </i>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+            <div
+              className="mt-1 flex items-center justify-between rounded-sm px-1 py-0.5"
+              style={{
+                backgroundColor: 'var(--color-chrome-surface)',
+                color: 'var(--color-chrome-ink)',
+              }}
+            >
+              <span>{t('予定')}</span>
+              <span>{t('追加')}</span>
+            </div>
+          </div>
           <div className="pointer-events-none absolute inset-0 ring-2 ring-white/80" />
         </div>
         <p className="text-meta text-ink-secondary">
-          {t('画像を指で動かせます。矢印キーでも調整できます。')}
+          {t('画像を指で動かせます。2本指で拡大縮小できます。矢印キーでも調整できます。')}
         </p>
         {error && (
           <p role="alert" className="text-meta text-danger">

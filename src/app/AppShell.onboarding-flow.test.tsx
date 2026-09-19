@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { appError, err, ok } from '@/data/result';
 import type { Profile } from '@/data/profiles';
+import { Screen } from '@/ui/Screen';
 
 /**
  * 回帰テスト(コードレビュー指摘): `AppShell` / `OnboardingScreen` / `ProfileScreen` が
@@ -38,7 +39,7 @@ function renderShell(initialPath = '/') {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<AppShell />}>
-          <Route index element={<div>ホーム画面</div>} />
+          <Route index element={<Screen title="ホーム画面" showProfileHeader>ホーム画面</Screen>} />
           <Route path="profile" element={<ProfileScreen />} />
         </Route>
       </Routes>
@@ -75,7 +76,7 @@ describe('AppShell × OnboardingScreen(実フック、data層のみモック)', 
     await user.click(screen.getByRole('button', { name: 'はじめる' }));
 
     // 別インスタンス問題が直っていれば、AppShell が同じ profile を認識して通常画面に切り替わる
-    expect(await screen.findByText('ホーム画面')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'ようこそ' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'プロフィール' })).toBeInTheDocument();
   });
@@ -105,6 +106,10 @@ describe('AppShell × OnboardingScreen(実フック、data層のみモック)', 
     await user.clear(nameInput);
     await user.type(nameInput, '次郎');
     await user.click(screen.getByRole('button', { name: '保存する' }));
+
+    // 実際の画面遷移後も AppShell の共通ヘッダーへ更新内容が反映されることを確認する。
+    await user.click(screen.getByRole('link', { name: /ホーム/ }));
+    expect(await screen.findByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
 
     // 上部アバターの頭文字フォールバックが「次」に変わる = AppShell が同じ profile を見ている
     // (ProfileForm 自身のプレビューにも「次」が出るため、上部リンクの中身に絞って確認する)
