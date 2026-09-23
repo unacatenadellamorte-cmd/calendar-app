@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+declare const __ADMOB_CONFIG__: import('../scripts/admob-config').AdsConfig;
 /// <reference types="vite-plugin-pwa/client" />
 /// <reference types="vite-plugin-pwa/react" />
 

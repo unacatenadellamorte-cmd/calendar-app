@@ -2,6 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BottomTabs } from './BottomTabs';
+import { AdBanner } from './AdBanner';
 import { OnlineProvider } from './OnlineProvider';
 import { SecretModeProvider } from './SecretModeProvider';
 import { useSecretMode } from './secret-mode-context';
@@ -92,6 +93,7 @@ export function AppShell() {
                 <Outlet context={outletContext} />
               </ProfileHeaderProvider>
               <BottomTabs />
+              <AdBanner />
             </>
           )}
           <PwaUpdatePrompt />

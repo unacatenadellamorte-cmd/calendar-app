@@ -324,5 +324,9 @@
   "中": "Medium",
   "大": "Large",
   "＋シフト": "+ Shift",
-  "＋予定": "+ Event"
+  "＋予定": "+ Event",
+  "プライバシー": "Privacy",
+  "プライバシーポリシー": "Privacy policy",
+  "広告のプライバシー設定": "Ad privacy settings",
+  "同意設定を更新できませんでした。通信状態を確認して、もう一度試してください。": "Could not update consent settings. Check your connection and try again."
 }

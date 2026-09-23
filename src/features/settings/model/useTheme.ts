@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { paletteTokens, themePalettes, type PaletteName } from './themePalettes';
+import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents';
 
 /** テーマの選択肢。'system' は端末設定に追従する。 */
 export type ThemePreference = 'system' | 'light' | 'dark' | PaletteName;
@@ -53,6 +54,7 @@ export function applyTheme(preference: ThemePreference): void {
   } else {
     root.setAttribute('data-theme', preference);
   }
+  notifyWidgetAppearanceChanged();
 }
 
 /**

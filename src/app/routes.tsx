@@ -36,7 +36,7 @@ function CalendarRoute() {
       initialEventId={initialEventId}
       initialCreateDate={initialCreateDate}
       // location.key は同じ日付を同じウィジェットから再度開いたときの要求識別子になる。
-      initialRequestKey={initialCreateDate ? location.key : undefined}
+      initialRequestKey={initialCreateDate || initialEventId ? location.key : undefined}
     />
   );
 }

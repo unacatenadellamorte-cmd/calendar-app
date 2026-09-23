@@ -40,28 +40,30 @@ class WeekEventsWidget : GlanceAppWidget() {
 private fun WeekEventsContent() {
     val context = LocalContext.current
     val overview = readCalendarOverview(context)
+    val appearance = readWidgetAppearance(context)
+    val fontScale = (context.resources.configuration.fontScale * appearance.appFontScale).coerceAtLeast(1f)
     val today = todayWidgetDay()
     val days = weekWidgetDays(today)
     Column(
-        modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(6.dp),
+        modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp),
     ) {
-        Row(modifier = GlanceModifier.fillMaxWidth().height(24.dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().height((24f * fontScale).dp)) {
             Text(
                 text = "${widgetText(overview.language, "week")} ${days.first().month}/${days.first().day}–${days.last().month}/${days.last().day}",
-                style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color.Black)),
+                style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor)),
                 modifier = GlanceModifier.defaultWeight(),
             )
-            AddWeekButton(context, today)
+            AddWeekButton(context, today, appearance)
         }
         // 月表示を日付タップで折りたたんだ時と同じ、日曜始まりの曜日見出し。
-        Row(modifier = GlanceModifier.fillMaxWidth().height(20.dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().height((20f * fontScale).dp)) {
             days.forEach { day ->
                 Text(
                     text = widgetWeekdayLabel(day, overview.language),
                     style = TextStyle(
-                        fontSize = 9.sp,
+                        fontSize = scaledSp(9f, appearance),
                         fontWeight = FontWeight.Bold,
-                        color = ColorProvider(Color.DarkGray),
+                        color = ColorProvider(appearance.secondaryTextColor),
                     ),
                     modifier = GlanceModifier.defaultWeight().padding(1.dp),
                 )
@@ -69,17 +71,17 @@ private fun WeekEventsContent() {
         }
         Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
             days.forEach { day ->
-                WeekDayCell(context, overview, day, day == today, GlanceModifier.defaultWeight())
+                WeekDayCell(context, overview, appearance, day, day == today, GlanceModifier.defaultWeight())
             }
         }
     }
 }
 
 @Composable
-private fun AddWeekButton(context: Context, today: WidgetDay) {
+private fun AddWeekButton(context: Context, today: WidgetDay, appearance: WidgetAppearance) {
     Text(
         text = "＋",
-        style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color(0xFF0072B2))),
+        style = TextStyle(fontSize = scaledSp(18f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
         modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, today))).padding(2.dp),
     )
 }
@@ -88,6 +90,7 @@ private fun AddWeekButton(context: Context, today: WidgetDay) {
 private fun WeekDayCell(
     context: Context,
     overview: CalendarOverview,
+    appearance: WidgetAppearance,
     day: WidgetDay,
     isToday: Boolean,
     cellModifier: GlanceModifier,
@@ -97,21 +100,21 @@ private fun WeekDayCell(
     Column(
         modifier = cellModifier
             .fillMaxHeight()
-            .background(if (isToday) Color(0xFFEAF4FF) else Color.Transparent)
+            .background(if (isToday) appearance.todayColor else Color.Transparent)
             .clickable(actionStartActivity(dayWidgetIntent(context, day)))
             .padding(1.dp),
     ) {
         Text(
             text = day.day.toString(),
             style = TextStyle(
-                fontSize = 10.sp,
+                fontSize = scaledSp(10f, appearance),
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = ColorProvider(if (isToday) Color(0xFF005A9C) else Color.DarkGray),
+                color = ColorProvider(if (isToday) appearance.todayTextColor else appearance.secondaryTextColor),
             ),
         )
         Text(
             text = if (summary.isBlank()) "" else summary,
-            style = TextStyle(fontSize = 10.sp, color = ColorProvider(Color.Black)),
+            style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.primaryTextColor)),
             maxLines = 2,
             modifier = GlanceModifier.defaultWeight(),
         )

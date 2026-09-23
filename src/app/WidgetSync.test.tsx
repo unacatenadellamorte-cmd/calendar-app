@@ -27,6 +27,14 @@ vi.mock('./auth-context', () => ({ useAuth: () => authState }));
 let language = 'ja';
 vi.mock('@/i18n', () => ({ useLanguage: () => language }));
 
+let mediaChange: ((event: MediaQueryListEvent) => void) | undefined;
+const removeMediaListener = vi.fn();
+vi.stubGlobal('matchMedia', () => ({
+  matches: false,
+  addEventListener: (_type: string, handler: (event: MediaQueryListEvent) => void) => { mediaChange = handler; },
+  removeEventListener: (...args: unknown[]) => removeMediaListener(...args),
+}));
+
 const { WidgetSync } = await import('./WidgetSync');
 
 beforeEach(() => {
@@ -35,6 +43,9 @@ beforeEach(() => {
   refreshFeaturedWidget.mockReset().mockResolvedValue(undefined);
   authState = { state: 'guest', session: { user: { id: 'user-1' } } };
   language = 'ja';
+  localStorage.clear();
+  mediaChange = undefined;
+  removeMediaListener.mockClear();
 });
 
 describe('WidgetSync', () => {
@@ -76,5 +87,30 @@ describe('WidgetSync', () => {
     language = 'en';
     view.rerender(<WidgetSync />);
     expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+  });
+
+  it('テーマ・文字サイズ変更通知でウィジェットを再更新する', () => {
+    render(<WidgetSync />);
+    refreshFeaturedWidget.mockClear();
+    window.dispatchEvent(new Event('calendar-app:widget-appearance-changed'));
+    expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+  });
+
+  it('systemテーマのOS変更だけで再更新し、解除時に購読を外す', () => {
+    localStorage.setItem('calendar-app.theme', 'system');
+    const view = render(<WidgetSync />);
+    refreshFeaturedWidget.mockClear();
+    mediaChange?.({} as MediaQueryListEvent);
+    expect(refreshFeaturedWidget).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(removeMediaListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('固定テーマではOS変更で再更新しない', () => {
+    localStorage.setItem('calendar-app.theme', 'dark');
+    render(<WidgetSync />);
+    refreshFeaturedWidget.mockClear();
+    mediaChange?.({} as MediaQueryListEvent);
+    expect(refreshFeaturedWidget).not.toHaveBeenCalled();
   });
 });

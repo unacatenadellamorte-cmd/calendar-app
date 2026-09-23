@@ -163,13 +163,16 @@ internal fun widgetText(language: String, key: String): String {
 }
 
 /** 月グリッドのセル高。外側余白・見出し・曜日行を除いた利用可能領域を返す。 */
-internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int): Float =
-    ((totalHeightDp - 12f - 24f - 20f) / rowCount.coerceAtLeast(1)).coerceAtLeast(0f)
+internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int, fontScale: Float = 1f): Float {
+    val scale = fontScale.coerceAtLeast(1f)
+    return ((totalHeightDp - 12f - 24f * scale - 20f * scale) / rowCount.coerceAtLeast(1)).coerceAtLeast(0f)
+}
 
 /** 日付行と上下余白を除き、セル内に収まるテキスト行数を求める。 */
 internal fun monthEventLineCapacity(cellHeightDp: Float, fontScale: Float = 1f): Int {
     val scale = fontScale.coerceAtLeast(0.5f)
-    return floor((cellHeightDp - 16f * scale) / (10f * scale)).toInt().coerceAtLeast(0)
+    // 日付行・上下余白を含む保守的な12dp行高。本文は10spで描画する。
+    return floor((cellHeightDp - 16f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
 }
 
 /** 超過件数は日付行に表示するため、イベント行の実容量までタイトルを描く。 */

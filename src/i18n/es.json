@@ -324,5 +324,9 @@
   "中": "Mediano",
   "大": "Grande",
   "＋シフト": "+ Turno",
-  "＋予定": "+ Evento"
+  "＋予定": "+ Evento",
+  "プライバシー": "Privacidad",
+  "プライバシーポリシー": "Política de privacidad",
+  "広告のプライバシー設定": "Configuración de privacidad de anuncios",
+  "同意設定を更新できませんでした。通信状態を確認して、もう一度試してください。": "No se pudo actualizar la configuración del consentimiento. Comprueba la conexión e inténtalo de nuevo."
 }

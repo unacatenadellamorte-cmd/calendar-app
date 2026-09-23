@@ -1,5 +1,6 @@
 import { t, useLanguage } from '@/i18n';
 import { BackgroundSection } from './BackgroundSection';
+import { AdsPrivacySection } from './AdsPrivacySection';
 import { themePalettes, type PaletteName } from '../model/themePalettes';
 import { Link } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
@@ -223,6 +224,7 @@ export function SettingsScreen() {
       </section>
 
       <DataSection />
+      <AdsPrivacySection />
     </Screen>
   );
 }

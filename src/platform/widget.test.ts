@@ -43,6 +43,7 @@ vi.mock('@/data/calendars', () => ({
 }));
 
 const { buildFeaturedWidgetPayload, buildCalendarOverviewPayload, refreshFeaturedWidget } = await import('./widget');
+const { buildWidgetAppearance } = await import('./widgetAppearance');
 
 const cal = (over: Partial<Calendar>): Calendar => ({
   id: 'c1',
@@ -208,26 +209,33 @@ describe('refreshFeaturedWidget', () => {
         'jp.ryo.multicalendar.widget.MonthEventsWidgetReceiver',
       ],
     });
-    expect(setItem).toHaveBeenCalledTimes(2);
-    const arg = setItem.mock.calls[0]![0];
+    expect(setItem).toHaveBeenCalledTimes(3);
+    const arg = setItem.mock.calls.find(([value]) => value.key === 'featuredEvents')![0];
     expect(arg.key).toBe('featuredEvents');
     expect(arg.group).toBe('group.jp.ryo.multicalendar.widget');
     expect(JSON.parse(arg.value)).toEqual([
       expect.objectContaining({ id: 'e1', schemaVersion: 1 }),
     ]);
-    const overviewArg = setItem.mock.calls[1]![0];
+    const overviewArg = setItem.mock.calls.find(([value]) => value.key === 'calendarOverview')![0];
     expect(overviewArg.key).toBe('calendarOverview');
     expect(JSON.parse(overviewArg.value)).toMatchObject({
       schemaVersion: 1,
       language: 'ja',
       events: [expect.objectContaining({ id: 'e1', title: '会議', startDate: '2026-09-08', endDate: '2026-09-09' })],
     });
+    const appearanceArg = setItem.mock.calls.find(([value]) => value.key === 'widgetAppearance')![0];
+    expect(appearanceArg.key).toBe('widgetAppearance');
+    expect(appearanceArg.group).toBe('group.jp.ryo.multicalendar.widget');
+    expect(JSON.parse(appearanceArg.value)).toMatchObject({ schemaVersion: 1, appFontScale: expect.any(Number) });
     expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
 
-    const order = [setRegisteredWidgets, setItem, reloadAllTimelines].map(
-      (fn) => fn.mock.invocationCallOrder[0],
+    const featuredOrder = setItem.mock.calls.findIndex(([value]) => value.key === 'featuredEvents');
+    expect(setRegisteredWidgets.mock.invocationCallOrder[0]).toBeLessThan(
+      setItem.mock.invocationCallOrder[featuredOrder]!,
     );
-    expect(order).toEqual([...order].sort((a, b) => a! - b!));
+    expect(setItem.mock.invocationCallOrder[featuredOrder]!).toBeLessThan(
+      reloadAllTimelines.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('listEvents が失敗したら何も書き込まず、警告ログを出す(catch節と対称)', async () => {
@@ -237,7 +245,9 @@ describe('refreshFeaturedWidget', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await refreshFeaturedWidget();
-    expect(setItem).not.toHaveBeenCalled();
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(setItem.mock.calls[0]![0].key).toBe('widgetAppearance');
+    expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
       'widget: refreshFeaturedWidget failed',
       expect.any(String),
@@ -260,7 +270,8 @@ describe('refreshFeaturedWidget', () => {
       group: 'group.jp.ryo.multicalendar.widget',
       value: expect.any(String),
     });
-    expect(JSON.parse(setItem.mock.calls[0]![0].value)[0].id).toBe('ios-event');
+    const featuredArg = setItem.mock.calls.find(([value]) => value.key === 'featuredEvents')![0];
+    expect(JSON.parse(featuredArg.value)[0].id).toBe('ios-event');
     expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
     expect(setItem.mock.invocationCallOrder[0]).toBeLessThan(
       reloadAllTimelines.mock.invocationCallOrder[0]!,
@@ -274,7 +285,9 @@ describe('refreshFeaturedWidget', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await refreshFeaturedWidget();
-    expect(setItem).not.toHaveBeenCalled();
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(setItem.mock.calls[0]![0].key).toBe('widgetAppearance');
+    expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
       'widget: refreshFeaturedWidget failed',
       expect.any(String),
@@ -303,18 +316,37 @@ describe('refreshFeaturedWidget', () => {
 
     const first = refreshFeaturedWidget();
     const second = refreshFeaturedWidget();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(listEvents).toHaveBeenCalledTimes(1);
 
     resolveEvents(ok([ev({ id: 'e1', startsAt: '2026-09-08T06:00:00.000Z' })]));
     await Promise.all([first, second]);
 
     expect(listEvents).toHaveBeenCalledTimes(2);
-    expect(setItem).toHaveBeenCalledTimes(4);
+    expect(setItem).toHaveBeenCalledTimes(6);
 
     expect(listEvents).toHaveBeenCalledTimes(2);
     // 完了後に呼べば新たな実行が起こる(使い回しっぱなしにならない)。
     await refreshFeaturedWidget();
     expect(listEvents).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('buildWidgetAppearance', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('設定中のテーマ色と月予定文字サイズを共有形式へ変換する', () => {
+    localStorage.setItem('calendar-app.theme', 'ocean');
+    localStorage.setItem('calendar-app.month-event-size', 'large');
+    const appearance = buildWidgetAppearance();
+    expect(appearance).toMatchObject({ theme: 'ocean', backgroundColor: '#f5fbff', accentColor: '#086d9e', appFontScale: 1.2 });
+  });
+
+  it('不正な設定は安全な既定値へ戻す', () => {
+    localStorage.setItem('calendar-app.theme', 'invalid');
+    localStorage.setItem('calendar-app.month-event-size', 'invalid');
+    expect(buildWidgetAppearance()).toMatchObject({ theme: 'system', appFontScale: 0.8 });
   });
 });
 

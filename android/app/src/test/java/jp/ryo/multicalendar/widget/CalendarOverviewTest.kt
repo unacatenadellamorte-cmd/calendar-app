@@ -58,7 +58,7 @@ class CalendarOverviewTest {
         val tallSixRows = monthCellHeightDp(420f, 6)
         assertEquals(2, monthVisibleEventCount(fiveRows, 3))
         assertEquals(2, monthVisibleEventCount(fiveRows, 4))
-        assertEquals(2, monthVisibleEventCount(sixRows, 3))
+        assertEquals(1, monthVisibleEventCount(sixRows, 3))
         assertTrue(monthVisibleEventCount(tallSixRows, 3) >= 2)
         assertEquals(0, monthEventLineCapacity(10f))
         assertEquals(0, monthEventLineCapacity(sixRows, 2f))

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onDeepLink } from '@/platform/deepLink';
 import { isValidLocalDate } from '@/lib/datetime';
@@ -14,34 +14,24 @@ import { isValidLocalDate } from '@/lib/datetime';
  */
 export function DeepLinkListener() {
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  useEffect(() => { navigateRef.current = navigate; }, [navigate]);
 
   useEffect(() => {
     let disposed = false;
-    const consumeTimers = new Set<ReturnType<typeof setTimeout>>();
     const unsubscribe = onDeepLink((url) => {
       if (disposed) return;
       const to = toInternalRoute(url);
       if (!to) return;
-      navigate(to);
-      if (to.startsWith('/calendar?event=')) {
-        // ?event= は一度きりの指定。開いた後も URL に残ると、PWA を手動リロードしたときに
-        // 同じ予定シートが再度開いてしまうため、遷移後にクエリを取り除く(replace で
-        // 履歴に残さない)。React 18 のバッチングで直後に同期実行すると、CalendarScreen が
-        // ?event= 付きの状態を一度も描画できず開かなくなるため、次の macrotask まで遅らせる。
-        const timer = setTimeout(() => {
-          consumeTimers.delete(timer);
-          if (!disposed) navigate('/calendar', { replace: true });
-        }, 0);
-        consumeTimers.add(timer);
-      }
+      navigateRef.current(to);
     });
     return () => {
       disposed = true;
-      for (const timer of consumeTimers) clearTimeout(timer);
-      consumeTimers.clear();
       unsubscribe();
     };
-  }, [navigate]);
+  // BrowserRouter の navigate は遷移ごとに変わる。再購読すると起動URLが再送され、
+  // カレンダーへの遷移を繰り返すため、購読はマウントにつき一度に固定する。
+  }, []);
 
   return null;
 }
@@ -69,7 +59,7 @@ function toInternalRoute(url: string): string | null {
   if (!value) return null;
 
   if (kind === 'event') return `/calendar?event=${encodeURIComponent(value)}`;
-  if (kind === 'day') return `/calendar?date=${encodeURIComponent(value)}`;
+  if (kind === 'day' && isValidLocalDate(value)) return `/calendar?date=${encodeURIComponent(value)}`;
   if (kind === 'create' && isValidLocalDate(value)) {
     return `/calendar?create=${encodeURIComponent(value)}`;
   }

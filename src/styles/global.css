@@ -159,7 +159,8 @@
   height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   background: var(--color-chrome-surface);
   color: var(--color-chrome-ink);
-  border-bottom: 1px solid var(--color-border-hairline);
+  /* ステータスバーと見出しの間に境界線を描かず、一体の上部面として見せる。 */
+  border-bottom: 0;
   pointer-events: none;
 }
 .screen-header,
@@ -168,6 +169,8 @@
   background-color: var(--color-chrome-surface);
   color: var(--color-chrome-ink);
 }
+/* プロフィール付き見出しと並び順画面のラベル下端を角張らせる。 */
+.screen-header { border-radius: 0; }
 .calendar-date-nav { color: var(--color-chrome-ink); }
 .screen-header h1,
 .screen-header a,
@@ -224,6 +227,9 @@
 .month-event-chip {
   font-size: var(--month-event-font-size, 8px);
 }
+.app-screen > main {
+  padding-bottom: calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + var(--ad-banner-height, 0px));
+}
 .app-screen-contained {
   height: calc(100dvh - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   min-height: 0;
@@ -234,7 +240,7 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  padding-bottom: calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + var(--ad-banner-height, 0px));
 }
 .app-screen-contained > main > :not(.calendar-list-scroll) { flex-shrink: 0; }
 .app-screen-contained .calendar-list-scroll {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents';
 
 export type MonthEventSize = 'small' | 'medium' | 'large';
 
@@ -21,6 +22,7 @@ export function readStoredMonthEventSize(): MonthEventSize {
 
 export function applyMonthEventSize(size: MonthEventSize): void {
   document.documentElement.style.setProperty('--month-event-font-size', CSS_VALUES[size]);
+  notifyWidgetAppearanceChanged();
 }
 
 export function initMonthEventSize(): void {

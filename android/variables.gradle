@@ -1,4 +1,7 @@
 ext {
+    // プラグイン既定の動的バージョンを固定する。
+    playServicesAdsVersion = '25.4.0'
+    userMessagingPlatformVersion = '4.0.0'
     minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36

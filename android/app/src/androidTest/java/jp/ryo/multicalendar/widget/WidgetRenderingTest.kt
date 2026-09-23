@@ -46,6 +46,7 @@ class WidgetRenderingTest {
         )
         val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
         val previous = prefs.getString(CALENDAR_OVERVIEW_KEY, null)
+        val previousAppearance = prefs.getString(WIDGET_APPEARANCE_KEY, null)
         val today = todayWidgetDay()
         val todayKey = today.toKey()
         val title = "検証予定"
@@ -75,6 +76,8 @@ class WidgetRenderingTest {
         var adopted = false
         try {
             prefs.edit().putString(CALENDAR_OVERVIEW_KEY, fixture.toString()).commit()
+            prefs.edit().putString(WIDGET_APPEARANCE_KEY,
+                """{"schemaVersion":1,"theme":"lavender","backgroundColor":"#fbf8ff","primaryTextColor":"#302641","accentColor":"#7042a8","appFontScale":1}""").commit()
             instrumentation.uiAutomation.adoptShellPermissionIdentity(
                 "android.permission.BIND_APPWIDGET",
             )
@@ -91,21 +94,23 @@ class WidgetRenderingTest {
             layoutForAssertions(week, 180, 140)
             saveBitmap(week, "widget-week.png", 180, 140)
             assertWeekHasOnlyHeaderAddButton(week)
+            // 5週・6週のどちらでも、1日2件と超過1件を描くセル高を確保する。
+            val minimumHeight = 56 + (monthWidgetDays(today).size / 7) * 44
             val monthMin = renderProvider(
                 host,
                 ComponentName(context, MonthEventsWidgetReceiver::class.java),
                 250,
-                280,
+                minimumHeight,
                 boundIds,
                 title,
             )
-            layoutForAssertions(monthMin, 250, 280)
+            layoutForAssertions(monthMin, 250, minimumHeight)
             assertPlus(monthMin)
             assertText(monthMin, title)
             assertText(monthMin, secondTitle)
             assertText(monthMin, "+1")
             assertTextViewsFitParent(monthMin, listOf(title, secondTitle, "+1"))
-            saveBitmap(monthMin, "widget-month-min.png", 250, 280)
+            saveBitmap(monthMin, "widget-month-min.png", 250, minimumHeight)
 
             val month = renderProvider(
                 host,
@@ -134,6 +139,7 @@ class WidgetRenderingTest {
             if (adopted) instrumentation.uiAutomation.dropShellPermissionIdentity()
             val edit = prefs.edit()
             if (previous == null) edit.remove(CALENDAR_OVERVIEW_KEY) else edit.putString(CALENDAR_OVERVIEW_KEY, previous)
+            if (previousAppearance == null) edit.remove(WIDGET_APPEARANCE_KEY) else edit.putString(WIDGET_APPEARANCE_KEY, previousAppearance)
             edit.commit()
         }
     }

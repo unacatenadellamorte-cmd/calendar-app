@@ -4,6 +4,15 @@ apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
+// cap syncでコピーされたWebビルドと同じ設定だけを使用する。
+def adsConfigFile = file('src/main/assets/public/admob-config.json')
+if (!adsConfigFile.exists()) throw new GradleException('先に npm run build と npx cap sync android を実行してください。')
+def adsConfig = new groovy.json.JsonSlurper().parse(adsConfigFile)
+if (!(adsConfig.appId ==~ /ca-app-pub-\d{16}~\d{10}/)) throw new GradleException('AdMob App IDが不正です。')
+if (project.hasProperty('requireReleaseSigning') && adsConfig.mode != 'production') {
+    throw new GradleException('提出用ビルドではVITE_ADMOB_MODE=productionが必要です。')
+}
+
 // 秘密値は環境変数から受け取り、ファイルやログへ書き出さない。
 def releaseSigning = [
     storeFile: System.getenv('ANDROID_KEYSTORE_PATH'),
@@ -21,10 +30,11 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "jp.ryo.multicalendar"
+        manifestPlaceholders.admobAppId = adsConfig.appId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 15
-        versionName "1.0.14"
+        versionCode 16
+        versionName "1.0.15"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

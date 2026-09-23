@@ -42,32 +42,33 @@ class MonthEventsWidget : GlanceAppWidget() {
 private fun MonthEventsContent() {
     val context = LocalContext.current
     val overview = readCalendarOverview(context)
+    val appearance = readWidgetAppearance(context)
     val size = LocalSize.current
-    val fontScale = context.resources.configuration.fontScale
+    val fontScale = context.resources.configuration.fontScale * appearance.appFontScale
     val today = todayWidgetDay()
     val days = monthWidgetDays(today)
     val rows = days.chunked(7)
-    val cellHeightDp = monthCellHeightDp(size.height.value, rows.size)
+    val cellHeightDp = monthCellHeightDp(size.height.value, rows.size, fontScale)
     Column(
-        modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(6.dp),
+        modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp),
     ) {
-        Row(modifier = GlanceModifier.fillMaxWidth().height(24.dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().height((24f * fontScale.coerceAtLeast(1f)).dp)) {
             Text(
                 text = "${today.year}/${today.month} ${widgetText(overview.language, "month")}",
-                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color.Black)),
+                style = TextStyle(fontSize = scaledSp(14f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor)),
                 modifier = GlanceModifier.defaultWeight(),
             )
             Text(
                 text = "＋",
-                style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color(0xFF0072B2))),
+                style = TextStyle(fontSize = scaledSp(18f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
                 modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, today))).padding(2.dp),
             )
         }
-        Row(modifier = GlanceModifier.fillMaxWidth().height(20.dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().height((20f * fontScale.coerceAtLeast(1f)).dp)) {
             (0..6).forEach { index ->
                 Text(
                     text = widgetWeekdayLabel(days[index], overview.language),
-                    style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color.DarkGray)),
+                    style = TextStyle(fontSize = scaledSp(9f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
                     modifier = GlanceModifier.defaultWeight().padding(1.dp),
                 )
             }
@@ -78,6 +79,7 @@ private fun MonthEventsContent() {
                     MonthDayCell(
                         context,
                         overview,
+                        appearance,
                         today,
                         day,
                         cellHeightDp,
@@ -94,6 +96,7 @@ private fun MonthEventsContent() {
 private fun MonthDayCell(
     context: Context,
     overview: CalendarOverview,
+    appearance: WidgetAppearance,
     today: WidgetDay,
     day: WidgetDay,
     cellHeightDp: Float,
@@ -108,7 +111,7 @@ private fun MonthDayCell(
     Column(
         modifier = cellModifier
             .fillMaxHeight()
-            .background(if (isToday) Color(0xFFEAF4FF) else Color.Transparent)
+            .background(if (isToday) appearance.todayColor else Color.Transparent)
             .clickable(actionStartActivity(createWidgetIntent(context, day)))
             .padding(2.dp),
     ) {
@@ -116,13 +119,13 @@ private fun MonthDayCell(
             Text(
                 text = day.day.toString(),
                 style = TextStyle(
-                    fontSize = 10.sp,
+                    fontSize = scaledSp(10f, appearance),
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                     color = ColorProvider(
                         when {
-                            isToday -> Color(0xFF005A9C)
-                            inCurrentMonth -> Color.Black
-                            else -> Color.LightGray
+                            isToday -> appearance.todayTextColor
+                            inCurrentMonth -> appearance.primaryTextColor
+                            else -> appearance.mutedTextColor
                         },
                     ),
                 ),
@@ -131,7 +134,7 @@ private fun MonthDayCell(
             if (overflowCount > 0) {
                 Text(
                     text = widgetOverflowCountText(overflowCount),
-                    style = TextStyle(fontSize = 7.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color.DarkGray)),
+                style = TextStyle(fontSize = scaledSp(7f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
                     maxLines = 1,
                 )
             }
@@ -139,7 +142,7 @@ private fun MonthDayCell(
         visibleEvents.forEach { event ->
             Text(
                 text = "• ${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
-                style = TextStyle(fontSize = 7.sp, color = ColorProvider(Color(0xFF0072B2))),
+                style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.accentColor)),
                 maxLines = 1,
             )
         }

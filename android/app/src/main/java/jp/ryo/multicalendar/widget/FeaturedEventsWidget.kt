@@ -172,10 +172,10 @@ private fun deepLinkIntent(context: Context, event: FeaturedWidgetEvent?): Inten
 }
 
 @Composable
-private fun AddEventButton(context: Context) {
+private fun AddEventButton(context: Context, appearance: WidgetAppearance) {
     Text(
         text = "＋",
-        style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ColorProvider(Color(0xFF0072B2))),
+        style = TextStyle(fontSize = scaledSp(18f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
         modifier = GlanceModifier
             .clickable(actionStartActivity(createWidgetIntent(context, todayWidgetDay())))
             .padding(2.dp),
@@ -185,32 +185,33 @@ private fun AddEventButton(context: Context) {
 @Composable
 private fun FeaturedEventsContent() {
     val context = LocalContext.current
+    val appearance = readWidgetAppearance(context)
     val size = LocalSize.current
     val events = readFeaturedEvents(context)
     val visibleRows = events.take(maxRowsFor(size))
 
     // 追加ボタンは予定の右に置き、小さい40dp表示でも予定を押し出さない。
-    Row(modifier = GlanceModifier.fillMaxSize().background(Color.White).padding(4.dp)) {
+    Row(modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(4.dp)) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             if (visibleRows.isEmpty()) {
                 Text(
                     text = "この後の予定はありません",
-                    style = TextStyle(fontSize = 11.sp, color = ColorProvider(Color.DarkGray)),
+                    style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.secondaryTextColor)),
                     maxLines = 1,
                     modifier = GlanceModifier.clickable(actionStartActivity(deepLinkIntent(context, null))),
                 )
             }
             visibleRows.forEachIndexed { index, event ->
                 if (index > 0) Spacer(modifier = GlanceModifier.height(6.dp))
-                FeaturedEventRow(context, event)
+                FeaturedEventRow(context, event, appearance)
             }
         }
-        AddEventButton(context)
+        AddEventButton(context, appearance)
     }
 }
 
 @Composable
-private fun FeaturedEventRow(context: Context, event: FeaturedWidgetEvent) {
+private fun FeaturedEventRow(context: Context, event: FeaturedWidgetEvent, appearance: WidgetAppearance) {
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -226,15 +227,15 @@ private fun FeaturedEventRow(context: Context, event: FeaturedWidgetEvent) {
         Text(
             text = formatStartLabel(event),
             style = TextStyle(
-                fontSize = 12.sp,
+                fontSize = scaledSp(12f, appearance),
                 fontWeight = FontWeight.Bold,
-                color = ColorProvider(Color.Black),
+                color = ColorProvider(appearance.primaryTextColor),
             ),
         )
         Spacer(modifier = GlanceModifier.width(6.dp))
         Text(
             text = event.calendarName,
-            style = TextStyle(fontSize = 12.sp, color = ColorProvider(Color.DarkGray)),
+            style = TextStyle(fontSize = scaledSp(12f, appearance), color = ColorProvider(appearance.secondaryTextColor)),
             maxLines = 1,
         )
     }

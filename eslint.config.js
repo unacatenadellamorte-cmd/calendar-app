@@ -13,6 +13,8 @@ export default tseslint.config(
       'node_modules',
       '_bmad',
       '_bmad-output',
+      // ストア動画素材に同梱された外部ライブラリの圧縮済み配布物。
+      'docs/store-kit-*/**/assets/gsap.min.js',
       'supabase/.temp',
       // Edge Functions は Deno ランタイム(jsr: 指定・Deno グローバル)。
       // ローカルに Deno が無いためマイグレーションと同じく目視レビュー。

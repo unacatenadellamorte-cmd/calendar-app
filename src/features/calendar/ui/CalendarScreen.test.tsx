@@ -90,6 +90,15 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('予定取得失敗ではリンクを消費せず、再取得成功後に開く', () => {
+    evState = { ...evState, events: [], errorKey: 'events.listFailed' };
+    const view = render(<CalendarScreen initialEventId="e1" initialRequestKey="retry-event" />);
+    expect(navigateMock).not.toHaveBeenCalled();
+    evState = { ...evState, events: [sampleEvent], errorKey: null };
+    view.rerender(<CalendarScreen initialEventId="e1" initialRequestKey="retry-event" />);
+    expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+    expect(navigateMock).toHaveBeenCalledWith('/calendar', { replace: true });
+  });
   it('折りたたみでDOM位置が変わっても同じ位置の2回目タップで日表示へ進む', () => {
     render(<CalendarScreen />);
     const day = screen.getByRole('button', { name: '9月8日を開く' });
@@ -598,10 +607,12 @@ describe('CalendarScreen', () => {
       evState.loading = true;
       const { rerender } = render(<CalendarScreen initialEventId="e1" />);
       expect(screen.queryByRole('dialog', { name: '予定を編集' })).not.toBeInTheDocument();
+      expect(navigateMock).not.toHaveBeenCalled();
 
       evState = { ...evState, loading: false };
       rerender(<CalendarScreen initialEventId="e1" />);
       expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledWith('/calendar', { replace: true });
     });
 
     it('cal がロード中の間は開かず、ロード完了後に開く(「不明なカレンダー」表示の防止)', () => {
@@ -637,6 +648,24 @@ describe('CalendarScreen', () => {
       rerender(<CalendarScreen initialEventId="e2" />);
       expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
       expect(screen.getByLabelText('タイトル')).toHaveValue('別の予定');
+    });
+
+    it('同じ予定でも requestKey が変われば、閉じた後に再度開いてクエリを消費する', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <CalendarScreen initialEventId="e1" initialRequestKey="event-request-1" />,
+      );
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByRole('button', { name: '閉じる' }));
+      rerender(
+        <CalendarScreen initialEventId="e1" initialRequestKey="event-request-2" />,
+      );
+
+      expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledTimes(2);
+      expect(navigateMock).toHaveBeenLastCalledWith('/calendar', { replace: true });
     });
   });
 

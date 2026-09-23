@@ -5,6 +5,8 @@ import androidx.compose.ui.unit.dp
 import java.util.TimeZone
 import org.junit.After
 import org.junit.Assert.assertEquals
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import org.junit.Before
 import org.junit.Test
 
@@ -17,6 +19,13 @@ import org.junit.Test
  * 一切テストされておらず、実機確認でも確定的な検証ができていなかった。
  */
 class FeaturedEventsWidgetTest {
+
+    @Test
+    fun `アプリ文字倍率は安全範囲に収まりspへ反映される`() {
+        assertEquals(8f, scaledSp(10f, WidgetAppearance(appFontScale = 0.8f)).value, 0.01f)
+        assertEquals(12f, scaledSp(10f, WidgetAppearance(appFontScale = 1.2f)).value, 0.01f)
+        assertEquals(Color.White, WidgetAppearance().backgroundColor)
+    }
 
     private lateinit var originalDefaultTimeZone: TimeZone
 

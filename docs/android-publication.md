@@ -81,8 +81,9 @@ Webビルド、Capacitor同期、Androidユニットテスト、release lint、A
 | Google連携情報 | OAuth経由でアクセスし、サーバー側でトークン管理 | `supabase/functions/oauth-exchange` |
 | シフト・時給情報 | ユーザー入力に基づいて保存・計算 | `src/data/events.ts` |
 | 通知・ウィジェット | OSのローカル通知と共有データ | `src/platform/` |
+| 広告SDK | AndroidへAdMob/UMPを追加。IPアドレス由来の概略位置、広告・アプリ操作、診断情報、端末等の識別子についてGoogleのSDK開示と実設定を照合して申告 | `src/platform/adsController.ts`、`docs/admob-setup.md`、Google公式データ開示 |
 
-広告・解析SDKは直接依存には見当たらないが、これだけで全SDKのデータ非収集を断定しない。Google Playの収集・共有の定義に合わせ、実際のサービス運用と照合する。
+2026-09-23にAndroid広告SDKを追加した。設定手順は[広告設定](admob-setup.md)を参照。本番ID・公開ポリシー・UMP管理画面・データセーフティ申告は未完了。SDK導入だけで配信や申告が完了したとは扱わず、[Google公式のSDKデータ開示](https://developers.google.com/admob/android/privacy/play-data-disclosure)と実際のサービス運用を照合する。
 
 ## 公式資料
 

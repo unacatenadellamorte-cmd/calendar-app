@@ -157,14 +157,17 @@ export function CalendarScreen({
   // ラッチは「最後に処理した initialEventId」を保持し、値が変わったら再度処理できるようにする。
   const processedEventIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!initialEventId || processedEventIdRef.current === initialEventId) return;
-    if (!enabled || ev.loading || cal.loading) return;
-    processedEventIdRef.current = initialEventId;
+    const requestKey = initialRequestKey ?? initialEventId;
+    if (!initialEventId || processedEventIdRef.current === requestKey) return;
+    if (!enabled || authJustResolved || ev.loading || cal.loading || ev.errorKey || cal.errorKey) return;
+    processedEventIdRef.current = requestKey;
     // ロック中はシークレット予定をディープリンクからも開けない(unlockedEvents で検索する、spec-secret-mode)。
     const target = unlockedEvents.find((e) => e.id === initialEventId);
     if (target) openEdit(target);
+    // 認証・データ取得の完了後に消費する。起動直後のタイマーでは要求を失う。
+    navigate('/calendar', { replace: true });
     // openEdit は毎レンダー再生成される関数だが、initialEventId/enabled/ev/cal の変化にのみ追従すればよい。
-  }, [initialEventId, enabled, ev.loading, unlockedEvents, cal.loading]);
+  }, [initialEventId, initialRequestKey, enabled, authJustResolved, ev.loading, ev.errorKey, unlockedEvents, cal.loading, cal.errorKey, navigate]);
   // ウィジェットの create リンクは、認証と予定・カレンダーのロードが済んでから消費する。
   // それまではルートのクエリに残るため、冷起動直後のリンクを失わない。
   const processedCreateRequestRef = useRef<string | undefined>(undefined);

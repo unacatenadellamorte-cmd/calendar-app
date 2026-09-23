@@ -7,6 +7,7 @@ import { EXTERNAL_DEFAULT_COLOR } from '@/data/calendar-colors';
 import { makePriorityOf } from '@/lib/calendar-view';
 import { getLanguage, type Language } from '@/i18n';
 import { localDateOf } from '@/lib/datetime';
+import { buildWidgetAppearance, WIDGET_APPEARANCE_KEY } from './widgetAppearance';
 
 /**
  * ホーム画面ウィジェットのデータブリッジ(Story 5.6、ARCHITECTURE-SPINE Epic5 AD-12)。
@@ -198,9 +199,19 @@ export function buildCalendarOverviewPayload(
 async function runRefreshFeaturedWidget(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
+    if (Capacitor.getPlatform() === 'android') {
+      await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
+    }
+    // 外観は予定データ取得に依存させない。オフラインでもテーマ変更を反映する。
+    await WidgetBridgePlugin.setItem({
+      key: WIDGET_APPEARANCE_KEY,
+      group: WIDGET_GROUP,
+      value: JSON.stringify(buildWidgetAppearance()),
+    });
     const [eventsResult, calendarsResult] = await Promise.all([listEvents(), listCalendars()]);
     if (!eventsResult.ok || !calendarsResult.ok) {
       console.warn('widget: refreshFeaturedWidget failed', 'listEvents/listCalendars not ok');
+      await WidgetBridgePlugin.reloadAllTimelines();
       return;
     }
 
@@ -210,12 +221,6 @@ async function runRefreshFeaturedWidget(): Promise<void> {
       new Date().toISOString(),
     );
 
-    // setRegisteredWidgets はプラグインの静的フィールドに保持されるだけでプロセス再起動で
-    // リセットされるため、毎回呼ぶ(冪等)。
-    // iOS プラグインにはこの Android 専用メソッドが無い。
-    if (Capacitor.getPlatform() === 'android') {
-      await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
-    }
     await WidgetBridgePlugin.setItem({
       key: WIDGET_ITEM_KEY,
       group: WIDGET_GROUP,

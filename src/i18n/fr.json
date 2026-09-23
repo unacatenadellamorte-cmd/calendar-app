@@ -324,5 +324,9 @@
   "中": "Moyen",
   "大": "Grand",
   "＋シフト": "+ Équipe",
-  "＋予定": "+ Événement"
+  "＋予定": "+ Événement",
+  "プライバシー": "Confidentialité",
+  "プライバシーポリシー": "Politique de confidentialité",
+  "広告のプライバシー設定": "Paramètres de confidentialité des annonces",
+  "同意設定を更新できませんでした。通信状態を確認して、もう一度試してください。": "Impossible de mettre à jour les paramètres de consentement. Vérifiez votre connexion et réessayez."
 }
