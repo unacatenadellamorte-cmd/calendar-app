@@ -2,7 +2,7 @@ name: Deploy privacy page
 
 on:
   push:
-    branches: [story/ad-monetization]
+    branches: [main, story/ad-monetization]
   workflow_dispatch:
 
 permissions:
