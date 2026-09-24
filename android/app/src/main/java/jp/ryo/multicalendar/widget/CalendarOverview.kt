@@ -96,6 +96,31 @@ internal fun monthWidgetDays(today: WidgetDay): List<WidgetDay> {
     return (0 until count).map { addWidgetDays(gridStart, it) }
 }
 
+/** 指定月を7列で表示するセル。前後月は空セルにして、対象月の日だけを表示する。 */
+internal fun monthGridDays(year: Int, month: Int): List<WidgetDay?> {
+    val first = WidgetDay(year, month, 1)
+    val calendar = Calendar.getInstance().apply {
+        clear()
+        set(year, month - 1, 1, 12, 0, 0)
+    }
+    val offset = calendar.get(Calendar.DAY_OF_WEEK) - Calendar.SUNDAY
+    val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val cellCount = if (offset + daysInMonth <= 35) 35 else 42
+    return (0 until cellCount).map { index ->
+        if (index in offset until (offset + daysInMonth)) addWidgetDays(first, index - offset) else null
+    }
+}
+
+/** 今日を基準に、月移動分だけずらした月の1日を返す。 */
+internal fun monthAnchor(today: WidgetDay, offset: Int): WidgetDay {
+    val calendar = Calendar.getInstance().apply {
+        clear()
+        set(today.year, today.month - 1, 1, 12, 0, 0)
+        add(Calendar.MONTH, offset)
+    }
+    return WidgetDay(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, 1)
+}
+
 internal fun eventsForWidgetDay(events: List<CalendarOverviewEvent>, day: WidgetDay): List<CalendarOverviewEvent> =
     events.filter { it.startDate <= day && day <= it.endDate }
 

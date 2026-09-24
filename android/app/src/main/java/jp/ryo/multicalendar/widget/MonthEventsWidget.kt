@@ -12,6 +12,7 @@ import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -48,7 +49,10 @@ private fun MonthEventsContent() {
     val size = LocalSize.current
     val fontScale = context.resources.configuration.fontScale * appearance.appFontScale
     val today = todayWidgetDay()
-    val days = monthWidgetDays(today)
+    val monthOffset = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE).getInt(MONTH_OFFSET_KEY, 0)
+    val displayedMonth = monthAnchor(today, monthOffset)
+    val days = monthGridDays(displayedMonth.year, displayedMonth.month)
+    val weekdayDays = (0..6).map { addWidgetDays(displayedMonth, it) }
     val rows = days.chunked(7)
     val cellHeightDp = monthCellHeightDp(size.height.value, rows.size, fontScale)
     Column(
@@ -56,20 +60,30 @@ private fun MonthEventsContent() {
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth().height((24f * fontScale.coerceAtLeast(1f)).dp)) {
             Text(
-                text = "${today.year}/${today.month} ${widgetText(overview.language, "month")}",
+                text = "${displayedMonth.year}/${displayedMonth.month} ${widgetText(overview.language, "month")}",
                 style = TextStyle(fontSize = scaledSp(14f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor)),
                 modifier = GlanceModifier.defaultWeight(),
             )
             Text(
+                text = "▲",
+                style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(3.dp),
+            )
+            Text(
+                text = "▼",
+                style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(3.dp),
+            )
+            Text(
                 text = "＋",
-                style = TextStyle(fontSize = scaledSp(18f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, today))).padding(2.dp),
+                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(3.dp),
             )
         }
         Row(modifier = GlanceModifier.fillMaxWidth().height((20f * fontScale.coerceAtLeast(1f)).dp)) {
             (0..6).forEach { index ->
                 Text(
-                    text = widgetWeekdayLabel(days[index], overview.language),
+                    text = widgetWeekdayLabel(weekdayDays[index], overview.language),
                     style = TextStyle(fontSize = scaledSp(9f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
                     modifier = GlanceModifier.defaultWeight().padding(1.dp),
                 )
@@ -78,17 +92,21 @@ private fun MonthEventsContent() {
         rows.forEachIndexed { rowIndex, row ->
             Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
                 row.forEachIndexed { dayIndex, day ->
-                    MonthDayCell(
-                        context,
-                        overview,
-                        appearance,
-                        today,
-                        day,
-                        cellHeightDp,
-                        fontScale,
-                        dayIndex < row.lastIndex,
-                        GlanceModifier.defaultWeight(),
-                    )
+                    if (day == null) {
+                        MonthBlankCell(appearance, dayIndex < row.lastIndex, GlanceModifier.defaultWeight())
+                    } else {
+                        MonthDayCell(
+                            context,
+                            overview,
+                            appearance,
+                            today,
+                            day,
+                            cellHeightDp,
+                            fontScale,
+                            dayIndex < row.lastIndex,
+                            GlanceModifier.defaultWeight(),
+                        )
+                    }
                 }
             }
             if (rowIndex < rows.lastIndex) {
@@ -162,6 +180,21 @@ private fun MonthDayCell(
                 )
             }
         }
+        if (showDivider) {
+            Spacer(
+                modifier = GlanceModifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(appearance.secondaryTextColor),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MonthBlankCell(appearance: WidgetAppearance, showDivider: Boolean, cellModifier: GlanceModifier) {
+    Row(modifier = cellModifier.fillMaxHeight()) {
+        Spacer(modifier = GlanceModifier.defaultWeight().fillMaxHeight())
         if (showDivider) {
             Spacer(
                 modifier = GlanceModifier
