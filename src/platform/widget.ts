@@ -171,6 +171,7 @@ export function buildCalendarOverviewPayload(
 ): CalendarOverviewPayload {
   const calendarById = new Map(calendars.map((calendar) => [calendar.id, calendar]));
   const visibleIds = new Set(calendars.filter((calendar) => calendar.isVisible).map((calendar) => calendar.id));
+  const priorityOf = makePriorityOf(calendarById);
   const overviewEvents = events
     .filter((event) => visibleIds.has(event.calendarId) && !event.isSecret)
     .map((event) => {
@@ -178,21 +179,24 @@ export function buildCalendarOverviewPayload(
       const calendar = calendarById.get(event.calendarId);
       if (!range || !calendar) return null;
       return {
+        calendarId: event.calendarId,
         id: event.id,
         title: event.title,
         calendarName: calendar.name,
         colorHex: calendar.color || EXTERNAL_DEFAULT_COLOR,
         ...range,
         allDay: event.allDay,
-      } satisfies CalendarOverviewEventPayload;
+      };
     })
-    .filter((event): event is CalendarOverviewEventPayload => event !== null)
+    .filter((event): event is CalendarOverviewEventPayload & { calendarId: string } => event !== null)
     .sort((a, b) =>
+      priorityOf(a.calendarId) - priorityOf(b.calendarId) ||
       a.startDate.localeCompare(b.startDate) ||
       Number(b.allDay) - Number(a.allDay) ||
       (a.startsAtIso ?? '').localeCompare(b.startsAtIso ?? '') ||
       a.id.localeCompare(b.id),
-    );
+    )
+    .map(({ calendarId: _calendarId, ...event }) => event);
   return { schemaVersion: 1, updatedAtIso, language, events: overviewEvents };
 }
 

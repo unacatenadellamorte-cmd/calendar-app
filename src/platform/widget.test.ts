@@ -351,6 +351,21 @@ describe('buildWidgetAppearance', () => {
 });
 
 describe('buildCalendarOverviewPayload', () => {
+  it('同じ日の予定は設定したカレンダー優先度順で整形する', () => {
+    const calendars = [
+      cal({ id: 'later', name: '後ろ', priority: 5 }),
+      cal({ id: 'first', name: '先頭', priority: 1 }),
+    ];
+    const events = [
+      ev({ id: 'later-event', calendarId: 'later', startsAt: '2026-09-08T01:00:00.000Z' }),
+      ev({ id: 'first-event', calendarId: 'first', startsAt: '2026-09-08T09:00:00.000Z' }),
+    ];
+
+    const payload = buildCalendarOverviewPayload(events, calendars, '2026-09-08T00:00:00.000Z', 'en');
+
+    expect(payload.events.map((event) => event.id)).toEqual(['first-event', 'later-event']);
+  });
+
   it('表示中かつ公開の予定を全件、ローカル日付の範囲順で整形する', () => {
     const calendars = [cal({ id: 'c1' }), cal({ id: 'off', isVisible: false })];
     const events = [
