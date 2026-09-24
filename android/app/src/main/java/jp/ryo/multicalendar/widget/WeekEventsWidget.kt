@@ -96,7 +96,7 @@ private fun WeekDayCell(
     cellModifier: GlanceModifier,
 ) {
     val events = eventsForWidgetDay(overview.events, day)
-    val summary = events.joinToString("・") { shortWidgetTitle(it.title.ifBlank { it.calendarName }, 7) }
+    val summary = weekEventSummary(events)
     Column(
         modifier = cellModifier
             .fillMaxHeight()
@@ -123,3 +123,7 @@ private fun WeekDayCell(
 
 internal fun shortWidgetTitle(value: String, maxLength: Int): String =
     value.trim().let { if (it.length <= maxLength) it else it.take(maxLength - 1) + "…" }
+
+/** 1日複数予定は区切り記号で詰めず、ウィジェット内で1予定1行にする。 */
+internal fun weekEventSummary(events: List<CalendarOverviewEvent>): String =
+    events.joinToString("\n") { shortWidgetTitle(it.title.ifBlank { it.calendarName }, 7) }
