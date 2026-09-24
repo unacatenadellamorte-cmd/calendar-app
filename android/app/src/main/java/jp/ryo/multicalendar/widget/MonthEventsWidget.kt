@@ -54,7 +54,8 @@ private fun MonthEventsContent() {
     val days = monthGridDays(displayedMonth.year, displayedMonth.month)
     val weekdayDays = (0..6).map { addWidgetDays(displayedMonth, it) }
     val rows = days.chunked(7)
-    val cellHeightDp = monthCellHeightDp(size.height.value, rows.size, fontScale)
+    val dividerHeight = (rows.size - 1).coerceAtLeast(0).toFloat()
+    val cellHeightDp = monthCellHeightDp((size.height.value - dividerHeight).coerceAtLeast(0f), rows.size, fontScale)
     Column(
         modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp),
     ) {
@@ -67,17 +68,18 @@ private fun MonthEventsContent() {
             Text(
                 text = "▲",
                 style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(3.dp),
+                modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 7.dp, vertical = 3.dp),
             )
             Text(
                 text = "▼",
                 style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(3.dp),
+                modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 7.dp, vertical = 3.dp),
             )
+            Spacer(modifier = GlanceModifier.width(6.dp))
             Text(
                 text = "＋",
                 style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(3.dp),
+                modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 3.dp),
             )
         }
         Row(modifier = GlanceModifier.fillMaxWidth().height((20f * fontScale.coerceAtLeast(1f)).dp)) {
