@@ -15,13 +15,16 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Column
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
+import androidx.glance.text.TextAlign
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
@@ -70,8 +73,16 @@ private fun WeekEventsContent() {
             }
         }
         Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-            days.forEach { day ->
+            days.forEachIndexed { index, day ->
                 WeekDayCell(context, overview, appearance, day, day == today, GlanceModifier.defaultWeight())
+                if (index < days.lastIndex) {
+                    Spacer(
+                        modifier = GlanceModifier
+                            .fillMaxHeight()
+                            .width(1.dp)
+                            .background(appearance.secondaryTextColor),
+                    )
+                }
             }
         }
     }
@@ -107,10 +118,12 @@ private fun WeekDayCell(
         Text(
             text = day.day.toString(),
             style = TextStyle(
-                fontSize = scaledSp(10f, appearance),
+                fontSize = scaledSp(12f, appearance),
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                 color = ColorProvider(if (isToday) appearance.todayTextColor else appearance.secondaryTextColor),
+                textAlign = TextAlign.Center,
             ),
+            modifier = GlanceModifier.fillMaxWidth(),
         )
         Text(
             text = if (summary.isBlank()) "" else summary,

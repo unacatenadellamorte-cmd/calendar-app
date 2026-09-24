@@ -22,8 +22,10 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
+import androidx.glance.text.TextAlign
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
@@ -73,9 +75,9 @@ private fun MonthEventsContent() {
                 )
             }
         }
-        rows.forEach { row ->
+        rows.forEachIndexed { rowIndex, row ->
             Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                row.forEach { day ->
+                row.forEachIndexed { dayIndex, day ->
                     MonthDayCell(
                         context,
                         overview,
@@ -86,7 +88,23 @@ private fun MonthEventsContent() {
                         fontScale,
                         GlanceModifier.defaultWeight(),
                     )
+                    if (dayIndex < row.lastIndex) {
+                        Spacer(
+                            modifier = GlanceModifier
+                                .fillMaxHeight()
+                                .width(1.dp)
+                                .background(appearance.secondaryTextColor),
+                        )
+                    }
                 }
+            }
+            if (rowIndex < rows.lastIndex) {
+                Spacer(
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(appearance.secondaryTextColor),
+                )
             }
         }
     }
@@ -119,7 +137,7 @@ private fun MonthDayCell(
             Text(
                 text = day.day.toString(),
                 style = TextStyle(
-                    fontSize = scaledSp(10f, appearance),
+                    fontSize = scaledSp(12f, appearance),
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                     color = ColorProvider(
                         when {
@@ -128,8 +146,9 @@ private fun MonthDayCell(
                             else -> appearance.mutedTextColor
                         },
                     ),
+                    textAlign = TextAlign.Center,
                 ),
-                modifier = GlanceModifier.defaultWeight(),
+                modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
             )
             if (overflowCount > 0) {
                 Text(
