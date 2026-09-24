@@ -32,6 +32,22 @@ class CalendarOverviewTest {
     }
 
     @Test
+    fun `表示月グリッドは前後月の日付を空セルにして月末までを収める`() {
+        val days = monthGridDays(2026, 8)
+        assertEquals(42, days.size)
+        assertTrue(days.take(6).all { it == null })
+        assertEquals("2026-08-01", days[6]?.toKey())
+        assertEquals("2026-08-31", days[36]?.toKey())
+        assertTrue(days.drop(37).all { it == null })
+    }
+
+    @Test
+    fun `月移動は年またぎして1日を返す`() {
+        assertEquals("2027-01-01", monthAnchor(WidgetDay(2026, 12, 20), 1).toKey())
+        assertEquals("2025-12-01", monthAnchor(WidgetDay(2026, 1, 20), -1).toKey())
+    }
+
+    @Test
     fun `不正日付は空データ扱いにできる`() {
         assertNull(parseWidgetDay("2026-02-29"))
         assertNull(parseWidgetDay("2026-1-01"))
