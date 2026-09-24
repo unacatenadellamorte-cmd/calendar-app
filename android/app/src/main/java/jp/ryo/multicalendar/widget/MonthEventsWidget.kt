@@ -86,16 +86,9 @@ private fun MonthEventsContent() {
                         day,
                         cellHeightDp,
                         fontScale,
+                        dayIndex < row.lastIndex,
                         GlanceModifier.defaultWeight(),
                     )
-                    if (dayIndex < row.lastIndex) {
-                        Spacer(
-                            modifier = GlanceModifier
-                                .fillMaxHeight()
-                                .width(1.dp)
-                                .background(appearance.secondaryTextColor),
-                        )
-                    }
                 }
             }
             if (rowIndex < rows.lastIndex) {
@@ -119,6 +112,7 @@ private fun MonthDayCell(
     day: WidgetDay,
     cellHeightDp: Float,
     fontScale: Float,
+    showDivider: Boolean,
     cellModifier: GlanceModifier,
 ) {
     val events = eventsForWidgetDay(overview.events, day)
@@ -126,43 +120,54 @@ private fun MonthDayCell(
     val overflowCount = events.size - visibleEvents.size
     val isToday = day == today
     val inCurrentMonth = day.month == today.month && day.year == today.year
-    Column(
-        modifier = cellModifier
-            .fillMaxHeight()
-            .background(if (isToday) appearance.todayColor else Color.Transparent)
-            .clickable(actionStartActivity(createWidgetIntent(context, day)))
-            .padding(2.dp),
-    ) {
-        Row(modifier = GlanceModifier.fillMaxWidth()) {
-            Text(
-                text = day.day.toString(),
-                style = TextStyle(
-                    fontSize = scaledSp(12f, appearance),
-                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                    color = ColorProvider(
-                        when {
-                            isToday -> appearance.todayTextColor
-                            inCurrentMonth -> appearance.primaryTextColor
-                            else -> appearance.mutedTextColor
-                        },
-                    ),
-                    textAlign = TextAlign.Center,
-                ),
-                modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
-            )
-            if (overflowCount > 0) {
+    Row(modifier = cellModifier.fillMaxHeight()) {
+        Column(
+            modifier = GlanceModifier
+                .defaultWeight()
+                .fillMaxHeight()
+                .background(if (isToday) appearance.todayColor else Color.Transparent)
+                .clickable(actionStartActivity(createWidgetIntent(context, day)))
+                .padding(2.dp),
+        ) {
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
                 Text(
-                    text = widgetOverflowCountText(overflowCount),
-                style = TextStyle(fontSize = scaledSp(7f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
+                    text = day.day.toString(),
+                    style = TextStyle(
+                        fontSize = scaledSp(12f, appearance),
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                        color = ColorProvider(
+                            when {
+                                isToday -> appearance.todayTextColor
+                                inCurrentMonth -> appearance.primaryTextColor
+                                else -> appearance.mutedTextColor
+                            },
+                        ),
+                        textAlign = TextAlign.Center,
+                    ),
+                    modifier = GlanceModifier.defaultWeight().fillMaxWidth(),
+                )
+                if (overflowCount > 0) {
+                    Text(
+                        text = widgetOverflowCountText(overflowCount),
+                        style = TextStyle(fontSize = scaledSp(7f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
+                        maxLines = 1,
+                    )
+                }
+            }
+            visibleEvents.forEach { event ->
+                Text(
+                    text = "• ${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
+                    style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.accentColor)),
                     maxLines = 1,
                 )
             }
         }
-        visibleEvents.forEach { event ->
-            Text(
-                text = "• ${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
-                style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.accentColor)),
-                maxLines = 1,
+        if (showDivider) {
+            Spacer(
+                modifier = GlanceModifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(appearance.secondaryTextColor),
             )
         }
     }

@@ -15,7 +15,6 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Column
-import androidx.glance.layout.Spacer
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
@@ -74,15 +73,15 @@ private fun WeekEventsContent() {
         }
         Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
             days.forEachIndexed { index, day ->
-                WeekDayCell(context, overview, appearance, day, day == today, GlanceModifier.defaultWeight())
-                if (index < days.lastIndex) {
-                    Spacer(
-                        modifier = GlanceModifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                            .background(appearance.secondaryTextColor),
-                    )
-                }
+                WeekDayCell(
+                    context,
+                    overview,
+                    appearance,
+                    day,
+                    day == today,
+                    index < days.lastIndex,
+                    GlanceModifier.defaultWeight(),
+                )
             }
         }
     }
@@ -104,33 +103,45 @@ private fun WeekDayCell(
     appearance: WidgetAppearance,
     day: WidgetDay,
     isToday: Boolean,
+    showDivider: Boolean,
     cellModifier: GlanceModifier,
 ) {
     val events = eventsForWidgetDay(overview.events, day)
     val summary = weekEventSummary(events)
-    Column(
-        modifier = cellModifier
-            .fillMaxHeight()
-            .background(if (isToday) appearance.todayColor else Color.Transparent)
-            .clickable(actionStartActivity(dayWidgetIntent(context, day)))
-            .padding(1.dp),
-    ) {
-        Text(
-            text = day.day.toString(),
-            style = TextStyle(
-                fontSize = scaledSp(12f, appearance),
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = ColorProvider(if (isToday) appearance.todayTextColor else appearance.secondaryTextColor),
-                textAlign = TextAlign.Center,
-            ),
-            modifier = GlanceModifier.fillMaxWidth(),
-        )
-        Text(
-            text = if (summary.isBlank()) "" else summary,
-            style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.primaryTextColor)),
-            maxLines = 2,
-            modifier = GlanceModifier.defaultWeight(),
-        )
+    Row(modifier = cellModifier.fillMaxHeight()) {
+        Column(
+            modifier = GlanceModifier
+                .defaultWeight()
+                .fillMaxHeight()
+                .background(if (isToday) appearance.todayColor else Color.Transparent)
+                .clickable(actionStartActivity(dayWidgetIntent(context, day)))
+                .padding(1.dp),
+        ) {
+            Text(
+                text = day.day.toString(),
+                style = TextStyle(
+                    fontSize = scaledSp(12f, appearance),
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = ColorProvider(if (isToday) appearance.todayTextColor else appearance.secondaryTextColor),
+                    textAlign = TextAlign.Center,
+                ),
+                modifier = GlanceModifier.fillMaxWidth(),
+            )
+            Text(
+                text = if (summary.isBlank()) "" else summary,
+                style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.primaryTextColor)),
+                maxLines = 2,
+                modifier = GlanceModifier.defaultWeight(),
+            )
+        }
+        if (showDivider) {
+            androidx.glance.layout.Spacer(
+                modifier = GlanceModifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(appearance.secondaryTextColor),
+            )
+        }
     }
 }
 
