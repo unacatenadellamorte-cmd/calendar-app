@@ -122,7 +122,7 @@ class WidgetRenderingTest {
         val events = JSONArray().apply {
             // 同日のカレンダー優先度順を表す。件名や時刻で並べ替えてはいけない。
             for (offset in 0..20) {
-                listOf("先頭予定", "後続予定").forEachIndexed { index, title ->
+                listOf("先頭予定", "後続予定", "補足予定a", "補足予定b", "補足予定c", "補足予定d", "補足予定e", "末尾予定").forEachIndexed { index, title ->
                     val day = addWidgetDays(first, offset)
                     put(JSONObject().put("id", "$offset-$index").put("title", "$title$offset")
                         .put("calendarName", "検証").put("startDate", day.toKey()).put("endDate", day.toKey())
@@ -144,14 +144,13 @@ class WidgetRenderingTest {
             assertTextViewsFitParent(day, listOf("先頭予定", "後続予定", "今日"))
             assertInVerticalOrder(day, "先頭予定", "後続予定")
             assertInVerticalOrder(week, "先頭予定0", "後続予定0")
-            val list = findListView(day) ?: error("予定一覧のスクロールViewがない")
-            runOnMain { list.setSelection(list.count - 1) }
             waitUntil("一覧末尾へのスクロール") {
+                runOnMain { findListView(day)?.let { it.setSelection(it.count - 1) } }
                 layoutForAssertions(day, 380, 270)
-                findText(day, "後続予定20")
+                findText(day, "末尾予定${weekWidgetDays(today).indexOf(today)}")
             }
-            runOnMain { list.setSelection(0) }
             waitUntil("一覧先頭に戻る") {
+                runOnMain { findListView(day)?.setSelection(0) }
                 layoutForAssertions(day, 380, 270)
                 findText(day, "今日")
             }
@@ -175,9 +174,45 @@ class WidgetRenderingTest {
                 android.util.Log.i("WidgetResponseTest", "week=$offset elapsedMs=$elapsed")
                 assertTrue("週切替に${elapsed}ms", elapsed <= 1000)
             }
+            val todayIndex = weekWidgetDays(today).indexOf(today)
+            listOf("▼" to 1, "▲" to 0).forEach { (arrow, offset) ->
+                val started = android.os.SystemClock.elapsedRealtime()
+                runOnMain { assertTrue(clickText(day, arrow)) }
+                waitUntil("日移動") {
+                    layoutForAssertions(day, 380, 270)
+                    findText(day, "先頭予定${todayIndex + offset}")
+                }
+                val elapsed = android.os.SystemClock.elapsedRealtime() - started
+                assertTrue("日切替に${elapsed}ms", elapsed <= 1000)
+                if (offset != 0) assertTrue("別日の予定が混入", !findText(day, "先頭予定$todayIndex"))
+                assertText(smallDay, "先頭予定$todayIndex")
+                android.util.Log.i("WidgetResponseTest", "day=$offset elapsedMs=$elapsed")
+            }
+            // 連続操作と共有データ更新が重なっても、最後の日付から巻き戻らない。
+            runOnMain {
+                assertTrue(clickText(day, "▼"))
+                assertTrue(clickText(day, "▼"))
+                assertTrue(clickText(day, "▲"))
+            }
+            waitUntil("連続操作の最終日") {
+                layoutForAssertions(day, 380, 270)
+                findText(day, "先頭予定${todayIndex + 1}")
+            }
+            repeat(20) {
+                Thread.sleep(100)
+                layoutForAssertions(day, 380, 270)
+                assertText(day, "先頭予定${todayIndex + 1}")
+                assertTrue("古い日に巻き戻った", !findText(day, "先頭予定$todayIndex"))
+            }
+            runOnMain { assertTrue(clickText(day, "▲")) }
+            waitUntil("今日へ戻る") { layoutForAssertions(day, 380, 270); findText(day, "先頭予定$todayIndex") }
             // アプリで順番を変えた共有データを受け取ると、どちらもその場で並び替わる。
             val reversed = JSONArray()
-            for (index in events.length() - 1 downTo 0) reversed.put(events.getJSONObject(index))
+            for (index in 0 until events.length() step 8) {
+                reversed.put(events.getJSONObject(index + 1))
+                reversed.put(events.getJSONObject(index))
+                for (extra in 2..7) reversed.put(events.getJSONObject(index + extra))
+            }
             prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", reversed).toString()).commit()
             waitUntil("日・週の並び順更新") {
                 layoutForAssertions(day, 380, 270)
@@ -213,6 +248,73 @@ class WidgetRenderingTest {
             listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
                 (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
             }
+            edit.commit()
+        }
+    }
+
+    @Test
+    fun allWidgetsNavigateAfterIdleWithinOneSecond() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 3)
+        val ids = mutableListOf<Int>()
+        val today = todayWidgetDay()
+        val events = JSONArray().apply {
+            repeat(800) { index ->
+                val date = addWidgetDays(today, index / 5 - 50).toKey()
+                put(JSONObject().put("id", "idle-$index").put("title", "検証$index")
+                    .put("calendarName", "検証").put("startDate", date).put("endDate", date)
+                    .put("allDay", true).put("colorHex", "#0072B2"))
+            }
+        }
+        try {
+            prefs.edit().putInt(MONTH_OFFSET_KEY, 0)
+                .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString())
+                .putString(WIDGET_APPEARANCE_KEY, """{"schemaVersion":1,"theme":"dark","appFontScale":1}""").commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            val overview = readCalendarOverview(context)
+            fun title(date: WidgetDay) = eventsForWidgetDay(overview.events, date).first().title
+            val month = renderProvider(host, ComponentName(context, MonthEventsWidgetReceiver::class.java), 380, 515, ids, title(monthAnchor(today, 0)))
+            val week = renderProvider(host, ComponentName(context, WeekEventsWidgetReceiver::class.java), 380, 180, ids, title(weekWidgetDays(today).first()))
+            val day = renderProvider(host, ComponentName(context, FeaturedEventsWidgetReceiver::class.java), 384, 170, ids, title(today))
+            // 稼働中セッションだけの測定にせず、45秒の描画セッション終了を待つ。
+            android.util.Log.i("WidgetResponseTest", "idleWaitStarted")
+            Thread.sleep(55_000)
+            val targets = listOf(
+                Triple(month, 515, monthAnchor(today, 1)),
+                Triple(week, 180, addWidgetDays(weekWidgetDays(today).first(), 7)),
+                Triple(day, 170, addWidgetDays(today, 1)),
+            )
+            targets.forEachIndexed { index, (view, height, nextDate) ->
+                val started = android.os.SystemClock.elapsedRealtime()
+                runOnMain { assertTrue(clickText(view, "▼")) }
+                waitUntil("非操作後の切替$index") {
+                    layoutForAssertions(view, if (index == 2) 384 else 380, height)
+                    findText(view, title(nextDate))
+                }
+                assertTextViewsFitParent(view, listOf(title(nextDate)))
+                val elapsed = android.os.SystemClock.elapsedRealtime() - started
+                android.util.Log.i("WidgetResponseTest", "idleKind=$index elapsedMs=$elapsed")
+                if (index != 2 || android.os.Build.VERSION.SDK_INT >= 31) {
+                    assertTrue("非操作後の切替$index: ${elapsed}ms", elapsed <= 1000)
+                }
+                repeat(10) {
+                    Thread.sleep(100)
+                    layoutForAssertions(view, if (index == 2) 384 else 380, height)
+                    assertText(view, title(nextDate))
+                }
+            }
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
+            }
+            (previous[MONTH_OFFSET_KEY] as? Int)?.let { edit.putInt(MONTH_OFFSET_KEY, it) } ?: edit.remove(MONTH_OFFSET_KEY)
             edit.commit()
         }
     }

@@ -8,11 +8,19 @@ class DayAgendaWidgetTest {
     private fun event(id: String, start: WidgetDay = today, end: WidgetDay = start) =
         CalendarOverviewEvent(id, id, "予定", "#0072B2", start, end, "", true)
 
-    @Test fun agendaPreservesCalendarOrderWithinEachDate() {
+    @Test fun agendaShowsOnlySelectedDateAndPreservesPayloadOrder() {
         val tomorrow = addWidgetDays(today, 1)
         val yesterday = addWidgetDays(today, -1)
-        val events = listOf(event("明日先", tomorrow), event("今日先"), event("過去", yesterday), event("継続", yesterday, today), event("今日後"), event("明日後", tomorrow))
-        assertEquals(listOf("今日先", "継続", "今日後", "明日先", "明日後"), dayAgendaEvents(events, today).map { it.id })
+        val events = listOf(event("明日先", tomorrow), event("今日先"), event("過去", yesterday), event("継続", yesterday, tomorrow), event("今日後"), event("明日後", tomorrow))
+        assertEquals(listOf("今日先", "継続", "今日後"), dayAgendaEvents(events, today).map { it.id })
+        assertEquals(listOf("明日先", "継続", "明日後"), dayAgendaEvents(events, tomorrow).map { it.id })
+    }
+
+    @Test fun agendaExcludesEventsOutsideSelectedDate() {
+        val yesterday = addWidgetDays(today, -1)
+        val tomorrow = addWidgetDays(today, 1)
+        val events = listOf(event("過去", yesterday), event("未来", tomorrow))
+        assertEquals(emptyList<CalendarOverviewEvent>(), dayAgendaEvents(events, today))
     }
 
     @Test fun detailsContainDateRangeAndAllDayLabel() {

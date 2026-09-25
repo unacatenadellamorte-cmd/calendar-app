@@ -3,8 +3,6 @@ package jp.ryo.multicalendar.widget
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.datastore.preferences.core.Preferences
-import androidx.glance.currentState
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -36,6 +34,10 @@ import androidx.glance.unit.ColorProvider
 class MonthEventsWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
+    override suspend fun onDelete(context: Context, glanceId: GlanceId) {
+        forgetWidgetDate(glanceId)
+    }
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent { MonthEventsContent() }
     }
@@ -52,8 +54,7 @@ private fun MonthEventsContent() {
     val size = LocalSize.current
     val fontScale = context.resources.configuration.fontScale * appearance.appFontScale
     val today = todayWidgetDay()
-    val monthOffset = currentState<Preferences>()[MONTH_OFFSET_STATE]
-        ?: preferences.getInt(MONTH_OFFSET_KEY, 0)
+    val monthOffset = widgetDateOffset(MONTH_OFFSET_STATE, preferences.getInt(MONTH_OFFSET_KEY, 0))
     val displayedMonth = monthAnchor(today, monthOffset)
     val days = monthGridDays(displayedMonth.year, displayedMonth.month)
     // 曜日は必ず日曜始まりにする。月初の曜日を起点にすると、9月は火曜始まりになってしまう。

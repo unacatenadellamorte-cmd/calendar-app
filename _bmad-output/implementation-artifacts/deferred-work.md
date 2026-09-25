@@ -170,3 +170,7 @@
 - source_spec: `spec-lightweight-animations.md`
   summary: 月ビューの左右スワイプ月送りが、iOS Safari等ブラウザ標準の「画面端からの戻る/進む」エッジスワイプジェスチャーと衝突する可能性が未検討。
   evidence: レビュー(Blind Hunter)指摘。`touchmove`で`preventDefault`しない設計(縦スクロールを妨げないため)は意図通りだが、その裏で画面端スワイプがブラウザ側のジェスチャーに先取りされうる。現状はAndroidエミュレータでの実機検証のみが範囲内で、iOS対応自体がStory 5.5(iOSウィジェット、未着手)の課題。iOS対応に着手する際にまとめて再考する。
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-widget-selected-day-cold-navigation.md`
+  summary: Android 7〜11で日ウィジェットの切替応答時間を実測する（medium、未検証）。
+  evidence: リストのサービス互換のため旧OSではGlance通常更新経路を維持。今回の実機・エミュレータは新OSであり、旧OSの1秒以内応答は未検証。

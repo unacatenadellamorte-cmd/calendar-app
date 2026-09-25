@@ -58,6 +58,8 @@ class CalendarOverviewTest {
 
     @Test
     fun `不正日付は空データ扱いにできる`() {
+        listOf("1900-02-29", "2026-04-31", "2026-00-01", "2026-01-00", "0000-01-01", "2026-01-01x", "+026-01-01").forEach { assertNull(parseWidgetDay(it)) }
+        assertEquals(WidgetDay(2000, 2, 29), parseWidgetDay("2000-02-29"))
         assertNull(parseWidgetDay("2026-02-29"))
         assertNull(parseWidgetDay("2026-1-01"))
         assertEquals("2026-02-28", parseWidgetDay("2026-02-28")?.toKey())

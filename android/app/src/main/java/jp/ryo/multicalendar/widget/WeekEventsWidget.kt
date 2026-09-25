@@ -3,7 +3,6 @@ package jp.ryo.multicalendar.widget
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
-import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
@@ -15,7 +14,6 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.currentState
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
@@ -33,6 +31,10 @@ import androidx.glance.unit.ColorProvider
 /** 週の7日を横並びで表示するウィジェット。 */
 class WeekEventsWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
+    override suspend fun onDelete(context: Context, glanceId: GlanceId) {
+        forgetWidgetDate(glanceId)
+    }
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent { WeekEventsContent() }
     }
@@ -48,7 +50,7 @@ private fun WeekEventsContent() {
     val fontScale = context.resources.configuration.fontScale * appearance.appFontScale
     val scale = fontScale.coerceAtLeast(1f)
     val today = todayWidgetDay()
-    val offset = currentState<Preferences>()[WEEK_OFFSET_STATE] ?: 0
+    val offset = widgetDateOffset(WEEK_OFFSET_STATE)
     val days = weekWidgetDays(addWidgetDays(today, offset * 7))
     val headerHeight = 28f * scale
     val weekdayHeight = 16f * scale

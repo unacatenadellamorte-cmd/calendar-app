@@ -18,6 +18,10 @@ class FeaturedEventsWidget : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Exact
 
+    override suspend fun onDelete(context: Context, glanceId: GlanceId) {
+        forgetWidgetDate(glanceId)
+    }
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
             DayAgendaContent()

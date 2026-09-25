@@ -5,10 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import jp.ryo.multicalendar.MainActivity
 import org.json.JSONArray
-import java.text.ParseException
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import kotlin.math.floor
 
@@ -22,7 +19,7 @@ internal data class WidgetDay(val year: Int, val month: Int, val day: Int) : Com
         val monthOrder = month.compareTo(other.month)
         return if (monthOrder != 0) monthOrder else day.compareTo(other.day)
     }
-    fun toKey(): String = String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
+    fun toKey(): String = "${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
 }
 
 internal data class CalendarOverviewEvent(
@@ -42,25 +39,20 @@ internal data class CalendarOverview(
     val events: List<CalendarOverviewEvent>,
 )
 
+/** 日付だけの検証にフォーマッターやタイムゾーン変換を使わない。 */
 internal fun parseWidgetDay(value: String): WidgetDay? {
-    if (!value.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return null
-    return try {
-        val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-            isLenient = false
-        }.parse(value) ?: return null
-        val calendar = Calendar.getInstance().apply { time = parsed }
-        // SimpleDateFormatのロケール日付はタイムゾーン境界の影響を受けないよう、
-        // 入力文字列の各フィールドを検証してから値を返す。
-        val result = WidgetDay(value.substring(0, 4).toInt(), value.substring(5, 7).toInt(), value.substring(8, 10).toInt())
-        if (calendar.get(Calendar.YEAR) != result.year ||
-            calendar.get(Calendar.MONTH) + 1 != result.month ||
-            calendar.get(Calendar.DAY_OF_MONTH) != result.day
-        ) null else result
-    } catch (_: ParseException) {
-        null
-    } catch (_: NumberFormatException) {
-        null
+    if (value.length != 10 || value[4] != '-' || value[7] != '-') return null
+    if (value.indices.any { it != 4 && it != 7 && value[it] !in '0'..'9' }) return null
+    val year = value.substring(0, 4).toInt()
+    val month = value.substring(5, 7).toInt()
+    val day = value.substring(8, 10).toInt()
+    if (year !in 1..9999 || month !in 1..12) return null
+    val daysInMonth = when (month) {
+        2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
+        4, 6, 9, 11 -> 30
+        else -> 31
     }
+    return if (day in 1..daysInMonth) WidgetDay(year, month, day) else null
 }
 
 internal fun todayWidgetDay(now: Long = System.currentTimeMillis()): WidgetDay {
@@ -130,11 +122,16 @@ internal fun monthAnchor(today: WidgetDay, offset: Int): WidgetDay {
 internal fun eventsForWidgetDay(events: List<CalendarOverviewEvent>, day: WidgetDay): List<CalendarOverviewEvent> =
     events.filter { it.startDate <= day && day <= it.endDate }
 
-/** 共有JSONが空/壊れていても呼び出し側は空カレンダーを描画できる。 */
+private var cachedOverviewRaw: String? = null
+private var cachedOverview = CalendarOverview("ja", emptyList())
+
+/** 同じ共有JSONは複数ウィジェット・再起動した描画セッションでも再解析しない。 */
+@Synchronized
 internal fun readCalendarOverview(context: Context): CalendarOverview {
     val raw = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
         .getString(CALENDAR_OVERVIEW_KEY, null) ?: return CalendarOverview("ja", emptyList())
-    return try {
+    if (raw == cachedOverviewRaw) return cachedOverview
+    val overview = try {
         val root = org.json.JSONObject(raw)
         val language = root.optString("language", "ja")
         val array = root.optJSONArray("events") ?: JSONArray()
@@ -161,6 +158,9 @@ internal fun readCalendarOverview(context: Context): CalendarOverview {
     } catch (_: Exception) {
         CalendarOverview("ja", emptyList())
     }
+    cachedOverviewRaw = raw
+    cachedOverview = overview
+    return overview
 }
 
 internal fun widgetText(language: String, key: String): String {
