@@ -97,7 +97,8 @@ private fun MonthEventsContent() {
             }
         }
         rows.forEachIndexed { rowIndex, row ->
-            Row(modifier = GlanceModifier.fillMaxWidth().height(cellHeightDp.dp)) {
+            // 行そのものは残り領域を均等配分し、端末ごとのウィジェット高で最終行が欠けないようにする。
+            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
                 row.forEachIndexed { dayIndex, day ->
                     if (day == null) {
                         MonthBlankCell(appearance, dayIndex < row.lastIndex, GlanceModifier.defaultWeight())
