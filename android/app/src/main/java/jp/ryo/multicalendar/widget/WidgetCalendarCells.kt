@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
@@ -32,6 +34,9 @@ internal fun CalendarWidgetDayCell(
     fontScale: Float,
     cellModifier: GlanceModifier,
 ) {
+    // 外側12dp・7列・セルとラベルの余白を引き、4文字と省略記号の幅を確保する。
+    val titleWidthDp = ((LocalSize.current.width.value - 12f) / 7f - 6f).coerceAtLeast(1f)
+    val systemFontScale = context.resources.configuration.fontScale.coerceAtLeast(0.5f)
     val events = eventsForWidgetDay(overview.events, day)
     val visibleEvents = events.take(monthVisibleEventCount(cellHeightDp, events.size, fontScale).coerceAtMost(4))
     val overflowCount = events.size - visibleEvents.size
@@ -79,7 +84,10 @@ internal fun CalendarWidgetDayCell(
                             .padding(horizontal = 1.dp)
                         else modifier
                     },
-                    style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(
+                    style = TextStyle(fontSize = minOf(
+                        8f * appearance.appFontScale,
+                        titleWidthDp / ((if (event.filledLabel) 5f else 6f) * systemFontScale),
+                    ).sp, color = ColorProvider(
                         if (event.filledLabel) widgetFilledLabelTextColor(widgetEventColor(event.colorHex, appearance.primaryTextColor))
                         else widgetEventColor(event.colorHex, appearance.primaryTextColor),
                     )),

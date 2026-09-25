@@ -517,7 +517,11 @@ class WidgetRenderingTest {
                 val date = addWidgetDays(today, index / 5 - 31).toKey()
                 put(JSONObject().apply {
                     put("id", "label-$index")
-                    put("title", "ラベル$index")
+                    put("title", when (index) {
+                        157 -> "会議予定長め"
+                        156 -> "確認予定長め"
+                        else -> "ラベル$index"
+                    })
                     put("calendarName", "混在検証")
                     put("colorHex", if (index % 2 == 0) "#F59E0B" else "#0072B2")
                     put("startDate", date)
@@ -534,7 +538,7 @@ class WidgetRenderingTest {
         try {
             prefs.edit().putInt(MONTH_OFFSET_KEY, 0)
                 .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString())
-                .putString(WIDGET_APPEARANCE_KEY, """{"schemaVersion":1,"theme":"light"}""").commit()
+                .putString(WIDGET_APPEARANCE_KEY, """{"schemaVersion":1,"theme":"light","appFontScale":1.2}""").commit()
             instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
             adopted = true
             host.startListening()
@@ -545,11 +549,11 @@ class WidgetRenderingTest {
             layoutForAssertions(month, 380, 515)
             layoutForAssertions(day, 380, 270)
             saveBitmap(month, "widget-label-month-inspect.png", 380, 515)
-            assertLabelRendering(week, "ラベル156", true, localColor)
+            assertLabelRendering(week, "確認予定長め", true, localColor)
             assertLabelRendering(week, "ラベル155", false, externalColor)
-            assertLabelRendering(month, "ラベル156", true, localColor)
+            assertLabelRendering(month, "確認予定長め", true, localColor)
             assertLabelRendering(month, "ラベル155", false, externalColor)
-            assertLabelRendering(day, "ラベル156", true, localColor)
+            assertLabelRendering(day, "確認予定長め", true, localColor)
             assertLabelRendering(day, "ラベル155", false, externalColor, android.graphics.Color.parseColor("#1A1C1E"))
             val lastDay = monthGridDays(today.year, today.month).filterNotNull().last()
             val lastEvent = eventsForWidgetDay(readCalendarOverview(context).events, lastDay).first()
@@ -557,6 +561,14 @@ class WidgetRenderingTest {
             saveBitmap(week, "widget-label-week.png", 380, 180)
             saveBitmap(month, "widget-label-month.png", 380, 515)
             saveBitmap(day, "widget-label-day.png", 380, 270)
+            // 狭い7列でも、日本語の先頭4文字とフォントの上下が予定行へ収まる。
+            listOf(Triple(WeekEventsWidgetReceiver::class.java, 320, 180), Triple(MonthEventsWidgetReceiver::class.java, 320, 515),
+                Triple(WeekEventsWidgetReceiver::class.java, 180, 180), Triple(MonthEventsWidgetReceiver::class.java, 250, 515)).forEach { (receiver, width, height) ->
+                val narrow = renderProvider(host, ComponentName(context, receiver), width, height, boundIds, "確認予定")
+                layoutForAssertions(narrow, width, height)
+                assertFourTitleCharactersFit(narrow, "会議予定")
+                assertFourTitleCharactersFit(narrow, "確認予定")
+            }
             repeat(events.length()) { index -> events.getJSONObject(index).put("filledLabel", true) }
             prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString()).commit()
             events.getJSONObject(155).put("title", "全自作155")
@@ -585,6 +597,16 @@ class WidgetRenderingTest {
             (previous[MONTH_OFFSET_KEY] as? Int)?.let { edit.putInt(MONTH_OFFSET_KEY, it) } ?: edit.remove(MONTH_OFFSET_KEY)
             edit.commit()
         }
+    }
+
+    private fun assertFourTitleCharactersFit(root: View, title: String) {
+        val view = findTextView(root, title) ?: error("予定の文字がない: $title")
+        val layout = view.layout ?: error("予定のレイアウトがない: $title")
+        assertTrue("$title が親領域からはみ出している", findBoundedText(root, title))
+        val contentHeight = view.height - view.totalPaddingTop - view.totalPaddingBottom
+        assertTrue("$title の文字下端が切れる: ${layout.height} > $contentHeight", layout.height <= contentHeight)
+        val prefixLength = view.text.toString().indexOf(title)
+        assertTrue("$title の4文字目が省略された", layout.getEllipsisCount(0) == 0 || layout.getEllipsisStart(0) >= prefixLength + 4)
     }
 
     private fun assertLabelRendering(root: View, title: String, filled: Boolean, backgroundColor: Int, externalTextColor: Int = backgroundColor) {

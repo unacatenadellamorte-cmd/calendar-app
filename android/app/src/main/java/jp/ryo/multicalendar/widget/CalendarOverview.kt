@@ -205,7 +205,7 @@ internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int, fontScale: F
 /** 日付行と上下余白を除き、セル内に収まるテキスト行数を求める。 */
 internal fun monthEventLineCapacity(cellHeightDp: Float, fontScale: Float = 1f): Int {
     val scale = fontScale.coerceAtLeast(0.5f)
-    // 日付行・上下余白を含む保守的な12dp行高。本文は10spで描画する。
+    // 日付行・上下余白を含む保守的な12dp行高。本文は8spに抑え、日本語フォントの上下に余白を残す。
     return floor((cellHeightDp - 4f - 16f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
 }
 
