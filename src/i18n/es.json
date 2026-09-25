@@ -349,5 +349,21 @@
   "タグを読み込めませんでした。予定はそのまま入力できます。": "No se pudieron cargar las etiquetas. Puedes introducir el evento igualmente.",
   "設定の「予定タグ」から登録できます。": "Puedes registrarlas en Ajustes > Etiquetas de eventos.",
   "ラベル色を選んでください": "Elige un color de etiqueta",
-  "開始・終了時刻を入力し、異なる時刻にしてください": "Introduce horas de inicio y fin diferentes"
+  "開始・終了時刻を入力し、異なる時刻にしてください": "Introduce horas de inicio y fin diferentes",
+  "アカウントを削除": "Eliminar cuenta",
+  "アカウント削除の確認": "Confirmar eliminación de cuenta",
+  "アカウント、予定、プロフィール、シフト、タグ、連携認証情報を削除します。この端末のキャッシュ、未送信操作、通知、ウィジェット、背景画像も消去します。": "Se eliminarán tu cuenta, eventos, perfil, turnos, etiquetas y credenciales de conexión. También se borrarán la caché, los cambios sin enviar, las notificaciones, los datos de widgets y la imagen de fondo de este dispositivo.",
+  "Google・端末カレンダーの原本は削除しません。削除は取り消せません。": "Los eventos originales de Google y del calendario del dispositivo se conservarán. La eliminación no se puede deshacer.",
+  "対象データが失われることを確認しました": "Entiendo que estos datos se perderán",
+  "完全に削除する": "Eliminar permanentemente",
+  "アカウントを削除しました": "Tu cuenta se ha eliminado",
+  "アカウントの削除中です": "Eliminando tu cuenta",
+  "新しく使い始める": "Empezar de nuevo",
+  "削除が完了するまで、この端末の同期と予定表示を停止しています。": "La sincronización y la visualización de eventos están pausadas en este dispositivo hasta que finalice la eliminación.",
+  "削除は完了していません。通信を確認して再試行してください。": "La eliminación no ha finalizado. Comprueba tu conexión y vuelve a intentarlo.",
+  "削除を再試行": "Reintentar eliminación",
+  "再試行できない場合はサポートへ連絡": "Contacta con soporte si no puedes reintentarlo",
+  "保存状態を確認できません": "No se puede comprobar el estado guardado",
+  "端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。": "La sincronización y la visualización de eventos están pausadas porque no se puede leer el estado guardado del dispositivo. No se iniciará ninguna eliminación.",
+  "保存状態を再確認": "Volver a comprobar el estado guardado"
 }

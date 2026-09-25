@@ -9,7 +9,7 @@ import type { Result } from '@/data/result';
  *  - authenticated:  メールアカウントのセッション
  *  - unavailable:    Supabase 未設定(ローカル開発)
  */
-export type AuthState = 'loading' | 'guest' | 'authenticated' | 'unavailable';
+export type AuthState = 'loading' | 'guest' | 'authenticated' | 'unavailable' | 'deleting' | 'deleted';
 
 export interface AuthContextValue {
   state: AuthState;
@@ -17,6 +17,7 @@ export interface AuthContextValue {
   /** ログイン済みユーザーのメール(匿名 / 未設定なら null)。 */
   email: string | null;
   signOut: () => Promise<Result<void>>;
+  deleteAccount: () => Promise<Result<void>>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

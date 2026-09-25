@@ -349,5 +349,21 @@
   "タグを読み込めませんでした。予定はそのまま入力できます。": "Could not load tags. You can still enter the event.",
   "設定の「予定タグ」から登録できます。": "You can register them in Settings > Event tags.",
   "ラベル色を選んでください": "Choose a label color",
-  "開始・終了時刻を入力し、異なる時刻にしてください": "Enter different start and end times"
+  "開始・終了時刻を入力し、異なる時刻にしてください": "Enter different start and end times",
+  "アカウントを削除": "Delete account",
+  "アカウント削除の確認": "Confirm account deletion",
+  "アカウント、予定、プロフィール、シフト、タグ、連携認証情報を削除します。この端末のキャッシュ、未送信操作、通知、ウィジェット、背景画像も消去します。": "Your account, events, profile, shifts, tags and connection credentials will be deleted. Cached data, unsent changes, notifications, widget data and background image on this device will also be erased.",
+  "Google・端末カレンダーの原本は削除しません。削除は取り消せません。": "Original events in Google and device calendars will remain. Deletion cannot be undone.",
+  "対象データが失われることを確認しました": "I understand that this data will be lost",
+  "完全に削除する": "Permanently delete",
+  "アカウントを削除しました": "Your account has been deleted",
+  "アカウントの削除中です": "Deleting your account",
+  "新しく使い始める": "Start again",
+  "削除が完了するまで、この端末の同期と予定表示を停止しています。": "Sync and event display on this device are paused until deletion is complete.",
+  "削除は完了していません。通信を確認して再試行してください。": "Deletion is not complete. Check your connection and try again.",
+  "削除を再試行": "Retry deletion",
+  "再試行できない場合はサポートへ連絡": "Contact support if you cannot retry",
+  "保存状態を確認できません": "Cannot check saved state",
+  "端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。": "Sync and event display are paused because this device’s saved state cannot be read. No deletion will be started.",
+  "保存状態を再確認": "Check saved state again"
 }

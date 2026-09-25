@@ -1,3 +1,4 @@
+import { isAccountDataBlocked } from '@/data/account-deletion-state';
 import type { PermissionState } from '@capacitor/core';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -38,8 +39,11 @@ function clockLabel(at: Date): string {
 }
 
 /** 通知を1件スケジュールする。`extra.eventId` を積み、通知タップ時に `deepLink.ts` が拾う。 */
+const pendingSchedules = new Set<Promise<unknown>>();
+
 export async function scheduleReminder(opts: ScheduleReminderOptions): Promise<void> {
-  await LocalNotifications.schedule({
+  if (isAccountDataBlocked()) return;
+  const task = LocalNotifications.schedule({
     notifications: [
       {
         id: opts.id,
@@ -50,9 +54,20 @@ export async function scheduleReminder(opts: ScheduleReminderOptions): Promise<v
       },
     ],
   });
+  pendingSchedules.add(task);
+  try { await task; } finally { pendingSchedules.delete(task); }
 }
 
 /** 通知を1件取り消す(スケジュールされていなくても無害)。 */
 export async function cancelReminder(id: number): Promise<void> {
   await LocalNotifications.cancel({ notifications: [{ id }] });
+}
+
+/** 予約中と表示済みの両方を消す。失敗時は削除を未完了のまま再試行する。 */
+export async function clearAccountNotifications(): Promise<void> {
+  if (!isNotificationSupported()) return;
+  await Promise.allSettled([...pendingSchedules]);
+  const { notifications } = await LocalNotifications.getPending();
+  if (notifications.length) await LocalNotifications.cancel({ notifications });
+  await LocalNotifications.removeAllDeliveredNotifications();
 }

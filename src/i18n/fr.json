@@ -349,5 +349,21 @@
   "タグを読み込めませんでした。予定はそのまま入力できます。": "Impossible de charger les étiquettes. Vous pouvez quand même saisir l’événement.",
   "設定の「予定タグ」から登録できます。": "Vous pouvez les enregistrer dans Réglages > Étiquettes d’événement.",
   "ラベル色を選んでください": "Choisissez une couleur d’étiquette",
-  "開始・終了時刻を入力し、異なる時刻にしてください": "Saisissez des heures de début et de fin différentes"
+  "開始・終了時刻を入力し、異なる時刻にしてください": "Saisissez des heures de début et de fin différentes",
+  "アカウントを削除": "Supprimer le compte",
+  "アカウント削除の確認": "Confirmer la suppression du compte",
+  "アカウント、予定、プロフィール、シフト、タグ、連携認証情報を削除します。この端末のキャッシュ、未送信操作、通知、ウィジェット、背景画像も消去します。": "Votre compte, vos événements, profil, horaires, étiquettes et identifiants de connexion seront supprimés. Le cache, les modifications non envoyées, les notifications, les données des widgets et l’image de fond de cet appareil seront aussi effacés.",
+  "Google・端末カレンダーの原本は削除しません。削除は取り消せません。": "Les événements originaux des calendriers Google et de l’appareil seront conservés. La suppression est irréversible.",
+  "対象データが失われることを確認しました": "Je comprends que ces données seront perdues",
+  "完全に削除する": "Supprimer définitivement",
+  "アカウントを削除しました": "Votre compte a été supprimé",
+  "アカウントの削除中です": "Suppression de votre compte en cours",
+  "新しく使い始める": "Recommencer",
+  "削除が完了するまで、この端末の同期と予定表示を停止しています。": "La synchronisation et l’affichage des événements sur cet appareil sont suspendus jusqu’à la fin de la suppression.",
+  "削除は完了していません。通信を確認して再試行してください。": "La suppression n’est pas terminée. Vérifiez votre connexion et réessayez.",
+  "削除を再試行": "Réessayer la suppression",
+  "再試行できない場合はサポートへ連絡": "Contactez l’assistance si vous ne pouvez pas réessayer",
+  "保存状態を確認できません": "Impossible de vérifier l’état enregistré",
+  "端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。": "La synchronisation et l’affichage des événements sont suspendus car l’état enregistré de cet appareil est illisible. Aucune suppression ne sera lancée.",
+  "保存状態を再確認": "Vérifier à nouveau l’état enregistré"
 }

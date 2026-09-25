@@ -1,3 +1,4 @@
+import { isAccountDataBlocked } from './account-deletion-state';
 import { listOutbox, removeOutbox } from './outbox';
 import { cachePut, cacheRekey } from './cache';
 import { isNetworkError } from './net';
@@ -100,17 +101,21 @@ async function replay(
 }
 
 export async function flushOutbox(): Promise<FlushResult> {
+  if (isAccountDataBlocked()) return { flushed: 0, dropped: 0, interrupted: true };
   const items = await listOutbox();
   const idMap = new Map<string, string>();
   let flushed = 0;
   let dropped = 0;
 
   for (const item of items) {
+    if (isAccountDataBlocked()) return { flushed, dropped, interrupted: true };
     const targetId = idMap.get(item.targetId) ?? item.targetId;
     let result: Result<unknown>;
     try {
       result = await replay(item, targetId, idMap);
+      if (isAccountDataBlocked()) return { flushed, dropped, interrupted: true };
     } catch (e) {
+      if (isAccountDataBlocked()) return { flushed, dropped, interrupted: true };
       if (isNetworkError(e)) return { flushed, dropped, interrupted: true };
       await removeOutbox(item.seq);
       dropped += 1;

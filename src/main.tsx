@@ -1,4 +1,5 @@
 import { initLanguage } from '@/i18n';
+import { isAccountDataBlocked } from '@/data/account-deletion-state';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -18,7 +19,7 @@ import './styles/global.css';
 initLanguage();
 initTheme();
 initMonthEventSize();
-void initBackground();
+if (!isAccountDataBlocked()) void initBackground();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

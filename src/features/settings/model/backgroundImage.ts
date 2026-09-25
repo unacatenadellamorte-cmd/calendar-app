@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { isAccountDataBlocked } from '@/data/account-deletion-state';
 import { getCropGeometry, type CropPosition } from './cropGeometry';
 
 const DATABASE = 'calendar-app-appearance';
@@ -24,7 +25,7 @@ export async function readBackground(): Promise<Blob | undefined> {
 export async function storeBackground(image: Blob | null): Promise<void> {
   const db = await database();
   try {
-    if (image) await db.put(STORE, image, 'image');
+    if (image && !isAccountDataBlocked()) await db.put(STORE, image, 'image');
     else await db.delete(STORE, 'image');
   } finally {
     db.close();
@@ -95,6 +96,7 @@ let activeUrl: string | null = null;
 let revision = 0;
 
 export function applyBackground(image: Blob | null): void {
+  if (isAccountDataBlocked()) image = null;
   revision += 1;
   const nextUrl = image ? URL.createObjectURL(image) : null;
   const root = document.documentElement;
@@ -110,6 +112,7 @@ export function applyBackground(image: Blob | null): void {
 }
 
 export async function initBackground(): Promise<void> {
+  if (isAccountDataBlocked()) { applyBackground(null); return; }
   const initialRevision = revision;
   try {
     const image = await readBackground();

@@ -1,3 +1,4 @@
+import { isAccountDataBlocked } from '@/data/account-deletion-state';
 import { eventLabelColor } from '@/lib/event-label';
 import { Capacitor } from '@capacitor/core';
 import { WidgetBridgePlugin } from 'capacitor-widget-bridge';
@@ -201,7 +202,7 @@ export function buildCalendarOverviewPayload(
 }
 
 async function runRefreshFeaturedWidget(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || isAccountDataBlocked()) return;
   try {
     if (Capacitor.getPlatform() === 'android') {
       await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
@@ -219,6 +220,7 @@ async function runRefreshFeaturedWidget(): Promise<void> {
       return;
     }
 
+    if (isAccountDataBlocked()) return;
     const payload = buildFeaturedWidgetPayload(
       eventsResult.value,
       calendarsResult.value,
@@ -264,6 +266,7 @@ let refreshRequested = false;
  * 実行中の呼び出しがあれば同じ Promise を共有し、途中で来た要求は捨てずに再実行する。
  */
 export function refreshFeaturedWidget(): Promise<void> {
+  if (isAccountDataBlocked()) return Promise.resolve();
   if (inFlight) {
     refreshRequested = true;
     return inFlight;
@@ -278,4 +281,19 @@ export function refreshFeaturedWidget(): Promise<void> {
   });
   inFlight = run;
   return run;
+}
+
+/** 先行のネイティブ書込みが終わってから空データを確実に保存する。失敗は呼出元へ返す。 */
+export async function clearAccountWidgets(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await inFlight;
+  if (Capacitor.getPlatform() === 'android') {
+    await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
+  }
+  const featured = await WidgetBridgePlugin.setItem({ key: WIDGET_ITEM_KEY, group: WIDGET_GROUP, value: '[]' });
+  if (featured?.results === false) throw new Error('ウィジェットの消去に失敗しました');
+  const overview = await WidgetBridgePlugin.setItem({ key: CALENDAR_OVERVIEW_ITEM_KEY, group: WIDGET_GROUP,
+    value: JSON.stringify({ schemaVersion: 1, updatedAtIso: new Date().toISOString(), language: getLanguage(), events: [] }) });
+  if (overview?.results === false) throw new Error('ウィジェットの消去に失敗しました');
+  await WidgetBridgePlugin.reloadAllTimelines();
 }

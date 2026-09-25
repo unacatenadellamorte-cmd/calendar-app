@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ok, err, appError } from '@/data/result';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
+import { writeDeletion } from '@/data/account-deletion-state';
 
 /**
  * widget.ts の検証。`buildFeaturedWidgetPayload` は純関数なので実物の `@core`/
@@ -42,7 +43,7 @@ vi.mock('@/data/calendars', () => ({
   listCalendars: (...a: unknown[]) => listCalendars(...a),
 }));
 
-const { buildFeaturedWidgetPayload, buildCalendarOverviewPayload, refreshFeaturedWidget } = await import('./widget');
+const { buildFeaturedWidgetPayload, buildCalendarOverviewPayload, refreshFeaturedWidget, clearAccountWidgets } = await import('./widget');
 const { buildWidgetAppearance } = await import('./widgetAppearance');
 
 const cal = (over: Partial<Calendar>): Calendar => ({
@@ -169,6 +170,47 @@ describe('buildFeaturedWidgetPayload', () => {
 });
 
 describe('refreshFeaturedWidget', () => {
+  it('Android再起動後の初回消去でも登録先を設定してから再描画する', async () => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue('android');
+    await clearAccountWidgets();
+    expect(listEvents).not.toHaveBeenCalled();
+    expect(setRegisteredWidgets).toHaveBeenCalledWith({ widgets: [
+      'jp.ryo.multicalendar.widget.FeaturedEventsWidgetReceiver',
+      'jp.ryo.multicalendar.widget.WeekEventsWidgetReceiver',
+      'jp.ryo.multicalendar.widget.MonthEventsWidgetReceiver',
+    ] });
+    expect(setRegisteredWidgets.mock.invocationCallOrder[0]).toBeLessThan(reloadAllTimelines.mock.invocationCallOrder[0]!);
+    expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['featuredEvents', 'calendarOverview'])('iOSの%s書込みがfalseなら消去失敗を伝える', async (failedKey) => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue('ios');
+    setItem.mockImplementation(async ({ key }) => ({ results: key !== failedKey }));
+    await expect(clearAccountWidgets()).rejects.toThrow('ウィジェットの消去に失敗しました');
+    expect(reloadAllTimelines).not.toHaveBeenCalled();
+  });
+
+  it('削除前の取得を待ち、両ウィジェットを空にして再書込みを拒否する', async () => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue('android');
+    let complete!: (value: ReturnType<typeof ok<EventItem[]>>) => void;
+    listEvents.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    listCalendars.mockResolvedValue(ok([cal({})]));
+    const refreshing = refreshFeaturedWidget();
+    await vi.waitFor(() => expect(listEvents).toHaveBeenCalled());
+    writeDeletion({ userId: '本人', phase: 'local' });
+    const clearing = clearAccountWidgets();
+    complete(ok([ev({})]));
+    await Promise.all([refreshing, clearing]);
+    const saved = setItem.mock.calls.map(([value]) => value);
+    expect(JSON.parse([...saved].reverse().find((item) => item.key === 'featuredEvents').value)).toEqual([]);
+    expect(JSON.parse([...saved].reverse().find((item) => item.key === 'calendarOverview').value).events).toEqual([]);
+    const count = setItem.mock.calls.length;
+    await refreshFeaturedWidget();
+    expect(setItem).toHaveBeenCalledTimes(count);
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-08T03:00:00.000Z'));

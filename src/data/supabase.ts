@@ -1,3 +1,4 @@
+import { isAccountDataBlocked } from './account-deletion-state';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env, type AppEnv } from './env';
 
@@ -21,6 +22,7 @@ export function createSupabaseClient(appEnv: AppEnv): SupabaseClient | null {
     return null;
   }
   return createClient(appEnv.supabaseUrl, appEnv.supabaseAnonKey, {
+    global: { fetch: accountAwareFetch },
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -40,4 +42,14 @@ export function requireSupabase(): SupabaseClient {
     );
   }
   return supabase;
+}
+
+/** 削除中の新規同期と、削除前に出発した応答の再利用を遮断する。 */
+export async function accountAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+  const recovery = url.pathname === '/rest/v1/rpc/delete_my_account' || url.pathname.startsWith('/auth/v1/');
+  if (!recovery && isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  const response = await fetch(input, init);
+  if (!recovery && isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  return response;
 }
