@@ -1,0 +1,82 @@
+[
+  {
+    "file": "20260926_multi-calendar_store-01.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 119228,
+    "sha256": "9e92f050806b571140380cd8e8ad686cbb01c4f6dfb8bc1a466e929055ab06df"
+  },
+  {
+    "file": "20260926_multi-calendar_store-02.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 86148,
+    "sha256": "c3be432613ec1f1eb6c34a66d7e6725e59fe7fa592398c2377c2c3ed14155bc7"
+  },
+  {
+    "file": "20260926_multi-calendar_store-03.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 81437,
+    "sha256": "1dafc345235071295b36ce64208baf66340cd5d451b80b7d5ff169fbfc462539"
+  },
+  {
+    "file": "20260926_multi-calendar_store-04.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 95725,
+    "sha256": "8d2d4eae6f1ab5191f8eb63b81135db942c762f46528aa33daab1d72198ae316"
+  },
+  {
+    "file": "20260926_multi-calendar_store-05.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 97832,
+    "sha256": "40e6ca372f023078c4009774c411f09a214652fb78f27f5867958e83dd9dc390"
+  },
+  {
+    "file": "20260926_multi-calendar_store-06.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 91576,
+    "sha256": "ac83fe38914899aabb9c745b6ae7708b8d10803b05433d1bd83fad7e208c2106"
+  },
+  {
+    "file": "20260926_multi-calendar_store-07.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 91322,
+    "sha256": "e869a21ed6298b84bf5635e0c382f8dc63f3b1c323b90c9cf04e5b21dae910a8"
+  },
+  {
+    "file": "20260926_multi-calendar_store-08.png",
+    "width": 1080,
+    "height": 1920,
+    "mode": "RGB",
+    "bytes": 122058,
+    "sha256": "66ae941950515ac9b15e32eef2689f0857be3fe5ad471d2942d0270374d8d311"
+  },
+  {
+    "file": "20260926_multi-calendar_feature-1024x500.png",
+    "width": 1024,
+    "height": 500,
+    "mode": "RGB",
+    "bytes": 28529,
+    "sha256": "e5ec732389679b75125cdf03982a727f4c53e76b562e993f7b84a34d6027bfb9"
+  },
+  {
+    "file": "20260926_multi-calendar_store-icon-512.png",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "bytes": 82029,
+    "sha256": "f036a1aba0670a1b358250ed14d95932a6e767c93b4e95071f30b9aefd9dd91f"
+  }
+]

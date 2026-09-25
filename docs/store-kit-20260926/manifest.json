@@ -1,0 +1,66 @@
+[
+  {
+    "file": "20260926_multi-calendar_store-01.png",
+    "title": "予定を、ひとつに。",
+    "alt": "仕事も暮らしも、色付きラベルで見渡す。",
+    "width": 1080,
+    "height": 1920,
+    "source": "month"
+  },
+  {
+    "file": "20260926_multi-calendar_store-02.png",
+    "title": "いつもの予定は、タグで。",
+    "alt": "名前・色・時間をまとめて入力。",
+    "width": 1080,
+    "height": 1920,
+    "source": "tag-form"
+  },
+  {
+    "file": "20260926_multi-calendar_store-03.png",
+    "title": "月の予定を、ホーム画面に。",
+    "alt": "月末まで見渡して、▲▼で月を移動。",
+    "width": 1080,
+    "height": 1920,
+    "source": "widget-month"
+  },
+  {
+    "file": "20260926_multi-calendar_store-04.png",
+    "title": "今日と今週を、すぐ確認。",
+    "alt": "日・週・月から、暮らしに合う表示を。",
+    "width": 1080,
+    "height": 1920,
+    "source": "widgets"
+  },
+  {
+    "file": "20260926_multi-calendar_store-05.png",
+    "title": "シフト入力を、もっと手軽に。",
+    "alt": "勤務時間を登録して、給料の目安も確認。",
+    "width": 1080,
+    "height": 1920,
+    "source": "shifts"
+  },
+  {
+    "file": "20260926_multi-calendar_store-06.png",
+    "title": "大切な予定を、見つけやすく。",
+    "alt": "カレンダーの色・表示・優先順を調整。",
+    "width": 1080,
+    "height": 1920,
+    "source": "calendars"
+  },
+  {
+    "file": "20260926_multi-calendar_store-07.png",
+    "title": "見せたくない予定は、非表示に。",
+    "alt": "予定ごとのシークレット設定に対応。",
+    "width": 1080,
+    "height": 1920,
+    "source": "secret"
+  },
+  {
+    "file": "20260926_multi-calendar_store-08.png",
+    "title": "毎日使うから、好きな色に。",
+    "alt": "テーマや背景で、自分らしいカレンダーへ。",
+    "width": 1080,
+    "height": 1920,
+    "source": "theme"
+  }
+]
