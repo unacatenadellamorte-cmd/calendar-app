@@ -16,7 +16,12 @@ import kotlin.math.floor
 internal const val CALENDAR_OVERVIEW_KEY = "calendarOverview"
 
 internal data class WidgetDay(val year: Int, val month: Int, val day: Int) : Comparable<WidgetDay> {
-    override fun compareTo(other: WidgetDay): Int = toKey().compareTo(other.toKey())
+    override fun compareTo(other: WidgetDay): Int {
+        val yearOrder = year.compareTo(other.year)
+        if (yearOrder != 0) return yearOrder
+        val monthOrder = month.compareTo(other.month)
+        return if (monthOrder != 0) monthOrder else day.compareTo(other.day)
+    }
     fun toKey(): String = String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
 }
 
@@ -197,7 +202,7 @@ internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int, fontScale: F
 internal fun monthEventLineCapacity(cellHeightDp: Float, fontScale: Float = 1f): Int {
     val scale = fontScale.coerceAtLeast(0.5f)
     // 日付行・上下余白を含む保守的な12dp行高。本文は10spで描画する。
-    return floor((cellHeightDp - 16f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
+    return floor((cellHeightDp - 4f - 16f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
 }
 
 /** 超過件数は日付行に表示するため、イベント行の実容量までタイトルを描く。 */

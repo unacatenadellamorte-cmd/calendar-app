@@ -38,6 +38,114 @@ class WidgetRenderingTest {
     private val hostId = ("calendar-widget-smoke".hashCode() and 0x7fff) + 1000
 
     @Test
+    fun monthNavigationRendersEventsWithinOneSecond() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 1)
+        val ids = mutableListOf<Int>()
+        val anchor = WidgetDay(2026, 9, 1)
+        val now = todayWidgetDay()
+        val events = JSONArray().apply {
+            repeat(800) { index ->
+                val date = addWidgetDays(anchor, index / 5 - 31).toKey()
+                put(JSONObject().apply {
+                    put("id", "response-$index")
+                    put("title", "予定$index")
+                    put("calendarName", "検証")
+                    put("colorHex", "#0072B2")
+                    put("startDate", date)
+                    put("endDate", date)
+                })
+            }
+        }
+        try {
+            prefs.edit().putInt(MONTH_OFFSET_KEY, (2026 - now.year) * 12 + 9 - now.month)
+                .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString())
+                .putString(WIDGET_APPEARANCE_KEY, """{"schemaVersion":1,"theme":"light"}""").commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            val view = renderProvider(host, ComponentName(context, MonthEventsWidgetReceiver::class.java), 380, 515, ids, "予定155")
+            layoutForAssertions(view, 380, 515)
+            assertMonthContents(view, anchor, "予定155")
+            assertText(view, "予定158")
+            assertText(view, "+1")
+            saveBitmap(view, "widget-month-response-september.png", 380, 515)
+            // 実際のRemoteViewsのクリックから、ホストへの新しい描画到着までを測る。
+            listOf("▲" to WidgetDay(2026, 8, 1), "▼" to anchor,
+                "▼" to WidgetDay(2026, 10, 1), "▲" to anchor).forEach { (arrow, month) ->
+                val firstEvent = eventsForWidgetDay(readCalendarOverview(context).events, month).first().title
+                val started = android.os.SystemClock.elapsedRealtime()
+                runOnMain { assertTrue("矢印をクリックできない", clickText(view, arrow)) }
+                waitUntil("月切替 ${month.month}") {
+                    findText(view, "${month.year}/${month.month}月") && findText(view, firstEvent)
+                }
+                layoutForAssertions(view, 380, 515)
+                assertMonthContents(view, month, firstEvent)
+                val elapsed = android.os.SystemClock.elapsedRealtime() - started
+                android.util.Log.i("WidgetResponseTest", "month=${month.month} elapsedMs=$elapsed")
+                assertTrue("月切替に${elapsed}ms: 1000msを超過", elapsed <= 1000)
+                val lastDay = monthGridDays(month.year, month.month).filterNotNull().last()
+                val lastEvent = eventsForWidgetDay(readCalendarOverview(context).events, lastDay).first().title
+                assertTextViewsFitParent(view, listOf(firstEvent, lastEvent))
+                if (month.month == 8) saveBitmap(view, "widget-month-response-august.png", 380, 515)
+            }
+            // 同一セッション中のアプリ側同期でも、既存の予定名が再読込される。
+            events.getJSONObject(155).put("title", "更新予定")
+            prefs.edit().putString(CALENDAR_OVERVIEW_KEY,
+                JSONObject().put("language", "ja").put("events", events).toString()).commit()
+            waitUntil("予定同期") { findText(view, "更新予定") }
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                val value = previous[key] as? String
+                if (value == null) edit.remove(key) else edit.putString(key, value)
+            }
+            val oldOffset = previous[MONTH_OFFSET_KEY] as? Int
+            if (oldOffset == null) edit.remove(MONTH_OFFSET_KEY) else edit.putInt(MONTH_OFFSET_KEY, oldOffset)
+            edit.commit()
+        }
+    }
+
+    private fun clickText(view: View, text: String): Boolean {
+        if (view is TextView && view.text.toString() == text) {
+            var target: View? = view
+            while (target != null && !target.isClickable) target = target.parent as? View
+            return target?.performClick() ?: error("クリック対象がない: $text")
+        }
+        if (view is android.view.ViewGroup) {
+            for (index in 0 until view.childCount) if (clickText(view.getChildAt(index), text)) return true
+        }
+        return false
+    }
+
+    private fun assertMonthContents(view: View, month: WidgetDay, title: String) {
+        val boxes = mutableListOf<TextBox>()
+        collectTextViews(view, boxes, -view.left, -view.top)
+        monthGridDays(month.year, month.month).filterNotNull().forEach { day ->
+            assertTrue("日付${day.day}の欠落", boxes.any {
+                it.text == day.day.toString() && it.top >= 0 && it.bottom > it.top &&
+                    it.right > it.left && it.bottom <= view.height
+            })
+        }
+        assertTrue("予定が画面外または高さゼロ: $title", boxes.any {
+            it.text.contains(title) && it.bottom > it.top && it.right > it.left && it.top >= 0 && it.bottom <= view.height
+        })
+        assertTrue("予定色が違う", findTextColor(view, title) == android.graphics.Color.parseColor("#0072B2"))
+    }
+
+    private fun findTextColor(view: View, text: String): Int? {
+        if (view is TextView && view.text.toString().contains(text)) return view.currentTextColor
+        if (view is android.view.ViewGroup) {
+            for (index in 0 until view.childCount) findTextColor(view.getChildAt(index), text)?.let { return it }
+        }
+        return null
+    }
+
+    @Test
     fun weekAndMonthWidgetsRenderFixtureWithoutRuntimeCrash() {
         // 接続実機を含む一括実行でも、データ差し替えはエミュレータだけに限定する。
         org.junit.Assume.assumeTrue(
@@ -121,6 +229,7 @@ class WidgetRenderingTest {
                 title,
             )
 
+            layoutForAssertions(month, 250, 420)
             assertPlus(week)
             assertText(week, title)
             assertText(week, secondTitle)
@@ -165,7 +274,8 @@ class WidgetRenderingTest {
             putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, heightDp)
         }
         appWidgetManager.updateAppWidgetOptions(id, options)
-        val view = runOnMain { host.createView(context, id, providerInfo) }
+        // optionsはウィジェット内容のサイズ。検証ホストの既定余白を二重に差し引かない。
+        val view = runOnMain { host.createView(context, id, providerInfo).apply { setPadding(0, 0, 0, 0) } }
         val update = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
             component = provider
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(id))
@@ -189,9 +299,16 @@ class WidgetRenderingTest {
 
     private fun findBoundedText(view: View, expected: String): Boolean {
         if (view is TextView && view.text?.toString()?.contains(expected) == true) {
-            val parent = view.parent as? View
-            return parent != null && view.left >= 0 && view.top >= 0 &&
-                view.right <= parent.width && view.bottom <= parent.height
+            if (view.width <= 0 || view.height <= 0) return false
+            var left = view.left
+            var top = view.top
+            var parent = view.parent as? View ?: return false
+            while (true) {
+                if (left < 0 || top < 0 || left + view.width > parent.width || top + view.height > parent.height) return false
+                left += parent.left - parent.scrollX
+                top += parent.top - parent.scrollY
+                parent = parent.parent as? View ?: return true
+            }
         }
         if (view is android.view.ViewGroup) {
             for (index in 0 until view.childCount) {
