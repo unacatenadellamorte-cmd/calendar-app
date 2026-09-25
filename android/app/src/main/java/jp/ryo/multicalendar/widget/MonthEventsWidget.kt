@@ -52,7 +52,8 @@ private fun MonthEventsContent() {
     val monthOffset = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE).getInt(MONTH_OFFSET_KEY, 0)
     val displayedMonth = monthAnchor(today, monthOffset)
     val days = monthGridDays(displayedMonth.year, displayedMonth.month)
-    val weekdayDays = (0..6).map { addWidgetDays(displayedMonth, it) }
+    // 曜日は必ず日曜始まりにする。月初の曜日を起点にすると、9月は火曜始まりになってしまう。
+    val weekdayDays = weekWidgetDays(displayedMonth)
     val rows = days.chunked(7)
     val dividerHeight = (rows.size - 1).coerceAtLeast(0).toFloat()
     val headerHeight = 28f * fontScale.coerceAtLeast(1f)
@@ -96,35 +97,39 @@ private fun MonthEventsContent() {
                 )
             }
         }
-        rows.forEachIndexed { rowIndex, row ->
-            // 行そのものは残り領域を均等配分し、端末ごとのウィジェット高で最終行が欠けないようにする。
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                row.forEachIndexed { dayIndex, day ->
-                    if (day == null) {
-                        MonthBlankCell(appearance, dayIndex < row.lastIndex, GlanceModifier.defaultWeight())
-                    } else {
-                        MonthDayCell(
-                            context,
-                            overview,
-                            appearance,
-                            today,
-                            displayedMonth,
-                            day,
-                            cellHeightDp,
-                            fontScale,
-                            dayIndex < row.lastIndex,
-                            GlanceModifier.defaultWeight(),
+        Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+            rows.forEachIndexed { rowIndex, row ->
+                // グリッドを1つの子にまとめ、Glanceの子要素上限で5週目以降が落ちないようにする。
+                Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+                    Row(modifier = GlanceModifier.fillMaxWidth().height(cellHeightDp.coerceAtMost(72f).dp)) {
+                        row.forEachIndexed { dayIndex, day ->
+                            if (day == null) {
+                                MonthBlankCell(appearance, dayIndex < row.lastIndex, GlanceModifier.defaultWeight())
+                            } else {
+                                MonthDayCell(
+                                    context,
+                                    overview,
+                                    appearance,
+                                    today,
+                                    displayedMonth,
+                                    day,
+                                    cellHeightDp,
+                                    fontScale,
+                                    dayIndex < row.lastIndex,
+                                    GlanceModifier.defaultWeight(),
+                                )
+                            }
+                        }
+                    }
+                    if (rowIndex < rows.lastIndex) {
+                        Spacer(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(appearance.secondaryTextColor),
                         )
                     }
                 }
-            }
-            if (rowIndex < rows.lastIndex) {
-                Spacer(
-                    modifier = GlanceModifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(appearance.secondaryTextColor),
-                )
             }
         }
     }
