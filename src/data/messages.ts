@@ -15,6 +15,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'profile/invalid-name': '名前を入力してください',
   'profile/photo-too-large': '写真のファイルサイズが大きすぎます(10MBまで)',
   'profile/photo-failed': '写真を処理できませんでした。別の写真でお試しください',
+  'event/invalid-color': 'ラベル色を選んでください',
   'event/invalid-title': '予定のタイトルを入力してください',
   'event/invalid-time': '終了は開始より後にしてください',
   'event/invalid-date': '日付を選んでください',

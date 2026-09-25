@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import android.widget.TextView
+import androidx.compose.ui.graphics.toArgb
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
@@ -498,6 +499,127 @@ class WidgetRenderingTest {
             if (previousAppearance == null) edit.remove(WIDGET_APPEARANCE_KEY) else edit.putString(WIDGET_APPEARANCE_KEY, previousAppearance)
             edit.commit()
         }
+    }
+
+    @Test
+    fun mixedLocalAndExternalLabelsRenderTintedRoundedBackgroundsWithinMonthBounds() {
+        org.junit.Assume.assumeTrue(
+            "エミュレータ専用の描画確認",
+            android.os.Build.HARDWARE in listOf("ranchu", "goldfish"),
+        )
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val today = todayWidgetDay()
+        val localColor = android.graphics.Color.parseColor("#F59E0B")
+        val externalColor = android.graphics.Color.parseColor("#0072B2")
+        val events = JSONArray().apply {
+            repeat(800) { index ->
+                val date = addWidgetDays(today, index / 5 - 31).toKey()
+                put(JSONObject().apply {
+                    put("id", "label-$index")
+                    put("title", "ラベル$index")
+                    put("calendarName", "混在検証")
+                    put("colorHex", if (index % 2 == 0) "#F59E0B" else "#0072B2")
+                    put("startDate", date)
+                    put("endDate", date)
+                    put("allDay", true)
+                    put("source", if (index % 2 == 0) "local" else "external")
+                    put("filledLabel", index % 2 == 0)
+                })
+            }
+        }
+        val host = AppWidgetHost(context, hostId + 4)
+        val boundIds = mutableListOf<Int>()
+        var adopted = false
+        try {
+            prefs.edit().putInt(MONTH_OFFSET_KEY, 0)
+                .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString())
+                .putString(WIDGET_APPEARANCE_KEY, """{"schemaVersion":1,"theme":"light"}""").commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            adopted = true
+            host.startListening()
+            val week = renderProvider(host, ComponentName(context, WeekEventsWidgetReceiver::class.java), 380, 180, boundIds, "ラベル155")
+            val month = renderProvider(host, ComponentName(context, MonthEventsWidgetReceiver::class.java), 380, 515, boundIds, "ラベル155")
+            val day = renderProvider(host, ComponentName(context, FeaturedEventsWidgetReceiver::class.java), 380, 270, boundIds, "ラベル155")
+            layoutForAssertions(week, 380, 180)
+            layoutForAssertions(month, 380, 515)
+            layoutForAssertions(day, 380, 270)
+            saveBitmap(month, "widget-label-month-inspect.png", 380, 515)
+            assertLabelRendering(week, "ラベル156", true, localColor)
+            assertLabelRendering(week, "ラベル155", false, externalColor)
+            assertLabelRendering(month, "ラベル156", true, localColor)
+            assertLabelRendering(month, "ラベル155", false, externalColor)
+            assertLabelRendering(day, "ラベル156", true, localColor)
+            assertLabelRendering(day, "ラベル155", false, externalColor, android.graphics.Color.parseColor("#1A1C1E"))
+            val lastDay = monthGridDays(today.year, today.month).filterNotNull().last()
+            val lastEvent = eventsForWidgetDay(readCalendarOverview(context).events, lastDay).first()
+            assertTrue("月末予定が画面外または高さゼロ", findBoundedText(month, lastEvent.title))
+            saveBitmap(week, "widget-label-week.png", 380, 180)
+            saveBitmap(month, "widget-label-month.png", 380, 515)
+            saveBitmap(day, "widget-label-day.png", 380, 270)
+            repeat(events.length()) { index -> events.getJSONObject(index).put("filledLabel", true) }
+            prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString()).commit()
+            events.getJSONObject(155).put("title", "全自作155")
+            prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString()).commit()
+            waitUntil("全予定を自作ラベルで表示") { findText(month, "全自作155") }
+            layoutForAssertions(month, 380, 515)
+            assertTrue("全自作でも月末を表示", findBoundedText(month, lastEvent.title))
+            val nextMonth = monthAnchor(today, 1)
+            val nextTitle = eventsForWidgetDay(readCalendarOverview(context).events, nextMonth).first().title
+            val started = android.os.SystemClock.elapsedRealtime()
+            runOnMain { assertTrue(clickText(month, "▼")) }
+            waitUntil("色付きラベルの翌月") { findText(month, "${nextMonth.year}/${nextMonth.month}月") && findText(month, nextTitle) }
+            layoutForAssertions(month, 380, 515)
+            val elapsed = android.os.SystemClock.elapsedRealtime() - started
+            android.util.Log.i("WidgetResponseTest", "filledLabels elapsedMs=$elapsed")
+            assertTrue("色付きラベルの月移動に${elapsed}ms", elapsed <= 1000)
+
+
+        } finally {
+            boundIds.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            if (adopted) instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            (previous[CALENDAR_OVERVIEW_KEY] as? String)?.let { edit.putString(CALENDAR_OVERVIEW_KEY, it) } ?: edit.remove(CALENDAR_OVERVIEW_KEY)
+            (previous[WIDGET_APPEARANCE_KEY] as? String)?.let { edit.putString(WIDGET_APPEARANCE_KEY, it) } ?: edit.remove(WIDGET_APPEARANCE_KEY)
+            (previous[MONTH_OFFSET_KEY] as? Int)?.let { edit.putInt(MONTH_OFFSET_KEY, it) } ?: edit.remove(MONTH_OFFSET_KEY)
+            edit.commit()
+        }
+    }
+
+    private fun assertLabelRendering(root: View, title: String, filled: Boolean, backgroundColor: Int, externalTextColor: Int = backgroundColor) {
+        val textView = findTextView(root, title) ?: error("text '$title' was not rendered")
+        val expectedTextColor = if (filled) {
+            widgetFilledLabelTextColor(widgetEventColor(String.format("#%06X", backgroundColor and 0xFFFFFF), androidx.compose.ui.graphics.Color.White)).toArgb()
+        } else externalTextColor
+        assertTrue("$title の文字色が違う", textView.currentTextColor == expectedTextColor)
+        // Glanceは画像背景を兄弟ImageViewへ展開する。最終描画の件名右端を検査する。
+        val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        runOnMain { root.draw(Canvas(bitmap)) }
+        var left = textView.left
+        var top = textView.top
+        var parent = textView.parent as? View
+        while (parent != null && parent !== root) {
+            left += parent.left - parent.scrollX
+            top += parent.top - parent.scrollY
+            parent = parent.parent as? View
+        }
+        val x = (left + textView.width - 5).coerceIn(0, bitmap.width - 1)
+        val y = (top + textView.height / 2).coerceIn(0, bitmap.height - 1)
+        val renderedBackground = bitmap.getPixel(x, y)
+        if (filled) {
+            assertTrue("$title の背景色が違う: $renderedBackground", renderedBackground == backgroundColor)
+        } else {
+            assertTrue("外部予定まで背景塗りされた: $title", renderedBackground != backgroundColor)
+        }
+    }
+
+    private fun findTextView(view: View, expected: String): TextView? {
+        if (view is TextView && view.text?.toString()?.contains(expected) == true) return view
+        if (view is android.view.ViewGroup) {
+            for (index in 0 until view.childCount) findTextView(view.getChildAt(index), expected)?.let { return it }
+        }
+        return null
     }
 
     private fun renderProvider(

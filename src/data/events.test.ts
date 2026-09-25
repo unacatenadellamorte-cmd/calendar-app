@@ -559,3 +559,17 @@ describe('hideSecretEvents (pure、spec-secret-mode)', () => {
     expect(hideSecretEvents(events, false)).toEqual(events);
   });
 });
+
+
+it('ラベル色を読み取り・作成・更新し、不正な色は拒否する', async () => {
+  queryResult = { data: row({ label_color: '#FFCC00' }), error: null };
+  const { createEvent, updateEvent, toEvent, validateEventPatch } = await importEvents();
+  const result = await createEvent({ calendarId: 'c1', title: 'タグ予定', allDay: true, eventDate: '2026-09-25', labelColor: '#FFCC00' });
+  expect(result.ok && result.value.labelColor).toBe('#FFCC00');
+  expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({ label_color: '#FFCC00' });
+  calls.length = 0;
+  await updateEvent({ id: 'e1', source: 'local' }, { labelColor: null });
+  expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ label_color: null });
+  expect(toEvent(row() as Parameters<typeof toEvent>[0]).labelColor).toBeNull();
+  expect(validateEventPatch({ labelColor: 'red' })).toMatchObject({ messageKey: 'event/invalid-color' });
+});

@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
+import kotlin.math.pow
 
 internal const val WIDGET_APPEARANCE_KEY = "widgetAppearance"
 
@@ -65,5 +66,20 @@ internal fun widgetEventColor(hex: String, fallback: Color): Color = try {
     Color(android.graphics.Color.parseColor(hex))
 } catch (_: IllegalArgumentException) {
     fallback
+}
+
+/** 自作予定の塗りつぶしラベル上で、背景とのコントラストが高い文字色を返す。 */
+internal fun widgetFilledLabelTextColor(background: Color): Color {
+    fun srgbToLinear(channel: Float): Float =
+        if (channel <= 0.04045f) channel / 12.92f else ((channel + 0.055f) / 1.055f).toDouble().pow(2.4).toFloat()
+    val luminance = 0.2126f * srgbToLinear(background.red) +
+        0.7152f * srgbToLinear(background.green) +
+        0.0722f * srgbToLinear(background.blue)
+    // #111827 の相対輝度。白と濃紺のコントラスト比が高い方を選ぶ。
+    val darkLuminance = 0.009189219295824f
+    val darkContrast = (luminance + 0.05f) / (darkLuminance + 0.05f)
+    val whiteContrast = 1.05f / (luminance + 0.05f)
+    if (maxOf(darkContrast, whiteContrast) < 4.5f) return Color.Black
+    return if (darkContrast > whiteContrast) Color(0xFF111827) else Color.White
 }
 

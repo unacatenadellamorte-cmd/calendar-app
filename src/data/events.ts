@@ -1,5 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { isLabelColor } from '@/lib/event-label';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isNetworkError, isOffline } from './net';
@@ -35,6 +36,7 @@ export interface EventItem {
   note: string | null;
   location?: string | null;
   url?: string | null;
+  labelColor?: string | null;
   source: EventSource;
   /** シフト属性(AD-8)。シフト実体以外はすべて null。 */
   breakMinutes: number | null;
@@ -79,6 +81,7 @@ export type NewEventInput = {
   isSecret?: boolean;
   location?: string | null;
   url?: string | null;
+  labelColor?: string | null;
 } & (TimedInput | AllDayInput);
 
 export type EventPatch = Partial<{
@@ -92,6 +95,7 @@ export type EventPatch = Partial<{
   isSecret: boolean;
   location?: string | null;
   url?: string | null;
+  labelColor?: string | null;
 }>;
 
 export interface EventRange {
@@ -123,13 +127,14 @@ export interface EventRow {
   is_secret: boolean;
   location?: string | null;
   event_url?: string | null;
+  label_color?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 export const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,location,event_url,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,location,event_url,label_color,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
 
 export function toEvent(row: EventRow): EventItem {
   return {
@@ -143,6 +148,7 @@ export function toEvent(row: EventRow): EventItem {
     note: row.note,
     location: row.location ?? null,
     url: row.event_url ?? null,
+    labelColor: row.label_color ?? null,
     source: row.source,
     breakMinutes: row.break_minutes ?? null,
     hourlyWage: row.hourly_wage ?? null,
@@ -157,7 +163,7 @@ export function toEvent(row: EventRow): EventItem {
 
 /** 旧キャッシュ(新列を持たない行)も読み出し時に同じ nullable 形へ揃える。 */
 function normalizeCachedEvent(event: EventItem): EventItem {
-  return { ...event, location: event.location ?? null, url: event.url ?? null };
+  return { ...event, location: event.location ?? null, url: event.url ?? null, labelColor: event.labelColor ?? null };
 }
 
 /**
@@ -215,6 +221,7 @@ interface EventInputShape {
   eventDate?: string | null;
   location?: string | null;
   url?: string | null;
+  labelColor?: string | null;
 }
 
 const LOCATION_MAX = 1000;
@@ -230,6 +237,7 @@ function validEventUrl(value: string): boolean {
 
 /** 入力の妥当性。問題なければ null。表示層向けの messageKey を持つ AppError を返す。 */
 export function validateEventInput(input: EventInputShape): AppError | null {
+  if (input.labelColor != null && !isLabelColor(input.labelColor)) return appError('event/invalid-color', 'event/invalid-color');
   if (input.title.trim().length < 1 || input.title.trim().length > 200) {
     return appError('event/invalid-title', 'event/invalid-title');
   }
@@ -259,6 +267,7 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
     note: input.note?.trim() || null,
     location: input.location?.trim() || null,
     event_url: input.url?.trim() || null,
+    label_color: input.labelColor ?? null,
     all_day: input.allDay,
     source: 'local' as const,
     is_secret: input.isSecret ?? false,
@@ -334,6 +343,7 @@ export async function createEvent(input: NewEventInput): Promise<Result<EventIte
 
 /** patch に含まれる項目だけを検証する。 */
 export function validateEventPatch(patch: EventPatch): AppError | null {
+  if (patch.labelColor != null && !isLabelColor(patch.labelColor)) return appError('event/invalid-color', 'event/invalid-color');
   if (patch.title !== undefined) {
     const t = patch.title.trim();
     if (t.length < 1 || t.length > 200)
@@ -393,6 +403,7 @@ export async function updateEvent(
   if (patch.note !== undefined) row.note = patch.note?.trim() || null;
   if (patch.location !== undefined) row.location = patch.location?.trim() || null;
   if (patch.url !== undefined) row.event_url = patch.url?.trim() || null;
+  if (patch.labelColor !== undefined) row.label_color = patch.labelColor;
   if (patch.allDay !== undefined) row.all_day = patch.allDay;
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;

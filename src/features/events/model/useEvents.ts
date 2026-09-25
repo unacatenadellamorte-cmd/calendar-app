@@ -24,6 +24,7 @@ function inputToPatch(input: NewEventInput): EventPatch {
     note: input.note ?? null,
     location: input.location ?? null,
     url: input.url ?? null,
+    labelColor: input.labelColor ?? null,
     isSecret: input.isSecret ?? false,
   };
   return input.allDay

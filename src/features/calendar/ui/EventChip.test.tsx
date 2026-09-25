@@ -90,3 +90,14 @@ describe('EventChip（月表示の件名計測）', () => {
     vi.unstubAllGlobals();
   });
 });
+
+
+it('自作予定は指定色で塗り、外部予定は元の色バー表示を保つ', () => {
+  const { container, rerender } = render(<EventChip event={{ ...event, labelColor: '#FFCC00' }} calendar={calendar} onTap={vi.fn()} />);
+  expect(container.querySelector('button')).toHaveStyle({ backgroundColor: '#FFCC00', color: '#111827', borderLeftWidth: '0' });
+  rerender(<EventChip event={{ ...event, source: 'google', labelColor: '#FFCC00' }} calendar={calendar} onTap={vi.fn()} />);
+  expect(container.querySelector('button')!.style.backgroundColor).toBe('');
+  expect(container.querySelector('button')).toHaveStyle({ borderColor: calendar.color });
+  rerender(<EventChip event={event} calendar={calendar} onTap={vi.fn()} />);
+  expect(container.querySelector('button')).toHaveStyle({ backgroundColor: calendar.color });
+});

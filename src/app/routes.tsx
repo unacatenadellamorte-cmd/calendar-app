@@ -6,6 +6,7 @@ import { SettingsScreen } from '@/features/settings/ui/SettingsScreen';
 import { AuthScreen } from '@/features/auth/ui/AuthScreen';
 import { CalendarsScreen } from '@/features/calendars/ui/CalendarsScreen';
 import { ShiftTemplatesScreen } from '@/features/shifts/ui/ShiftTemplatesScreen';
+import { EventTagsScreen } from '@/features/tags/ui/EventTagsScreen';
 import { QuickShiftScreen } from '@/features/shifts/ui/QuickShiftScreen';
 import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
 import { GoogleCalendarPicker } from '@/features/connections/ui/GoogleCalendarPicker';
@@ -55,6 +56,7 @@ const routes: RouteObject[] = [
       { path: 'calendars', element: <CalendarsScreen /> },
       // タブ外。設定から遷移する。
       { path: 'shift-templates', element: <ShiftTemplatesScreen /> },
+      { path: 'event-tags', element: <EventTagsScreen /> },
       // タブ外。設定から遷移する(spec-secret-mode)。
       { path: 'secret-mode', element: <SecretModeSettingsScreen /> },
       // タブ外。上部アバターアイコン・設定から遷移する。

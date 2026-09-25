@@ -48,6 +48,7 @@ export async function offlineCreateEvent(
     note: input.note?.trim() || null,
     location: input.location?.trim() || null,
     url: input.url?.trim() || null,
+    labelColor: input.labelColor ?? null,
     source: 'local',
     breakMinutes: input.shift?.breakMinutes ?? null,
     hourlyWage: input.shift?.hourlyWage ?? null,

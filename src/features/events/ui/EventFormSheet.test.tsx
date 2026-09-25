@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Calendar } from '@/data/calendars';
 import { EventFormSheet } from './EventFormSheet';
@@ -9,6 +9,9 @@ vi.mock('@/platform/externalLinks', async (original) => ({
   openMap: vi.fn().mockResolvedValue(true),
   openExternalUrl: vi.fn().mockResolvedValue(true),
 }));
+
+const tagsMock = vi.hoisted(() => ({ list: vi.fn().mockResolvedValue({ ok: true, value: [] }) }));
+vi.mock('@/data/event-tags', () => ({ listEventTags: tagsMock.list }));
 
 const calendars: Calendar[] = [
   {
@@ -388,5 +391,42 @@ describe('EventFormSheet', () => {
     };
     setup({ editing });
     expect(screen.getByRole('checkbox', { name: 'シークレット' })).toBeChecked();
+  });
+});
+
+
+describe('予定タグの適用', () => {
+  const tag = { id: 'tag1', name: '夜勤', color: '#FFCC00', startLocal: '22:00', endLocal: '06:00', createdAt: '', updatedAt: '' };
+  it('対象日と日またぎを守って複写し、個別編集した色と名称を保存する', async () => {
+    tagsMock.list.mockResolvedValueOnce({ ok: true, value: [tag] });
+    const { onCreate } = setup({ seed: { date: '2026-12-31' } });
+    await waitFor(() => expect(screen.getByLabelText('タグ')).not.toBeDisabled());
+    await userEvent.selectOptions(screen.getByLabelText('タグ'), 'tag1');
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-12-31T22:00');
+    expect(screen.getByLabelText('終了')).toHaveValue('2027-01-01T06:00');
+    expect(screen.getByLabelText('タイトル')).toHaveValue('夜勤');
+    fireEvent.change(screen.getByLabelText('ラベル色'), { target: { value: '#009e73' } });
+    fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '夜勤（変更）' } });
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: '夜勤（変更）', labelColor: '#009e73', allDay: false }));
+    expect(onCreate.mock.calls[0]![0]).not.toHaveProperty('tagId');
+  });
+  it('終日のフォームからタグを選んでも入力した日付を使う', async () => {
+    tagsMock.list.mockResolvedValueOnce({ ok: true, value: [tag] });
+    setup({ seed: { date: '2026-09-30' } });
+    await userEvent.click(screen.getByLabelText('終日'));
+    fireEvent.change(screen.getByLabelText('日付'), { target: { value: '2026-10-02' } });
+    await waitFor(() => expect(screen.getByLabelText('タグ')).not.toBeDisabled());
+    await userEvent.selectOptions(screen.getByLabelText('タグ'), 'tag1');
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-10-02T22:00');
+    expect(screen.getByLabelText('終日')).not.toBeChecked();
+  });
+  it('タグ取得失敗でも通常の予定を保存できる', async () => {
+    tagsMock.list.mockResolvedValueOnce({ ok: false, error: { messageKey: 'data/offline' } });
+    const { onCreate } = setup({ seed: { date: '2026-09-30' } });
+    await screen.findByText('タグを読み込めませんでした。予定はそのまま入力できます。');
+    fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '通常予定' } });
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: '通常予定', labelColor: null }));
   });
 });

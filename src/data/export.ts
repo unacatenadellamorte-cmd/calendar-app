@@ -1,3 +1,4 @@
+import { listEventTags, type EventTag } from './event-tags';
 import { listCalendars, type Calendar } from './calendars';
 import { hideSecretEvents, listEvents, type EventItem } from './events';
 import { listShiftTemplates, type ShiftTemplate } from './shift-templates';
@@ -13,13 +14,14 @@ import { err, ok, type Result } from './result';
 
 export interface ExportBundle {
   app: 'calendar-app';
-  /** shiftTemplates の追加で 1 → 2(Story 4.1)。 */
-  schemaVersion: 2;
+  /** 予定タグを追加した形式。 */
+  schemaVersion: 3;
   /** 書き出した時刻(UTC ISO)。 */
   exportedAt: string;
   calendars: Calendar[];
   events: EventItem[];
   shiftTemplates: ShiftTemplate[];
+  eventTags: EventTag[];
 }
 
 function eventKey(e: EventItem): string {
@@ -34,6 +36,9 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
   const templates = await listShiftTemplates();
   if (!templates.ok) return err(templates.error);
 
+  const tags = await listEventTags();
+  if (!tags.ok) return err(tags.error);
+
   const localCalendars = calendars.value
     .filter((c) => c.source === 'local')
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -41,7 +46,8 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
 
   return ok({
     app: 'calendar-app',
-    schemaVersion: 2,
+    eventTags: tags.value,
+    schemaVersion: 3,
     exportedAt: new Date().toISOString(),
     calendars: localCalendars,
     // ローカル予定のうち、書き出すカレンダーに属すものだけ(削除済みカレンダーの

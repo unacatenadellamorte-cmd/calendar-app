@@ -398,3 +398,25 @@ describe('buildCalendarOverviewPayload', () => {
     });
   });
 });
+
+
+it('自作予定だけ背景ラベルと個別色を渡し、取込予定の色は変えない', () => {
+  const result = buildCalendarOverviewPayload([
+    ev({ id: 'local', labelColor: '#FFCC00' }),
+    ev({ id: 'old' }),
+    ev({ id: 'google', source: 'google', labelColor: '#FFCC00' }),
+    ev({ id: 'device', source: 'device', labelColor: '#FFCC00' }),
+  ], [cal({})], '2026-09-25T00:00:00Z');
+  expect(result.events).toEqual([
+    expect.objectContaining({ id: 'local', filledLabel: true, colorHex: '#FFCC00' }),
+    expect.objectContaining({ id: 'old', filledLabel: true, colorHex: '#0072B2' }),
+    expect.objectContaining({ id: 'google', filledLabel: false, colorHex: '#0072B2' }),
+    expect.objectContaining({ id: 'device', filledLabel: false, colorHex: '#0072B2' }),
+  ]);
+});
+
+
+it('色なしの取込予定は従来の既定色を維持する', () => {
+  const result = buildCalendarOverviewPayload([ev({ source: 'device' })], [cal({ color: '' })], '2026-09-25T00:00:00Z');
+  expect(result.events[0]).toMatchObject({ filledLabel: false, colorHex: '#7A7A7A' });
+});

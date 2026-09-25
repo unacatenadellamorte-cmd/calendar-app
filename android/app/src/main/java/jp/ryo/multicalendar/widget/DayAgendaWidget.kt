@@ -11,6 +11,7 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
@@ -131,7 +132,16 @@ internal fun DayAgendaContent() {
                         Spacer(modifier = GlanceModifier.width(4.dp).height((42f * scale).dp).background(widgetEventColor(event.colorHex, appearance.accentColor)))
                         Spacer(modifier = GlanceModifier.width(8.dp))
                         Column(modifier = GlanceModifier.defaultWeight()) {
-                            Text(text = event.title.ifBlank { event.calendarName }, style = TextStyle(fontSize = scaledSp(17f, appearance), color = ColorProvider(appearance.primaryTextColor)), maxLines = 1)
+                            val eventColor = widgetEventColor(event.colorHex, appearance.primaryTextColor)
+                            Text(
+                                text = event.title.ifBlank { event.calendarName },
+                                modifier = if (event.filledLabel) GlanceModifier.fillMaxWidth()
+                                    .background(eventColor).cornerRadius(2.dp).padding(horizontal = 1.dp) else GlanceModifier,
+                                style = TextStyle(fontSize = scaledSp(17f, appearance), color = ColorProvider(
+                                    if (event.filledLabel) widgetFilledLabelTextColor(eventColor) else appearance.primaryTextColor,
+                                )),
+                                maxLines = 1,
+                            )
                             Text(text = agendaEventDetail(event, today, overview.language), style = TextStyle(fontSize = scaledSp(12f, appearance), color = ColorProvider(appearance.secondaryTextColor)), maxLines = 2)
                         }
                     }
@@ -154,7 +164,16 @@ private fun CompactDayAgenda(event: CalendarOverviewEvent?, selectedDay: WidgetD
             Text(text = if (selectedDay.year != today.year) "${selectedDay.year}/${selectedDay.month}/${selectedDay.day}" else "${selectedDay.month}/${selectedDay.day} ⚙", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.primaryTextColor)), modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(widgetDeepLinkIntent(context, "settings", ""))), maxLines = 1)
         }
         Column(modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(if (event?.id.isNullOrBlank()) dayWidgetIntent(context, selectedDay) else widgetDeepLinkIntent(context, "event", event!!.id)))) {
-            Text(text = event?.title?.ifBlank { event.calendarName } ?: "—", style = TextStyle(fontSize = scaledSp(12f, appearance), color = ColorProvider(widgetEventColor(event?.colorHex.orEmpty(), appearance.primaryTextColor))), maxLines = 1)
+            val eventColor = widgetEventColor(event?.colorHex.orEmpty(), appearance.primaryTextColor)
+            Text(
+                text = event?.title?.ifBlank { event.calendarName } ?: "—",
+                modifier = if (event?.filledLabel == true) GlanceModifier.fillMaxWidth()
+                    .background(eventColor).cornerRadius(2.dp).padding(horizontal = 1.dp) else GlanceModifier,
+                style = TextStyle(fontSize = scaledSp(12f, appearance), color = ColorProvider(
+                    if (event?.filledLabel == true) widgetFilledLabelTextColor(eventColor) else eventColor,
+                )),
+                maxLines = 1,
+            )
             if (event != null) Text(text = agendaEventDetail(event, today, language), style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.secondaryTextColor)), maxLines = 1)
         }
         Text(text = "＋", style = TextStyle(fontSize = scaledSp(18f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, selectedDay))))

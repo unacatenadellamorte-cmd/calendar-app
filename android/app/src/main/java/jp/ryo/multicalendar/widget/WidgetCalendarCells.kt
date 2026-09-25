@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceModifier
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -70,9 +71,18 @@ internal fun CalendarWidgetDayCell(
             visibleEvents.forEach { event ->
                 // 色マーカーと件名を1つのViewにして、予定の多い月でもGlanceの上限を超えない。
                 Text(
-                    text = "▎${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
-                    modifier = GlanceModifier.fillMaxWidth().height((12f * fontScale).dp),
-                    style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(widgetEventColor(event.colorHex, appearance.primaryTextColor))),
+                    text = if (event.filledLabel) shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)
+                    else "▎${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
+                    modifier = GlanceModifier.fillMaxWidth().height((12f * fontScale).dp).let { modifier ->
+                        if (event.filledLabel) modifier
+                            .background(widgetEventColor(event.colorHex, appearance.primaryTextColor)).cornerRadius(2.dp)
+                            .padding(horizontal = 1.dp)
+                        else modifier
+                    },
+                    style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(
+                        if (event.filledLabel) widgetFilledLabelTextColor(widgetEventColor(event.colorHex, appearance.primaryTextColor))
+                        else widgetEventColor(event.colorHex, appearance.primaryTextColor),
+                    )),
                     maxLines = 1,
                 )
             }

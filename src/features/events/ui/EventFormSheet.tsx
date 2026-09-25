@@ -11,6 +11,9 @@ import {
   todayLocalDate,
   utcIsoToLocalInput,
 } from '@/lib/datetime';
+import { listEventTags, type EventTag } from '@/data/event-tags';
+import { eventLabelColor, labelTextColor } from '@/lib/event-label';
+import { applyEventTag } from '@/lib/event-tag';
 import { ReminderPicker } from './ReminderPicker';
 import { isAllowedExternalUrl, openExternalUrl, openMap } from '@/platform/externalLinks';
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
@@ -44,6 +47,7 @@ interface FormState {
   location: string;
   url: string;
   isSecret: boolean;
+  labelColor: string | null;
 }
 function initialState(
   editing: EventItem | null,
@@ -70,6 +74,7 @@ function initialState(
       location: '',
       url: '',
       isSecret: false,
+      labelColor: null,
     };
   }
   // 以前の不具合で外部カレンダーに保存された local 予定は、編集時に
@@ -88,6 +93,7 @@ function initialState(
     location: editing.location ?? '',
     url: editing.url ?? '',
     isSecret: editing.isSecret,
+    labelColor: editing.labelColor ?? null,
   };
 }
 function toInput(form: FormState): NewEventInput {
@@ -98,6 +104,7 @@ function toInput(form: FormState): NewEventInput {
     location: form.location.trim() || null,
     url: form.url.trim() || null,
     isSecret: form.isSecret,
+    labelColor: form.labelColor,
   };
   return form.allDay
     ? { ...common, allDay: true, eventDate: form.dateLocal }
@@ -128,6 +135,33 @@ export function EventFormSheet({
   const [form, setForm] = useState<FormState>(() =>
     initialState(editing, editableCalendars, seed),
   );
+  const [tags, setTags] = useState<EventTag[]>([]);
+  const [selectedTag, setSelectedTag] = useState('');
+  const [tagsError, setTagsError] = useState(false);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setTags([]);
+    setTagsError(false);
+    setTagsLoading(true);
+    void listEventTags()
+      .then((result) => {
+        if (!active) return;
+        setTagsLoading(false);
+        if (result.ok) setTags(result.value);
+        else setTagsError(true);
+      })
+      .catch(() => {
+        if (active) {
+          setTagsLoading(false);
+          setTagsError(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const launchRequest = useRef(0);
@@ -136,12 +170,15 @@ export function EventFormSheet({
     if (!open) return;
     const current = latestPropsRef.current;
     setForm(initialState(current.editing, current.calendars, current.seed));
+    setSelectedTag('');
     setErrorKey(null);
     setLaunchError(null);
     setSubmitting(false);
     // calendars は refetch のたびに配列が新しくなる。ここへ含めると入力中の
     // タイトル・日時が消えるため、フォームを開く単位(予定ID/seed)だけで初期化する。
-    return () => { launchRequest.current += 1; };
+    return () => {
+      launchRequest.current += 1;
+    };
   }, [open, editing?.id, seed?.date, seed?.startLocal]);
   const firstEditableCalendarId = editableCalendars[0]?.id ?? '';
   useEffect(() => {
@@ -156,6 +193,10 @@ export function EventFormSheet({
     setForm((f) => ({ ...f, [key]: value }));
     setErrorKey(null);
   };
+  const previewColor = eventLabelColor(
+    { source: 'local', labelColor: form.labelColor },
+    editableCalendars.find((c) => c.id === form.calendarId),
+  );
   return (
     <BottomSheet
       open={open}
@@ -172,7 +213,13 @@ export function EventFormSheet({
           // フォーム値を検証する。これで入力途中でも画面内エラーに留める。
           const invalid = validateEventInput(
             form.allDay
-              ? { title: form.title, allDay: true, eventDate: form.dateLocal, location: form.location, url: form.url.trim() || null }
+              ? {
+                  title: form.title,
+                  allDay: true,
+                  eventDate: form.dateLocal,
+                  location: form.location,
+                  url: form.url.trim() || null,
+                }
               : {
                   title: form.title,
                   location: form.location,
@@ -200,6 +247,52 @@ export function EventFormSheet({
         }}
       >
         <label className="flex flex-col gap-1">
+          <span className="text-meta text-ink-secondary">{t('タグ')}</span>
+          <select
+            value={selectedTag}
+            disabled={tagsLoading || tags.length === 0}
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+            onChange={(e) => {
+              const tag = tags.find((item) => item.id === e.target.value);
+              if (!tag) {
+                setSelectedTag('');
+                return;
+              }
+              const date = form.allDay ? form.dateLocal : form.startLocal.slice(0, 10);
+              const applied = applyEventTag(tag, date);
+              if (!applied) {
+                setErrorKey('event/invalid-date');
+                return;
+              }
+              setSelectedTag(tag.id);
+              setForm((current) => ({ ...current, ...applied }));
+              setErrorKey(null);
+            }}
+          >
+            <option value="">
+              {tagsLoading ? t('読み込み中…') : t('タグを選択（任意）')}
+            </option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name} ({tag.startLocal}–{tag.endLocal})
+              </option>
+            ))}
+          </select>
+        </label>
+        {tagsError ? (
+          <p className="text-meta text-danger">
+            {t('タグを読み込めませんでした。予定はそのまま入力できます。')}
+          </p>
+        ) : (
+          !tagsLoading &&
+          tags.length === 0 && (
+            <p className="text-meta text-ink-secondary">
+              {t('設定の「予定タグ」から登録できます。')}
+            </p>
+          )
+        )}
+
+        <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('タイトル')}</span>
           <input
             value={form.title}
@@ -224,6 +317,34 @@ export function EventFormSheet({
             ))}
           </select>
         </label>
+
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-meta text-ink-secondary">{t('ラベル色')}</span>
+            <input
+              type="color"
+              value={previewColor}
+              onChange={(e) => set('labelColor', e.target.value)}
+              className="h-11 w-16 rounded-sm border border-border-hairline"
+            />
+          </label>
+          <span
+            className="truncate rounded-sm px-2 py-1 text-body"
+            style={{
+              backgroundColor: previewColor,
+              color: labelTextColor(previewColor),
+            }}
+          >
+            {form.title || t('予定のプレビュー')}
+          </span>
+          <button
+            type="button"
+            onClick={() => set('labelColor', null)}
+            className="min-h-11 text-left text-meta text-accent"
+          >
+            {t('カレンダーの色を使う')}
+          </button>
+        </div>
 
         <label className="flex items-center gap-2">
           <input
@@ -310,7 +431,8 @@ export function EventFormSheet({
               const request = ++launchRequest.current;
               setLaunchError(null);
               void openMap(form.location).then((ok) => {
-                if (request === launchRequest.current && !ok) setLaunchError('地図を開けませんでした');
+                if (request === launchRequest.current && !ok)
+                  setLaunchError('地図を開けませんでした');
               });
             }}
           >
@@ -338,14 +460,19 @@ export function EventFormSheet({
               const request = ++launchRequest.current;
               setLaunchError(null);
               void openExternalUrl(form.url).then((ok) => {
-                if (request === launchRequest.current && !ok) setLaunchError('リンクを開けませんでした');
+                if (request === launchRequest.current && !ok)
+                  setLaunchError('リンクを開けませんでした');
               });
             }}
           >
             {t('リンクを開く')}
           </button>
         )}
-        {launchError && <p role="alert" className="text-meta text-danger">{t(launchError)}</p>}
+        {launchError && (
+          <p role="alert" className="text-meta text-danger">
+            {t(launchError)}
+          </p>
+        )}
 
         {editing && !editing.allDay && (
           <ReminderPicker

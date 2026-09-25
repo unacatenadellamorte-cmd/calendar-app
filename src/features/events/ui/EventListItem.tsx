@@ -1,6 +1,7 @@
 import { t, useLanguage } from '@/i18n';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
+import { eventLabelColor, labelTextColor } from '@/lib/event-label';
 import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
 interface EventListItemProps {
   event: EventItem;
@@ -16,6 +17,8 @@ export function EventListItem({
   compact = false,
 }: EventListItemProps) {
   useLanguage();
+  const filled = event.source === 'local';
+  const color = eventLabelColor(event, calendar);
   let when = '';
   if (event.allDay && event.eventDate) {
     when = compact ? t('終日') : formatEventDate(event.eventDate);
@@ -29,14 +32,14 @@ export function EventListItem({
         onClick={() => onEdit(event)}
         className="flex min-h-14 w-full items-center gap-3 py-2 pr-2 text-left"
       >
-        <span
+        {!filled && <span
           aria-hidden="true"
           className="h-8 w-1 flex-none rounded-full"
           style={{ backgroundColor: calendar?.color ?? 'var(--color-ink-disabled)' }}
-        />
+        />}
         <span className="min-w-0 flex-1">
           <span className="block text-meta text-ink-secondary tabular">{when}</span>
-          <span className="block truncate text-body text-ink-primary">{event.title}</span>
+          <span className="block truncate rounded-sm text-body text-ink-primary" style={filled ? { backgroundColor: color, color: labelTextColor(color), paddingInline: 6, paddingBlock: 2 } : undefined}>{event.title}</span>
         </span>
         <span className="flex-none text-meta text-ink-secondary">
           {calendar?.name ?? t('不明なカレンダー')}

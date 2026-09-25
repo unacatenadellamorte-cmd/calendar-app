@@ -2,6 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
+import { eventLabelColor, labelTextColor } from '@/lib/event-label';
 import { formatClock } from '@/lib/datetime';
 interface EventChipProps {
   event: EventItem;
@@ -34,7 +35,8 @@ export function EventChip({
   const titleTextRef = useRef<HTMLSpanElement>(null);
   const [marqueeDistance, setMarqueeDistance] = useState(0);
   const time = event.allDay ? t('終日') : event.startsAt ? formatClock(event.startsAt) : '';
-  const color = calendar?.color ?? 'var(--color-ink-disabled)';
+  const filled = event.source === 'local';
+  const color = filled ? eventLabelColor(event, calendar) : calendar?.color ?? 'var(--color-ink-disabled)';
   const label = [time, event.title, calendar?.name].filter(Boolean).join(' ');
   const marqueeDuration = Math.max(4, Math.min(14, 4 + marqueeDistance * 0.055));
   useEffect(() => {
@@ -63,7 +65,7 @@ export function EventChip({
         e.stopPropagation();
         onTap(event);
       }}
-      style={{ ...style, borderColor: color }}
+      style={{ ...style, borderColor: color, ...(filled ? { backgroundColor: color, color: labelTextColor(color), borderLeftWidth: 0, paddingInline: 2 } : {}) }}
       aria-label={label}
       title={calendar ? `${event.title} ・ ${calendar.name}` : event.title}
       className={[
@@ -74,7 +76,7 @@ export function EventChip({
       ].join(' ')}
     >
       {showTime && time && (
-        <span className="flex-none tabular text-ink-secondary">{time}</span>
+        <span className={filled ? "flex-none tabular" : "flex-none tabular text-ink-secondary"}>{time}</span>
       )}
       {month ? (
         <span

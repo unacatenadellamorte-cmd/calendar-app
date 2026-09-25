@@ -524,3 +524,18 @@ describe('useEvents', () => {
     });
   });
 });
+
+
+it('既存予定のラベル色の変更と解除が保存・再取得まで届く', async () => {
+  let saved = ev();
+  listEvents.mockImplementation(async () => ok([saved]));
+  updateEvent.mockImplementation(async (_current, patch) => { saved = { ...saved, ...patch }; return ok(saved); });
+  const { result } = renderHook(() => useEvents(true));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  for (const labelColor of ['#FFCC00', null]) {
+    await act(async () => { await result.current.update(saved, { ...timedInput, labelColor }); });
+    expect(saved.labelColor).toBe(labelColor);
+    await act(async () => { await result.current.reload(); });
+    expect(result.current.events[0]?.labelColor).toBe(labelColor);
+  }
+});

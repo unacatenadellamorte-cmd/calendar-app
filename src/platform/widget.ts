@@ -1,3 +1,4 @@
+import { eventLabelColor } from '@/lib/event-label';
 import { Capacitor } from '@capacitor/core';
 import { WidgetBridgePlugin } from 'capacitor-widget-bridge';
 import { compareEventsForList, selectFeaturedEvents } from '@core';
@@ -56,6 +57,7 @@ export interface FeaturedWidgetEventPayload {
 }
 
 export interface CalendarOverviewEventPayload {
+  filledLabel: boolean;
   id: string;
   title: string;
   calendarName: string;
@@ -187,7 +189,8 @@ export function buildCalendarOverviewPayload(
         id: event.id,
         title: event.title,
         calendarName: calendar.name,
-        colorHex: calendar.color || EXTERNAL_DEFAULT_COLOR,
+        colorHex: event.source === 'local' ? eventLabelColor(event, calendar) : calendar.color || EXTERNAL_DEFAULT_COLOR,
+        filledLabel: event.source === 'local',
         ...range,
         allDay: event.allDay,
       };
