@@ -2,17 +2,10 @@ package jp.ryo.multicalendar.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import android.content.SharedPreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.currentState
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
@@ -53,18 +46,9 @@ class MonthEventsWidget : GlanceAppWidget() {
 private fun MonthEventsContent() {
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE) }
-    var dataRevision by remember { mutableIntStateOf(0) }
-    DisposableEffect(preferences) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == null || key == CALENDAR_OVERVIEW_KEY || key == WIDGET_APPEARANCE_KEY) dataRevision++
-        }
-        preferences.registerOnSharedPreferenceChangeListener(listener)
-        // 初回読出しからリスナー登録までに更新された場合も再読出しする。
-        dataRevision++
-        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
-    val overview = remember(dataRevision) { readCalendarOverview(context) }
-    val appearance = remember(dataRevision) { readWidgetAppearance(context) }
+    val snapshot = rememberWidgetSnapshot()
+    val overview = snapshot.overview
+    val appearance = snapshot.appearance
     val size = LocalSize.current
     val fontScale = context.resources.configuration.fontScale * appearance.appFontScale
     val today = todayWidgetDay()
@@ -125,12 +109,11 @@ private fun MonthEventsContent() {
                             if (day == null) {
                                 MonthBlankCell(GlanceModifier.defaultWeight())
                             } else {
-                                MonthDayCell(
+                                CalendarWidgetDayCell(
                                     context,
                                     overview,
                                     appearance,
                                     today,
-                                    displayedMonth,
                                     day,
                                     cellHeightDp,
                                     fontScale,
@@ -143,68 +126,6 @@ private fun MonthEventsContent() {
             }
         }
     }
-}
-
-@Composable
-private fun MonthDayCell(
-    context: Context,
-    overview: CalendarOverview,
-    appearance: WidgetAppearance,
-    today: WidgetDay,
-    displayedMonth: WidgetDay,
-    day: WidgetDay,
-    cellHeightDp: Float,
-    fontScale: Float,
-    cellModifier: GlanceModifier,
-) {
-    val events = eventsForWidgetDay(overview.events, day)
-    val visibleEvents = events.take(monthVisibleEventCount(cellHeightDp, events.size, fontScale).coerceAtMost(4))
-    val overflowCount = events.size - visibleEvents.size
-    val isToday = day == today
-    val inCurrentMonth = day.month == displayedMonth.month && day.year == displayedMonth.year
-    Column(
-            modifier = GlanceModifier
-                .then(cellModifier)
-                .fillMaxHeight()
-                .background(if (isToday) appearance.todayColor else Color.Transparent)
-                .clickable(actionStartActivity(createWidgetIntent(context, day)))
-                .padding(2.dp),
-        ) {
-            Row(modifier = GlanceModifier.fillMaxWidth().height((16f * fontScale).dp)) {
-                Text(
-                    text = day.day.toString(),
-                    style = TextStyle(
-                        fontSize = scaledSp(12f, appearance),
-                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = ColorProvider(
-                            when {
-                                isToday -> appearance.todayTextColor
-                                inCurrentMonth -> appearance.primaryTextColor
-                                else -> appearance.mutedTextColor
-                            },
-                        ),
-                        textAlign = TextAlign.Center,
-                    ),
-                    modifier = GlanceModifier.defaultWeight(),
-                )
-                if (overflowCount > 0) {
-                    Text(
-                        text = widgetOverflowCountText(overflowCount),
-                        style = TextStyle(fontSize = scaledSp(7f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
-                        maxLines = 1,
-                    )
-                }
-            }
-            visibleEvents.forEach { event ->
-                // 色マーカーと件名を1つのViewにして、予定の多い月でもGlanceの上限を超えない。
-                Text(
-                    text = "▎${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
-                    modifier = GlanceModifier.fillMaxWidth().height((12f * fontScale).dp),
-                    style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(widgetEventColor(event.colorHex, appearance.primaryTextColor))),
-                    maxLines = 1,
-                )
-            }
-        }
 }
 
 @Composable

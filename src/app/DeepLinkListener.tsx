@@ -6,7 +6,7 @@ import { isValidLocalDate } from '@/lib/datetime';
 /**
  * ディープリンクの唯一の受け口(ARCHITECTURE-SPINE Epic5 AD-16)。
  * `calendar-app://event/{id}`、`calendar-app://day/{date}`、
- * `calendar-app://create/{date}` の形式だけを解釈し、既存のルーティングへ委ねる。
+ * `calendar-app://create/{date}`、`calendar-app://settings/` を既存のルーティングへ委ねる。
  * 未知のスキーム/ホスト部は静かに無視する(現在の画面のまま何もしない、クラッシュしない)。
  *
  * `<BrowserRouter>` の内側、`<AppRoutes />` と並べて配置する(src/main.tsx)。
@@ -56,6 +56,7 @@ function toInternalRoute(url: string): string | null {
 
   const kind = parsed.hostname.toLowerCase();
   const value = decodeSegment(parsed.pathname.replace(/^\/+/, ''));
+  if (kind === 'settings' && !value) return '/settings';
   if (!value) return null;
 
   if (kind === 'event') return `/calendar?event=${encodeURIComponent(value)}`;

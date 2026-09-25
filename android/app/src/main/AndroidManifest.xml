@@ -58,6 +58,7 @@
         -->
         <receiver
             android:name=".widget.FeaturedEventsWidgetReceiver"
+            android:label="@string/widget_day_label"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

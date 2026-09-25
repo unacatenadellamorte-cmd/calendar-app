@@ -366,6 +366,19 @@ describe('buildCalendarOverviewPayload', () => {
     expect(payload.events.map((event) => event.id)).toEqual(['first-event', 'later-event']);
   });
 
+  it('同日の時刻付き・終日をアプリと同じ順にし、カレンダーの並び変更も反映する', () => {
+    const events = [
+      ev({ id: 'all', calendarId: 'a', allDay: true, startsAt: null, endsAt: null, eventDate: '2026-09-08' }),
+      ev({ id: 'b-time', calendarId: 'b', startsAt: '2026-09-08T01:00:00Z' }),
+      ev({ id: 'a-time', calendarId: 'a', startsAt: '2026-09-08T06:00:00Z' }),
+    ];
+    const calendars = [cal({ id: 'a', priority: 0 }), cal({ id: 'b', priority: 1 })];
+    expect(buildCalendarOverviewPayload(events, calendars, '2026-09-08T00:00:00Z').events.map(e => e.id))
+      .toEqual(['a-time', 'all', 'b-time']);
+    expect(buildCalendarOverviewPayload(events, calendars.map(c => ({ ...c, priority: 1 - c.priority })), '2026-09-08T00:00:00Z').events.map(e => e.id))
+      .toEqual(['b-time', 'a-time', 'all']);
+  });
+
   it('表示中かつ公開の予定を全件、ローカル日付の範囲順で整形する', () => {
     const calendars = [cal({ id: 'c1' }), cal({ id: 'off', isVisible: false })];
     const events = [
@@ -377,8 +390,8 @@ describe('buildCalendarOverviewPayload', () => {
     ];
     const payload = buildCalendarOverviewPayload(events, calendars, '2026-09-08T00:00:00.000Z', 'en');
     expect(payload).toMatchObject({ schemaVersion: 1, updatedAtIso: '2026-09-08T00:00:00.000Z', language: 'en' });
-    expect(payload.events.map((event) => event.id)).toEqual(['all-day', 'overnight']);
-    expect(payload.events[1]).toMatchObject({
+    expect(payload.events.map((event) => event.id)).toEqual(['overnight', 'all-day']);
+    expect(payload.events[0]).toMatchObject({
       startDate: '2026-09-08',
       endDate: '2026-09-09',
       startsAtIso: '2026-09-08T14:00:00.000Z',

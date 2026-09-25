@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { WidgetBridgePlugin } from 'capacitor-widget-bridge';
-import { selectFeaturedEvents } from '@core';
+import { compareEventsForList, selectFeaturedEvents } from '@core';
 import { hideSecretEvents, listEvents, type EventItem } from '@/data/events';
 import { listCalendars, type Calendar } from '@/data/calendars';
 import { EXTERNAL_DEFAULT_COLOR } from '@/data/calendar-colors';
@@ -12,9 +12,8 @@ import { buildWidgetAppearance, WIDGET_APPEARANCE_KEY } from './widgetAppearance
 /**
  * ホーム画面ウィジェットのデータブリッジ(Story 5.6、ARCHITECTURE-SPINE Epic5 AD-12)。
  * `deviceCalendar.ts`/`deepLink.ts` と同じ層分離 ── 選抜ロジック(`selectFeaturedEvents`)
- * の呼び出しと JSON 整形はここ(JS側)だけで行い、ネイティブ側(Android の
- * `FeaturedEventsWidget.kt`)はサイズに応じて渡された配列を切り詰めて表示するだけ
- * (AD-12「選抜ロジックは共有する」)。
+ * と一覧の並び替え(compareEventsForList)・JSON整形をここで共有する。
+ * Androidの日・週・月はcalendarOverview、iOSの代表予定はfeaturedEventsを読む。
  *
  * `WIDGET_GROUP` は iOS App Group 識別子(AD-18)と同じ文字列を、Android では
  * SharedPreferences のファイル名として流用する(Story 5.5 との一貫性のため)。
@@ -64,6 +63,7 @@ export interface CalendarOverviewEventPayload {
   startDate: string;
   endDate: string;
   startsAtIso: string | null;
+  endsAtIso: string | null;
   allDay: boolean;
 }
 
@@ -144,10 +144,11 @@ function dateRangeForEvent(event: EventItem): {
   startDate: string;
   endDate: string;
   startsAtIso: string | null;
+  endsAtIso: string | null;
 } | null {
   if (event.allDay) {
     if (!event.eventDate || !isLocalDate(event.eventDate)) return null;
-    return { startDate: event.eventDate, endDate: event.eventDate, startsAtIso: null };
+    return { startDate: event.eventDate, endDate: event.eventDate, startsAtIso: null, endsAtIso: null };
   }
   if (!event.startsAt) return null;
   const startMs = Date.parse(event.startsAt);
@@ -160,7 +161,8 @@ function dateRangeForEvent(event: EventItem): {
     // 終了はexclusive。深夜0時終了なら前日までにする。
     endDate = localDateString(new Date(Math.max(startMs, endMs - 1)));
   }
-  return { startDate, endDate, startsAtIso: new Date(startMs).toISOString() };
+  return { startDate, endDate, startsAtIso: new Date(startMs).toISOString(),
+    endsAtIso: event.endsAt ? new Date(event.endsAt).toISOString() : null };
 }
 
 export function buildCalendarOverviewPayload(
@@ -173,7 +175,9 @@ export function buildCalendarOverviewPayload(
   const visibleIds = new Set(calendars.filter((calendar) => calendar.isVisible).map((calendar) => calendar.id));
   const priorityOf = makePriorityOf(calendarById);
   const overviewEvents = events
-    .filter((event) => visibleIds.has(event.calendarId) && !event.isSecret)
+    // 不正な時刻を比較関数へ渡すとNaNが混ざるため、並べ替え前に除外する。
+    .filter((event) => visibleIds.has(event.calendarId) && !event.isSecret && dateRangeForEvent(event) !== null)
+    .sort((a, b) => compareEventsForList(a, b, priorityOf))
     .map((event) => {
       const range = dateRangeForEvent(event);
       const calendar = calendarById.get(event.calendarId);
@@ -189,13 +193,6 @@ export function buildCalendarOverviewPayload(
       };
     })
     .filter((event): event is CalendarOverviewEventPayload & { calendarId: string } => event !== null)
-    .sort((a, b) =>
-      priorityOf(a.calendarId) - priorityOf(b.calendarId) ||
-      a.startDate.localeCompare(b.startDate) ||
-      Number(b.allDay) - Number(a.allDay) ||
-      (a.startsAtIso ?? '').localeCompare(b.startsAtIso ?? '') ||
-      a.id.localeCompare(b.id),
-    )
     .map(({ calendarId: _calendarId, ...event }) => event);
   return { schemaVersion: 1, updatedAtIso, language, events: overviewEvents };
 }

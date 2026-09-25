@@ -34,6 +34,7 @@ internal data class CalendarOverviewEvent(
     val endDate: WidgetDay,
     val startsAtIso: String,
     val allDay: Boolean,
+    val endsAtIso: String = "",
 )
 
 internal data class CalendarOverview(
@@ -152,6 +153,7 @@ internal fun readCalendarOverview(context: Context): CalendarOverview {
                     endDate = normalizedEnd,
                     startsAtIso = item.optString("startsAtIso", ""),
                     allDay = item.optBoolean("allDay", false),
+                    endsAtIso = item.optString("endsAtIso", ""),
                 ))
             }
         }

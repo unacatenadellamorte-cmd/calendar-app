@@ -31,6 +31,15 @@ afterEach(() => {
 });
 
 describe('DeepLinkListener', () => {
+  it('日の歯車リンクで設定画面を開き、不明な設定パスは無視する', () => {
+    render(<DeepLinkListener />);
+    capturedHandler?.('calendar-app://settings/');
+    expect(navigateMock).toHaveBeenCalledWith('/settings');
+    navigateMock.mockClear();
+    capturedHandler?.('calendar-app://settings/unknown');
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('create リンクは実在する日付だけを /calendar?create= へ変換する', () => {
     render(<DeepLinkListener />);
     capturedHandler?.('calendar-app://create/2026-02-28');

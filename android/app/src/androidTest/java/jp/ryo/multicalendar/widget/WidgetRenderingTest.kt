@@ -110,6 +110,151 @@ class WidgetRenderingTest {
         }
     }
 
+    @Test
+    fun dayAndWeekKeepCalendarOrderAndLiveUpdates() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 2)
+        val ids = mutableListOf<Int>()
+        val today = todayWidgetDay()
+        val first = weekWidgetDays(today).first()
+        val events = JSONArray().apply {
+            // 同日のカレンダー優先度順を表す。件名や時刻で並べ替えてはいけない。
+            for (offset in 0..20) {
+                listOf("先頭予定", "後続予定").forEachIndexed { index, title ->
+                    val day = addWidgetDays(first, offset)
+                    put(JSONObject().put("id", "$offset-$index").put("title", "$title$offset")
+                        .put("calendarName", "検証").put("startDate", day.toKey()).put("endDate", day.toKey())
+                        .put("allDay", true).put("colorHex", if (index == 0) "#E99A43" else "#3AAE97"))
+                }
+            }
+        }
+        try {
+            prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString())
+                .putString(WIDGET_APPEARANCE_KEY, """{"schemaVersion":1,"theme":"dark","appFontScale":1}""").commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            val week = renderProvider(host, ComponentName(context, WeekEventsWidgetReceiver::class.java), 380, 180, ids, "先頭予定0")
+            val day = renderProvider(host, ComponentName(context, FeaturedEventsWidgetReceiver::class.java), 380, 270, ids, "先頭予定")
+            layoutForAssertions(week, 380, 180)
+            layoutForAssertions(day, 380, 270)
+            assertText(day, "⚙")
+            assertText(day, "今日")
+            assertTextViewsFitParent(day, listOf("先頭予定", "後続予定", "今日"))
+            assertInVerticalOrder(day, "先頭予定", "後続予定")
+            assertInVerticalOrder(week, "先頭予定0", "後続予定0")
+            val list = findListView(day) ?: error("予定一覧のスクロールViewがない")
+            runOnMain { list.setSelection(list.count - 1) }
+            waitUntil("一覧末尾へのスクロール") {
+                layoutForAssertions(day, 380, 270)
+                findText(day, "後続予定20")
+            }
+            runOnMain { list.setSelection(0) }
+            waitUntil("一覧先頭に戻る") {
+                layoutForAssertions(day, 380, 270)
+                findText(day, "今日")
+            }
+            saveBitmap(day, "widget-day-agenda.png", 380, 270)
+            val smallDay = renderProvider(host, ComponentName(context, FeaturedEventsWidgetReceiver::class.java), 180, 110, ids, "先頭予定")
+            assertTextViewsFitParent(smallDay, listOf("⚙", "＋", "先頭予定"))
+            saveBitmap(smallDay, "widget-day-small.png", 180, 110)
+            val legacyDay = renderProvider(host, ComponentName(context, FeaturedEventsWidgetReceiver::class.java), 180, 40, ids, "先頭予定")
+            assertTextViewsFitParent(legacyDay, listOf("⚙", "＋", "先頭予定"))
+            saveBitmap(legacyDay, "widget-day-legacy.png", 180, 40)
+            assertTextViewsFitParent(week, listOf(weekHeaderText(weekWidgetDays(today))))
+            assertNoEllipsis(week, weekHeaderText(weekWidgetDays(today)))
+            saveBitmap(week, "widget-week-unified.png", 380, 180)
+            listOf("▼" to 7, "▲" to 0).forEach { (arrow, offset) ->
+                val started = android.os.SystemClock.elapsedRealtime()
+                runOnMain { assertTrue(clickText(week, arrow)) }
+                waitUntil("週移動") { findText(week, "先頭予定$offset") }
+                layoutForAssertions(week, 380, 180)
+                assertTextViewsFitParent(week, listOf("先頭予定$offset", "後続予定$offset"))
+                val elapsed = android.os.SystemClock.elapsedRealtime() - started
+                android.util.Log.i("WidgetResponseTest", "week=$offset elapsedMs=$elapsed")
+                assertTrue("週切替に${elapsed}ms", elapsed <= 1000)
+            }
+            // アプリで順番を変えた共有データを受け取ると、どちらもその場で並び替わる。
+            val reversed = JSONArray()
+            for (index in events.length() - 1 downTo 0) reversed.put(events.getJSONObject(index))
+            prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", reversed).toString()).commit()
+            waitUntil("日・週の並び順更新") {
+                layoutForAssertions(day, 380, 270)
+                layoutForAssertions(week, 380, 180)
+                isInVerticalOrder(day, "後続予定", "先頭予定") && isInVerticalOrder(week, "後続予定0", "先頭予定0")
+            }
+            // 実際のRemoteViewsから起動したActivityのURLを確認する。
+            val firstId = dayAgendaEvents(readCalendarOverview(context).events, today).first().id
+            listOf("後続予定" to "calendar-app://event/$firstId", "⚙" to "calendar-app://settings/", "＋" to "calendar-app://create/${today.toKey()}").forEach { (text, expectedUrl) ->
+                runOnMain {
+                    androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).toList().forEach { it.finish() }
+                }
+                instrumentation.waitForIdleSync()
+                runOnMain { assertTrue("日の操作をクリックできない: $text", clickContainingText(day, text)) }
+                waitUntil("起動リンク: $expectedUrl") {
+                    runOnMain {
+                        androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                            .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)
+                            .any { it.intent?.data?.toString() == expectedUrl }
+                    }
+                }
+            }
+            runOnMain {
+                androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).toList().forEach { it.finish() }
+            }
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
+            }
+            edit.commit()
+        }
+    }
+
+    private fun findListView(view: View): android.widget.ListView? {
+        if (view is android.widget.ListView) return view
+        if (view is android.view.ViewGroup) for (i in 0 until view.childCount) findListView(view.getChildAt(i))?.let { return it }
+        return null
+    }
+
+    private fun assertNoEllipsis(view: View, text: String) {
+        if (view is TextView && view.text.toString() == text) {
+            val layout = view.layout ?: error("文字レイアウトがない")
+            for (line in 0 until layout.lineCount) assertTrue("見出しが省略された: $text", layout.getEllipsisCount(line) == 0)
+        }
+        if (view is android.view.ViewGroup) for (i in 0 until view.childCount) assertNoEllipsis(view.getChildAt(i), text)
+    }
+
+    private fun isInVerticalOrder(view: View, first: String, second: String): Boolean {
+        val boxes = mutableListOf<TextBox>()
+        collectTextViews(view, boxes, -view.left, -view.top)
+        val before = boxes.firstOrNull { it.text.contains(first) } ?: return false
+        val after = boxes.firstOrNull { it.text.contains(second) } ?: return false
+        return before.top < after.top
+    }
+
+    private fun assertInVerticalOrder(view: View, first: String, second: String) {
+        assertTrue("予定順が違う: $first → $second", isInVerticalOrder(view, first, second))
+    }
+
+    private fun clickContainingText(view: View, text: String): Boolean {
+        if (view is TextView && view.text.toString().contains(text)) {
+            var target: View? = view
+            while (target != null && !target.isClickable) target = target.parent as? View
+            return target?.performClick() ?: false
+        }
+        if (view is android.view.ViewGroup) for (index in 0 until view.childCount) {
+            if (clickContainingText(view.getChildAt(index), text)) return true
+        }
+        return false
+    }
+
     private fun clickText(view: View, text: String): Boolean {
         if (view is TextView && view.text.toString() == text) {
             var target: View? = view
@@ -282,6 +427,7 @@ class WidgetRenderingTest {
         }
         context.sendBroadcast(update)
         waitUntil("RemoteViews update for $provider") {
+            layoutForAssertions(view, widthDp, heightDp)
             view.childCount > 0 && (findText(view, "＋") || findText(view, "+")) && findText(view, expectedTitle)
         }
         return view
