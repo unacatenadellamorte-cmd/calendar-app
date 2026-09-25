@@ -73,3 +73,14 @@ ObsidianのsaveスキルはWSLでのトランザクション書込みが必要�
 - 更新先行・削除先行の2接続テストも成功。非公開schemaの仮関数と専用fixture2名だけを使い、実ロック待ち、新旧Vault消去、他者保護を確認。終了時の仮関数/schema/fixture/秘密情報消去を検証し、公開RPCは未適用のまま。
 - 応答喪失に続いて認証も失効した場合は、削除済みと推定せずサポート案内を残す。実機では削除を実行していない。ネイティブAPIの永久停止の再現・タイムアウト設計は未検証として別記録。
 - Obsidianは保存skillのWSL必須条件を満たせず未記録。成果・検証は本リポジトリへ記録しコミットする。秘密値は記録していない。
+
+## サーバー反映と提出版1.0.16
+- 本人限定削除RPCとGoogle接続更新のロックをSupabaseへ恒久適用。適用後も使い捨てfixtureのSQL検証が成功し、トランザクションはrollback。実ユーザーは削除していない。
+- 公開用HTML2ファイルだけを専用ブランチの078715cへコミットし、既存の公開対象ブランチへ通常のfast-forwardで反映。Pages実行36168482332は成功。私的な運用記録を含むローカル履歴はpushしていない。
+- https://unacatenadellamorte-cmd.github.io/calendar-app/account-deletion.html の公開内容をブラウザで確認。
+- AndroidはversionCode17/versionName1.0.16へ更新。JDK21で単体テスト35件、lintRelease、署名付きbundleRelease成功。lintは0 errors/43 warnings。実機テスト・アンインストール・データ消去は行っていない。
+- AAB SHA256: B97CA6B9BF933B9AB456EF8E58FB9C8BFFA5809C8DA56CBADC1234896DE2ABE4
+- AAB出力: LOCALAPPDATA/calendar-app/play-build-20260926/build-output17/app/outputs/bundle/release/app-release.aab
+- Playが17 (1.0.16)を受付。旧16をリリース下書きから外し、17のみで名前・削除機能のノートを未公開保存。画面の「変更を保存しました」を確認。配信・審査提出は未実施。
+- 審査用パスワードのユーザー入力、Google連携の審査アクセス、対象年齢・データセーフティ詳細申告、12名以上の14日間継続テストは残っている。
+- 公開済み削除URLをデータセーフティの未公開版へ登録し、画面の「変更を保存しました」を確認。詳細のデータ種類・用途申告は未完了。
