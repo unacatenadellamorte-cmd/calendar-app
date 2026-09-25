@@ -55,44 +55,51 @@ private fun MonthEventsContent() {
     val weekdayDays = (0..6).map { addWidgetDays(displayedMonth, it) }
     val rows = days.chunked(7)
     val dividerHeight = (rows.size - 1).coerceAtLeast(0).toFloat()
-    val cellHeightDp = monthCellHeightDp((size.height.value - dividerHeight).coerceAtLeast(0f), rows.size, fontScale)
+    val headerHeight = 30f * fontScale.coerceAtLeast(1f)
+    val weekdayHeight = 18f * fontScale.coerceAtLeast(1f)
+    val cellHeightDp = ((size.height.value - 12f - headerHeight - weekdayHeight - dividerHeight) / rows.size)
+        .coerceAtLeast(24f)
     Column(
         modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp),
     ) {
-        Row(modifier = GlanceModifier.fillMaxWidth().height((24f * fontScale.coerceAtLeast(1f)).dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().height(headerHeight.dp)) {
             Text(
                 text = "${displayedMonth.year}/${displayedMonth.month} ${widgetText(overview.language, "month")}",
-                style = TextStyle(fontSize = scaledSp(14f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor)),
+                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor)),
                 modifier = GlanceModifier.defaultWeight(),
             )
-            Text(
-                text = "▲",
-                style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 7.dp, vertical = 3.dp),
-            )
-            Text(
-                text = "▼",
-                style = TextStyle(fontSize = scaledSp(12f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 7.dp, vertical = 3.dp),
-            )
-            Spacer(modifier = GlanceModifier.width(6.dp))
+            Row(modifier = GlanceModifier.defaultWeight()) {
+                Spacer(modifier = GlanceModifier.defaultWeight())
+                Text(
+                    text = "▲",
+                    style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                    modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 9.dp, vertical = 3.dp),
+                )
+                Spacer(modifier = GlanceModifier.width(12.dp))
+                Text(
+                    text = "▼",
+                    style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                    modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 9.dp, vertical = 3.dp),
+                )
+                Spacer(modifier = GlanceModifier.defaultWeight())
+            }
             Text(
                 text = "＋",
                 style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 3.dp),
+                modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 3.dp),
             )
         }
-        Row(modifier = GlanceModifier.fillMaxWidth().height((20f * fontScale.coerceAtLeast(1f)).dp)) {
+        Row(modifier = GlanceModifier.fillMaxWidth().height(weekdayHeight.dp)) {
             (0..6).forEach { index ->
                 Text(
                     text = widgetWeekdayLabel(weekdayDays[index], overview.language),
-                    style = TextStyle(fontSize = scaledSp(9f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
-                    modifier = GlanceModifier.defaultWeight().padding(1.dp),
+                    style = TextStyle(fontSize = scaledSp(9f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor), textAlign = TextAlign.Center),
+                    modifier = GlanceModifier.defaultWeight().fillMaxWidth().padding(1.dp),
                 )
             }
         }
         rows.forEachIndexed { rowIndex, row ->
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
+            Row(modifier = GlanceModifier.fillMaxWidth().height(cellHeightDp.dp)) {
                 row.forEachIndexed { dayIndex, day ->
                     if (day == null) {
                         MonthBlankCell(appearance, dayIndex < row.lastIndex, GlanceModifier.defaultWeight())
@@ -102,6 +109,7 @@ private fun MonthEventsContent() {
                             overview,
                             appearance,
                             today,
+                            displayedMonth,
                             day,
                             cellHeightDp,
                             fontScale,
@@ -129,6 +137,7 @@ private fun MonthDayCell(
     overview: CalendarOverview,
     appearance: WidgetAppearance,
     today: WidgetDay,
+    displayedMonth: WidgetDay,
     day: WidgetDay,
     cellHeightDp: Float,
     fontScale: Float,
@@ -139,7 +148,7 @@ private fun MonthDayCell(
     val visibleEvents = events.take(monthVisibleEventCount(cellHeightDp, events.size, fontScale))
     val overflowCount = events.size - visibleEvents.size
     val isToday = day == today
-    val inCurrentMonth = day.month == today.month && day.year == today.year
+    val inCurrentMonth = day.month == displayedMonth.month && day.year == displayedMonth.year
     Row(modifier = cellModifier.fillMaxHeight()) {
         Column(
             modifier = GlanceModifier
