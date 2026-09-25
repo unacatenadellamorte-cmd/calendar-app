@@ -55,38 +55,36 @@ private fun MonthEventsContent() {
     val weekdayDays = (0..6).map { addWidgetDays(displayedMonth, it) }
     val rows = days.chunked(7)
     val dividerHeight = (rows.size - 1).coerceAtLeast(0).toFloat()
-    val headerHeight = 30f * fontScale.coerceAtLeast(1f)
-    val weekdayHeight = 18f * fontScale.coerceAtLeast(1f)
+    val headerHeight = 28f * fontScale.coerceAtLeast(1f)
+    val weekdayHeight = 16f * fontScale.coerceAtLeast(1f)
     val cellHeightDp = ((size.height.value - 12f - headerHeight - weekdayHeight - dividerHeight) / rows.size)
-        .coerceAtLeast(24f)
+        .coerceAtLeast(1f)
     Column(
         modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp),
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth().height(headerHeight.dp)) {
-            Text(
-                text = "${displayedMonth.year}/${displayedMonth.month} ${widgetText(overview.language, "month")}",
-                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor)),
-                modifier = GlanceModifier.defaultWeight(),
-            )
             Row(modifier = GlanceModifier.defaultWeight()) {
-                Spacer(modifier = GlanceModifier.defaultWeight())
                 Text(
                     text = "▲",
                     style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                    modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 9.dp, vertical = 3.dp),
+                    modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 7.dp, vertical = 2.dp),
                 )
-                Spacer(modifier = GlanceModifier.width(12.dp))
+                Spacer(modifier = GlanceModifier.width(10.dp))
                 Text(
                     text = "▼",
                     style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                    modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 9.dp, vertical = 3.dp),
+                    modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 7.dp, vertical = 2.dp),
                 )
-                Spacer(modifier = GlanceModifier.defaultWeight())
             }
             Text(
+                text = "${displayedMonth.year}/${displayedMonth.month}${widgetText(overview.language, "month")}",
+                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor), textAlign = TextAlign.Center),
+                modifier = GlanceModifier.defaultWeight(),
+            )
+            Text(
                 text = "＋",
-                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 3.dp),
+                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.End),
+                modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 2.dp),
             )
         }
         Row(modifier = GlanceModifier.fillMaxWidth().height(weekdayHeight.dp)) {
@@ -94,7 +92,7 @@ private fun MonthEventsContent() {
                 Text(
                     text = widgetWeekdayLabel(weekdayDays[index], overview.language),
                     style = TextStyle(fontSize = scaledSp(9f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor), textAlign = TextAlign.Center),
-                    modifier = GlanceModifier.defaultWeight().fillMaxWidth().padding(1.dp),
+                    modifier = GlanceModifier.defaultWeight().padding(1.dp),
                 )
             }
         }

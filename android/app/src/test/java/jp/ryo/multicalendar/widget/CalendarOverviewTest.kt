@@ -42,6 +42,15 @@ class CalendarOverviewTest {
     }
 
     @Test
+    fun `2026年9月は1日から30日まで5週グリッドに含める`() {
+        val days = monthGridDays(2026, 9)
+        assertEquals(35, days.size)
+        assertEquals("2026-09-01", days[2]?.toKey())
+        assertEquals("2026-09-30", days[31]?.toKey())
+        assertTrue(days.drop(32).all { it == null })
+    }
+
+    @Test
     fun `月移動は年またぎして1日を返す`() {
         assertEquals("2027-01-01", monthAnchor(WidgetDay(2026, 12, 20), 1).toKey())
         assertEquals("2025-12-01", monthAnchor(WidgetDay(2026, 1, 20), -1).toKey())
