@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.glance.LocalContext
 import androidx.glance.LocalGlanceId
-import androidx.glance.appwidget.AppWidgetId
 import java.util.concurrent.atomic.AtomicInteger
 
 internal data class WidgetSnapshot(val overview: CalendarOverview, val appearance: WidgetAppearance)
@@ -19,7 +18,7 @@ internal data class WidgetSnapshot(val overview: CalendarOverview, val appearanc
 @Composable
 internal fun rememberWidgetSnapshot(): WidgetSnapshot {
     val context = LocalContext.current
-    val id = (LocalGlanceId.current as AppWidgetId).appWidgetId
+    val id = LocalGlanceId.current
     DisposableEffect(id) {
         val active = activeWidgetCompositions.getOrPut(id) { AtomicInteger() }
         active.incrementAndGet()

@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Multi calendar</string>
-    <string name="title_activity_main">Multi calendar</string>
-    <string name="package_name">jp.ryo.multicalendar</string>
-    <string name="custom_url_scheme">jp.ryo.multicalendar</string>
+    <string name="app_name" translatable="false">Multi calendar</string>
+    <string name="title_activity_main" translatable="false">Multi calendar</string>
+    <string name="package_name" translatable="false">jp.ryo.multicalendar</string>
+    <string name="custom_url_scheme" translatable="false">jp.ryo.multicalendar</string>
     <string name="widget_week_label">週の予定</string>
     <string name="widget_month_label">月の予定</string>
     <string name="widget_day_label">日</string>

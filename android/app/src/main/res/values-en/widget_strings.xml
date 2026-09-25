@@ -2,4 +2,5 @@
 <resources>
     <string name="widget_week_label">Multi calendar · Week</string>
     <string name="widget_month_label">Multi calendar · Month</string>
+    <string name="widget_day_label">Day</string>
 </resources>

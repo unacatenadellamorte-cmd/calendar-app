@@ -12,7 +12,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.currentState
 import androidx.glance.LocalGlanceId
-import androidx.glance.appwidget.AppWidgetId
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.compose
 import androidx.glance.appwidget.state.getAppWidgetState
@@ -26,19 +26,19 @@ import kotlinx.coroutines.sync.withLock
 
 // 同じウィジェットへの連続操作は、保存と描画をまとめて直列化する。
 private val navigationLocks = Array(16) { Mutex() }
-internal val activeWidgetCompositions = ConcurrentHashMap<Int, AtomicInteger>()
-private val currentOffsets = ConcurrentHashMap<Int, MutableStateFlow<Int?>>()
+internal val activeWidgetCompositions = ConcurrentHashMap<GlanceId, AtomicInteger>()
+private val currentOffsets = ConcurrentHashMap<GlanceId, MutableStateFlow<Int?>>()
 
 /** 稼働中の描画にも保存直後の選択を渡し、遅れて届く旧Glance状態で巻き戻さない。 */
 @Composable
 internal fun widgetDateOffset(key: Preferences.Key<Int>, initialOffset: Int = 0): Int {
-    val id = (LocalGlanceId.current as AppWidgetId).appWidgetId
+    val id = LocalGlanceId.current
     val selected by currentOffsets.getOrPut(id) { MutableStateFlow(null) }.collectAsState()
     return selected ?: currentState<Preferences>()[key] ?: initialOffset
 }
 
 internal fun forgetWidgetDate(glanceId: GlanceId) {
-    currentOffsets.remove((glanceId as AppWidgetId).appWidgetId)
+    currentOffsets.remove(glanceId)
 }
 
 internal suspend fun navigateWidget(
@@ -50,7 +50,7 @@ internal suspend fun navigateWidget(
     limit: Int,
     initialOffset: Int = 0,
 ) {
-    val id = (glanceId as AppWidgetId).appWidgetId
+    val id = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
     val started = SystemClock.elapsedRealtime()
     navigationLocks[(id and Int.MAX_VALUE) % navigationLocks.size].withLock {
         var selected = initialOffset
@@ -58,8 +58,8 @@ internal suspend fun navigateWidget(
             selected = ((state[key] ?: initialOffset) + amount).coerceIn(-limit, limit)
             state[key] = selected
         }
-        val alreadyRendering = (activeWidgetCompositions[id]?.get() ?: 0) > 0
-        currentOffsets.getOrPut(id) { MutableStateFlow(null) }.value = selected
+        val alreadyRendering = (activeWidgetCompositions[glanceId]?.get() ?: 0) > 0
+        currentOffsets.getOrPut(glanceId) { MutableStateFlow(null) }.value = selected
         if (alreadyRendering) {
             // 稼働中は既存の描画を使い、同じ画面を二重生成しない。
             widget.update(context, glanceId)

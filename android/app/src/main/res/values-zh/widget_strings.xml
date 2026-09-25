@@ -2,4 +2,5 @@
 <resources>
     <string name="widget_week_label">Multi calendar · 周</string>
     <string name="widget_month_label">Multi calendar · 月</string>
+    <string name="widget_day_label">日</string>
 </resources>
