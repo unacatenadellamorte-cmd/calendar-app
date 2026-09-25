@@ -201,7 +201,7 @@ class Handler(BaseHTTPRequestHandler):
             target = parse_qs(parsed.query).get("path", ["/"])[0]
             if not target.startswith("/") or target.startswith("//") or "?" in target:
                 target = "/"
-            html = ("<!doctype html><meta charset='utf-8'><style>html,body{margin:0;width:824px;height:1640px;overflow:hidden;scrollbar-width:none}" 
+            html = ("<!doctype html><meta charset='utf-8'><style>html,body{margin:0;width:824px;height:1640px;overflow:hidden;scrollbar-width:none}"
                     "::-webkit-scrollbar{display:none}"
                     "iframe{width:412px;height:820px;transform:scale(2);transform-origin:0 0;border:0}</style>"
                     f"<iframe src='{target}'></iframe>")
