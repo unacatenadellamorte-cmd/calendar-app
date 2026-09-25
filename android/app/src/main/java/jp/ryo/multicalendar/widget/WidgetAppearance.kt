@@ -59,3 +59,11 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
 }
 
 internal fun scaledSp(base: Float, appearance: WidgetAppearance): androidx.compose.ui.unit.TextUnit = (base * appearance.appFontScale).sp
+
+/** 予定データの色を安全にウィジェット用の色へ変換する。 */
+internal fun widgetEventColor(hex: String, fallback: Color): Color = try {
+    Color(android.graphics.Color.parseColor(hex))
+} catch (_: IllegalArgumentException) {
+    fallback
+}
+

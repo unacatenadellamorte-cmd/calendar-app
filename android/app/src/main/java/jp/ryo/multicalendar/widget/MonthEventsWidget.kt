@@ -98,13 +98,13 @@ private fun MonthEventsContent() {
             }
         }
         Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-            rows.forEachIndexed { rowIndex, row ->
+            rows.forEach { row ->
                 // グリッドを1つの子にまとめ、Glanceの子要素上限で5週目以降が落ちないようにする。
                 Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
                     Row(modifier = GlanceModifier.fillMaxWidth().height(cellHeightDp.coerceAtMost(72f).dp)) {
-                        row.forEachIndexed { dayIndex, day ->
+                        row.forEach { day ->
                             if (day == null) {
-                                MonthBlankCell(appearance, dayIndex < row.lastIndex, GlanceModifier.defaultWeight())
+                                MonthBlankCell(GlanceModifier.defaultWeight())
                             } else {
                                 MonthDayCell(
                                     context,
@@ -115,19 +115,10 @@ private fun MonthEventsContent() {
                                     day,
                                     cellHeightDp,
                                     fontScale,
-                                    dayIndex < row.lastIndex,
                                     GlanceModifier.defaultWeight(),
                                 )
                             }
                         }
-                    }
-                    if (rowIndex < rows.lastIndex) {
-                        Spacer(
-                            modifier = GlanceModifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(appearance.secondaryTextColor),
-                        )
                     }
                 }
             }
@@ -145,7 +136,6 @@ private fun MonthDayCell(
     day: WidgetDay,
     cellHeightDp: Float,
     fontScale: Float,
-    showDivider: Boolean,
     cellModifier: GlanceModifier,
 ) {
     val events = eventsForWidgetDay(overview.events, day)
@@ -153,10 +143,9 @@ private fun MonthDayCell(
     val overflowCount = events.size - visibleEvents.size
     val isToday = day == today
     val inCurrentMonth = day.month == displayedMonth.month && day.year == displayedMonth.year
-    Row(modifier = cellModifier.fillMaxHeight()) {
-        Column(
+    Column(
             modifier = GlanceModifier
-                .defaultWeight()
+                .then(cellModifier)
                 .fillMaxHeight()
                 .background(if (isToday) appearance.todayColor else Color.Transparent)
                 .clickable(actionStartActivity(createWidgetIntent(context, day)))
@@ -188,35 +177,26 @@ private fun MonthDayCell(
                 }
             }
             visibleEvents.forEach { event ->
-                Text(
-                    text = "• ${shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7)}",
-                    style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.accentColor)),
-                    maxLines = 1,
-                )
+                Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    Spacer(
+                        modifier = GlanceModifier
+                            .width(2.dp)
+                            .height(10.dp)
+                            .background(ColorProvider(widgetEventColor(event.colorHex, appearance.accentColor))),
+                    )
+                    Spacer(modifier = GlanceModifier.width(2.dp))
+                    Text(
+                        text = shortWidgetTitle(event.title.ifBlank { event.calendarName }, 7),
+                        style = TextStyle(fontSize = scaledSp(9f, appearance), color = ColorProvider(widgetEventColor(event.colorHex, appearance.primaryTextColor))),
+                        maxLines = 1,
+                    )
+                }
             }
         }
-        if (showDivider) {
-            Spacer(
-                modifier = GlanceModifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(appearance.secondaryTextColor),
-            )
-        }
-    }
 }
 
 @Composable
-private fun MonthBlankCell(appearance: WidgetAppearance, showDivider: Boolean, cellModifier: GlanceModifier) {
-    Row(modifier = cellModifier.fillMaxHeight()) {
-        Spacer(modifier = GlanceModifier.defaultWeight().fillMaxHeight())
-        if (showDivider) {
-            Spacer(
-                modifier = GlanceModifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(appearance.secondaryTextColor),
-            )
-        }
-    }
+private fun MonthBlankCell(cellModifier: GlanceModifier) {
+    Spacer(modifier = cellModifier.fillMaxHeight())
 }
+
