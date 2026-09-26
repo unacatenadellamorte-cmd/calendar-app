@@ -216,3 +216,18 @@ supabase functions deploy sync-calendars # デプロイ
 
 > Phase B が終わって「動作確認できる状態」になってから実装に入る。
 > そこまでは、7 の動作確認以外はコードを書いても検証できないため。
+
+
+## Android公式認可への切り替え（2026-09-26）
+
+Androidは`AuthorizationClient`で認可コードを取得する。`https://localhost/connections/google/callback`をGoogleへ登録する方法は使わない。Webのリダイレクトとstate検証は従来どおり。
+
+1. 既存Google Cloudプロジェクトに、パッケージ`jp.ryo.multicalendar`と**Playのアプリ署名SHA-1**を指定したAndroid OAuthクライアントを用意する。アップロード鍵やローカルdebug鍵とは区別する。エミュレーターで検証する場合は、そのAPKの署名に対応した別Androidクライアントも必要。
+2. `VITE_GOOGLE_OAUTH_CLIENT_ID`には既存の**WebクライアントID**を設定する。サーバーの`GOOGLE_OAUTH_CLIENT_ID`と一致させる。AndroidクライアントIDへ置き換えない。クライアントシークレットは引き続きサーバーのみ。
+3. Supabaseの`APP_ORIGIN`は既存Webオリジンを維持し、`APP_ORIGINS`へ`https://localhost`を追加する。追加オリジンが複数ならカンマ区切りにする。ワイルドカードは使わない。
+4. `oauth-exchange`と、共通CORSを使う`google-calendars`・`sync-calendars`などの配信対象を更新する。`Origin: https://localhost`のOPTIONS応答が同じAllow-Originを返すことを確認する。
+5. 読み取り専用2スコープのまま、専用審査アカウントで接続→カレンダー選択→取り込みを確認する。同意拒否や再試行、認可中のログアウトでも別利用者へ接続されないことを確認する。
+
+実施済みの範囲と残作業は[Android Google認可の検証記録](android-google-oauth-verification-20260926.md)を参照。
+
+公式根拠: [Androidのユーザーデータ認可](https://developer.android.com/identity/authorization)。

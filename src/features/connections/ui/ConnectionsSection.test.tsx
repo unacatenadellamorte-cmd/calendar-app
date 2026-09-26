@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ok, err, appError } from '@/data/result';
 
@@ -86,6 +86,42 @@ describe('ConnectionsSection', () => {
     const btn = await screen.findByRole('button', { name: 'Google を接続' });
     await user.click(btn);
     expect(startGoogleConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('Android認可中は連打を防ぎ、完了後は再取得してカレンダー選択へ進む', async () => {
+    let complete!: (value: unknown) => void;
+    startGoogleConnect.mockReturnValue(new Promise((resolve) => { complete = resolve; }));
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Google を接続' }));
+    expect(screen.getByRole('button', { name: '確認中…' })).toBeDisabled();
+    complete(ok({ googleEmail: 'me@gmail.com' }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/connections/google/calendars'));
+    expect(getConnection).toHaveBeenCalledTimes(2);
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it('認可待ちで画面を離れた後の成功は移動・再取得へ反映しない', async () => {
+    let complete!: (value: unknown) => void;
+    startGoogleConnect.mockReturnValue(new Promise((resolve) => { complete = resolve; }));
+    const user = userEvent.setup();
+    const { unmount } = render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Google を接続' }));
+    unmount();
+    await act(async () => { complete(ok({ googleEmail: 'me@gmail.com' })); });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(refetch).not.toHaveBeenCalled();
+    expect(getConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('認可取消後はエラーを出し再試行できる', async () => {
+    startGoogleConnect.mockResolvedValue(err(appError('connection/cancelled', 'connection/cancelled')));
+    const user = userEvent.setup();
+    render(<ConnectionsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Google を接続' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Google を接続' })).toBeEnabled();
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('authenticated・接続済み: email と接続中を表示、接続ボタンは出さない', async () => {

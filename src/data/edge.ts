@@ -14,10 +14,14 @@ export async function invokeFn<T>(
   payload: Record<string, unknown>,
   slugToKey: (slug: string) => string,
   fallbackKey: string,
+  accessToken?: string,
 ): Promise<Result<T>> {
   if (!supabase) return err(appError('connection/unavailable', 'connection/unavailable'));
   try {
-    const { data, error } = await supabase.functions.invoke<T>(name, { body: payload });
+    const { data, error } = await supabase.functions.invoke<T>(name, {
+      body: payload,
+      ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+    });
     if (error) {
       const kind = (error as { name?: string }).name;
       if (kind === 'FunctionsFetchError' || isNetworkError(error)) {

@@ -1,5 +1,5 @@
 // Edge Function 共通の CORS ヘッダ。
-// 許可オリジンは APP_ORIGIN(関数シークレット)。単一オリジンのみ許可する。
+// 許可オリジンは APP_ORIGIN(関数シークレット)。APP_ORIGINSには追加の許可オリジンをカンマ区切りで指定できる。
 //
 // ⚠️ フォールバックの `http://localhost:5173` は**ローカル開発専用**。
 //    localhost 以外へ SPA をデプロイする前に、必ず全 Edge Function
@@ -8,7 +8,10 @@
 //    未設定のままだと本番からのリクエストが CORS で全部弾かれる。
 //    設定手順: docs/google-connection-setup.md / Epic 3 retro F4。
 
-const ALLOWED_ORIGIN = Deno.env.get('APP_ORIGIN') ?? 'http://localhost:5173';
+const ALLOWED_ORIGINS = new Set([
+  Deno.env.get('APP_ORIGIN') ?? 'http://localhost:5173',
+  ...(Deno.env.get('APP_ORIGINS') ?? '').split(',').map((origin) => origin.trim()).filter(Boolean),
+]);
 
 /**
  * リクエストごとの CORS ヘッダ。
@@ -17,8 +20,9 @@ const ALLOWED_ORIGIN = Deno.env.get('APP_ORIGIN') ?? 'http://localhost:5173';
  */
 export function corsHeadersFor(req: Request): Record<string, string> {
   const requested = req.headers.get('Access-Control-Request-Headers');
+  const origin = req.headers.get('Origin') ?? '';
   return {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    ...(ALLOWED_ORIGINS.has(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
     'Access-Control-Allow-Headers': requested ?? 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin, Access-Control-Request-Headers',

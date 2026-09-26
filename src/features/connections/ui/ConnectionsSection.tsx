@@ -1,5 +1,5 @@
 import { t, useLanguage } from '@/i18n';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/auth-context';
 import { useOnline } from '@/app/online-context';
@@ -50,7 +50,16 @@ function formatSyncResultLine(result: SyncResultLike | null): string | null {
  */
 export function ConnectionsSection() {
   useLanguage();
-  const { state } = useAuth();
+  const { state, session } = useAuth();
+  const authIdentity = `${state}:${session?.user.id ?? ''}`;
+  const currentAuth = useRef<string | null>(authIdentity);
+  currentAuth.current = authIdentity;
+  useEffect(() => {
+    currentAuth.current = authIdentity;
+    return () => { currentAuth.current = null; };
+  }, [authIdentity]);
+  const connectBusy = useRef(false);
+  const [connecting, setConnecting] = useState(false);
   const navigate = useNavigate();
   const { refetch } = useOnline();
   const { connection, loading, errorKey, refresh } = useGoogleConnection(
@@ -113,11 +122,25 @@ export function ConnectionsSection() {
   useEffect(() => {
     if (connection) void reloadSyncState();
   }, [connection, reloadSyncState]);
-  const onConnect = () => {
+  const onConnect = async () => {
+    if (connectBusy.current) return;
+    connectBusy.current = true;
+    setConnecting(true);
     setActionErrorKey(null);
-    const result = startGoogleConnect();
-    // 成功時はページ遷移するので返らない。返ってきたら失敗(遷移していない)。
-    if (result && !result.ok) setActionErrorKey(result.error.messageKey);
+    const startedAuth = authIdentity;
+    try {
+      const result = await startGoogleConnect();
+      if (currentAuth.current !== startedAuth) return;
+      if (result && !result.ok) setActionErrorKey(result.error.messageKey);
+      if (result?.ok) {
+        refresh();
+        refetch();
+        navigate('/connections/google/calendars');
+      }
+    } finally {
+      connectBusy.current = false;
+      if (currentAuth.current !== null) setConnecting(false);
+    }
   };
   // 端末カレンダー接続(Story 5.2)。OAuth を持たないため env.hasGoogleOauth には依存しない。
   // Web/PWA ビルドでは機能自体が原理的に成立しないため、ブロックごと出さない。
@@ -296,10 +319,11 @@ export function ConnectionsSection() {
             )}
             <button
               type="button"
-              onClick={onConnect}
+              onClick={() => void onConnect()}
+              disabled={connecting}
               className="mt-3 min-h-11 w-full rounded-sm bg-accent px-4 text-body font-semibold text-on-accent"
             >
-              {t('Google を接続')}
+              {connecting ? t('確認中…') : t('Google を接続')}
             </button>
           </>
         )}
