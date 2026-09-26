@@ -92,3 +92,10 @@ ObsidianのsaveスキルはWSLでのトランザクション書込みが必要�
 - Google OAuthの接続から予定取り込みまでの通し検証、および別端末でのGoogle本人確認要求の有無は未確認。
 - パスワード転記スクリプトはWindows PowerShell向けUTF-8 BOMへ修正し構文検査成功。ユーザーの明示依頼で実行し、ユーザーがPlay欄へ貼り付けた。誤って作成した平文パスワードファイルは削除済み。
 - ObsidianのWSL必須条件は引き続き未充足。本記録をローカルリポジトリへコミットする。
+
+## 審査提出前の申告完了とGoogle連携の問題
+- 対象年齢18歳以上を保存。データセーフティ11種類の収集・共有・用途・削除URLを入力し、「変更を保存しました。[公開の概要]で審査に送信してください」を確認。
+- 審査資格情報の追加利用にあたるGoogle・信頼できるパートナーの端末テスト用スイッチはオフで保存。
+- AndroidのGoogle認可戻り先がhttps://localhost/connections/google/callbackになる問題をコード確認。Capacitorは外部ホストをブラウザへ渡し、現在のアプリにはGoogle認可の復帰処理がない。WebView認証拒否は実証していない。
+- Google連携を維持するため、Android公式AuthorizationClientと既存サーバー交換処理を使う修正仕様をAI作業場の_bmad-output/implementation-artifacts/spec-android-google-oauth-review-20260926.mdへ作成。bmad-buildの仕様承認段階。実装は未着手。
+- 既存の17は内部テスト下書きのまま。審査提出・テスト配信は未実施。修正版の検証後に続行する。
