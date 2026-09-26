@@ -99,3 +99,16 @@ ObsidianのsaveスキルはWSLでのトランザクション書込みが必要�
 - AndroidのGoogle認可戻り先がhttps://localhost/connections/google/callbackになる問題をコード確認。Capacitorは外部ホストをブラウザへ渡し、現在のアプリにはGoogle認可の復帰処理がない。WebView認証拒否は実証していない。
 - Google連携を維持するため、Android公式AuthorizationClientと既存サーバー交換処理を使う修正仕様をAI作業場の_bmad-output/implementation-artifacts/spec-android-google-oauth-review-20260926.mdへ作成。bmad-buildの仕様承認段階。実装は未着手。
 - 既存の17は内部テスト下書きのまま。審査提出・テスト配信は未実施。修正版の検証後に続行する。
+
+## Android Google連携修正・Alphaリリース保存
+- ユーザー承認後、公式AuthorizationClientへ移行。ログアウト・利用者変更・取消・再試行・画面離脱・JWT更新を保護。変更と検証記録をローカルコミット。詳細はandroid-google-oauth-verification-20260926.md。
+- Cloudで配信署名3種とローカル提出署名のAndroid OAuthクライアントを登録し、審査専用Googleアカウントをテストユーザーへ追加・保存。
+- SupabaseのAndroidオリジン許可を設定し、認可交換・カレンダー一覧・同期の3関数を配信。CORSの許可・拒否9条件を確認。
+- 全Vitest1,087件、Android単体36件、型検査・変更対象ESLint・Webビルド・release lint・署名付きAAB/APK生成成功。
+- Play Alphaの対象国を日本、初期テスター候補2名、フィードバック先をサポートメールに設定。実際の参加人数ではない。
+- 18 (1.0.17)をアップロードし、「1.0.17 クローズドテスト」として保存完了。公開の概要に14件の未送信変更が表示された。内部テスト17は以前の下書きのまま。
+- AAB SHA256: 5ED4226388C7C651A146B55D567AE33B5DA286A185F90B8E9CB1738ED86CF7F0。最終APK/AABはLOCALAPPDATA/calendar-app/oauth-review-fix-20260926/android/app/build/outputs/配下。
+- Playの警告は難読化解除ファイルなしの1件。minifyEnabled false。Playの自動クイックチェックは開始されたが、結果はまだ確認していない。
+- Windows画面操作の接続が失敗し、所定の再接続でも復旧せず。実Google認可→選択→取り込みの受入確認をユーザーへ依頼。実機の削除・更新やエミュレーターへのAPKインストールは行っていない。
+- 審査へ送信するボタンは押していない。実連携確認後に送信を続ける。製品版公開に必要なテスター確保・継続テストも残る。
+- Obsidian記録は既存のWSL必須条件未充足で保留。認証秘密を含めず、本記録をローカルGitへ保存する。公開リポジトリへのpushなし。
