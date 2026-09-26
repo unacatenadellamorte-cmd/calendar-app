@@ -120,3 +120,9 @@ ObsidianのsaveスキルはWSLでのトランザクション書込みが必要�
 - アンインストール・データ消去は未実施。端末内データの内容やGoogle連携成功は未確認。
 - 実機検証用APK: LOCALAPPDATA/calendar-app/device-update-20260926/multi-calendar-18-device.apk。Play提出用APK/AABは変更していない。
 - この開発用署名のAndroid OAuthクライアントは今回未登録。実機Google連携テストには追加設定が必要。
+
+## 実機検証署名のOAuth登録
+- ユーザーが追加登録を明示承認。Cloud calendar-app-508202へ「Multi calendar Android device verification」を作成し、成功表示を確認。
+- パッケージjp.ryo.multicalendar、SHA-1 B2434FA22223180DBCED0BE312B11BB614B2922Bに限定。
+- AndroidクライアントID: 1015352739751-tmaiq37104vt3ocm1rq5f774dnj8vlb0.apps.googleusercontent.com。既存Webクライアント・スコープ・テストユーザーは変更なし。
+- Google画面は設定反映に5分から数時間かかる場合がある旨を表示。実機Google認可から予定取り込みまでの確認は引き続き未完了。審査送信も未実施。
