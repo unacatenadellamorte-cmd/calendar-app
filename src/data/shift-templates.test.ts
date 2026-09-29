@@ -90,6 +90,18 @@ describe('templateWorkedMinutes', () => {
 });
 
 describe('createShiftTemplate バリデーション', () => {
+  it('24色のプリセットを全てシフトの色として保存できる', async () => {
+    const { CALENDAR_COLORS } = await import('./calendar-colors');
+    const { createShiftTemplate } = await load();
+    expect(CALENDAR_COLORS).toHaveLength(24);
+    for (const { hex } of CALENDAR_COLORS) {
+      queryResult = { data: row({ color: hex }), error: null };
+      const result = await createShiftTemplate(input({ color: hex }));
+      expect(result.ok && result.value.color).toBe(hex);
+      const inserted = calls.filter(call => call.method === 'insert').at(-1)?.args[0];
+      expect(inserted).toEqual(expect.objectContaining({ color: hex }));
+    }
+  });
   const cases: [string, Record<string, unknown>, string][] = [
     ['名前空', { name: '' }, 'shift-template/invalid-name'],
     ['時刻不正', { startLocal: '0900' }, 'shift-template/invalid-time'],

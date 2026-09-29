@@ -2,6 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
+import { LabelColorPresets } from '@/ui/LabelColorPresets';
 import { resolveMessage } from '@/data/messages';
 import type { NewShiftTemplateInput, ShiftTemplate } from '@/data/shift-templates';
 interface ShiftTemplateFormSheetProps {
@@ -155,22 +156,12 @@ export function ShiftTemplateFormSheet({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-meta text-ink-secondary">{t('色')}</legend>
-          <div className="flex flex-wrap gap-2">
-            {CALENDAR_COLORS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                aria-label={c.name}
-                aria-pressed={color === c.hex}
-                onClick={() => setColor(c.hex)}
-                className={[
-                  'h-11 w-11 rounded-sm border',
-                  color === c.hex ? 'border-accent' : 'border-border-hairline',
-                ].join(' ')}
-                style={{ backgroundColor: c.hex }}
-              />
-            ))}
-          </div>
+          <LabelColorPresets
+            value={color}
+            onChange={setColor}
+            disabled={submitting}
+            includeHexInAriaLabel={false}
+          />
         </fieldset>
 
         <button
