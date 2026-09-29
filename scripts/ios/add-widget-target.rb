@@ -10,7 +10,7 @@ abort 'Appターゲットが見つからない' unless app
 
 widget_name = 'FeaturedEventsWidget'
 widget_dir = File.join(File.dirname(project_path), widget_name)
-files = %w[Models/FeaturedWidgetData.swift FeaturedEventsWidget.swift FeaturedEventsWidgetBundle.swift]
+files = %w[Models/FeaturedWidgetData.swift Models/CalendarGridData.swift FeaturedEventsWidget.swift CalendarGridWidget.swift FeaturedEventsWidgetBundle.swift]
 (files + %w[Info.plist FeaturedEventsWidget.entitlements]).each do |path|
   abort "必要なファイルが無い: #{path}" unless File.file?(File.join(widget_dir, path))
 end

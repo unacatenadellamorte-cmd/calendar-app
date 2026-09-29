@@ -314,10 +314,27 @@ describe('refreshFeaturedWidget', () => {
     });
     const featuredArg = setItem.mock.calls.find(([value]) => value.key === 'featuredEvents')![0];
     expect(JSON.parse(featuredArg.value)[0].id).toBe('ios-event');
+    const overviewArg = setItem.mock.calls.find(([value]) => value.key === 'calendarOverview')![0];
+    expect(JSON.parse(overviewArg.value).events[0].id).toBe('ios-event');
     expect(reloadAllTimelines).toHaveBeenCalledTimes(1);
     expect(setItem.mock.invocationCallOrder[0]).toBeLessThan(
       reloadAllTimelines.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it('calendarOverviewの書込み結果がfalseなら再描画しない', async () => {
+    isNativePlatform.mockReturnValue(true);
+    getPlatform.mockReturnValue('ios');
+    listEvents.mockResolvedValue(ok([ev({ id: 'ios-event' })]));
+    listCalendars.mockResolvedValue(ok([cal({})]));
+    setItem.mockImplementation(async ({ key }) => ({ results: key !== 'calendarOverview' }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await refreshFeaturedWidget();
+
+    expect(reloadAllTimelines).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('widget: refreshFeaturedWidget failed', expect.any(String));
+    warn.mockRestore();
   });
 
   it('listCalendars が失敗したら何も書き込まず、警告ログを出す', async () => {

@@ -227,23 +227,25 @@ async function runRefreshFeaturedWidget(): Promise<void> {
       new Date().toISOString(),
     );
 
-    await WidgetBridgePlugin.setItem({
+    const featuredResult = await WidgetBridgePlugin.setItem({
       key: WIDGET_ITEM_KEY,
       group: WIDGET_GROUP,
       value: JSON.stringify(payload),
     });
-    if (Capacitor.getPlatform() === 'android') {
-      const overview = buildCalendarOverviewPayload(
-        eventsResult.value,
-        calendarsResult.value,
-        new Date().toISOString(),
-      );
-      await WidgetBridgePlugin.setItem({
-        key: CALENDAR_OVERVIEW_ITEM_KEY,
-        group: WIDGET_GROUP,
-        value: JSON.stringify(overview),
-      });
-    }
+    if (featuredResult?.results === false) throw new Error('ウィジェットの書込みに失敗しました');
+    // Android/iOSの月グリッドが同じ保存済みスナップショットを読む。
+    // Android固有なのは登録先の設定だけで、共有データの書込みは両方で行う。
+    const overview = buildCalendarOverviewPayload(
+      eventsResult.value,
+      calendarsResult.value,
+      new Date().toISOString(),
+    );
+    const overviewResult = await WidgetBridgePlugin.setItem({
+      key: CALENDAR_OVERVIEW_ITEM_KEY,
+      group: WIDGET_GROUP,
+      value: JSON.stringify(overview),
+    });
+    if (overviewResult?.results === false) throw new Error('ウィジェットの書込みに失敗しました');
     await WidgetBridgePlugin.reloadAllTimelines();
   } catch (e) {
     console.warn('widget: refreshFeaturedWidget failed', (e as Error)?.message);

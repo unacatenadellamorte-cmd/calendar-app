@@ -12,6 +12,7 @@ import { addDays, eventOccursOnDate } from '@/lib/calendar-view';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { ShiftTemplateFormSheet } from '@/features/shifts/ui/ShiftTemplateFormSheet';
 import type { NewShiftTemplateInput } from '@/data/shift-templates';
+import { useShiftAutoAdvance } from '@/features/settings/model/useShiftAutoAdvance';
 
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_MOVE_PX = 8;
@@ -34,6 +35,7 @@ export function MonthShiftTiles({
 }) {
   useLanguage();
   const shifts = useShiftTemplates(enabled);
+  const { shiftAutoAdvance } = useShiftAutoAdvance();
   const navigate = useNavigate();
   const calendar = calendars.find((item) => item.isShift && item.source === 'local');
   const busyRef = useRef(false);
@@ -47,6 +49,19 @@ export function MonthShiftTiles({
   const longPressTriggered = useRef(false);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
+  const mountedRef = useRef(true);
+  const latestDateRef = useRef(date);
+  const dateVersionRef = useRef(0);
+  if (latestDateRef.current !== date) {
+    latestDateRef.current = date;
+    dateVersionRef.current += 1;
+  }
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const dayShifts = events.filter(
     (event) =>
       event.source === 'local' &&
@@ -112,6 +127,9 @@ export function MonthShiftTiles({
   };
   const pick = async (template: ShiftTemplate) => {
     if (busyRef.current || !calendar) return;
+    const registrationDate = date;
+    const registrationDateVersion = dateVersionRef.current;
+    const shouldAdvance = shiftAutoAdvance;
     busyRef.current = true;
     setBusy(true);
     setError(null);
@@ -124,6 +142,14 @@ export function MonthShiftTiles({
       }
       onCreated(result.value);
       setNotice(t('{0}に「{1}」を追加しました', [date, template.name]));
+      if (
+        shouldAdvance &&
+        mountedRef.current &&
+        latestDateRef.current === registrationDate &&
+        dateVersionRef.current === registrationDateVersion
+      ) {
+        onDateChange(addDays(registrationDate, 1));
+      }
     } catch {
       setError('data/query');
     } finally {

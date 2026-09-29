@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 
 // カレンダー画面を描画可能にするため auth を guest 固定、データ層は空でモック。
@@ -86,6 +87,25 @@ beforeEach(() => {
 });
 
 describe('CalendarRoute の ?date=', () => {
+  it('ウィジェットで同じ日を開き直しても月表示へ戻り、入力画面を持ち越さない', async () => {
+    const user = userEvent.setup();
+    function WidgetDayLink() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/calendar?date=2026-12-25')}>ウィジェットの日付</button>;
+    }
+    render(<MemoryRouter initialEntries={['/calendar?date=2026-12-25']}>
+      <WidgetDayLink /><AppRoutes />
+    </MemoryRouter>);
+    await user.click(screen.getByRole('radio', { name: /^年$/ }));
+    await user.click(screen.getByRole('button', { name: 'ウィジェットの日付' }));
+    expect(screen.getByRole('radio', { name: /^月$/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: '2026年12月' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '＋予定' }));
+    expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ウィジェットの日付', hidden: true }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('?date=YYYY-MM-DD でその月を開く', () => {
     renderAt('/calendar?date=2026-12-25');
     expect(screen.getByRole('button', { name: '2026年12月' })).toBeInTheDocument();

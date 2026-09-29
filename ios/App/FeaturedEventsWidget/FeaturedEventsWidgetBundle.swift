@@ -5,5 +5,6 @@ import WidgetKit
 struct FeaturedEventsWidgetBundle: WidgetBundle {
     var body: some Widget {
         FeaturedEventsWidget()
+        CalendarGridWidget()
     }
 }
