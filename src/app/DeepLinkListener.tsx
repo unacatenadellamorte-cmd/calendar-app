@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onDeepLink } from '@/platform/deepLink';
+import { isValidLocalDate } from '@/lib/datetime';
 
 /**
  * ディープリンクの唯一の受け口(ARCHITECTURE-SPINE Epic5 AD-16)。
- * `calendar-app://event/{id}` と `calendar-app://day/{date}` の2形式だけを解釈し、
- * 既存のルーティング(`/calendar?event=` / `/calendar?date=`)へ委ねる。
+ * `calendar-app://event/{id}`、`calendar-app://day/{date}`、
+ * `calendar-app://create/{date}`、`calendar-app://settings/` を既存のルーティングへ委ねる。
  * 未知のスキーム/ホスト部は静かに無視する(現在の画面のまま何もしない、クラッシュしない)。
  *
  * `<BrowserRouter>` の内側、`<AppRoutes />` と並べて配置する(src/main.tsx)。
@@ -13,21 +14,24 @@ import { onDeepLink } from '@/platform/deepLink';
  */
 export function DeepLinkListener() {
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  useEffect(() => { navigateRef.current = navigate; }, [navigate]);
 
   useEffect(() => {
-    return onDeepLink((url) => {
+    let disposed = false;
+    const unsubscribe = onDeepLink((url) => {
+      if (disposed) return;
       const to = toInternalRoute(url);
       if (!to) return;
-      navigate(to);
-      if (to.startsWith('/calendar?event=')) {
-        // ?event= は一度きりの指定。開いた後も URL に残ると、PWA を手動リロードしたときに
-        // 同じ予定シートが再度開いてしまうため、遷移後にクエリを取り除く(replace で
-        // 履歴に残さない)。React 18 のバッチングで直後に同期実行すると、CalendarScreen が
-        // ?event= 付きの状態を一度も描画できず開かなくなるため、次の macrotask まで遅らせる。
-        setTimeout(() => navigate('/calendar', { replace: true }), 0);
-      }
+      navigateRef.current(to);
     });
-  }, [navigate]);
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  // BrowserRouter の navigate は遷移ごとに変わる。再購読すると起動URLが再送され、
+  // カレンダーへの遷移を繰り返すため、購読はマウントにつき一度に固定する。
+  }, []);
 
   return null;
 }
@@ -35,6 +39,7 @@ export function DeepLinkListener() {
 /**
  * `calendar-app://event/{id}` → `/calendar?event={id}`
  * `calendar-app://day/{date}` → `/calendar?date={date}`
+ * `calendar-app://create/{date}` → `/calendar?create={date}`
  * それ以外(未知のスキーム/ホスト、パース不能、空値)は null。
  */
 function toInternalRoute(url: string): string | null {
@@ -51,10 +56,14 @@ function toInternalRoute(url: string): string | null {
 
   const kind = parsed.hostname.toLowerCase();
   const value = decodeSegment(parsed.pathname.replace(/^\/+/, ''));
+  if (kind === 'settings' && !value) return '/settings';
   if (!value) return null;
 
   if (kind === 'event') return `/calendar?event=${encodeURIComponent(value)}`;
-  if (kind === 'day') return `/calendar?date=${encodeURIComponent(value)}`;
+  if (kind === 'day' && isValidLocalDate(value)) return `/calendar?date=${encodeURIComponent(value)}`;
+  if (kind === 'create' && isValidLocalDate(value)) {
+    return `/calendar?create=${encodeURIComponent(value)}`;
+  }
   return null;
 }
 

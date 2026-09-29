@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Calendar } from '@/data/calendars';
 import { EventFormSheet } from './EventFormSheet';
+import { openMap, openExternalUrl } from '@/platform/externalLinks';
+vi.mock('@/platform/externalLinks', async (original) => ({
+  ...await original<typeof import('@/platform/externalLinks')>(),
+  openMap: vi.fn().mockResolvedValue(true),
+  openExternalUrl: vi.fn().mockResolvedValue(true),
+}));
+
+const tagsMock = vi.hoisted(() => ({ list: vi.fn().mockResolvedValue({ ok: true, value: [] }) }));
+vi.mock('@/data/event-tags', () => ({ listEventTags: tagsMock.list }));
 
 const calendars: Calendar[] = [
   {
@@ -23,7 +32,7 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
   const onUpdate = vi.fn().mockResolvedValue(true);
   const onClose = vi.fn();
   const onSetReminder = vi.fn().mockResolvedValue(true);
-  render(
+  const view = render(
     <EventFormSheet
       open
       editing={null}
@@ -35,10 +44,100 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
       {...overrides}
     />,
   );
-  return { onCreate, onUpdate, onClose, onSetReminder };
+  return { onCreate, onUpdate, onClose, onSetReminder, ...view };
 }
 
 describe('EventFormSheet', () => {
+  it('24色目のプリセットを選んで保存値へ渡す', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '予定');
+    await user.click(screen.getByRole('button', { name: '水浅葱 #06B6D4' }));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ labelColor: '#06B6D4' }));
+  });
+
+  it('自由色入力が小文字でもプリセット選択状態を大文字小文字無視で判定する', () => {
+    const { rerender } = setup();
+    fireEvent.change(screen.getByLabelText('ラベル色'), { target: { value: '#06b6d4' } });
+    expect(screen.getByRole('button', { name: '水浅葱 #06B6D4' })).toHaveAttribute('aria-pressed', 'true');
+    rerender(<EventFormSheet open editing={null} calendars={calendars} onClose={vi.fn()} onCreate={vi.fn()} onUpdate={vi.fn()} onSetReminder={vi.fn().mockResolvedValue(true)} />);
+  });
+
+  it('送信中は自由色入力とプリセットを無効化する', async () => {
+    const user = userEvent.setup();
+    let resolve!: (value: boolean) => void;
+    const onCreate = vi.fn(() => new Promise<boolean>((r) => { resolve = r; }));
+    setup({ onCreate });
+    await user.type(screen.getByLabelText('タイトル'), '予定');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(screen.getByLabelText('ラベル色')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '水浅葱 #06B6D4' })).toBeDisabled();
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    await act(async () => resolve(true));
+  });
+
+  it('保存済みのローカル予定を開き直すと場所とURLを開ける（保存は行わない）', async () => {
+    const user = userEvent.setup();
+    const { onCreate, onUpdate } = setup({ editing: {
+      id: 'saved', calendarId: 'c1', title: '打合せ', source: 'local',
+      allDay: true, eventDate: '2026-09-19', startsAt: null, endsAt: null,
+      note: null, location: '京都駅', url: 'https://zoom.us/j/123',
+      breakMinutes: null, hourlyWage: null, workplaceLabel: null,
+      shiftTemplateId: null, reminderMinutes: null, isSecret: false,
+      createdAt: '', updatedAt: '',
+    } });
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    expect(openMap).toHaveBeenCalledWith('京都駅');
+    await user.click(screen.getByRole('button', { name: 'リンクを開く' }));
+    expect(openExternalUrl).toHaveBeenCalledWith('https://zoom.us/j/123');
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('地図起動失敗は入力を消さず画面内に表示する', async () => {
+    const user = userEvent.setup();
+    setup();
+    vi.mocked(openMap).mockResolvedValueOnce(false);
+    await user.type(screen.getByLabelText('場所'), '京都駅');
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('地図を開けませんでした');
+    expect(screen.getByLabelText('場所')).toHaveValue('京都駅');
+  });
+
+  it('危険なURLは起動操作を出さず保存前にも拒否する', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '会議');
+    await user.type(screen.getByLabelText('予定URL'), 'javascript:alert(1)');
+    expect(screen.queryByRole('button', { name: 'リンクを開く' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('httpまたはhttps');
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('リンク起動の失敗を入力を保持して表示する', async () => {
+    const user = userEvent.setup();
+    setup();
+    vi.mocked(openExternalUrl).mockResolvedValueOnce(false);
+    await user.type(screen.getByLabelText('予定URL'), 'https://example.com');
+    await user.click(screen.getByRole('button', { name: 'リンクを開く' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('リンクを開けませんでした');
+    expect(screen.getByLabelText('予定URL')).toHaveValue('https://example.com');
+  });
+
+  it('後の起動が成功したら先の遅い失敗結果を表示しない', async () => {
+    const user = userEvent.setup();
+    setup();
+    let finishFirst!: (ok: boolean) => void;
+    vi.mocked(openMap).mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }));
+    await user.type(screen.getByLabelText('場所'), '京都駅');
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    await user.click(screen.getByRole('button', { name: '地図を開く' }));
+    await act(async () => { finishFirst(false); });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('空タイトルでは保存せずバリデーションメッセージを出す', async () => {
     const user = userEvent.setup();
     const { onCreate } = setup();
@@ -59,6 +158,85 @@ describe('EventFormSheet', () => {
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(screen.getByRole('alert')).toHaveTextContent('終了は開始より後に');
     expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('開始または終了が空欄でも変換で落とさず時刻エラーを表示する', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '入力途中');
+    await user.clear(screen.getByLabelText('開始'));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('終了は開始より後に');
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it('カレンダーの再取得で入力中のフォームをリセットしない', async () => {
+    const user = userEvent.setup();
+    const first = setup();
+    await user.type(screen.getByLabelText('タイトル'), '入力を保持');
+    first.rerender(
+      <EventFormSheet
+        open
+        editing={null}
+        calendars={[{ ...calendars[0]!, updatedAt: 'refetched' }]}
+        onClose={first.onClose}
+        onCreate={first.onCreate}
+        onUpdate={first.onUpdate}
+        onSetReminder={first.onSetReminder}
+      />,
+    );
+    expect(screen.getByLabelText('タイトル')).toHaveValue('入力を保持');
+  });
+
+  it('カレンダー未取得で開いても一覧到着後に自作カレンダーだけ補完する', async () => {
+    const user = userEvent.setup();
+    const first = setup({ calendars: [] });
+    await user.type(screen.getByLabelText('タイトル'), '先に入力');
+    first.rerender(
+      <EventFormSheet
+        open
+        editing={null}
+        calendars={calendars}
+        onClose={first.onClose}
+        onCreate={first.onCreate}
+        onUpdate={first.onUpdate}
+        onSetReminder={first.onSetReminder}
+      />,
+    );
+    expect(screen.getByLabelText('タイトル')).toHaveValue('先に入力');
+    expect(screen.getByRole('combobox', { name: 'カレンダー' })).toHaveValue('c1');
+  });
+
+  it('外部カレンダーは選択肢に出さず、誤登録 local 予定は自作へ移せる', () => {
+    const external: Calendar = {
+      ...calendars[0]!,
+      id: 'g1',
+      name: 'Google取り込み',
+      source: 'google',
+    };
+    const local: Calendar = { ...calendars[0]!, id: 'c2', name: '自作' };
+    const editing = {
+      id: 'e1',
+      calendarId: external.id,
+      title: '誤登録',
+      allDay: false as const,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+      eventDate: null,
+      note: null,
+      source: 'local' as const,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
+      reminderMinutes: null,
+      isSecret: false,
+      createdAt: '',
+      updatedAt: '',
+    };
+    setup({ calendars: [external, local], editing });
+    expect(screen.queryByRole('option', { name: 'Google取り込み' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'カレンダー' })).toHaveValue('c2');
   });
 
   it('終日で日付未入力なら「日付を選んで」を出す', async () => {
@@ -190,6 +368,18 @@ describe('EventFormSheet', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('場所と予定URLを保存入力として onCreate に渡す', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), 'オンライン会議');
+    await user.type(screen.getByLabelText('場所'), '東京駅');
+    await user.type(screen.getByLabelText('予定URL'), 'https://zoom.us/j/123');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate.mock.calls[0]![0]).toMatchObject({
+      location: '東京駅', url: 'https://zoom.us/j/123',
+    });
+  });
+
   it('シークレットのチェックを付けて保存すると isSecret: true で onCreate を呼ぶ(spec-secret-mode)', async () => {
     const user = userEvent.setup();
     const { onCreate } = setup();
@@ -230,5 +420,42 @@ describe('EventFormSheet', () => {
     };
     setup({ editing });
     expect(screen.getByRole('checkbox', { name: 'シークレット' })).toBeChecked();
+  });
+});
+
+
+describe('予定タグの適用', () => {
+  const tag = { id: 'tag1', name: '夜勤', color: '#FFCC00', startLocal: '22:00', endLocal: '06:00', createdAt: '', updatedAt: '' };
+  it('対象日と日またぎを守って複写し、個別編集した色と名称を保存する', async () => {
+    tagsMock.list.mockResolvedValueOnce({ ok: true, value: [tag] });
+    const { onCreate } = setup({ seed: { date: '2026-12-31' } });
+    await waitFor(() => expect(screen.getByLabelText('タグ')).not.toBeDisabled());
+    await userEvent.selectOptions(screen.getByLabelText('タグ'), 'tag1');
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-12-31T22:00');
+    expect(screen.getByLabelText('終了')).toHaveValue('2027-01-01T06:00');
+    expect(screen.getByLabelText('タイトル')).toHaveValue('夜勤');
+    fireEvent.change(screen.getByLabelText('ラベル色'), { target: { value: '#009e73' } });
+    fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '夜勤（変更）' } });
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: '夜勤（変更）', labelColor: '#009e73', allDay: false }));
+    expect(onCreate.mock.calls[0]![0]).not.toHaveProperty('tagId');
+  });
+  it('終日のフォームからタグを選んでも入力した日付を使う', async () => {
+    tagsMock.list.mockResolvedValueOnce({ ok: true, value: [tag] });
+    setup({ seed: { date: '2026-09-30' } });
+    await userEvent.click(screen.getByLabelText('終日'));
+    fireEvent.change(screen.getByLabelText('日付'), { target: { value: '2026-10-02' } });
+    await waitFor(() => expect(screen.getByLabelText('タグ')).not.toBeDisabled());
+    await userEvent.selectOptions(screen.getByLabelText('タグ'), 'tag1');
+    expect(screen.getByLabelText('開始')).toHaveValue('2026-10-02T22:00');
+    expect(screen.getByLabelText('終日')).not.toBeChecked();
+  });
+  it('タグ取得失敗でも通常の予定を保存できる', async () => {
+    tagsMock.list.mockResolvedValueOnce({ ok: false, error: { messageKey: 'data/offline' } });
+    const { onCreate } = setup({ seed: { date: '2026-09-30' } });
+    await screen.findByText('タグを読み込めませんでした。予定はそのまま入力できます。');
+    fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '通常予定' } });
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: '通常予定', labelColor: null }));
   });
 });

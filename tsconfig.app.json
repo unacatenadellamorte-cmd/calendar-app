@@ -32,5 +32,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "packages/core/src"]
+  "include": ["src", "packages/core/src", "scripts/admob-config.ts"]
 }

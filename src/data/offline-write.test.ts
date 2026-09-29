@@ -117,3 +117,14 @@ describe('offline-write', () => {
     expect((outbox[0]!.payload as { orderedIds: string[] }).orderedIds).toEqual(['b', 'c', 'a']);
   });
 });
+
+
+it('ラベル色はオフラインの作成・更新・送信キューで保持する', async () => {
+  await offlineCreateEvent('label-event', { ...timedInput, labelColor: '#FFCC00' });
+  expect((await cacheGetAll('events'))[0]?.labelColor).toBe('#FFCC00');
+  await offlineUpdateEvent('label-event', { labelColor: '#00AAFF' });
+  expect((await cacheGetAll('events'))[0]?.labelColor).toBe('#00AAFF');
+  expect((await listOutbox()).map((item) => item.payload)).toEqual([
+    expect.objectContaining({ labelColor: '#FFCC00' }), { labelColor: '#00AAFF' },
+  ]);
+});

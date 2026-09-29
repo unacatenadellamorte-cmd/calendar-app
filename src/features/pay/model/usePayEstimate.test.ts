@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { usePayEstimate } from './usePayEstimate';
+import { calculateMonthlyPay, usePayEstimate } from './usePayEstimate';
 
 // 「今日」を 2026-09-15 に固定(Date のみ差し替え)。
 beforeAll(() => {
@@ -47,10 +47,33 @@ const shiftEvent = (over: Partial<EventItem> = {}): EventItem => ({
 });
 
 describe('usePayEstimate', () => {
+  it('共通月集計は対象月・シフトカレンダー・時刻付き予定だけを金額に反映する', () => {
+    const result = calculateMonthlyPay(
+      [
+        shiftEvent({ id: 'sep' }),
+        shiftEvent({
+          id: 'aug',
+          startsAt: '2026-08-25T00:00:00Z',
+          endsAt: '2026-08-25T08:00:00Z',
+        }),
+        shiftEvent({ id: 'normal', calendarId: 'c1' }),
+        shiftEvent({ id: 'all-day', allDay: true, startsAt: null, endsAt: null }),
+      ],
+      [shiftCal, normalCal],
+      '2026-09',
+    );
+    expect(result.amount).toBe(7700);
+    expect(result.shiftCount).toBe(1);
+  });
+
   it('当月のシフト用カレンダーの予定を集計する', () => {
     const events = [
       shiftEvent({ id: 'a' }),
-      shiftEvent({ id: 'b', startsAt: '2026-09-20T00:00:00Z', endsAt: '2026-09-20T08:00:00Z' }),
+      shiftEvent({
+        id: 'b',
+        startsAt: '2026-09-20T00:00:00Z',
+        endsAt: '2026-09-20T08:00:00Z',
+      }),
     ];
     const { result } = renderHook(() => usePayEstimate(events, [shiftCal]));
     expect(result.current.amount).toBe(15400); // 7h * 1100 * 2
@@ -70,7 +93,11 @@ describe('usePayEstimate', () => {
   it('別の月のシフトは当月集計に入らない', () => {
     const events = [
       shiftEvent({ id: 'a' }),
-      shiftEvent({ id: 'aug', startsAt: '2026-08-25T00:00:00Z', endsAt: '2026-08-25T08:00:00Z' }),
+      shiftEvent({
+        id: 'aug',
+        startsAt: '2026-08-25T00:00:00Z',
+        endsAt: '2026-08-25T08:00:00Z',
+      }),
     ];
     const { result } = renderHook(() => usePayEstimate(events, [shiftCal]));
     expect(result.current.shiftCount).toBe(1);
@@ -79,7 +106,11 @@ describe('usePayEstimate', () => {
   it('prev / next で対象月が変わる', () => {
     const events = [
       shiftEvent({ id: 'sep' }),
-      shiftEvent({ id: 'aug', startsAt: '2026-08-25T00:00:00Z', endsAt: '2026-08-25T08:00:00Z' }),
+      shiftEvent({
+        id: 'aug',
+        startsAt: '2026-08-25T00:00:00Z',
+        endsAt: '2026-08-25T08:00:00Z',
+      }),
     ];
     const { result } = renderHook(() => usePayEstimate(events, [shiftCal]));
     expect(result.current.monthLabel).toBe('9月');

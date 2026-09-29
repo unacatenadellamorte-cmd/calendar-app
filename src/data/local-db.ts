@@ -60,3 +60,12 @@ export function getLocalDb(): Promise<LocalDb> {
 export function resetLocalDbForTests(): void {
   dbPromise = null;
 }
+
+/** 表示キャッシュと未送信操作を一つのトランザクションで消す。 */
+export async function clearLocalAccountData(): Promise<void> {
+  const db = await getLocalDb();
+  const stores = ['calendars', 'events', 'outbox', 'meta'] as const;
+  const tx = db.transaction([...stores], 'readwrite');
+  await Promise.all(stores.map((store) => tx.objectStore(store).clear()));
+  await tx.done;
+}

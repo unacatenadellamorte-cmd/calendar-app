@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { t, useLanguage } from '@/i18n';
+import { useEffect, useRef, useState } from 'react';
 import { resolveMessage } from '@/data/messages';
-import { requestNotificationPermission } from '@/platform/reminders';
-
+import {
+  isNotificationSupported,
+  requestNotificationPermission,
+} from '@/platform/reminders';
 /**
  * リマインダー設定の小さい共有UI(Story 5.4)。`EventFormSheet`/`EventDetailSheet` の
  * 両方から使う。プリセット(10分/30分/1時間前)+ カスタム分数 + 「リマインダーなし」。
- * 選択したら即座に `onChange` で保存する(フォームの「保存」ボタンとは独立。
+ * 選択状態は即座に反映し、Web版ではそのまま `onChange` で保存する。Native版は
+ * 通知許可の結果を受けてから一度だけ保存する(フォームの「保存」ボタンとは独立。
  * `EventDetailSheet` では唯一の書き込み可能な項目になる)。
  *
  * 通知許可はリマインダーをオンにする操作のたびに要求する(既に確定していれば
@@ -13,63 +17,89 @@ import { requestNotificationPermission } from '@/platform/reminders';
  * `onChange` は呼ぶ ── DB への保存は通知の可否と独立して常に成功させる
  * (spec I/O Matrix「通知権限が無い」行)。
  */
-
-const PRESETS: { label: string; minutes: number }[] = [
-  { label: '10分前', minutes: 10 },
-  { label: '30分前', minutes: 30 },
-  { label: '1時間前', minutes: 60 },
+const PRESETS: {
+  label: string;
+  minutes: number;
+}[] = [
+  {
+    get label() {
+      return t('10分前');
+    },
+    minutes: 10,
+  },
+  {
+    get label() {
+      return t('30分前');
+    },
+    minutes: 30,
+  },
+  {
+    get label() {
+      return t('1時間前');
+    },
+    minutes: 60,
+  },
 ];
-
 /** `data/events.ts` の `REMINDER_MINUTES_MAX`(DB の CHECK 制約)と同じ値。UI側の二重防御。 */
 const REMINDER_MINUTES_MAX = 10080;
-
 interface ReminderPickerProps {
   /** 現在のリマインダー(分)。未設定は null。 */
   value: number | null;
   onChange: (minutes: number | null) => Promise<boolean>;
 }
-
 export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
+  useLanguage();
   const [selected, setSelected] = useState<number | null>(value);
   const [customValue, setCustomValue] = useState('');
   const [warningKey, setWarningKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
+  const operationRef = useRef(0);
   useEffect(() => {
     setSelected(value);
     setCustomValue(
       value !== null && !PRESETS.some((p) => p.minutes === value) ? String(value) : '',
     );
   }, [value]);
-
   const apply = async (minutes: number | null) => {
     setSaving(true);
     setWarningKey(null);
-    if (minutes !== null) {
-      let perm: string;
-      try {
-        perm = await requestNotificationPermission();
-      } catch {
-        perm = 'denied';
-      }
-      if (perm !== 'granted') setWarningKey('notification/permission-denied');
-    }
     const prev = selected;
+    const operation = ++operationRef.current;
+    // 選択状態と DB 保存は通知許可から独立させる。Web版は通知非対応を
+    // 即時に表示し、予定の保存だけは完了させる。
     setSelected(minutes);
-    const ok = await onChange(minutes);
+    let permission: string | null = null;
+    if (minutes !== null && !isNotificationSupported()) {
+      setWarningKey('notification/unavailable');
+    } else if (minutes !== null) {
+      // Native版は許可結果を待ってから一度だけ保存する。選択表示は先に
+      // 更新し、許可待ちの間はボタンを無効にして古い値の競合を防ぐ。
+      try {
+        permission = await requestNotificationPermission();
+      } catch {
+        permission = 'denied';
+      }
+      if (operation !== operationRef.current) return;
+      if (permission !== 'granted') setWarningKey('notification/permission-denied');
+    }
+    let ok = false;
+    try {
+      ok = await onChange(minutes);
+    } catch {
+      if (operation === operationRef.current) setWarningKey('data/query');
+    }
+    if (operation !== operationRef.current) return;
     if (!ok) setSelected(prev);
     setSaving(false);
   };
-
   const customInvalid =
     customValue.trim() !== '' &&
     (!Number.isFinite(Number(customValue)) ||
       Number(customValue) < 0 ||
       Number(customValue) > REMINDER_MINUTES_MAX);
-
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-meta text-ink-secondary">リマインダー</span>
+      <span className="text-meta text-ink-secondary">{t('リマインダー')}</span>
       <div className="flex flex-wrap gap-2">
         {PRESETS.map((p) => (
           <button
@@ -93,12 +123,12 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
           onClick={() => void apply(null)}
           className="min-h-11 rounded-sm border border-border-hairline px-3 text-body text-ink-secondary disabled:opacity-60"
         >
-          リマインダーなし
+          {t('リマインダーなし')}
         </button>
       </div>
 
       <label className="flex items-center gap-2">
-        <span className="text-meta text-ink-secondary">カスタム(分)</span>
+        <span className="text-meta text-ink-secondary">{t('カスタム(分)')}</span>
         <input
           type="number"
           min={0}
@@ -113,7 +143,7 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
           onClick={() => void apply(Math.floor(Number(customValue)))}
           className="min-h-11 rounded-sm border border-border-hairline px-3 text-body text-accent disabled:opacity-60"
         >
-          設定
+          {t('設定')}
         </button>
       </label>
 

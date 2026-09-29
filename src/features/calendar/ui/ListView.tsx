@@ -1,10 +1,10 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { groupEventsByDay, makePriorityOf } from '@/lib/calendar-view';
 import { formatDayTitle } from '@/lib/datetime';
 import { EventListItem } from '@/features/events/ui/EventListItem';
-
 interface ListViewProps {
   events: EventItem[];
   calendarById: Map<string, Calendar>;
@@ -13,37 +13,57 @@ interface ListViewProps {
   scrollTo: string;
   onEventTap: (event: EventItem) => void;
 }
-
 /** リストビュー。日ごとの見出し + その日の予定。`scrollTo` の日へ見出しをスクロールする。 */
-export function ListView({ events, calendarById, today, scrollTo, onEventTap }: ListViewProps) {
+export function ListView({
+  events,
+  calendarById,
+  today,
+  scrollTo,
+  onEventTap,
+}: ListViewProps) {
+  useLanguage();
   // 日内の並びは所属カレンダーの優先度順(Story 2.2)。未知は最下位相当。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
   const byDay = useMemo(() => groupEventsByDay(events, priorityOf), [events, priorityOf]);
   const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
+  const scrollRegionRef = useRef<HTMLDivElement>(null);
   const headerRefs = useRef(new Map<string, HTMLElement>());
-
   useEffect(() => {
-    const target = days.find((d) => d >= scrollTo);
+    const target = days.find((d) => d >= scrollTo) ?? days.at(-1);
     if (!target) return;
-    try {
-      headerRefs.current.get(target)?.scrollIntoView({ block: 'start' });
-    } catch {
-      // jsdom は scrollIntoView 未実装。無視する。
+    const region = scrollRegionRef.current;
+    const section = headerRefs.current.get(target);
+    if (!region || !section) return;
+    // ページ全体の祖先を動かさず、リスト専用領域だけを移動する。
+    const regionTop = region.getBoundingClientRect().top;
+    const headerTop = section.getBoundingClientRect().top;
+    const top = Math.max(0, region.scrollTop + headerTop - regionTop);
+    if (typeof region.scrollTo === 'function') {
+      region.scrollTo({ top, behavior: 'smooth' });
+    } else {
+      // jsdom など scrollTo 未実装環境ではページを動かさない。
+      region.scrollTop = top;
     }
   }, [days, scrollTo]);
-
   if (days.length === 0) {
-    return <p className="text-meta text-ink-secondary">予定はありません</p>;
+    return <p className="text-meta text-ink-secondary">{t('予定はありません')}</p>;
   }
-
   return (
-    <div className="flex flex-col gap-3">
-      {days.map((date) => (
-        <section key={date}>
+    <div
+      ref={scrollRegionRef}
+      data-testid="list-scroll-region"
+      className="calendar-list-scroll relative max-h-[calc(100dvh-16rem)] min-h-0 overflow-y-auto overscroll-contain pr-1"
+    >
+      <div className="flex flex-col gap-3">
+        {days.map((date) => (
+        <section
+          key={date}
+          ref={(el) => {
+            if (el) headerRefs.current.set(date, el);
+            else headerRefs.current.delete(date);
+          }}
+        >
           <h3
-            ref={(el) => {
-              if (el) headerRefs.current.set(date, el);
-            }}
             className={[
               'sticky top-0 bg-surface-sunken py-1 text-meta font-semibold',
               date === today ? 'text-accent' : 'text-ink-secondary',
@@ -63,7 +83,8 @@ export function ListView({ events, calendarById, today, scrollTo, onEventTap }: 
             ))}
           </ul>
         </section>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

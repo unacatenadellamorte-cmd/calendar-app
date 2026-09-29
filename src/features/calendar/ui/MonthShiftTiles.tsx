@@ -1,0 +1,357 @@
+import { getLocale } from '@/i18n';
+import { t, useLanguage } from '@/i18n';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { Calendar } from '@/data/calendars';
+import type { EventItem } from '@/data/events';
+import type { ShiftTemplate } from '@/data/shift-templates';
+import { createShifts } from '@/data/shifts';
+import { resolveMessage } from '@/data/messages';
+import { useShiftTemplates } from '@/features/shifts/model/useShiftTemplates';
+import { addDays, eventOccursOnDate } from '@/lib/calendar-view';
+import { BottomSheet } from '@/ui/BottomSheet';
+import { ShiftTemplateFormSheet } from '@/features/shifts/ui/ShiftTemplateFormSheet';
+import type { NewShiftTemplateInput } from '@/data/shift-templates';
+
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_PX = 8;
+export function MonthShiftTiles({
+  date,
+  calendars,
+  enabled,
+  onCreated,
+  events,
+  onDateChange,
+  onRemove,
+}: {
+  date: string;
+  calendars: Calendar[];
+  enabled: boolean;
+  onCreated: (events: EventItem[]) => void;
+  events: EventItem[];
+  onDateChange: (date: string) => void;
+  onRemove: (event: EventItem) => Promise<void>;
+}) {
+  useLanguage();
+  const shifts = useShiftTemplates(enabled);
+  const navigate = useNavigate();
+  const calendar = calendars.find((item) => item.isShift && item.source === 'local');
+  const busyRef = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
+  const dayShifts = events.filter(
+    (event) =>
+      event.source === 'local' &&
+      (event.shiftTemplateId !== null ||
+        calendars.some((item) => item.id === event.calendarId && item.isShift)) &&
+      eventOccursOnDate(event, date),
+  );
+  const closeDelete = useCallback(() => setDeleteOpen(false), []);
+  useEffect(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    pointerStart.current = null;
+    longPressTriggered.current = false;
+    suppressClick.current = false;
+    setDeleteOpen(false);
+    setEditOpen(false);
+    setEditingTemplate(null);
+    setNotice('');
+    setError(null);
+  }, [date]);
+  useEffect(() => {
+    const captureClick = (event: MouseEvent) => {
+      if (!suppressClick.current) return;
+      suppressClick.current = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    const resetSuppression = () => {
+      suppressClick.current = false;
+    };
+    document.addEventListener('click', captureClick, true);
+    document.addEventListener('pointerdown', resetSuppression, true);
+    document.addEventListener('keydown', resetSuppression, true);
+    return () => {
+      document.removeEventListener('click', captureClick, true);
+      document.removeEventListener('pointerdown', resetSuppression, true);
+      document.removeEventListener('keydown', resetSuppression, true);
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
+  const remove = async (event: EventItem) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setNotice('');
+    setError(null);
+    try {
+      // 既存の削除・通知取消・取り消しバナーを利用する。
+      await onRemove(event);
+      setDeleteOpen(false);
+    } catch {
+      setError('data/query');
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+  const requestDelete = () => {
+    if (busyRef.current || dayShifts.length === 0) return;
+    const onlyShift = dayShifts[0];
+    if (dayShifts.length === 1 && onlyShift) void remove(onlyShift);
+    else setDeleteOpen(true);
+  };
+  const pick = async (template: ShiftTemplate) => {
+    if (busyRef.current || !calendar) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError(null);
+    setNotice('');
+    try {
+      const result = await createShifts(calendar.id, template, [date]);
+      if (!result.ok) {
+        setError(result.error.messageKey);
+        return;
+      }
+      onCreated(result.value);
+      setNotice(t('{0}に「{1}」を追加しました', [date, template.name]));
+    } catch {
+      setError('data/query');
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="mt-4" aria-label={t('登録シフト')}>
+      <div className="flex flex-col items-start gap-2">
+        <h2 className="text-body font-semibold">{t('登録シフト')}</h2>
+        <div
+          className="order-first flex w-full items-center justify-center gap-2"
+          role="group"
+          aria-label={t('シフトの日付移動と削除')}
+        >
+          <button
+            type="button"
+            aria-label={t('前日に移動')}
+            title={t('前日に移動')}
+            disabled={busy}
+            onClick={() => onDateChange(addDays(date, -1))}
+            className="shift-control shift-control-prev flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
+          >
+            <svg
+              aria-hidden="true"
+              width="42"
+              height="24"
+              viewBox="0 0 42 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M38 12H4m9-8-9 8 9 8" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label={t('選択日のシフトを削除')}
+            title={t('選択日のシフトを削除')}
+            disabled={busy || dayShifts.length === 0}
+            onClick={requestDelete}
+            className="shift-control shift-control-delete flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-danger disabled:opacity-40"
+          >
+            <svg
+              aria-hidden="true"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label={t('翌日に移動')}
+            title={t('翌日に移動')}
+            disabled={busy}
+            onClick={() => onDateChange(addDays(date, 1))}
+            className="shift-control shift-control-next flex h-11 w-16 items-center justify-center rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
+          >
+            <svg
+              aria-hidden="true"
+              width="42"
+              height="24"
+              viewBox="0 0 42 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 12h34m-9-8 9 8-9 8" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <p className="shift-description mt-1 rounded-sm px-2 py-1 text-meta text-ink-secondary">
+        {t('{0}に追加 · 日付をタップで週と予定一覧、長押しで予定追加', [date])}
+      </p>
+      {(error || shifts.errorKey) && (
+        <p role="alert" className="mt-2 text-meta text-danger">
+          {resolveMessage(error ?? shifts.errorKey!)}
+        </p>
+      )}
+      {shifts.loading ? (
+        <p className="text-meta">{t('読み込み中…')}</p>
+      ) : shifts.templates.length === 0 ? (
+        <button
+          type="button"
+          className="mt-2 inline-block text-accent"
+          onClick={() => navigate('/shift-templates')}
+        >
+          {t('お気に入りシフトを登録する')}
+        </button>
+      ) : (
+        <div className="mt-2 grid grid-cols-5 gap-1.5">
+          {shifts.templates.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              disabled={busy || !calendar}
+              onClick={() => {
+                if (longPressTriggered.current || suppressClick.current) {
+                  longPressTriggered.current = false;
+                  suppressClick.current = false;
+                  return;
+                }
+                void pick(template);
+              }}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || event.isPrimary === false) return;
+                pointerStart.current = { x: event.clientX, y: event.clientY };
+                longPressTriggered.current = false;
+                suppressClick.current = false;
+                longPressTimer.current = setTimeout(() => {
+                  longPressTimer.current = null;
+                  longPressTriggered.current = true;
+                  suppressClick.current = true;
+                  setEditingTemplate(template);
+                  shifts.dismissError();
+                  setEditOpen(true);
+                }, LONG_PRESS_MS);
+              }}
+              onPointerMove={(event) => {
+                const start = pointerStart.current;
+                if (
+                  start &&
+                  (Math.abs(event.clientX - start.x) > LONG_PRESS_MOVE_PX ||
+                    Math.abs(event.clientY - start.y) > LONG_PRESS_MOVE_PX)
+                ) {
+                  if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                  suppressClick.current = true;
+                }
+              }}
+              onPointerUp={() => {
+                pointerStart.current = null;
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+              }}
+              onPointerLeave={() => {
+                if (pointerStart.current) suppressClick.current = true;
+                pointerStart.current = null;
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+              }}
+              onPointerCancel={() => {
+                pointerStart.current = null;
+                if (longPressTimer.current) clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+                longPressTriggered.current = false;
+                suppressClick.current = false;
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+              aria-label={t('{0}を{1}に追加', [template.name, date])}
+              className="flex aspect-square min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-border-hairline border-t-2 bg-surface-raised p-1 disabled:opacity-50"
+              style={{ borderTopColor: template.color }}
+            >
+              <span className="line-clamp-2 max-w-full break-words text-xs font-semibold">
+                {template.name}
+              </span>
+              <span className="text-[10px] leading-tight text-ink-secondary">
+                <span className="block">{template.startLocal}–</span>
+                <span className="block">{template.endLocal}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!calendar && (
+        <p className="mt-2 text-meta text-ink-secondary">
+          {t('シフト用カレンダーを準備しています。')}
+        </p>
+      )}
+      <p role="status" className="mt-2 text-meta text-ink-secondary">
+        {busy ? t('処理中…') : notice}
+      </p>
+      <BottomSheet open={deleteOpen} title={t('削除するシフトを選択')} onClose={closeDelete}>
+        <p className="mb-2 text-meta text-ink-secondary">{date}</p>
+        <div className="flex max-h-[50dvh] flex-col gap-2 overflow-y-auto">
+          {dayShifts.map((event) => (
+            <button
+              key={event.id}
+              type="button"
+              disabled={busy}
+              onClick={() => void remove(event)}
+              className="flex min-h-11 items-center justify-between gap-3 rounded-sm border border-border-hairline px-3 py-2 text-left disabled:opacity-40"
+            >
+              <span className="break-words text-body">{event.title}</span>
+              <span className="shrink-0 text-meta text-ink-secondary">
+                {event.startsAt
+                  ? new Date(event.startsAt).toLocaleTimeString(getLocale(), {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : t('終日')}
+              </span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+      <ShiftTemplateFormSheet
+        open={editOpen}
+        editing={editingTemplate}
+        usedColors={shifts.templates.map((item) => item.color)}
+        errorKey={shifts.errorKey}
+        onClose={() => {
+          setEditOpen(false);
+          setEditingTemplate(null);
+        }}
+        onSubmit={(values: NewShiftTemplateInput) => {
+          if (!editingTemplate) return Promise.resolve(false);
+          return shifts.update(editingTemplate, values);
+        }}
+        onDelete={(template) => {
+          setEditOpen(false);
+          setEditingTemplate(null);
+          void shifts.remove(template);
+        }}
+      />
+    </section>
+  );
+}

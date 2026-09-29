@@ -1,7 +1,8 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState } from 'react';
 import type { ViewMode } from '@/features/calendar/model/useCalendarView';
 import { formatDayTitle, formatMonthTitle, formatYearTitle } from '@/lib/datetime';
-
+import { formatYen } from '@/lib/money';
 interface DateNavProps {
   view: ViewMode;
   cursor: string;
@@ -9,13 +10,23 @@ interface DateNavProps {
   onNext: () => void;
   onToday: () => void;
   onJump: (date: string) => void;
+  /** 月表示のときだけ見出し右に表示する金額。未確定時は渡さない。 */
+  monthPayAmount?: number;
 }
-
 /**
  * 日付ナビ。`‹` `今日` `›` と、見出しタップで開く日付ジャンプ。
  * list ビューは前後ボタンを出さない(連続スクロールのため)。
  */
-export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateNavProps) {
+export function DateNav({
+  view,
+  cursor,
+  onPrev,
+  onNext,
+  onToday,
+  onJump,
+  monthPayAmount,
+}: DateNavProps) {
+  useLanguage();
   const [jumpOpen, setJumpOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const stepping = view !== 'list';
@@ -26,25 +37,23 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
       : view === 'year'
         ? formatYearTitle(cursor)
         : formatMonthTitle(cursor);
-
   useEffect(() => {
     if (jumpOpen) inputRef.current?.focus();
   }, [jumpOpen]);
-
   return (
-    <div className="mb-3 flex items-center gap-2">
+    <div className="calendar-date-nav mb-3 flex flex-wrap items-center gap-2 rounded-md px-2 py-1">
       {stepping && (
         <button
           type="button"
           onClick={onPrev}
-          aria-label="前へ"
-          className="min-h-11 min-w-11 text-ink-secondary"
+          aria-label={t('前へ')}
+          className="calendar-date-button min-h-11 min-w-11 rounded-sm text-ink-secondary"
         >
           ‹
         </button>
       )}
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
         <h2 className="text-title font-semibold text-ink-primary">
           <button
             type="button"
@@ -55,11 +64,19 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
             {title}
           </button>
         </h2>
+        {view === 'month' && monthPayAmount !== undefined && (
+          <span
+            aria-label={t('{0}の給料見込み', [title])}
+            className="calendar-pay shrink-0 tabular text-meta font-semibold text-ink-secondary"
+          >
+            {formatYen(monthPayAmount)}
+          </span>
+        )}
         {jumpOpen && (
           <input
             ref={inputRef}
             type="date"
-            aria-label="日付を移動"
+            aria-label={t('日付を移動')}
             value={cursor}
             onChange={(e) => {
               if (e.target.value) {
@@ -67,7 +84,7 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
                 setJumpOpen(false);
               }
             }}
-            className="mt-1 min-h-11 self-start rounded-sm border border-border-hairline bg-surface-base px-2 text-body"
+            className="mt-1 min-h-11 basis-full rounded-sm border border-border-hairline bg-surface-base px-2 text-body text-ink-primary"
           />
         )}
       </div>
@@ -75,17 +92,17 @@ export function DateNav({ view, cursor, onPrev, onNext, onToday, onJump }: DateN
       <button
         type="button"
         onClick={onToday}
-        className="min-h-11 rounded-sm border border-border-hairline px-3 text-meta text-ink-secondary"
+        className="calendar-today-button min-h-11 rounded-sm border border-border-hairline px-3 text-meta text-ink-secondary"
       >
-        今日
+        {t('今日')}
       </button>
 
       {stepping && (
         <button
           type="button"
           onClick={onNext}
-          aria-label="次へ"
-          className="min-h-11 min-w-11 text-ink-secondary"
+          aria-label={t('次へ')}
+          className="calendar-date-button min-h-11 min-w-11 rounded-sm text-ink-secondary"
         >
           ›
         </button>

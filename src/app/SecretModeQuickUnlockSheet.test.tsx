@@ -33,11 +33,11 @@ describe('SecretModeQuickUnlockSheet', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('open=true ならパスコード入力欄1つ(type=password, inputMode=numeric)と送信ボタンを出す', () => {
+  it('open=true ならパスコード入力欄1つ(type=password, inputMode=text)と送信ボタンを出す', () => {
     render(<SecretModeQuickUnlockSheet open onClose={onClose} />);
     const input = screen.getByLabelText('パスコード');
     expect(input).toHaveAttribute('type', 'password');
-    expect(input).toHaveAttribute('inputMode', 'numeric');
+    expect(input).toHaveAttribute('inputMode', 'text');
     expect(screen.getByRole('button', { name: '解除する' })).toBeInTheDocument();
     // 「パスコードを変更」機能は持たない(spec Never)。
     expect(screen.queryByText('パスコードを変更')).not.toBeInTheDocument();

@@ -22,10 +22,20 @@ beforeEach(() => {
 });
 
 describe('SettingsScreen', () => {
+  it('色見本から桜を選んで保存し、再表示後も選択が残る', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderSettings();
+    await user.click(screen.getByRole('radio', { name: '桜' }));
+    expect(window.localStorage.getItem('calendar-app.theme')).toBe('sakura');
+    expect(document.documentElement.dataset.theme).toBe('sakura');
+    unmount();
+    renderSettings();
+    expect(screen.getByRole('radio', { name: '桜', checked: true })).toBeInTheDocument();
+  });
   it('プロフィール・カレンダー管理・お気に入りシフト・シークレットモードへのリンクがある', () => {
     renderSettings();
     expect(screen.getByRole('link', { name: /プロフィール/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /カレンダー管理/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /カレンダーの並び順/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /お気に入りシフト/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /シークレットモード/ })).toHaveAttribute(
       'href',

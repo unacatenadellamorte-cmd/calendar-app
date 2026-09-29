@@ -16,7 +16,7 @@ function makeChain() {
       calls.push({ method, args });
       return chain;
     };
-  for (const m of ['select', 'insert', 'update', 'single', 'maybeSingle']) {
+  for (const m of ['select', 'insert', 'update', 'eq', 'single', 'maybeSingle']) {
     chain[m] = record(m);
   }
   chain.then = (resolve: (v: unknown) => unknown) => resolve(queryResult);
@@ -155,7 +155,7 @@ describe('profiles.ts', () => {
   it('updateProfile: 渡したフィールドだけ update する', async () => {
     queryResult = { data: row({ display_name: '次郎' }), error: null };
     const { updateProfile } = await importProfiles();
-    const r = await updateProfile({ displayName: '  次郎  ' });
+    const r = await updateProfile('u1', { displayName: '  次郎  ' });
     expect(r.ok).toBe(true);
     expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ display_name: '次郎' });
   });
@@ -164,8 +164,9 @@ describe('profiles.ts', () => {
     const hash = 'a'.repeat(64);
     queryResult = { data: row({ secret_passcode_hash: hash }), error: null };
     const { updateProfile } = await importProfiles();
-    const r = await updateProfile({ secretPasscodeHash: hash });
+    const r = await updateProfile('u1', { secretPasscodeHash: hash });
     expect(r.ok).toBe(true);
+    expect(calls).toContainEqual({ method: 'eq', args: ['id', 'u1'] });
     if (r.ok) expect(r.value.secretPasscodeHash).toBe(hash);
     expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({
       secret_passcode_hash: hash,
@@ -175,7 +176,7 @@ describe('profiles.ts', () => {
   it('updateProfile: secretPasscodeHash に null を渡すと解除する', async () => {
     queryResult = { data: row({ secret_passcode_hash: null }), error: null };
     const { updateProfile } = await importProfiles();
-    const r = await updateProfile({ secretPasscodeHash: null });
+    const r = await updateProfile('u1', { secretPasscodeHash: null });
     expect(r.ok).toBe(true);
     expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({
       secret_passcode_hash: null,
@@ -184,9 +185,16 @@ describe('profiles.ts', () => {
 
   it('updateProfile: 空名は拒否する', async () => {
     const { updateProfile } = await importProfiles();
-    const r = await updateProfile({ displayName: '' });
+    const r = await updateProfile('u1', { displayName: '' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.kind).toBe('profile/invalid-name');
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('updateProfile: IDが無い更新は送信しない', async () => {
+    const { updateProfile } = await importProfiles();
+    const result = await updateProfile('', { secretPasscodeHash: 'a'.repeat(64) });
+    expect(result.ok).toBe(false);
     expect(from).not.toHaveBeenCalled();
   });
 

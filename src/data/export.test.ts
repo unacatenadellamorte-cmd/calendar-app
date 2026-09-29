@@ -7,6 +7,8 @@ import type { ShiftTemplate } from './shift-templates';
 const listCalendars = vi.fn();
 const listEvents = vi.fn();
 const listShiftTemplates = vi.fn();
+const listEventTags = vi.fn().mockResolvedValue({ ok: true, value: [] });
+vi.mock('./event-tags', () => ({ listEventTags: () => listEventTags() }));
 
 vi.mock('./calendars', () => ({ listCalendars: () => listCalendars() }));
 // `hideSecretEvents` は実装(pure関数)をそのまま使う。`listEvents` だけ差し替える。
@@ -80,17 +82,18 @@ describe('buildExportBundle', () => {
     );
     listEvents.mockResolvedValue(
       ok([
-        ev({ id: 'late', calendarId: 'a', startsAt: '2026-09-09T00:00:00Z', endsAt: '2026-09-09T01:00:00Z' }),
+        ev({ id: 'late', calendarId: 'a', location: '東京駅', url: 'https://example.com', startsAt: '2026-09-09T00:00:00Z', endsAt: '2026-09-09T01:00:00Z' }),
         ev({ id: 'early', calendarId: 'b', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
       ]),
     );
     const r = await buildExportBundle();
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value).toMatchObject({ app: 'calendar-app', schemaVersion: 2 });
+    expect(r.value).toMatchObject({ app: 'calendar-app', schemaVersion: 3 });
     expect(r.value.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(r.value.calendars.map((c) => c.id)).toEqual(['a', 'b']);
     expect(r.value.events.map((e) => e.id)).toEqual(['early', 'late']);
+    expect(r.value.events.find((e) => e.id === 'late')).toMatchObject({ location: '東京駅', url: 'https://example.com' });
   });
 
   it('お気に入りシフトのテンプレを createdAt 順で含める', async () => {
@@ -169,4 +172,14 @@ describe('buildExportBundle', () => {
     expect(r.ok).toBe(false);
     expect(listEvents).not.toHaveBeenCalled();
   });
+});
+
+
+it('書き出しに登録したタグと予定へ複写した色を含める', async () => {
+  listCalendars.mockResolvedValue(ok([cal()]));
+  listEvents.mockResolvedValue(ok([ev({ labelColor: '#FFCC00' })]));
+  listEventTags.mockResolvedValueOnce(ok([{ id: 'tag', name: '会議', color: '#FFCC00', startLocal: '09:00', endLocal: '10:00', createdAt: '', updatedAt: '' }]));
+  const result = await buildExportBundle();
+  expect(result.ok && result.value.eventTags[0]?.name).toBe('会議');
+  expect(result.ok && result.value.events[0]?.labelColor).toBe('#FFCC00');
 });

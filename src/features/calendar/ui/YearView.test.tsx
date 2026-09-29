@@ -112,3 +112,9 @@ describe('YearView', () => {
     expect(screen.getByRole('button', { name: '2026年10月1日を開く' })).toBeInTheDocument();
   });
 });
+
+it('年表示でも自作予定の個別ラベル色を優先する', () => {
+  setup([ev({ labelColor: '#FFCC00' })]);
+  const day = screen.getByRole('button', { name: '2026年9月8日を開く(予定あり)' });
+  expect(day.querySelector('[aria-hidden="true"]')).toHaveStyle({ backgroundColor: '#FFCC00' });
+});

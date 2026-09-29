@@ -121,6 +121,20 @@ describe('events.ts', () => {
     });
   });
 
+  it('createEvent: location/event_url を専用列へ保存し、読み出しで null を正規化する', async () => {
+    queryResult = { data: row({ location: '東京駅', event_url: 'https://zoom.us/j/123' }), error: null };
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'c1', title: '会議', location: '  東京駅  ', url: 'https://zoom.us/j/123',
+      allDay: false, startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value).toMatchObject({ location: '東京駅', url: 'https://zoom.us/j/123' });
+    expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({
+      location: '東京駅', event_url: 'https://zoom.us/j/123',
+    });
+  });
+
   it('createEvent: input.shift があるとシフト属性列を insert し、toEvent が写す', async () => {
     queryResult = {
       data: row({
@@ -185,6 +199,28 @@ describe('events.ts', () => {
     );
   });
 
+  it('updateEvent: location/url の更新を送り、旧 patch の省略では列を送らない', async () => {
+    queryResult = { data: row({ location: '新宿', event_url: 'https://example.com' }), error: null };
+    const { updateEvent } = await importEvents();
+    await updateEvent({ id: 'e1', source: 'local' }, { location: '新宿', url: 'https://example.com' });
+    expect(calls.find((c) => c.method === 'update')?.args[0]).toMatchObject({
+      location: '新宿', event_url: 'https://example.com',
+    });
+    calls.length = 0;
+    queryResult = { data: row(), error: null };
+    await updateEvent({ id: 'e1', source: 'local' }, { title: '旧形式' });
+    expect(calls.find((c) => c.method === 'update')?.args[0]).not.toHaveProperty('event_url');
+    expect(calls.find((c) => c.method === 'update')?.args[0]).not.toHaveProperty('location');
+  });
+
+  it('location/url は長さと scheme を検証する', async () => {
+    const { createEvent } = await importEvents();
+    const base = { calendarId: 'c1', title: 'x', allDay: true as const, eventDate: '2026-09-08' };
+    expect((await createEvent({ ...base, location: 'x'.repeat(1001) })).ok).toBe(false);
+    expect((await createEvent({ ...base, url: 'javascript:alert(1)' })).ok).toBe(false);
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it('createEvent: 終日は event_date のみ、時刻は null', async () => {
     queryResult = {
       data: row({ all_day: true, starts_at: null, ends_at: null, event_date: '2026-09-09' }),
@@ -235,6 +271,21 @@ describe('events.ts', () => {
     expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({ is_secret: true });
   });
 
+  it('createEvent: Google カレンダーを指定した書き込みを拒否する', async () => {
+    queryResult = { data: { source: 'google' }, error: null };
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'google-calendar',
+      title: '取り込み先へ書かない',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/calendar-not-writable');
+    expect(calls.some((call) => call.method === 'insert')).toBe(false);
+  });
+
   it('updateEvent: isSecret を渡すと is_secret 列を update する', async () => {
     queryResult = { data: row({ is_secret: true }), error: null };
     const { updateEvent } = await importEvents();
@@ -278,6 +329,18 @@ describe('events.ts', () => {
     expect(r.ok).toBe(true);
     expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ title: '変更後' });
     expect(calls.find((c) => c.method === 'eq')?.args).toEqual(['id', 'e1']);
+  });
+
+  it('updateEvent: local 予定でも外部カレンダーへの移動を拒否する', async () => {
+    queryResult = { data: { source: 'device' }, error: null };
+    const { updateEvent } = await importEvents();
+    const r = await updateEvent(
+      { id: 'e1', source: 'local' },
+      { calendarId: 'device-calendar' },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/calendar-not-writable');
+    expect(calls.some((call) => call.method === 'update')).toBe(false);
   });
 
   it('updateEvent: external は not-editable を返し、supabase に触れない', async () => {
@@ -395,6 +458,20 @@ describe('events.ts — オフライン(Story 1.6)', () => {
   beforeEach(() => vi.stubGlobal('navigator', { onLine: false }));
   afterEach(() => vi.unstubAllGlobals());
 
+  it('createEvent は offline で calendar source を確認できなければ fail closed にする', async () => {
+    const { createEvent } = await importEvents();
+    const r = await createEvent({
+      calendarId: 'missing-calendar',
+      title: '保存先不明',
+      allDay: false,
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.kind).toBe('event/calendar-not-writable');
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it('setEventReminder はオフラインで data/offline を返す(狭い経路、outbox には積まない)', async () => {
     const { setEventReminder } = await importEvents();
     const r = await setEventReminder('e1', 30);
@@ -418,18 +495,26 @@ describe('events.ts — オフライン(Story 1.6)', () => {
     const { listEvents } = await importEvents();
     const r = await listEvents();
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value.map((e) => e.title)).toEqual(['キャッシュ予定']);
+    if (r.ok) {
+      expect(r.value.map((e) => e.title)).toEqual(['キャッシュ予定']);
+      expect(r.value[0]).toMatchObject({ location: null, url: null });
+    }
   });
 
   it('createEvent はオフラインで outbox に積み、楽観行を返す(supabase に触れない)', async () => {
     const { createEvent } = await importEvents();
+    const { cachePut } = await import('./cache');
+    await cachePut('calendars', {
+      id: 'c1', name: '自作', color: '#0072B2', source: 'local', isShift: false,
+      isVisible: true, priority: 0, createdAt: '', updatedAt: '',
+    });
     const { listOutbox } = await import('./outbox');
     const r = await createEvent({
-      calendarId: 'c1', title: '打合せ', allDay: false,
+      calendarId: 'c1', title: '打合せ', location: '会議室A', url: 'https://example.com', allDay: false,
       startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z',
     });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value.id).toMatch(/^[0-9a-f-]{36}$/);
+    if (r.ok) expect(r.value).toMatchObject({ location: '会議室A', url: 'https://example.com' });
     expect(from).not.toHaveBeenCalled();
     const outbox = await listOutbox();
     expect(outbox[0]).toMatchObject({ entity: 'event', op: 'create' });
@@ -473,4 +558,18 @@ describe('hideSecretEvents (pure、spec-secret-mode)', () => {
     const events = [mk('e1', false), mk('e2', false)];
     expect(hideSecretEvents(events, false)).toEqual(events);
   });
+});
+
+
+it('ラベル色を読み取り・作成・更新し、不正な色は拒否する', async () => {
+  queryResult = { data: row({ label_color: '#FFCC00' }), error: null };
+  const { createEvent, updateEvent, toEvent, validateEventPatch } = await importEvents();
+  const result = await createEvent({ calendarId: 'c1', title: 'タグ予定', allDay: true, eventDate: '2026-09-25', labelColor: '#FFCC00' });
+  expect(result.ok && result.value.labelColor).toBe('#FFCC00');
+  expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({ label_color: '#FFCC00' });
+  calls.length = 0;
+  await updateEvent({ id: 'e1', source: 'local' }, { labelColor: null });
+  expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({ label_color: null });
+  expect(toEvent(row() as Parameters<typeof toEvent>[0]).labelColor).toBeNull();
+  expect(validateEventPatch({ labelColor: 'red' })).toMatchObject({ messageKey: 'event/invalid-color' });
 });

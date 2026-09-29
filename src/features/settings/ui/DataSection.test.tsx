@@ -15,11 +15,12 @@ const { DataSection } = await import('./DataSection');
 
 const bundle = {
   app: 'calendar-app',
-  schemaVersion: 2,
+  schemaVersion: 3,
   exportedAt: 'x',
   calendars: [],
   events: [],
   shiftTemplates: [],
+  eventTags: [],
 };
 
 beforeEach(() => {

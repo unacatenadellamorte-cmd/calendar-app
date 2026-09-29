@@ -18,6 +18,17 @@ describe('ProfileForm', () => {
     expect(screen.getByRole('button', { name: 'はじめる' })).toBeDisabled();
   });
 
+  it('空白の名前からフォーカスを外すと理由を表示し、APIは呼ばない', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<ProfileForm submitLabel="保存する" onSubmit={onSubmit} />);
+    const name = screen.getByLabelText('名前');
+    await user.type(name, '   ');
+    await user.tab();
+    expect(screen.getByRole('alert')).toHaveTextContent('名前を入力してください');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('名前を入力すると送信できるようになる', async () => {
     const user = userEvent.setup();
     render(<ProfileForm submitLabel="はじめる" onSubmit={vi.fn()} />);
@@ -32,6 +43,14 @@ describe('ProfileForm', () => {
     await user.type(screen.getByLabelText('名前'), '  花子  ');
     await user.click(screen.getByRole('button', { name: 'はじめる' }));
     expect(onSubmit).toHaveBeenCalledWith({ displayName: '花子', avatarDataUrl: null });
+  });
+
+  it('保存成功時は完了フィードバックを表示する', async () => {
+    const user = userEvent.setup();
+    render(<ProfileForm submitLabel="保存する" onSubmit={vi.fn().mockResolvedValue(true)} />);
+    await user.type(screen.getByLabelText('名前'), '花子');
+    await user.click(screen.getByRole('button', { name: '保存する' }));
+    expect(screen.getByRole('status')).toHaveTextContent('保存しました。');
   });
 
   it('写真を選ぶとリサイズ結果を avatarDataUrl として渡す', async () => {

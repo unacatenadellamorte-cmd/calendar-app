@@ -6,7 +6,7 @@
 //
 // 必要な関数シークレット(Supabase ダッシュボード → Edge Functions → Secrets):
 //   GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI
-//   (APP_ORIGIN は任意。未設定なら http://localhost:5173)
+//   APP_ORIGIN / APP_ORIGINS: WebとAndroidの明示許可オリジン。
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY は実行時に自動注入される。
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -82,12 +82,23 @@ async function handle(req: Request): Promise<Response> {
   // 2) リクエスト本文。
   let code: string | undefined;
   let redirectUri: string | undefined;
+  let platform: unknown;
+  let expectedUserId: unknown;
   try {
     const body = await req.json();
+    platform = body?.platform;
+    expectedUserId = body?.expectedUserId;
     code = typeof body?.code === 'string' ? body.code : undefined;
     redirectUri = typeof body?.redirectUri === 'string' ? body.redirectUri : undefined;
   } catch {
     // フォールスルー
+  }
+  if (platform !== undefined && platform !== 'android' && platform !== 'web') {
+    return jsonResponse(req, { error: 'exchange-failed' }, 400);
+  }
+  const android = platform === 'android';
+  if (android && (expectedUserId !== userId || userData.user.is_anonymous)) {
+    return jsonResponse(req, { error: 'not-authenticated' }, 401);
   }
   if (!code) return jsonResponse(req, { error: 'exchange-failed' }, 400);
 
@@ -98,9 +109,11 @@ async function handle(req: Request): Promise<Response> {
     console.error('oauth-exchange: missing GOOGLE_OAUTH_CLIENT_ID / _SECRET');
     return jsonResponse(req, { error: 'exchange-failed' }, 500);
   }
-  // redirect_uri は認可リクエストで使った値と厳密一致が必要なので、クライアントが
-  // 送ってきた値を優先し、無ければ設定値にフォールバックする。
-  const effectiveRedirect = redirectUri ?? configuredRedirect ?? '';
+  // Webは既存のリダイレクト先を維持する。Androidのサーバー用コードは空文字で交換する。
+  const effectiveRedirect = android ? '' : redirectUri ?? configuredRedirect ?? '';
+  if (android && redirectUri !== undefined) {
+    return jsonResponse(req, { error: 'exchange-failed' }, 400);
+  }
 
   // 3) 認可コード → トークン交換。
   let tokenJson: unknown = null;
@@ -116,6 +129,7 @@ async function handle(req: Request): Promise<Response> {
         grant_type: 'authorization_code',
       }),
     });
+    if (!tokenRes.ok) return jsonResponse(req, { error: 'exchange-failed' }, 400);
     tokenJson = await tokenRes.json().catch(() => null);
   } catch (e) {
     console.warn('oauth-exchange: token endpoint unreachable', (e as Error)?.message);
@@ -127,6 +141,18 @@ async function handle(req: Request): Promise<Response> {
     return jsonResponse(req, { error: parsed.reason }, 400);
   }
 
+  // Androidはコード交換で返されたスコープをサーバーでも確認する。
+  if (android) {
+    const scope = (tokenJson as Record<string, unknown>).scope;
+    const granted = typeof scope === 'string' ? scope.split(/\s+/) : [];
+    if (![
+      'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+      'https://www.googleapis.com/auth/calendar.events.readonly',
+    ].every((required) => granted.includes(required))) {
+      return jsonResponse(req, { error: 'exchange-failed' }, 400);
+    }
+  }
+
   // 4) 表示用に primary カレンダーのメールを取得(ベストエフォート)。
   let googleEmail: string | null = null;
   try {
@@ -135,9 +161,12 @@ async function handle(req: Request): Promise<Response> {
     });
     if (listRes.ok) {
       googleEmail = primaryEmailFromCalendarList(await listRes.json());
+    } else if (android) {
+      return jsonResponse(req, { error: 'exchange-failed' }, 502);
     }
   } catch {
-    // メールは無くても接続は成立する
+    if (android) return jsonResponse(req, { error: 'exchange-failed' }, 502);
+    // Webの既存フローではメール取得はベストエフォート。
   }
 
   // 5) refresh_token を Vault へ、connections を upsert(service_role)。

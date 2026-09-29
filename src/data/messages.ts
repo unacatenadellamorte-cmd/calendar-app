@@ -1,3 +1,4 @@
+import { t } from '@/i18n';
 import { AUTH_MESSAGES } from './auth.errors';
 
 /**
@@ -14,12 +15,17 @@ const DATA_MESSAGES: Record<string, string> = {
   'profile/invalid-name': '名前を入力してください',
   'profile/photo-too-large': '写真のファイルサイズが大きすぎます(10MBまで)',
   'profile/photo-failed': '写真を処理できませんでした。別の写真でお試しください',
+  'event/invalid-color': 'ラベル色を選んでください',
   'event/invalid-title': '予定のタイトルを入力してください',
   'event/invalid-time': '終了は開始より後にしてください',
   'event/invalid-date': '日付を選んでください',
   'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
+  'event/calendar-not-writable':
+    '取り込んだカレンダーには予定を追加できません。自作カレンダーを選んでください',
   'event/invalid-reminder': 'リマインダーの分数が正しくありません',
-  'secret/invalid-passcode': 'パスコードは数字4〜8桁で入力してください',
+  'event/invalid-location': '場所は1000文字までで入力してください',
+  'event/invalid-url': '予定URLはhttpまたはhttpsのURLを入力してください',
+  'secret/invalid-passcode': 'パスコードは半角英数字4〜8文字で入力してください',
   'secret/incorrect-passcode': 'パスコードが違います',
   'secret/save-failed': 'パスコードを保存できませんでした。もう一度お試しください',
   'event/offline': 'オフラインのため保存できません。接続後にもう一度お試しください',
@@ -42,20 +48,24 @@ const DATA_MESSAGES: Record<string, string> = {
   'connection/unavailable': 'この機能は Supabase の設定後に使えます',
   'connection/reauth-needed': 'Google を接続し直してください',
   'connection/not-connected': '先に Google を接続してください',
-  'connection/calendars-failed': 'カレンダー一覧を取得できませんでした。もう一度お試しください',
+  'connection/calendars-failed':
+    'カレンダー一覧を取得できませんでした。もう一度お試しください',
   'connection/disconnect-failed': '接続の解除に失敗しました。もう一度お試しください',
   'connection/permission-denied':
     '端末カレンダーへのアクセスが許可されませんでした。設定から許可してください',
-  'connection/device-unavailable': '端末カレンダーに接続できませんでした。もう一度お試しください',
+  'connection/device-unavailable':
+    '端末カレンダーに接続できませんでした。もう一度お試しください',
   'connection/calendar-not-found':
     'このカレンダーは一覧に見つかりませんでした。更新してもう一度お試しください',
   'notification/permission-denied':
     '通知が許可されていません。端末の設定から許可すると通知が届きます',
+  'notification/unavailable':
+    'この環境は通知に対応していません。予定は保存されます',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };
 const FALLBACK = 'エラーが発生しました。もう一度お試しください';
 
 export function resolveMessage(messageKey: string): string {
-  return ALL[messageKey] ?? FALLBACK;
+  return t(ALL[messageKey] ?? FALLBACK);
 }

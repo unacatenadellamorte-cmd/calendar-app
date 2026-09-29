@@ -27,21 +27,34 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // event ケースが setTimeout を使うため、後始末を忘れると次のテストへ実タイマーが漏れる。
   vi.useRealTimers();
 });
 
 describe('DeepLinkListener', () => {
-  it('calendar-app://event/{id} を /calendar?event={id} へ変換して navigate し、直後に ?event= をクエリから取り除く', () => {
-    vi.useFakeTimers();
+  it('日の歯車リンクで設定画面を開き、不明な設定パスは無視する', () => {
+    render(<DeepLinkListener />);
+    capturedHandler?.('calendar-app://settings/');
+    expect(navigateMock).toHaveBeenCalledWith('/settings');
+    navigateMock.mockClear();
+    capturedHandler?.('calendar-app://settings/unknown');
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('create リンクは実在する日付だけを /calendar?create= へ変換する', () => {
+    render(<DeepLinkListener />);
+    capturedHandler?.('calendar-app://create/2026-02-28');
+    expect(navigateMock).toHaveBeenCalledWith('/calendar?create=2026-02-28');
+    navigateMock.mockClear();
+    capturedHandler?.('calendar-app://create/2026-02-29');
+    capturedHandler?.('calendar-app://create/2026-13-01');
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('calendar-app://event/{id} を /calendar?event={id} へ変換して navigate する', () => {
     render(<DeepLinkListener />);
     capturedHandler?.('calendar-app://event/abc-123');
-    expect(navigateMock).toHaveBeenNthCalledWith(1, '/calendar?event=abc-123');
-    // ?event= が URL に残ったままだと手動リロードで同じシートが再度開くため、
-    // 次の macrotask で /calendar へ replace してクエリを取り除く。
+    expect(navigateMock).toHaveBeenCalledWith('/calendar?event=abc-123');
     expect(navigateMock).toHaveBeenCalledTimes(1);
-    vi.runAllTimers();
-    expect(navigateMock).toHaveBeenNthCalledWith(2, '/calendar', { replace: true });
   });
 
   it('calendar-app://day/{date} を /calendar?date={date} へ変換して navigate する', () => {
@@ -51,11 +64,9 @@ describe('DeepLinkListener', () => {
   });
 
   it('ホスト部の大文字小文字ゆれ(calendar-app://Event/x)を無視する', () => {
-    vi.useFakeTimers();
     render(<DeepLinkListener />);
     capturedHandler?.('calendar-app://Event/abc-123');
-    expect(navigateMock).toHaveBeenNthCalledWith(1, '/calendar?event=abc-123');
-    vi.runAllTimers();
+    expect(navigateMock).toHaveBeenCalledWith('/calendar?event=abc-123');
   });
 
   it('未知のホスト部(calendar-app://unknown/xyz)は navigate しない', () => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { isAccountDataBlocked } from '@/data/account-deletion-state';
 import { flushOutbox } from '@/data/sync';
 import { outboxCount } from '@/data/outbox';
 import { resolveMessage } from '@/data/messages';
@@ -29,7 +30,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
 
   const runFlush = useCallback(async () => {
     const generation = generationRef.current;
-    if (runningRef.current) return;
+    if (runningRef.current || isAccountDataBlocked()) return;
     // 未送信が無ければ何もしない(毎回の起動で「送信中…」が瞬く のを避ける)。
     let pending = 0;
     try {
@@ -39,7 +40,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     }
     if (generation !== generationRef.current) return;
     setPendingCount(pending);
-    if (pending === 0) return;
+    if (pending === 0 || isAccountDataBlocked()) return;
 
     runningRef.current = true;
     setFlushing(true);

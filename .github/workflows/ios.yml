@@ -75,13 +75,37 @@ jobs:
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ios/DerivedData \
-            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee ios-build.log
+            CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=1.0.18 CURRENT_PROJECT_VERSION=19 build 2>&1 | tee ios-build.log
           test -d ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app/PlugIns/FeaturedEventsWidget.appex
+      - name: 実機向け署名なしアーカイブを作成
+        shell: bash
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath ios/UnsignedApp.xcarchive \
+            CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=1.0.18 CURRENT_PROJECT_VERSION=19 \
+            archive 2>&1 | tee ios-archive.log
+          test -d ios/UnsignedApp.xcarchive/Products/Applications/App.app/PlugIns/FeaturedEventsWidget.appex
+      - name: 署名なし成果物を保存
+        shell: bash
+        run: |
+          tar -czf ios-simulator-app.tar.gz -C ios/DerivedData/Build/Products/Debug-iphonesimulator App.app
+          tar -czf ios-unsigned-archive.tar.gz -C ios UnsignedApp.xcarchive
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-builds
+          path: |
+            ios-simulator-app.tar.gz
+            ios-unsigned-archive.tar.gz
+          retention-days: 7
       - name: ビルドログを保存
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-log
-          path: ios-build.log
+          path: |
+            ios-build.log
+            ios-archive.log
           if-no-files-found: ignore
           retention-days: 7

@@ -54,6 +54,46 @@ function setup(events: EventItem[]) {
 }
 
 describe('ListView', () => {
+  it('未来の予定がない場合も最古ではなく最も新しい日へスクロールする', () => {
+    const original = HTMLElement.prototype.scrollTo;
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    const scrolled: { target: HTMLElement; top: number }[] = [];
+    HTMLElement.prototype.scrollTo = function (options) {
+      scrolled.push({ target: this, top: typeof options === 'number' ? options : options?.top ?? 0 });
+    };
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return {
+        top:
+          this.getAttribute('data-testid') === 'list-scroll-region'
+            ? 100
+            : this.textContent?.includes('9月7日')
+              ? 250
+              : 500,
+        bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0,
+        toJSON: () => ({}),
+      };
+    };
+    try {
+      setup([
+        ev({ id: 'old', allDay: true, eventDate: '2026-07-15', startsAt: null, endsAt: null }),
+        ev({
+          id: 'recent',
+          allDay: true,
+          eventDate: '2026-09-07',
+          startsAt: null,
+          endsAt: null,
+        }),
+      ]);
+      const region = screen.getByTestId('list-scroll-region');
+      expect(scrolled).toHaveLength(1);
+      expect(scrolled[0]?.target).toBe(region);
+      expect(scrolled[0]?.top).toBe(150);
+    } finally {
+      HTMLElement.prototype.scrollTo = original;
+      HTMLElement.prototype.getBoundingClientRect = originalRect;
+    }
+  });
+
   it('予定を日ごとの見出しでグルーピングする', () => {
     setup([
       ev({ id: 'a', title: '会議アルファ' }),
@@ -87,8 +127,20 @@ describe('ListView', () => {
     render(
       <ListView
         events={[
-          ev({ id: 'low-late', title: '低優先の夕方', calendarId: 'low', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' }),
-          ev({ id: 'high-morning', title: '高優先の朝', calendarId: 'high', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
+          ev({
+            id: 'low-late',
+            title: '低優先の夕方',
+            calendarId: 'low',
+            startsAt: '2026-09-08T09:00:00Z',
+            endsAt: '2026-09-08T10:00:00Z',
+          }),
+          ev({
+            id: 'high-morning',
+            title: '高優先の朝',
+            calendarId: 'high',
+            startsAt: '2026-09-08T00:00:00Z',
+            endsAt: '2026-09-08T01:00:00Z',
+          }),
         ]}
         calendarById={
           new Map<string, Calendar>([

@@ -47,13 +47,14 @@ describe('useCalendarView', () => {
     expect(result.current.view).toBe('month');
   });
 
-  it('setView は localStorage に保存し、再マウントで復元する', () => {
+  it('前回のビューにかかわらず再マウントでは月表示になる', () => {
     const first = renderHook(() => useCalendarView([], []));
     act(() => first.result.current.setView('week'));
-    expect(window.localStorage.getItem('calendar-app.view')).toBe('week');
+    expect(first.result.current.view).toBe('week');
+    window.localStorage.setItem('calendar-app.view', 'year');
 
     const second = renderHook(() => useCalendarView([], []));
-    expect(second.result.current.view).toBe('week');
+    expect(second.result.current.view).toBe('month');
   });
 
   it('month では goPrev/goNext が月単位、week では日単位', () => {

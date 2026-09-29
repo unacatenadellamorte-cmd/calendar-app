@@ -1,17 +1,21 @@
+import { isAccountDataBlocked } from '@/data/account-deletion-state';
+import { eventLabelColor } from '@/lib/event-label';
 import { Capacitor } from '@capacitor/core';
 import { WidgetBridgePlugin } from 'capacitor-widget-bridge';
-import { selectFeaturedEvents } from '@core';
+import { compareEventsForList, selectFeaturedEvents } from '@core';
 import { hideSecretEvents, listEvents, type EventItem } from '@/data/events';
 import { listCalendars, type Calendar } from '@/data/calendars';
 import { EXTERNAL_DEFAULT_COLOR } from '@/data/calendar-colors';
 import { makePriorityOf } from '@/lib/calendar-view';
+import { getLanguage, type Language } from '@/i18n';
+import { localDateOf } from '@/lib/datetime';
+import { buildWidgetAppearance, WIDGET_APPEARANCE_KEY } from './widgetAppearance';
 
 /**
  * ホーム画面ウィジェットのデータブリッジ(Story 5.6、ARCHITECTURE-SPINE Epic5 AD-12)。
  * `deviceCalendar.ts`/`deepLink.ts` と同じ層分離 ── 選抜ロジック(`selectFeaturedEvents`)
- * の呼び出しと JSON 整形はここ(JS側)だけで行い、ネイティブ側(Android の
- * `FeaturedEventsWidget.kt`)はサイズに応じて渡された配列を切り詰めて表示するだけ
- * (AD-12「選抜ロジックは共有する」)。
+ * と一覧の並び替え(compareEventsForList)・JSON整形をここで共有する。
+ * Androidの日・週・月はcalendarOverview、iOSの代表予定はfeaturedEventsを読む。
  *
  * `WIDGET_GROUP` は iOS App Group 識別子(AD-18)と同じ文字列を、Android では
  * SharedPreferences のファイル名として流用する(Story 5.5 との一貫性のため)。
@@ -23,10 +27,16 @@ import { makePriorityOf } from '@/lib/calendar-view';
  * の冒頭で `Capacitor.isNativePlatform()` を確認し、ネイティブでなければ何もせず返す。
  */
 
-const WIDGET_GROUP = 'group.jp.ryo.calendarapp.widget';
+const WIDGET_GROUP = 'group.jp.ryo.multicalendar.widget';
 const WIDGET_ITEM_KEY = 'featuredEvents';
+const CALENDAR_OVERVIEW_ITEM_KEY = 'calendarOverview';
 /** `android/app/src/main/java/jp/ryo/calendarapp/widget/FeaturedEventsWidgetReceiver.kt` と同じ値。 */
-const WIDGET_RECEIVER_FQCN = 'jp.ryo.calendarapp.widget.FeaturedEventsWidgetReceiver';
+const WIDGET_RECEIVER_FQCN = 'jp.ryo.multicalendar.widget.FeaturedEventsWidgetReceiver';
+const WIDGET_RECEIVER_FQCNS = [
+  WIDGET_RECEIVER_FQCN,
+  'jp.ryo.multicalendar.widget.WeekEventsWidgetReceiver',
+  'jp.ryo.multicalendar.widget.MonthEventsWidgetReceiver',
+];
 /** AD-12「常に上限3件を計算する」。ウィジェットの現在サイズでの実際の表示件数はネイティブ側が決める。 */
 const WIDGET_LIMIT = 3;
 
@@ -45,6 +55,26 @@ export interface FeaturedWidgetEventPayload {
   startsAtIso: string;
   allDay: boolean;
   schemaVersion: 1;
+}
+
+export interface CalendarOverviewEventPayload {
+  filledLabel: boolean;
+  id: string;
+  title: string;
+  calendarName: string;
+  colorHex: string;
+  startDate: string;
+  endDate: string;
+  startsAtIso: string | null;
+  endsAtIso: string | null;
+  allDay: boolean;
+}
+
+export interface CalendarOverviewPayload {
+  schemaVersion: 1;
+  updatedAtIso: string;
+  language: Language;
+  events: CalendarOverviewEventPayload[];
 }
 
 /** `event_date`(YYYY-MM-DD)をローカル00:00として解釈した UTC ISO(device-sync.ts の localDateStringToMs と対の形)。 */
@@ -73,7 +103,7 @@ export function buildFeaturedWidgetPayload(
   const visible = hideSecretEvents(
     events.filter((e) => visibleIds.has(e.calendarId)),
     false,
-  );
+  ).filter((event) => dateRangeForEvent(event) !== null);
   const featured = selectFeaturedEvents(
     visible,
     makePriorityOf(calendarById),
@@ -81,12 +111,13 @@ export function buildFeaturedWidgetPayload(
     WIDGET_LIMIT,
   );
 
-  return featured.map((event) => {
+  return featured.flatMap((event) => {
+    if (!dateRangeForEvent(event)) return [];
     const calendar = calendarById.get(event.calendarId);
-    return {
+    return [{
       id: event.id,
       calendarName: calendar?.name ?? '不明なカレンダー',
-      colorHex: calendar?.color ?? EXTERNAL_DEFAULT_COLOR,
+      colorHex: event.source === 'local' ? eventLabelColor(event, calendar) : calendar?.color ?? EXTERNAL_DEFAULT_COLOR,
       startsAtIso:
         event.allDay && event.eventDate
           ? localMidnightIso(event.eventDate)
@@ -97,44 +128,131 @@ export function buildFeaturedWidgetPayload(
             new Date(event.startsAt ?? now).toISOString(),
       allDay: event.allDay,
       schemaVersion: 1,
-    };
+    }];
   });
 }
 
+function isLocalDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isFinite(parsed.getTime()) && localDateString(parsed) === value;
+}
+
+function localDateString(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function dateRangeForEvent(event: EventItem): {
+  startDate: string;
+  endDate: string;
+  startsAtIso: string | null;
+  endsAtIso: string | null;
+} | null {
+  if (event.allDay) {
+    if (!event.eventDate || !isLocalDate(event.eventDate)) return null;
+    return { startDate: event.eventDate, endDate: event.eventDate, startsAtIso: null, endsAtIso: null };
+  }
+  if (!event.startsAt) return null;
+  const startMs = Date.parse(event.startsAt);
+  if (!Number.isFinite(startMs)) return null;
+  const startDate = localDateOf(new Date(startMs).toISOString());
+  let endDate = startDate;
+  if (event.endsAt) {
+    const endMs = Date.parse(event.endsAt);
+    if (!Number.isFinite(endMs) || endMs < startMs) return null;
+    // 終了はexclusive。深夜0時終了なら前日までにする。
+    endDate = localDateString(new Date(Math.max(startMs, endMs - 1)));
+  }
+  return { startDate, endDate, startsAtIso: new Date(startMs).toISOString(),
+    endsAtIso: event.endsAt ? new Date(event.endsAt).toISOString() : null };
+}
+
+export function buildCalendarOverviewPayload(
+  events: EventItem[],
+  calendars: Calendar[],
+  updatedAtIso: string,
+  language: Language = getLanguage(),
+): CalendarOverviewPayload {
+  const calendarById = new Map(calendars.map((calendar) => [calendar.id, calendar]));
+  const visibleIds = new Set(calendars.filter((calendar) => calendar.isVisible).map((calendar) => calendar.id));
+  const priorityOf = makePriorityOf(calendarById);
+  const overviewEvents = events
+    // 不正な時刻を比較関数へ渡すとNaNが混ざるため、並べ替え前に除外する。
+    .filter((event) => visibleIds.has(event.calendarId) && !event.isSecret && dateRangeForEvent(event) !== null)
+    .sort((a, b) => compareEventsForList(a, b, priorityOf))
+    .map((event) => {
+      const range = dateRangeForEvent(event);
+      const calendar = calendarById.get(event.calendarId);
+      if (!range || !calendar) return null;
+      return {
+        calendarId: event.calendarId,
+        id: event.id,
+        title: event.title,
+        calendarName: calendar.name,
+        colorHex: event.source === 'local' ? eventLabelColor(event, calendar) : calendar.color || EXTERNAL_DEFAULT_COLOR,
+        filledLabel: event.source === 'local',
+        ...range,
+        allDay: event.allDay,
+      };
+    })
+    .filter((event): event is CalendarOverviewEventPayload & { calendarId: string } => event !== null)
+    .map(({ calendarId: _calendarId, ...event }) => event);
+  return { schemaVersion: 1, updatedAtIso, language, events: overviewEvents };
+}
+
 async function runRefreshFeaturedWidget(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform() || isAccountDataBlocked()) return;
   try {
+    if (Capacitor.getPlatform() === 'android') {
+      await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
+    }
+    // 外観は予定データ取得に依存させない。オフラインでもテーマ変更を反映する。
+    await WidgetBridgePlugin.setItem({
+      key: WIDGET_APPEARANCE_KEY,
+      group: WIDGET_GROUP,
+      value: JSON.stringify(buildWidgetAppearance()),
+    });
     const [eventsResult, calendarsResult] = await Promise.all([listEvents(), listCalendars()]);
     if (!eventsResult.ok || !calendarsResult.ok) {
       console.warn('widget: refreshFeaturedWidget failed', 'listEvents/listCalendars not ok');
+      await WidgetBridgePlugin.reloadAllTimelines();
       return;
     }
 
+    if (isAccountDataBlocked()) return;
     const payload = buildFeaturedWidgetPayload(
       eventsResult.value,
       calendarsResult.value,
       new Date().toISOString(),
     );
 
-    // setRegisteredWidgets はプラグインの静的フィールドに保持されるだけでプロセス再起動で
-    // リセットされるため、毎回呼ぶ(冪等)。
-    // iOS プラグインにはこの Android 専用メソッドが無い。
-    if (Capacitor.getPlatform() === 'android') {
-      await WidgetBridgePlugin.setRegisteredWidgets({ widgets: [WIDGET_RECEIVER_FQCN] });
-    }
     await WidgetBridgePlugin.setItem({
       key: WIDGET_ITEM_KEY,
       group: WIDGET_GROUP,
       value: JSON.stringify(payload),
     });
+    if (Capacitor.getPlatform() === 'android') {
+      const overview = buildCalendarOverviewPayload(
+        eventsResult.value,
+        calendarsResult.value,
+        new Date().toISOString(),
+      );
+      await WidgetBridgePlugin.setItem({
+        key: CALENDAR_OVERVIEW_ITEM_KEY,
+        group: WIDGET_GROUP,
+        value: JSON.stringify(overview),
+      });
+    }
     await WidgetBridgePlugin.reloadAllTimelines();
   } catch (e) {
     console.warn('widget: refreshFeaturedWidget failed', (e as Error)?.message);
   }
 }
 
-/** 実行中の呼び出しがあれば同じ Promise を返す(`syncDeviceCalendarsNow` と同じ同時実行ガード)。 */
+/** 実行中の呼び出しを共有しつつ、途中の更新要求は完了後に再実行する。 */
 let inFlight: Promise<void> | null = null;
+let refreshRequested = false;
 
 /**
  * 代表予定をウィジェットへ反映する。呼び出し側の React state に依存せず、
@@ -145,13 +263,37 @@ let inFlight: Promise<void> | null = null;
  * 直後に呼ぶ(イベント駆動、AD-12)。全体を try/catch し、失敗しても警告ログのみで
  * 呼び出し側には影響させない。呼び出し側は fire-and-forget(`void refreshFeaturedWidget()`)
  * で呼ぶため、短時間に連続発火しても新しいデータが古いデータに上書きされないよう
- * 実行中の呼び出しがあれば同じ Promise を共有する(`device-sync.ts` の `inFlight` と同じパターン)。
+ * 実行中の呼び出しがあれば同じ Promise を共有し、途中で来た要求は捨てずに再実行する。
  */
 export function refreshFeaturedWidget(): Promise<void> {
-  if (inFlight) return inFlight;
-  const run = runRefreshFeaturedWidget().finally(() => {
+  if (isAccountDataBlocked()) return Promise.resolve();
+  if (inFlight) {
+    refreshRequested = true;
+    return inFlight;
+  }
+  const run = (async () => {
+    do {
+      refreshRequested = false;
+      await runRefreshFeaturedWidget();
+    } while (refreshRequested);
+  })().finally(() => {
     if (inFlight === run) inFlight = null;
   });
   inFlight = run;
   return run;
+}
+
+/** 先行のネイティブ書込みが終わってから空データを確実に保存する。失敗は呼出元へ返す。 */
+export async function clearAccountWidgets(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  await inFlight;
+  if (Capacitor.getPlatform() === 'android') {
+    await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
+  }
+  const featured = await WidgetBridgePlugin.setItem({ key: WIDGET_ITEM_KEY, group: WIDGET_GROUP, value: '[]' });
+  if (featured?.results === false) throw new Error('ウィジェットの消去に失敗しました');
+  const overview = await WidgetBridgePlugin.setItem({ key: CALENDAR_OVERVIEW_ITEM_KEY, group: WIDGET_GROUP,
+    value: JSON.stringify({ schemaVersion: 1, updatedAtIso: new Date().toISOString(), language: getLanguage(), events: [] }) });
+  if (overview?.results === false) throw new Error('ウィジェットの消去に失敗しました');
+  await WidgetBridgePlugin.reloadAllTimelines();
 }

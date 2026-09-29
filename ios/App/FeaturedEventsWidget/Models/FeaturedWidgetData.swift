@@ -11,7 +11,7 @@ struct FeaturedWidgetEvent: Decodable, Equatable {
 }
 
 enum FeaturedWidgetData {
-    static let group = "group.jp.ryo.calendarapp.widget"
+    static let group = "group.jp.ryo.multicalendar.widget"
     static let key = "featuredEvents"
     static let emptyMessage = "この後の予定はありません"
 

@@ -16,7 +16,7 @@ import type { ShiftTemplate } from './shift-templates';
  */
 
 const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,source,break_minutes,hourly_wage,workplace_label,shift_template_id,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,label_color,source,break_minutes,hourly_wage,workplace_label,shift_template_id,created_at,updated_at';
 
 function fromPostgrest(error: PostgrestError): AppError {
   return appError('data/query', 'data/query', error);
@@ -32,6 +32,7 @@ function toEvent(row: Record<string, unknown>): EventItem {
     endsAt: (row.ends_at as string | null) ?? null,
     eventDate: (row.event_date as string | null) ?? null,
     note: (row.note as string | null) ?? null,
+    labelColor: (row.label_color as string | null) ?? null,
     source: row.source as EventItem['source'],
     breakMinutes: (row.break_minutes as number | null) ?? null,
     hourlyWage: (row.hourly_wage as number | null) ?? null,
@@ -81,6 +82,8 @@ export async function createShifts(
       ends_at: endsAt,
       event_date: null,
       note: null,
+      // 追加時の色を複写し、予定ごとの後からの色変更を保持する。
+      label_color: template.color,
       source: 'local' as const,
       break_minutes: template.breakMinutes,
       hourly_wage: template.hourlyWage,

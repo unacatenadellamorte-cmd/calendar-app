@@ -84,7 +84,7 @@ struct FeaturedEventsWidget: Widget {
         StaticConfiguration(kind: kind, provider: FeaturedEventsProvider()) { entry in
             FeaturedEventsWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("マルチカレンダー")
+        .configurationDisplayName("Multi calendar")
         .description("優先度の高い予定を最大3件表示します。")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }

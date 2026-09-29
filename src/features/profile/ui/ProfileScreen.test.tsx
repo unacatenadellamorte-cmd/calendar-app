@@ -32,6 +32,20 @@ beforeEach(() => {
 });
 
 describe('ProfileScreen', () => {
+  it('既存プロフィールから言語だけを変更でき、名前や写真の更新は呼ばない', async () => {
+    outletContext = {
+      profile: { id: 'u1', displayName: '花子', avatarDataUrl: null },
+      loading: false,
+      errorKey: null,
+      update: (p) => update(p),
+    };
+    render(<ProfileScreen />);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en');
+    expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('花子');
+    expect(update).not.toHaveBeenCalled();
+    expect(localStorage.getItem('calendar-app.language')).toBe('en');
+  });
   it('unavailable なら Supabase 未設定の案内を表示する', () => {
     authState = 'unavailable';
     render(<ProfileScreen />);
@@ -80,6 +94,8 @@ describe('ProfileScreen', () => {
       update: (p) => update(p),
     };
     render(<ProfileScreen />);
-    expect(screen.getByRole('alert')).toHaveTextContent('読み込みに失敗しました。もう一度お試しください');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '読み込みに失敗しました。もう一度お試しください',
+    );
   });
 });

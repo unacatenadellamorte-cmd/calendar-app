@@ -1,6 +1,8 @@
+import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BottomTabs } from './BottomTabs';
+import { AdBanner } from './AdBanner';
 import { OnlineProvider } from './OnlineProvider';
 import { SecretModeProvider } from './SecretModeProvider';
 import { useSecretMode } from './secret-mode-context';
@@ -14,7 +16,7 @@ import { AvatarIcon } from '@/features/profile/ui/AvatarIcon';
 import { OnboardingScreen } from '@/features/profile/ui/OnboardingScreen';
 import type { Profile } from '@/data/profiles';
 import type { ProfileOutletContext } from './profile-outlet-context';
-
+import { ProfileHeaderProvider } from '@/ui/profile-header-context';
 /**
  * アプリシェル。単一カラム。接続状態バーを最上部に、現在ルートの画面を Outlet に、
  * 下タブバーを常時表示。SW 更新プロンプトは最前面に浮かせる。
@@ -33,28 +35,43 @@ import type { ProfileOutletContext } from './profile-outlet-context';
  *     (シングルタップ→ /profile、ダブルタップ→シークレットモードON/OFF、`AvatarNav`)
  */
 export function AppShell() {
+  useLanguage();
+  const location = useLocation();
+  useEffect(() => {
+    // 保存済み画像(data-background)とは分けて、写真を見せる画面だけを指定する。
+    const root = document.documentElement;
+    const photoScreen = location.pathname === '/' || location.pathname === '/calendar';
+    if (photoScreen) root.dataset.backgroundScreen = 'photo';
+    else delete root.dataset.backgroundScreen;
+    return () => {
+      delete root.dataset.backgroundScreen;
+    };
+  }, [location.pathname]);
   const { state } = useAuth();
   const authResolving = state === 'loading';
   const enabled = state === 'guest' || state === 'authenticated';
   const { profile, loading, errorKey, loadErrorKey, reload, create, update } =
     useProfile(enabled);
-
   const showWaiting = authResolving || (enabled && loading);
   const showProfileError = !showWaiting && enabled && Boolean(loadErrorKey);
   const needsOnboarding = !showWaiting && !showProfileError && enabled && profile === null;
-
   const outletContext: ProfileOutletContext = { profile, loading, errorKey, update, reload };
-
   return (
     <OnlineProvider>
       <SecretModeProvider
         passcodeHash={profile?.secretPasscodeHash ?? null}
         onChangePasscodeHash={(hash) => update({ secretPasscodeHash: hash })}
       >
-        <div className="mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken pt-[env(safe-area-inset-top)]">
+        <div
+          className="app-shell mx-auto min-h-[100dvh] w-full max-w-2xl bg-surface-sunken"
+          style={{ paddingTop: 'var(--safe-area-inset-top, env(safe-area-inset-top, 0px))' }}
+        >
+          <div className="app-status-bar" aria-hidden="true" />
           <ConnectivityBar />
           {showWaiting ? (
-            <p className="px-4 py-8 text-center text-meta text-ink-secondary">読み込み中…</p>
+            <p className="px-4 py-8 text-center text-meta text-ink-secondary">
+              {t('読み込み中…')}
+            </p>
           ) : showProfileError ? (
             <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
               <p role="alert" className="text-meta text-danger">
@@ -65,16 +82,18 @@ export function AppShell() {
                 onClick={() => void reload()}
                 className="min-h-11 rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
               >
-                もう一度試す
+                {t('もう一度試す')}
               </button>
             </div>
           ) : needsOnboarding ? (
             <OnboardingScreen create={create} errorKey={errorKey} />
           ) : (
             <>
-              {profile && <AvatarNav profile={profile} />}
-              <Outlet context={outletContext} />
+              <ProfileHeaderProvider value={profile ? <AvatarNav profile={profile} /> : null}>
+                <Outlet context={outletContext} />
+              </ProfileHeaderProvider>
               <BottomTabs />
+              <AdBanner />
             </>
           )}
           <PwaUpdatePrompt />
@@ -83,10 +102,8 @@ export function AppShell() {
     </OnlineProvider>
   );
 }
-
 /** シングルタップ判定用タイマーの遅延(spec-secret-mode-avatar-toggle Always)。 */
 const AVATAR_TAP_WINDOW_MS = 300;
-
 /**
  * 上部アバター(spec-secret-mode-avatar-toggle)。
  *
@@ -112,7 +129,8 @@ const AVATAR_TAP_WINDOW_MS = 300;
  * 扱われ、意図せず`/profile`へ遷移してしまう)。アンマウント時は両タイマーとも
  * `clearTimeout`(`useEvents` の削除 Undo タイマーと同じパターン)。
  */
-function AvatarNav({ profile }: { profile: Profile }) {
+export function AvatarNav({ profile }: { profile: Profile }) {
+  useLanguage();
   const navigate = useNavigate();
   const { unlocked, hasPasscode, lock } = useSecretMode();
   const [quickUnlockOpen, setQuickUnlockOpen] = useState(false);
@@ -120,7 +138,6 @@ function AvatarNav({ profile }: { profile: Profile }) {
   // ダブルタップ確定直後のクールダウン中かどうか(3連続タップ対策)。
   const cooldownRef = useRef(false);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(
     () => () => {
       if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
@@ -128,19 +145,22 @@ function AvatarNav({ profile }: { profile: Profile }) {
     },
     [],
   );
-
   const handleTap = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
       // 中クリック・Ctrl/Cmd/Shift+クリック等はネイティブ動作(新規タブ表示等)に任せる。
       return;
     }
     event.preventDefault();
-
     if (cooldownRef.current) {
       // ダブルタップ確定直後のクールダウン中の追加タップは無視する。
       return;
     }
-
     if (tapTimerRef.current !== null) {
       // 300ms 以内の2回目のタップ = ダブルタップ確定。保留中のシングルタップ用タイマー
       // (満了で /profile へ遷移する)を止め、/profile へは遷移させない。
@@ -165,17 +185,19 @@ function AvatarNav({ profile }: { profile: Profile }) {
       navigate('/profile');
     }, AVATAR_TAP_WINDOW_MS);
   };
-
   return (
     <>
-      <div className="flex justify-end px-4 pt-3">
+      <div className="flex shrink-0 items-center">
         <Link
           to="/profile"
           onClick={handleTap}
-          aria-label="プロフィール"
+          aria-label={t('プロフィール')}
           className="touch-manipulation inline-flex min-h-11 min-w-11 items-center justify-center rounded-full"
         >
-          <AvatarIcon displayName={profile.displayName} avatarDataUrl={profile.avatarDataUrl} />
+          <AvatarIcon
+            displayName={profile.displayName}
+            avatarDataUrl={profile.avatarDataUrl}
+          />
         </Link>
       </div>
       <SecretModeQuickUnlockSheet

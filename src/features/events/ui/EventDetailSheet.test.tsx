@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { EventDetailSheet } from './EventDetailSheet';
+import * as externalLinks from '@/platform/externalLinks';
 
 const baseEvent: EventItem = {
   id: 'e1',
@@ -155,5 +156,23 @@ describe('EventDetailSheet', () => {
       />,
     );
     expect(screen.queryByText('リマインダー')).not.toBeInTheDocument();
+  });
+
+  it('場所とURLをタップすると地図と外部リンクを開く', async () => {
+    const user = userEvent.setup();
+    const map = vi.spyOn(externalLinks, 'openMap').mockResolvedValue(true);
+    const link = vi.spyOn(externalLinks, 'openExternalUrl').mockResolvedValue(true);
+    render(
+      <EventDetailSheet
+        event={{ ...baseEvent, location: '東京駅', url: 'https://zoom.us/j/123' }}
+        calendar={calendar}
+        onClose={vi.fn()}
+        onSetReminder={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: '東京駅' }));
+    await user.click(screen.getByRole('button', { name: 'https://zoom.us/j/123' }));
+    expect(map).toHaveBeenCalledWith('東京駅');
+    expect(link).toHaveBeenCalledWith('https://zoom.us/j/123');
   });
 });

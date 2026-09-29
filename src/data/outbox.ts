@@ -1,3 +1,4 @@
+import { isAccountDataBlocked } from './account-deletion-state';
 import { getLocalDb, type OutboxItem } from './local-db';
 
 /**
@@ -9,6 +10,7 @@ export type OutboxInput = Omit<OutboxItem, 'seq' | 'enqueuedAt'>;
 
 export async function enqueue(input: OutboxInput): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   await db.add('outbox', {
     ...input,
     enqueuedAt: new Date().toISOString(),
@@ -18,17 +20,20 @@ export async function enqueue(input: OutboxInput): Promise<void> {
 /** `seq` 昇順の全項目。 */
 export async function listOutbox(): Promise<OutboxItem[]> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   const all = await db.getAll('outbox');
   return all.sort((a, b) => a.seq - b.seq);
 }
 
 export async function removeOutbox(seq: number): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   await db.delete('outbox', seq);
 }
 
 export async function outboxCount(): Promise<number> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   return db.count('outbox');
 }
 
@@ -43,6 +48,7 @@ export async function dropOutboxFor(
   op?: string,
 ): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   const tx = db.transaction('outbox', 'readwrite');
   for (const item of await tx.store.getAll()) {
     if (item.entity === entity && item.targetId === targetId && (!op || item.op === op)) {

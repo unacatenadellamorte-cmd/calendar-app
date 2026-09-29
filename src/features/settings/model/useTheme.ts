@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { paletteTokens, themePalettes, type PaletteName } from './themePalettes';
+import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents';
 
 /** テーマの選択肢。'system' は端末設定に追従する。 */
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type ThemePreference = 'system' | 'light' | 'dark' | PaletteName;
 
 const STORAGE_KEY = 'calendar-app.theme';
-const VALID: readonly ThemePreference[] = ['system', 'light', 'dark'];
+const VALID: readonly ThemePreference[] = ['system', 'light', 'dark', 'sakura', 'leaf', 'ocean', 'lavender'];
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (VALID as readonly string[]).includes(value);
@@ -23,11 +26,35 @@ export function readStoredTheme(): ThemePreference {
 /** ルート要素の data-theme 属性を更新する。'system' 時は属性を外して端末追従に戻す。 */
 export function applyTheme(preference: ThemePreference): void {
   const root = document.documentElement;
+  paletteTokens.forEach((token) => root.style.removeProperty(`--color-${token}`));
+  if (preference in themePalettes) {
+    const palette = themePalettes[preference as PaletteName];
+    paletteTokens.forEach((token, index) => root.style.setProperty(`--color-${token}`, palette.colors[index]!));
+  }
+  // ヘッダーやステータスバーは、選択中テーマの文字色を基準にした濃色面へ揃える。
+  // system は tokens.css の prefers-color-scheme 定義に任せる。
+  if (preference === 'system') {
+    root.style.removeProperty('--color-chrome-surface');
+  } else if (preference === 'dark') {
+    root.style.setProperty('--color-chrome-surface', '#090b0f');
+  } else {
+    root.style.setProperty('--color-chrome-surface', 'color-mix(in srgb, var(--color-ink-primary) 90%, #000)');
+  }
+  root.style.setProperty('--color-chrome-ink', '#ffffff');
+  // v8 の SystemBars.Dark は「暗い面に明るいアイコン」を意味する。
+  // Web 実行時は未実装なので失敗を握りつぶし、CSS 面だけで継続する。
+  // chrome面は system 選択時も常に濃色なので、OS設定に任せず白アイコンを指定する。
+  const systemBarStyle = SystemBarsStyle.Dark;
+  if (Capacitor.isNativePlatform() && SystemBars && typeof SystemBars.setStyle === 'function') {
+    void Promise.resolve(SystemBars.setStyle({ style: systemBarStyle })).catch(() => undefined);
+  }
+  root.style.colorScheme = preference === 'system' ? 'light dark' : preference === 'dark' ? 'dark' : 'light';
   if (preference === 'system') {
     root.removeAttribute('data-theme');
   } else {
     root.setAttribute('data-theme', preference);
   }
+  notifyWidgetAppearanceChanged();
 }
 
 /**

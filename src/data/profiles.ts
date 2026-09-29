@@ -104,8 +104,9 @@ export async function createProfile(input: NewProfileInput): Promise<Result<Prof
 }
 
 /** プロフィール編集画面からの更新。RLS が自分の1行だけに絞る。 */
-export async function updateProfile(patch: ProfilePatch): Promise<Result<Profile>> {
+export async function updateProfile(profileId: string, patch: ProfilePatch): Promise<Result<Profile>> {
   if (!supabase) return err(UNAVAILABLE);
+  if (!profileId) return err(appError('data/query', 'data/query'));
   const dbPatch: Record<string, unknown> = {};
   if (patch.displayName !== undefined) {
     const nameError = validateName(patch.displayName);
@@ -123,6 +124,7 @@ export async function updateProfile(patch: ProfilePatch): Promise<Result<Profile
     const { data, error } = await supabase
       .from('profiles')
       .update(dbPatch)
+      .eq('id', profileId)
       .select(COLUMNS)
       .single<ProfileRow>();
     if (error) return err(appError('data/query', 'data/query', error));

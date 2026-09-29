@@ -10,7 +10,7 @@ const updateProfile = vi.fn();
 vi.mock('@/data/profiles', () => ({
   getProfile: () => getProfile(),
   createProfile: (i: unknown) => createProfile(i),
-  updateProfile: (p: unknown) => updateProfile(p),
+  updateProfile: (id: string, p: unknown) => updateProfile(id, p),
 }));
 
 const { useProfile } = await import('./useProfile');
@@ -94,6 +94,7 @@ describe('useProfile', () => {
       const success = await result.current.update({ displayName: '次郎' });
       expect(success).toBe(true);
     });
+    expect(updateProfile).toHaveBeenCalledWith('u1', { displayName: '次郎' });
     expect(result.current.profile).toEqual(updated);
   });
 

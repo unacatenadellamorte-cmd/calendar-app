@@ -90,6 +90,24 @@ describe('buildShiftTimes', () => {
 });
 
 describe('createShifts', () => {
+  it('シフト色を保存し、作成直後・キャッシュ・再取得でもラベル色として保持する', async () => {
+    const color = '#06B6D4';
+    queryResult = { data: [eventRow({ label_color: color })], error: null };
+    const { createShifts } = await load();
+    const result = await createShifts('shift', { ...tpl, color }, ['2026-09-08']);
+    expect(result.ok && result.value[0]?.labelColor).toBe(color);
+    expect(calls.find(call => call.method === 'insert')?.args[0]).toEqual([
+      expect.objectContaining({ label_color: color }),
+    ]);
+    expect((calls.find(call => call.method === 'select')?.args[0] as string).split(',')).toContain('label_color');
+    const { cacheGetAll } = await import('./cache');
+    expect((await cacheGetAll('events')).find(event => event.id === 'ev1')?.labelColor).toBe(color);
+    const { listEvents } = await import('./events');
+    const reloaded = await listEvents();
+    expect(reloaded.ok && reloaded.value[0]?.labelColor).toBe(color);
+    const reloadSelect = calls.filter(call => call.method === 'select').at(-1);
+    expect((reloadSelect?.args[0] as string).split(',')).toContain('label_color');
+  });
   it('1日ぶんを insert し、シフト属性つきの EventItem を返す', async () => {
     queryResult = { data: [eventRow()], error: null };
     const { createShifts } = await load();

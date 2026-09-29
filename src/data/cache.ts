@@ -1,3 +1,4 @@
+import { isAccountDataBlocked } from './account-deletion-state';
 import { getLocalDb, type CacheStore } from './local-db';
 import type { Calendar } from './calendars';
 import type { EventItem } from './events';
@@ -15,6 +16,7 @@ export async function cacheReplace<S extends CacheStore>(
   rows: CacheRow[S][],
 ): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   const tx = db.transaction(store, 'readwrite');
   await tx.store.clear();
   for (const row of rows) await tx.store.put(row);
@@ -23,6 +25,7 @@ export async function cacheReplace<S extends CacheStore>(
 
 export async function cacheGetAll<S extends CacheStore>(store: S): Promise<CacheRow[S][]> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   return (await db.getAll(store)) as CacheRow[S][];
 }
 
@@ -32,12 +35,14 @@ export async function cachePut<S extends CacheStore>(
   row: CacheRow[S],
 ): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   await db.put(store, row);
 }
 
 /** 1行を削除(論理削除の楽観反映)。 */
 export async function cacheDelete(store: CacheStore, id: string): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   await db.delete(store, id);
 }
 
@@ -48,6 +53,7 @@ export async function cacheRekey<S extends CacheStore>(
   row: CacheRow[S],
 ): Promise<void> {
   const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   const tx = db.transaction(store, 'readwrite');
   if (oldId !== (row as { id: string }).id) await tx.store.delete(oldId);
   await tx.store.put(row);

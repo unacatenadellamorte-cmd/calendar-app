@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Screen } from '@/ui/Screen';
 
 /**
  * オンボーディング(profiles 行なし)分岐・取得エラー分岐・通常表示 + 上部アバター分岐を検証する。
@@ -83,7 +84,7 @@ function renderShell() {
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<AppShell />}>
-          <Route index element={<div>ホーム画面</div>} />
+          <Route index element={<Screen title="ホーム画面" showProfileHeader>ホーム画面</Screen>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -131,7 +132,7 @@ describe('AppShell', () => {
       loadErrorKey: null,
     };
     renderShell();
-    expect(screen.getByText('ホーム画面')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'メインナビゲーション' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'プロフィール' })).toBeInTheDocument();
   });
@@ -139,7 +140,7 @@ describe('AppShell', () => {
   it('unavailable なら通常表示のまま、アバターは出さない', () => {
     authState = 'unavailable';
     renderShell();
-    expect(screen.getByText('ホーム画面')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'プロフィール' })).not.toBeInTheDocument();
   });
 

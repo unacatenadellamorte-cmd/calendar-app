@@ -3,6 +3,8 @@ import { appError, err, ok } from './result';
 import { enqueue, listOutbox } from './outbox';
 import { cacheGetAll } from './cache';
 import type { EventItem } from './events';
+import { writeDeletion } from './account-deletion-state';
+import { clearLocalAccountData, getLocalDb } from './local-db';
 
 const createEvent = vi.fn();
 const updateEvent = vi.fn();
@@ -72,6 +74,21 @@ beforeEach(() => {
 });
 
 describe('flushOutbox', () => {
+  it('削除中に返った遅延同期でキャッシュを復活させず後続処理を止める', async () => {
+    await enqueue({ entity: 'event', op: 'create', targetId: '旧予定' });
+    await enqueue({ entity: 'event', op: 'delete', targetId: '次の予定' });
+    let complete!: (value: ReturnType<typeof ok<EventItem>>) => void;
+    createEvent.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    const pending = flushOutbox();
+    await vi.waitFor(() => expect(createEvent).toHaveBeenCalled());
+    writeDeletion({ userId: '本人', phase: 'local' });
+    await clearLocalAccountData();
+    complete(ok(ev('旧予定')));
+    expect((await pending).interrupted).toBe(true);
+    expect(deleteEvent).not.toHaveBeenCalled();
+    expect(await (await getLocalDb()).count('events')).toBe(0);
+    expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+  });
   it('seq 昇順で再生し、成功したら outbox を空にする', async () => {
     await enqueue({ entity: 'event', op: 'create', targetId: 't1', payload: { id: 't1' } });
     await enqueue({ entity: 'event', op: 'update', targetId: 't1', payload: { title: 'x' } });

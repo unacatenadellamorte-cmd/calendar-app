@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
@@ -6,7 +7,6 @@ import { resolveMessage } from '@/data/messages';
 import { useDeviceConnection } from '@/features/connections/model/useDeviceConnection';
 import { useDeviceCalendars } from '@/features/connections/model/useDeviceCalendars';
 import { DEFAULT_NAME, DEFAULT_COLOR } from '@/data/device-calendars';
-
 /**
  * `/connections/device/calendars`(Story 5.2)。`GoogleCalendarPicker` と同型の
  * 一覧画面。接続した端末カレンダーの候補を出し、取り込む対象を選ぶ。
@@ -14,6 +14,7 @@ import { DEFAULT_NAME, DEFAULT_COLOR } from '@/data/device-calendars';
  * (予定の同期は Story 5.3。取り込み時刻・失敗の表示はここには無い)。
  */
 export function DeviceCalendarPicker() {
+  useLanguage();
   const navigate = useNavigate();
   const { state } = useAuth();
   const connectionEnabled = env.hasSupabase && state === 'authenticated';
@@ -22,37 +23,35 @@ export function DeviceCalendarPicker() {
   const { choices, loading, refreshing, errorKey, refresh, toggle } = useDeviceCalendars(
     enabled && connection ? connection.id : null,
   );
-
   if (connLoading) {
     return (
-      <Screen title="取り込むカレンダー">
-        <p className="mt-4 text-meta text-ink-secondary">読み込み中…</p>
+      <Screen title={t('取り込むカレンダー')}>
+        <p className="mt-4 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       </Screen>
     );
   }
-
   if (!enabled) {
     return (
-      <Screen title="取り込むカレンダー">
+      <Screen title={t('取り込むカレンダー')}>
         <div className="mt-4 rounded-md border border-border-hairline bg-surface-raised p-4">
-          <p className="text-body text-ink-primary">先に端末カレンダーを接続してください</p>
+          <p className="text-body text-ink-primary">
+            {t('先に端末カレンダーを接続してください')}
+          </p>
           <button
             type="button"
             onClick={() => navigate('/settings')}
             className="mt-3 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
           >
-            設定へ
+            {t('設定へ')}
           </button>
         </div>
       </Screen>
     );
   }
-
   const selectedCount = choices.filter((c) => c.selected).length;
-
   return (
     <Screen
-      title="取り込むカレンダー"
+      title={t('取り込むカレンダー')}
       action={
         <button
           type="button"
@@ -60,12 +59,14 @@ export function DeviceCalendarPicker() {
           disabled={refreshing}
           className="min-h-11 text-meta text-accent disabled:opacity-60"
         >
-          {refreshing ? '更新中…' : '更新'}
+          {refreshing ? t('更新中…') : t('更新')}
         </button>
       }
     >
       <p className="mt-1 text-meta text-ink-secondary">
-        オンにしたカレンダーの予定を読み取り専用で取り込みます。{selectedCount} 件選択中。
+        {t('オンにしたカレンダーの予定を読み取り専用で取り込みます。{0} 件選択中。', [
+          selectedCount,
+        ])}
       </p>
 
       {errorKey && (
@@ -75,10 +76,10 @@ export function DeviceCalendarPicker() {
       )}
 
       {loading ? (
-        <p className="mt-4 text-meta text-ink-secondary">読み込み中…</p>
+        <p className="mt-4 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : choices.length === 0 ? (
         <p className="mt-4 text-meta text-ink-secondary">
-          取り込めるカレンダーが見つかりませんでした。
+          {t('取り込めるカレンダーが見つかりませんでした。')}
         </p>
       ) : (
         <ul className="mt-3 overflow-hidden rounded-md border border-border-hairline bg-surface-raised">

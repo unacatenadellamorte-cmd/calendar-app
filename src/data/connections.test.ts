@@ -5,6 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * Docker 未導入で Supabase ローカルが起動できないため。
  */
 
+const authorizeGoogle = vi.fn();
+let android = false;
+vi.mock('@/platform/googleAuthorization', () => ({
+  authorizeGoogle: (...args: unknown[]) => authorizeGoogle(...args),
+  isAndroidGoogleAuthorization: () => android,
+}));
+
 const STATE_KEY = 'calendar-app.google-oauth-state';
 
 let queryResult: { data: unknown; error: unknown; count?: number } = { data: null, error: null };
@@ -84,6 +91,8 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.resetModules();
+  android = false;
+  authorizeGoogle.mockReset();
   queryResult = { data: null, error: null };
   invokeResult = { data: null, error: null };
   rpcResult = { data: null, error: null };
@@ -106,14 +115,14 @@ describe('startGoogleConnect', () => {
   it('client ID 未設定なら connection/unavailable を返し、遷移しない', async () => {
     envValue.googleOauthClientId = undefined;
     const { startGoogleConnect } = await load();
-    const r = startGoogleConnect();
+    const r = await startGoogleConnect();
     expect(r && r.ok === false && r.error.messageKey).toBe('connection/unavailable');
     expect(assign).not.toHaveBeenCalled();
   });
 
   it('state を sessionStorage に置き、同意画面 URL へ遷移する', async () => {
     const { startGoogleConnect } = await load();
-    startGoogleConnect();
+    await startGoogleConnect();
     const state = sessionStorage.getItem(STATE_KEY);
     expect(state).toMatch(/^[0-9a-f]{32}$/);
     expect(assign).toHaveBeenCalledTimes(1);
@@ -283,5 +292,116 @@ describe('disconnectGoogle', () => {
     const r = await disconnectGoogle();
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/offline');
+  });
+});
+
+
+describe('AndroidのGoogle認可', () => {
+  const scopes = [
+    'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+    'https://www.googleapis.com/auth/calendar.events.readonly',
+  ];
+  let session: { user: { id: string; is_anonymous: boolean }; access_token: string } | null;
+  let authChanged: (_event: string, value: typeof session) => void;
+  const unsubscribe = vi.fn();
+  beforeEach(() => {
+    android = true;
+    session = { user: { id: 'user-a', is_anonymous: false }, access_token: 'jwt-a' };
+    supabaseValue = {
+      from, functions: { invoke }, rpc,
+      auth: {
+        getSession: vi.fn(async () => ({ data: { session }, error: null })),
+        onAuthStateChange: vi.fn((callback) => {
+          authChanged = callback;
+          return { data: { subscription: { unsubscribe } } };
+        }),
+      },
+    };
+    unsubscribe.mockClear();
+    invokeResult = { data: { googleEmail: 'me@gmail.com' }, error: null };
+    authorizeGoogle.mockResolvedValue({ code: 'native-code', grantedScopes: scopes });
+  });
+
+  it('開始時のJWTと利用者IDで交換し、ブラウザへ遷移しない', async () => {
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toEqual({ ok: true, value: { googleEmail: 'me@gmail.com' } });
+    expect(invoke).toHaveBeenCalledWith('oauth-exchange', {
+      body: { code: 'native-code', platform: 'android', expectedUserId: 'user-a' },
+      headers: { Authorization: 'Bearer jwt-a' },
+    });
+    expect(assign).not.toHaveBeenCalled();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { code: '', grantedScopes: scopes },
+    { code: 'native-code', grantedScopes: scopes.slice(0, 1) },
+  ])('コードなし・権限不足では保存しない', async (value) => {
+    authorizeGoogle.mockResolvedValue(value);
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toMatchObject({ ok: false });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('同一利用者のJWT更新後は交換直前の新しいJWTで認可コードを送る', async () => {
+    authorizeGoogle.mockImplementation(async () => {
+      session = { user: { id: 'user-a', is_anonymous: false }, access_token: 'jwt-refreshed' };
+      authChanged('TOKEN_REFRESHED', session);
+      return { code: 'native-code', grantedScopes: scopes };
+    });
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toMatchObject({ ok: true });
+    expect(invoke).toHaveBeenCalledWith('oauth-exchange', {
+      body: { code: 'native-code', platform: 'android', expectedUserId: 'user-a' },
+      headers: { Authorization: 'Bearer jwt-refreshed' },
+    });
+  });
+
+  it('取消の後に再試行できる', async () => {
+    authorizeGoogle.mockRejectedValueOnce({ code: 'cancelled' });
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toMatchObject({ ok: false, error: { messageKey: 'connection/cancelled' } });
+    expect(await startGoogleConnect()).toMatchObject({ ok: true });
+  });
+
+  it('認可中の連打を拒否し、利用者変更では交換しない', async () => {
+    let finish!: (value: unknown) => void;
+    authorizeGoogle.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { startGoogleConnect } = await load();
+    const first = startGoogleConnect();
+    await vi.waitFor(() => expect(authorizeGoogle).toHaveBeenCalledOnce());
+    expect(await startGoogleConnect()).toMatchObject({ ok: false });
+    session = { user: { id: 'user-b', is_anonymous: false }, access_token: 'jwt-b' };
+    authChanged('SIGNED_IN', session);
+    finish({ code: 'native-code', grantedScopes: scopes });
+    expect(await first).toMatchObject({ ok: false, error: { messageKey: 'connection/not-authenticated' } });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('ログアウトして同じ利用者へ戻っても認可を無効化する', async () => {
+    authorizeGoogle.mockImplementation(async () => {
+      authChanged('SIGNED_OUT', null);
+      authChanged('SIGNED_IN', session);
+      return { code: 'native-code', grantedScopes: scopes };
+    });
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toMatchObject({ ok: false });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'FunctionsFetchError', message: 'Failed to send' },
+    { context: new Response(JSON.stringify({ error: 'not-authenticated' }), { status: 401 }) },
+  ])('通信失敗・認証失効を成功扱いしない', async (error) => {
+    invokeResult = { data: null, error };
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toMatchObject({ ok: false });
+  });
+
+  it('匿名・セッションなしでは認可を開始しない', async () => {
+    session = null;
+    const { startGoogleConnect } = await load();
+    expect(await startGoogleConnect()).toMatchObject({ ok: false });
+    expect(authorizeGoogle).not.toHaveBeenCalled();
   });
 });
