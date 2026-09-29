@@ -16,8 +16,10 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "sync:edge-shared": "node scripts/sync-edge-shared.mjs",
-    "postinstall": "node scripts/android/patch-admob.mjs",
-    "patch:admob": "node scripts/android/patch-admob.mjs"
+    "postinstall": "node scripts/android/patch-admob.mjs && node scripts/ios/patch-admob.mjs",
+    "patch:admob": "node scripts/android/patch-admob.mjs && node scripts/ios/patch-admob.mjs",
+    "sync:ios-ads": "node scripts/ios/sync-admob-config.mjs",
+    "capacitor:sync:after": "node scripts/ios/sync-admob-config.mjs"
   },
   "dependencies": {
     "@calendar-app/core": "*",
@@ -56,6 +58,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^16.0.0",
     "jsdom": "^26.0.0",
+    "plist": "3.1.1",
     "prettier": "^3.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0",

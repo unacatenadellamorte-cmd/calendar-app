@@ -8,6 +8,37 @@ const productionIds = {
 };
 
 describe('resolveAdsConfig', () => {
+  it('iOS検証はAndroidの環境値が存在しても公式iOS IDだけを使う', () => {
+    expect(resolveAdsConfig({ VITE_ADMOB_PLATFORM: 'ios', ...productionIds })).toMatchObject({
+      platform: 'ios', mode: 'test',
+      appId: 'ca-app-pub-3940256099942544~1458002511',
+      bannerId: 'ca-app-pub-3940256099942544/2435281174',
+    });
+  });
+
+  it('iOS本番では専用IDが必須でAndroid IDを流用しない', () => {
+    const env = { VITE_ADMOB_PLATFORM: 'ios', VITE_ADMOB_MODE: 'production', ...productionIds };
+    expect(() => resolveAdsConfig(env)).toThrow();
+    expect(() => resolveAdsConfig({ ...env, ADMOB_IOS_APP_ID: productionIds.ADMOB_ANDROID_APP_ID,
+      VITE_ADMOB_IOS_BANNER_ID: productionIds.VITE_ADMOB_ANDROID_BANNER_ID })).toThrow(/流用/);
+    expect(resolveAdsConfig({ ...env, ADMOB_IOS_APP_ID: 'ca-app-pub-1234567890123456~9876543210',
+      VITE_ADMOB_IOS_BANNER_ID: 'ca-app-pub-1234567890123456/9876543210' })).toMatchObject({ platform: 'ios', mode: 'production' });
+    expect(() => resolveAdsConfig({ VITE_ADMOB_PLATFORM: 'unknown' })).toThrow(/対象/);
+  });
+  it('iOSテストでは自分のUMP App IDを使い、広告ユニットは公式テストIDに固定する', () => {
+    expect(resolveAdsConfig({ VITE_ADMOB_PLATFORM: 'ios', VITE_ADMOB_MODE: 'test',
+      ADMOB_IOS_APP_ID: 'ca-app-pub-1234567890123456~9876543210',
+      VITE_ADMOB_IOS_BANNER_ID: 'ca-app-pub-1234567890123456/9876543210',
+      VITE_ADMOB_DEBUG_EEA: 'true', VITE_ADMOB_TEST_DEVICE_IDS: 'ios-device',
+    })).toMatchObject({ appId: 'ca-app-pub-1234567890123456~9876543210',
+      bannerId: 'ca-app-pub-3940256099942544/2435281174', debugEea: true, testDeviceIds: ['ios-device'] });
+  });
+  it.each(['test', 'production'])('iOSの%sモードでもAndroid App IDを拒否する', (mode) => {
+    const env = { VITE_ADMOB_PLATFORM: 'ios', VITE_ADMOB_MODE: mode, ...productionIds };
+    expect(() => resolveAdsConfig({ ...env, ADMOB_IOS_APP_ID: 'ca-app-pub-3940256099942544~3347511713' })).toThrow(/流用/);
+    expect(() => resolveAdsConfig({ ...env, ADMOB_IOS_APP_ID: productionIds.ADMOB_ANDROID_APP_ID })).toThrow(/流用/);
+  });
+
   it('既定値は公式の AdMob テストIDを使う', () => {
     expect(resolveAdsConfig({})).toMatchObject({
       mode: 'test',

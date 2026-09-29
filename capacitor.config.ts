@@ -9,9 +9,11 @@ const config: CapacitorConfig = {
   appName: 'Multi calendar',
   // Vite のビルド出力(vite.config.ts の既定 outDir)とそろえる。
   webDir: 'dist',
-  // Androidのみ広告対応。将来のiOS同期でも広告SDKを組み込まない。
   ios: {
+    // DOMの安全領域をネイティブ側で重ねて加算しない。
+    contentInset: 'never',
     includePlugins: [
+      '@capacitor-community/admob',
       '@capacitor/app', '@capacitor/app-launcher', '@capacitor/local-notifications',
       '@ebarooni/capacitor-calendar', 'capacitor-widget-bridge',
     ],

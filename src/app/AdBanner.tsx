@@ -18,6 +18,8 @@ export function AdBanner() {
       const rect = element.getBoundingClientRect();
       const viewport = window.visualViewport;
       const keyboard = viewport ? viewport.height < window.innerHeight - 100 : false;
+      // 拡大中のCSS座標はネイティブ座標と一致しないため、等倍へ戻るまで隠す。
+      const zoomed = (viewport?.scale ?? 1) !== 1;
       // WebViewごと縮むキーボードでも、入力欄のフォーカス中は広告を隠す。
       const editing = document.activeElement instanceof HTMLElement &&
         document.activeElement.matches('input, textarea, select, [contenteditable="true"]');
@@ -27,7 +29,7 @@ export function AdBanner() {
       const clipBottom = Math.min(tabsTop, main?.bottom ?? window.innerHeight, (viewport?.height ?? window.innerHeight) + (viewport?.offsetTop ?? 0));
       const clipLeft = Math.max(0, main?.left ?? 0, viewport?.offsetLeft ?? 0);
       const clipRight = Math.min(main?.right ?? window.innerWidth, (viewport?.width ?? window.innerWidth) + (viewport?.offsetLeft ?? 0));
-      const blocked = Boolean(document.querySelector('[role="dialog"], [aria-modal="true"]')) || keyboard || editing || document.hidden;
+      const blocked = Boolean(document.querySelector('[role="dialog"], [aria-modal="true"]')) || keyboard || zoomed || editing || document.hidden;
       const next = {
         // 安全領域はWebViewの親またはCSSに反映済み。ここでは加算しない。
         margin: Math.round(rect.top + (rect.height > 0 ? bannerGap : 0)), left: Math.round(rect.left), width: Math.floor(rect.width),

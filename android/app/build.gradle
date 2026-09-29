@@ -8,6 +8,7 @@ apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 def adsConfigFile = file('src/main/assets/public/admob-config.json')
 if (!adsConfigFile.exists()) throw new GradleException('先に npm run build と npx cap sync android を実行してください。')
 def adsConfig = new groovy.json.JsonSlurper().parse(adsConfigFile)
+if (adsConfig.platform != 'android') throw new GradleException('Android対象の広告設定でWebを再ビルドしてください。')
 if (!(adsConfig.appId ==~ /ca-app-pub-\d{16}~\d{10}/)) throw new GradleException('AdMob App IDが不正です。')
 if (project.hasProperty('requireReleaseSigning') && adsConfig.mode != 'production') {
     throw new GradleException('提出用ビルドではVITE_ADMOB_MODE=productionが必要です。')

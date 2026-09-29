@@ -29,7 +29,7 @@ class WidgetTargetTest < Minitest::Test
       widgets = project.targets.select { |target| target.name == 'FeaturedEventsWidget' }
       assert_equal 1, widgets.length
       widget = widgets.first
-      assert_equal 3, widget.source_build_phase.files.length
+      assert_equal 5, widget.source_build_phase.files.length
       widget.source_build_phase.files_references.each do |ref|
         assert File.file?(ref.real_path), "ソースが見つからない: #{ref.path}"
       end
@@ -65,7 +65,7 @@ class WidgetTargetTest < Minitest::Test
       assert system(RbConfig.ruby, File.join(__dir__, 'add-widget-target.rb'), path)
       targets = Xcodeproj::Project.open(path).targets
       assert_equal %w[App FeaturedEventsWidget], targets.map(&:name)
-      assert_equal 3, targets.last.source_build_phase.files.length
+      assert_equal 5, targets.last.source_build_phase.files.length
     end
   end
 end

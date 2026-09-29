@@ -13,13 +13,13 @@ afterEach(() => {
     rmSync(fixture, { recursive: true, force: true });
   }
 });
-function fixture() {
+function fixture(platform: 'android' | 'ios') {
   const root = mkdtempSync(join(tmpdir(), 'calendar-admob-patch-'));
   fixtures.push(root);
-  const scriptRoot = join(root, 'scripts/android');
+  const scriptRoot = join(root, `scripts/${platform}`);
   mkdirSync(scriptRoot, { recursive: true });
-  cpSync(resolve('scripts/android/patch-admob.mjs'), join(scriptRoot, 'patch-admob.mjs'));
-  cpSync(resolve('scripts/android/admob-8.1.0'), join(scriptRoot, 'admob-8.1.0'), { recursive: true });
+  cpSync(resolve(`scripts/${platform}/patch-admob.mjs`), join(scriptRoot, 'patch-admob.mjs'));
+  cpSync(resolve(`scripts/${platform}/admob-8.1.0`), join(scriptRoot, 'admob-8.1.0'), { recursive: true });
   const manifestPath = join(scriptRoot, 'admob-8.1.0/manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
     files: { path: string; replacement: string; sourceSha256: string }[];
@@ -31,7 +31,7 @@ function fixture() {
     const target = join(packageRoot, entry.path);
     mkdirSync(dirname(target), { recursive: true });
     // 元ソースのハッシュ一致を制御できる独立したfixtureにする。
-    const original = `元のJavaソース: ${entry.path}`;
+    const original = `元のネイティブソース: ${entry.path}`;
     entry.sourceSha256 = createHash('sha256').update(original).digest('hex');
     writeFileSync(target, original);
   }
@@ -39,9 +39,9 @@ function fixture() {
   return { root, scriptRoot, packageRoot, manifest, script: join(scriptRoot, 'patch-admob.mjs') };
 }
 
-describe('AdMob 8.1.0の再現可能パッチ', () => {
+describe.each(['android', 'ios'] as const)('AdMob 8.1.0の再現可能パッチ（%s）', (platform) => {
   it('初回は適用し、再実行では同じファイルを変更しない', () => {
-    const f = fixture();
+    const f = fixture(platform);
     expect(execFileSync(process.execPath, [f.script], { encoding: 'utf8' })).toContain('適用 2ファイル');
     expect(execFileSync(process.execPath, [f.script], { encoding: 'utf8' })).toContain('適用 0ファイル');
     for (const entry of f.manifest.files) {
@@ -49,14 +49,14 @@ describe('AdMob 8.1.0の再現可能パッチ', () => {
     }
   });
   it('依存バージョンが違うなら明確に失敗する', () => {
-    const f = fixture();
+    const f = fixture(platform);
     writeFileSync(join(f.packageRoot, 'package.json'), JSON.stringify({ version: '8.2.0' }));
     const result = spawnSync(process.execPath, [f.script], { encoding: 'utf8' });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('AdMobパッチ対象は8.1.0のみ');
   });
   it('元ソース不一致では部分適用もせず失敗する', () => {
-    const f = fixture();
+    const f = fixture(platform);
     const untouched = join(f.packageRoot, f.manifest.files[0]!.path);
     const before = readFileSync(untouched);
     writeFileSync(join(f.packageRoot, f.manifest.files[1]!.path), '不明なソース変更');

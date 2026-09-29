@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
   define: { __ADMOB_CONFIG__: JSON.stringify(ads) },
   plugins: [
     {
-      name: 'android-admob-config',
+      name: 'native-admob-config',
       generateBundle() {
         this.emitFile({ type: 'asset', fileName: 'admob-config.json', source: JSON.stringify(ads) });
       },

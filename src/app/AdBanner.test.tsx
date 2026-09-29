@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 describe('カレンダー上部の広告枠', () => {
-  it('Web/iOSでは枠もAPI呼出しも追加しない', () => {
+  it('Webでは枠もAPI呼出しも追加しない', () => {
     sdk.supported = false;
     const view = render(<AdBanner />);
     expect(view.container).toBeEmptyDOMElement();
@@ -78,6 +78,21 @@ describe('カレンダー上部の広告枠', () => {
     top = 112; width = 600;
     act(() => window.dispatchEvent(new Event('resize')));
     expect(sdk.place).toHaveBeenLastCalledWith(expect.objectContaining({ width: 600, visible: true }), false);
+  });
+  it('枠が収まっていても拡大中は隠し、等倍へ戻れば元の配置で表示する', () => {
+    const viewport = new EventTarget();
+    Object.assign(viewport, { height: window.innerHeight, width: window.innerWidth, offsetTop: 0, offsetLeft: 0, scale: 1 });
+    vi.stubGlobal('visualViewport', viewport);
+    sdk.height = 60;
+    render(<AdBanner />);
+    const initial = sdk.place.mock.calls.at(-1)![0];
+    expect(initial.visible).toBe(true);
+    Object.assign(viewport, { scale: 2 });
+    act(() => viewport.dispatchEvent(new Event('resize')));
+    expect(sdk.place).toHaveBeenLastCalledWith({ ...initial, visible: false }, false);
+    Object.assign(viewport, { scale: 1 });
+    act(() => viewport.dispatchEvent(new Event('resize')));
+    expect(sdk.place).toHaveBeenLastCalledWith(initial, false);
   });
   it('通信復旧は明示再試行、破棄後はリスナーから再表示しない', () => {
     const view = render(<AdBanner />);

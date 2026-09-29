@@ -1,0 +1,17 @@
+{
+  "version": "8.1.0",
+  "files": [
+    {
+      "path": "ios/Sources/AdMobPlugin/AdMobPlugin.swift",
+      "replacement": "AdMobPlugin.swift",
+      "sourceSha256": "2476f6e68713a4ce5eebf7af54e390502b34d8108b3aa4aaa22880d7cde2a7f9",
+      "patchedSha256": "97c5d3c157862c42de42e44ddc8e1ccf30aa34193e65734a4a583a77e3784c3b"
+    },
+    {
+      "path": "ios/Sources/AdMobPlugin/Banner/BannerExecutor.swift",
+      "replacement": "BannerExecutor.swift",
+      "sourceSha256": "78bc17e8bca6364e1e5e6f37cae97b558c28c9cf655c5907d0d2ae4dd2afc35d",
+      "patchedSha256": "e2eb8a2d58c22c72fcd1582c973cf1a68be3092b7c50f14f66837350214b8f98"
+    }
+  ]
+}

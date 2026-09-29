@@ -7,6 +7,7 @@ import {
 import { createAdsController, type AdsState, type BannerPlacement, type PositionedAdMob } from './adsController';
 
 const config = {
+  platform: 'android' as const,
   mode: 'test' as const,
   appId: 'ca-app-pub-3940256099942544~3347511713',
   bannerId: 'ca-app-pub-3940256099942544/9214589741',

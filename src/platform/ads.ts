@@ -3,11 +3,14 @@ import { AdMob } from '@capacitor-community/admob';
 import { useEffect, useSyncExternalStore } from 'react';
 import { createAdsController, type AdsState, type BannerPlacement, type PositionedAdMob } from './adsController';
 
-export const adsSupported = () => Capacitor.getPlatform() === 'android';
+export const adsSupported = () => {
+  const platform = Capacitor.getPlatform();
+  return (platform === 'android' || platform === 'ios') && platform === __ADMOB_CONFIG__.platform;
+};
 export const privacyPolicyUrl = __ADMOB_CONFIG__.privacyUrl;
 let state: AdsState = { privacyRequired: false, busy: false, error: false, height: 0 };
 const listeners = new Set<() => void>();
-// Androidの8.1.0局所パッチで位置だけを更新するメソッドを追加している。
+// 両OSの8.1.0局所パッチで位置だけを更新するメソッドを追加している。
 const controller = createAdsController(AdMob as PositionedAdMob, __ADMOB_CONFIG__, (next) => {
   state = next;
   listeners.forEach((listener) => listener());
