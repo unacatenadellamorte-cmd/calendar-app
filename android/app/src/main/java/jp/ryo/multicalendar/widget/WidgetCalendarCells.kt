@@ -46,7 +46,7 @@ internal fun CalendarWidgetDayCell(
                 .then(cellModifier)
                 .fillMaxHeight()
                 .background(if (isToday) appearance.todayColor else Color.Transparent)
-                .clickable(actionStartActivity(createWidgetIntent(context, day)))
+                .clickable(actionStartActivity(dayWidgetIntent(context, day)))
                 .padding(2.dp),
         ) {
             Row(modifier = GlanceModifier.fillMaxWidth().height((16f * fontScale).dp)) {
@@ -96,4 +96,3 @@ internal fun CalendarWidgetDayCell(
             }
         }
 }
-

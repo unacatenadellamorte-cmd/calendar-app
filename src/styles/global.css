@@ -228,7 +228,7 @@
   font-size: var(--month-event-font-size, 8px);
 }
 .app-screen > main {
-  padding-bottom: calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + var(--ad-banner-height, 0px));
+  padding-bottom: calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
 .app-screen-contained {
   height: calc(100dvh - var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
@@ -240,7 +240,7 @@
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + var(--ad-banner-height, 0px));
+  padding-bottom: calc(4rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }
 .app-screen-contained > main > :not(.calendar-list-scroll) { flex-shrink: 0; }
 .app-screen-contained .calendar-list-scroll {
@@ -308,3 +308,6 @@
     transform: none !important;
   }
 }
+
+/* カレンダー上部だけでSDKが通知した広告の高さを確保する。 */
+.calendar-ad-slot { width: 100%; flex-shrink: 0; overflow-anchor: none; }

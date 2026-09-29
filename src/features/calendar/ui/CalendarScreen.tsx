@@ -2,6 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
+import { AdBanner } from '@/app/AdBanner';
 import { useAuth } from '@/app/auth-context';
 import { useSecretMode } from '@/app/secret-mode-context';
 import { resolveMessage } from '@/data/messages';
@@ -233,6 +234,8 @@ export function CalendarScreen({
       <div className="mb-3">
         <ViewSwitcher view={view} onChange={setView} />
       </div>
+
+      <AdBanner />
 
       <DateNav
         view={view}

@@ -15,11 +15,13 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "sync:edge-shared": "node scripts/sync-edge-shared.mjs"
+    "sync:edge-shared": "node scripts/sync-edge-shared.mjs",
+    "postinstall": "node scripts/android/patch-admob.mjs",
+    "patch:admob": "node scripts/android/patch-admob.mjs"
   },
   "dependencies": {
     "@calendar-app/core": "*",
-    "@capacitor-community/admob": "^8.1.0",
+    "@capacitor-community/admob": "8.1.0",
     "@capacitor/android": "^8.5.1",
     "@capacitor/app": "^8.1.1",
     "@capacitor/app-launcher": "^8.0.1",

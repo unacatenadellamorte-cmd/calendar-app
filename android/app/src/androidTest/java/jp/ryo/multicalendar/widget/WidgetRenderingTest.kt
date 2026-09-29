@@ -160,7 +160,7 @@ class WidgetRenderingTest {
             assertTextViewsFitParent(smallDay, listOf("⚙", "＋", "先頭予定"))
             saveBitmap(smallDay, "widget-day-small.png", 180, 110)
             val legacyDay = renderProvider(host, ComponentName(context, FeaturedEventsWidgetReceiver::class.java), 180, 40, ids, "先頭予定")
-            assertTextViewsFitParent(legacyDay, listOf("⚙", "＋", "先頭予定"))
+            assertTextViewsFitParent(legacyDay, listOf("＋", "先頭予定"))
             saveBitmap(legacyDay, "widget-day-legacy.png", 180, 40)
             assertTextViewsFitParent(week, listOf(weekHeaderText(weekWidgetDays(today))))
             assertNoEllipsis(week, weekHeaderText(weekWidgetDays(today)))
@@ -222,7 +222,12 @@ class WidgetRenderingTest {
             }
             // 実際のRemoteViewsから起動したActivityのURLを確認する。
             val firstId = dayAgendaEvents(readCalendarOverview(context).events, today).first().id
-            listOf("後続予定" to "calendar-app://event/$firstId", "⚙" to "calendar-app://settings/", "＋" to "calendar-app://create/${today.toKey()}").forEach { (text, expectedUrl) ->
+            listOf(
+                today.day.toString() to "calendar-app://day/${today.toKey()}",
+                "後続予定" to "calendar-app://event/$firstId",
+                "⚙" to "calendar-app://settings/",
+                "＋" to "calendar-app://create/${today.toKey()}",
+            ).forEach { (text, expectedUrl) ->
                 runOnMain {
                     androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
                         .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).toList().forEach { it.finish() }

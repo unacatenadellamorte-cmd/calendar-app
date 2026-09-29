@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/app/AuthProvider';
 import { resetFeaturedCountForTests } from '@/features/compact/model/featuredCount';
+import { resetShiftAutoAdvanceForTests } from '@/features/settings/model/useShiftAutoAdvance';
 import { SettingsScreen } from './SettingsScreen';
 
 function renderSettings() {
@@ -19,6 +20,7 @@ function renderSettings() {
 beforeEach(() => {
   window.localStorage.clear();
   resetFeaturedCountForTests();
+  resetShiftAutoAdvanceForTests();
 });
 
 describe('SettingsScreen', () => {
@@ -55,5 +57,30 @@ describe('SettingsScreen', () => {
     await user.click(screen.getByRole('radio', { name: '2 件' }));
     expect(screen.getByRole('radio', { name: '2 件', checked: true })).toBeInTheDocument();
     expect(window.localStorage.getItem('calendar-app.featured-count')).toBe('2');
+  });
+
+  it('シフト入力後の日付移動は既定でオフ、選択を保存して再表示できる', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderSettings();
+    expect(screen.getByRole('radio', { name: '移動しない', checked: true })).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: '翌日に移動する' }));
+    expect(window.localStorage.getItem('calendar-app.shift-auto-advance')).toBe('true');
+    unmount();
+    renderSettings();
+    expect(screen.getByRole('radio', { name: '翌日に移動する', checked: true })).toBeInTheDocument();
+  });
+  it('日付移動の選択を矢印キーで切り替えられる', async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const stay = screen.getByRole('radio', { name: '移動しない' });
+    stay.focus();
+    await user.keyboard('{ArrowUp}');
+    const advance = screen.getByRole('radio', { name: '翌日に移動する' });
+    expect(advance).toBeChecked();
+    expect(advance).toHaveFocus();
+    expect(window.localStorage.getItem('calendar-app.shift-auto-advance')).toBe('true');
+    await user.keyboard('{ArrowDown}');
+    expect(stay).toBeChecked();
+    expect(stay).toHaveFocus();
   });
 });

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { resetShiftAutoAdvanceForTests } from '@/features/settings/model/useShiftAutoAdvance';
 import { MonthShiftTiles } from './MonthShiftTiles';
 import { appError, err, ok } from '@/data/result';
 import type { EventItem } from '@/data/events';
@@ -15,6 +17,8 @@ const updateTemplate = vi.fn().mockResolvedValue(true);
 const removeTemplate = vi.fn();
 vi.mock('@/features/shifts/model/useShiftTemplates', () => ({ useShiftTemplates: () => ({ templates: [template], loading: false, errorKey: null, update: updateTemplate, remove: removeTemplate, dismissError: vi.fn() }) }));
 beforeEach(() => {
+  window.localStorage.clear();
+  resetShiftAutoAdvanceForTests();
   createShifts.mockReset();
   updateTemplate.mockReset().mockResolvedValue(true);
   removeTemplate.mockReset();
@@ -131,6 +135,64 @@ describe('月表示のシフトタイル', () => {
     expect(createShifts).toHaveBeenCalledWith('shift', template, ['2026-09-21']);
     expect(onCreated).toHaveBeenCalledWith([]);
     expect(screen.getByRole('status')).toHaveTextContent('2026-09-21に「夜勤」を追加しました');
+  });
+  it('設定がオンなら登録成功後に翌日へ移動する(月末・年末を含む)', async () => {
+    window.localStorage.setItem('calendar-app.shift-auto-advance', 'true');
+    const onDateChange = vi.fn();
+    createShifts.mockResolvedValue(ok([]));
+    render(<MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-12-31" calendars={[calendar]} enabled onCreated={vi.fn()} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-12-31に追加' })));
+    expect(onDateChange).toHaveBeenCalledWith('2027-01-01');
+  });
+  it('StrictMode の effect 再実行後も成功時に翌日へ移動する', async () => {
+    window.localStorage.setItem('calendar-app.shift-auto-advance', 'true');
+    const onDateChange = vi.fn();
+    createShifts.mockResolvedValue(ok([]));
+    render(
+      <StrictMode>
+        <MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-09-30" calendars={[calendar]} enabled onCreated={vi.fn()} />
+      </StrictMode>,
+    );
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-09-30に追加' })));
+    expect(onDateChange).toHaveBeenCalledWith('2026-10-01');
+  });
+  it('設定がオフなら登録成功後も日付を移動しない', async () => {
+    const onDateChange = vi.fn();
+    createShifts.mockResolvedValue(ok([]));
+    render(<MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-09-08" calendars={[calendar]} enabled onCreated={vi.fn()} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-09-08に追加' })));
+    expect(onDateChange).not.toHaveBeenCalled();
+  });
+  it('設定がオンでも登録失敗なら日付を移動しない', async () => {
+    window.localStorage.setItem('calendar-app.shift-auto-advance', 'true');
+    const onDateChange = vi.fn();
+    createShifts.mockResolvedValue(err(appError('data/query', 'data/query')));
+    render(<MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-09-08" calendars={[calendar]} enabled onCreated={vi.fn()} />);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-09-08に追加' })));
+    expect(onDateChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+  it('通信中に別日へ移動したら古い成功応答で日付を戻さない', async () => {
+    window.localStorage.setItem('calendar-app.shift-auto-advance', 'true');
+    let resolve!: (value: unknown) => void;
+    createShifts.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const onDateChange = vi.fn();
+    const view = render(<MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-09-08" calendars={[calendar]} enabled onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-09-08に追加' }));
+    view.rerender(<MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-09-09" calendars={[calendar]} enabled onCreated={vi.fn()} />);
+    await act(async () => resolve(ok([])));
+    expect(onDateChange).not.toHaveBeenCalled();
+  });
+  it('登録中にアンマウントしたら成功応答で日付を移動しない', async () => {
+    window.localStorage.setItem('calendar-app.shift-auto-advance', 'true');
+    let resolve!: (value: unknown) => void;
+    createShifts.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const onDateChange = vi.fn();
+    const view = render(<MonthShiftTiles events={[]} onDateChange={onDateChange} onRemove={vi.fn()} date="2026-09-08" calendars={[calendar]} enabled onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-09-08に追加' }));
+    view.unmount();
+    await act(async () => resolve(ok([])));
+    expect(onDateChange).not.toHaveBeenCalled();
   });
   it('保存中の連打を抑止し、失敗は表示して再試行できる', async () => {
     let resolve!: (value: unknown) => void;

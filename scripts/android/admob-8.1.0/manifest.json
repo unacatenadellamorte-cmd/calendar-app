@@ -1,0 +1,17 @@
+{
+  "version": "8.1.0",
+  "files": [
+    {
+      "path": "android/src/main/java/com/getcapacitor/community/admob/banner/BannerExecutor.java",
+      "sourceSha256": "7e970e07938b1b582848da6dc6c2ff63461ab7b34b1c3bd781f3c0493d7ad267",
+      "patchedSha256": "7820fe518a050a06ae8980d3659e6b237c7c7e1c5ff81df002fede898019917e",
+      "replacement": "BannerExecutor.java"
+    },
+    {
+      "path": "android/src/main/java/com/getcapacitor/community/admob/AdMob.java",
+      "sourceSha256": "7f24a588efc90df50a3c6456646d169bce57cd9ccd1c8c86746db30bd5913686",
+      "patchedSha256": "2125c2ba988bfc9a73d4accffe331156c489c1d58d14f238bd3b90300655ea0c",
+      "replacement": "AdMob.java"
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 
+vi.mock('@/app/AdBanner', () => ({ AdBanner: () => <div data-testid="calendar-ad-slot" /> }));
+
 const navigateMock = vi.fn();
 const backHandlers = vi.hoisted(() => new Set<() => void>());
 vi.mock('@/platform/layerBack', () => ({
@@ -90,6 +92,17 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('各ビューで表示切替と年月見出しの間に広告枠を置く', async () => {
+    const user = userEvent.setup();
+    render(<CalendarScreen />);
+    for (const label of ['年', '月', '日', 'リスト']) {
+      await user.click(screen.getByRole('radio', { name: label }));
+      const slot = screen.getByTestId('calendar-ad-slot');
+      expect(slot.previousElementSibling).toContainElement(screen.getByRole('radio', { name: label }));
+      expect(slot.nextElementSibling).toContainElement(screen.getByRole('button', { name: '今日' }));
+    }
+  });
+
   it('同日の複数予定でも月表示は各ラベル色を保ち、取得内容の更新を反映する', () => {
     const coloredEvents: EventItem[] = [
       { ...sampleEvent, labelColor: '#FFCC00' },

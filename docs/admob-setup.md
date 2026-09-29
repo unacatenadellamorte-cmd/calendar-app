@@ -4,7 +4,7 @@
 
 ## 開発用
 
-既定はGoogle公式のテストApp IDとアダプティブバナーID。`npm run build`、`npx cap sync android`、Androidビルドの順に実行する。下タブがある通常画面で表示し、オンボーディング・入力シート・キーボード表示中には出さない。シークレットのロック状態は配信条件に使用しない。
+既定はGoogle公式のテストApp IDとアダプティブバナーID。`npm run build`、`npx cap sync android`、Androidビルドの順に実行する。カレンダー画面の年・月・日・リスト切替と年月見出しの間に専用枠を置く。その他の画面・オンボーディング・入力シート・キーボード表示中には出さない。シークレットのロック状態は配信条件に使用しない。
 
 UMPの`canRequestAds`が真になるまで広告SDK初期化と配信を待つ。必要なら同意フォームを表示する。同意の選択はUMPがSDKに保存する信号へ委ね、拒否を`npa`で迂回しない。プライバシー選択肢が必要な利用者には設定画面の「広告のプライバシー設定」を表示する。
 
@@ -35,3 +35,22 @@ AdMobのアプリ登録、バナーユニット作成、UMP同意メッセージ
 - [Google Playデータ開示](https://developers.google.com/admob/android/privacy/play-data-disclosure)
 
 依存は`@capacitor-community/admob` 8.1.0、Android Mobile Ads 25.4.0、UMP 4.0.0。配布版と導入したAndroidソースが一致することを確認済み。
+
+
+## カレンダー上部の配置（2026-09-29）
+
+Androidのみ、SDKから通知されたアダプティブバナーの高さを専用DOM枠に反映してから表示する。広告の上下には8pxずつ間隔を取り、操作との接触を避ける。この間隔も広告なしの場合は0。Web/iOSには枠も余白も作らない。安全領域はCapacitorの親padding/CSSで反映済みなので、DOMの`getBoundingClientRect()`座標をそのまま使い、ネイティブでInsetsを加算しない。
+
+スクロールでは`updateBannerPlacement`で座標と可視性だけを変え、広告を取り直さない。枠の一部でも画面外、本文のクリップ範囲外、下タブに重なる場合は隠す。非表示中は既存の枠高さを保ってスクロールの飛びを防ぐ。幅が変わった場合のみ旧バナーの破棄完了を待ち、新しい幅でアダプティブバナーを作る。広告なし・同意不可・読込失敗時は高さ0。通信復旧・アプリ復帰で再試行できる。
+
+### プラグインの局所パッチ
+
+`@capacitor-community/admob`は8.1.0に固定。`npm install` / `npm ci`の`postinstall`で`node scripts/android/patch-admob.mjs`を実行する。インストールスクリプトを省略した環境は`npm run patch:admob`を同期前に実行する。
+
+`scripts/android/admob-8.1.0/`に改変Javaソース、元ソースと改変後のSHA-256、元のMITライセンスを保持する。元はnpm配布の8.1.0の`android/src/main/java/com/getcapacitor/community/admob/`。バージョンまたはソースが異なれば失敗する。適用済みの再実行は変更しない。更新時は対象版のコードを読み直してハッシュとパッチを更新する。
+
+主な修正は、Android 15以降でCapacitorの安全領域処理と衝突する`decorView.setOnApplyWindowInsetsListener`の除去、UIスレッドでの生成と破棄完了の保証、位置のみを変更するメソッド、枠確保前の非表示、旧リクエストのイベントを無視する識別子。UMPと広告リクエストの同意信号は維持する。
+
+### 30秒更新
+
+30秒更新はAdMob管理画面の当該バナー広告ユニットで、自動更新をカスタム30秒に設定する。アプリには30秒タイマーを追加しない。表示中の広告更新はGoogle Mobile Ads SDK/AdMobに任せる。管理画面で保存された値とPlayクローズドテストの配信結果は、作業記録で別途確認する。

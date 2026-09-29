@@ -33,6 +33,8 @@ function CalendarRoute() {
   const initialCreateDate = rawCreate && isValidLocalDate(rawCreate) ? rawCreate : undefined;
   return (
     <CalendarScreen
+      // 同じ日付の再タップでも、以前開いた入力シートや表示モードを持ち越さない。
+      key={initialDate ? location.key : undefined}
       initialDate={initialDate}
       initialEventId={initialEventId}
       initialCreateDate={initialCreateDate}

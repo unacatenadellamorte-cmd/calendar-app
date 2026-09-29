@@ -19,6 +19,7 @@ import {
   useMonthEventSize,
   type MonthEventSize,
 } from '@/features/settings/model/monthEventSize';
+import { useShiftAutoAdvance } from '@/features/settings/model/useShiftAutoAdvance';
 const THEME_OPTIONS: {
   value: ThemePreference;
   label: string;
@@ -55,11 +56,16 @@ const MONTH_EVENT_SIZE_OPTIONS: { value: MonthEventSize; label: string; descript
   { value: 'medium', label: '中', description: '10px' },
   { value: 'large', label: '大', description: '12px' },
 ];
+const SHIFT_AUTO_ADVANCE_OPTIONS = [
+  { value: true, label: '翌日に移動する' },
+  { value: false, label: '移動しない' },
+] as const;
 export function SettingsScreen() {
   useLanguage();
   const { theme, setTheme } = useTheme();
   const featuredCount = useFeaturedCount();
   const { monthEventSize, setMonthEventSize } = useMonthEventSize();
+  const { shiftAutoAdvance, setShiftAutoAdvance } = useShiftAutoAdvance();
   return (
     <Screen title={t('設定')} showProfileHeader>
       <section aria-labelledby="theme-heading" className="mt-2">
@@ -139,6 +145,38 @@ export function SettingsScreen() {
               <span>{t(option.label)}</span>
               <span className="text-meta text-ink-secondary">{option.description}</span>
             </button>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="shift-auto-advance-heading" className="mt-6">
+        <h2 id="shift-auto-advance-heading" className="text-body font-semibold text-ink-primary">
+          {t('シフト入力後の日付移動')}
+        </h2>
+        <div
+          role="radiogroup"
+          aria-labelledby="shift-auto-advance-heading"
+          className="mt-3 overflow-hidden rounded-md border border-border-hairline bg-surface-raised"
+        >
+          {SHIFT_AUTO_ADVANCE_OPTIONS.map((option, index) => (
+            <label
+              key={String(option.value)}
+              className={[
+                'flex min-h-11 w-full cursor-pointer items-center justify-between px-4 text-left text-body focus-within:ring-2 focus-within:ring-inset focus-within:ring-accent',
+                index > 0 ? 'border-t border-border-hairline' : '',
+                shiftAutoAdvance === option.value ? 'text-accent' : 'text-ink-primary',
+              ].join(' ')}
+            >
+              <span>{t(option.label)}</span>
+              <input
+                type="radio"
+                name="shift-auto-advance"
+                value={String(option.value)}
+                checked={shiftAutoAdvance === option.value}
+                onChange={() => setShiftAutoAdvance(option.value)}
+                className="accent-accent"
+              />
+            </label>
           ))}
         </div>
       </section>

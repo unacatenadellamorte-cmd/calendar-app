@@ -102,7 +102,7 @@ internal fun DayAgendaContent() {
         ((size.height.value - 12f) / ((if (compact) 108f else 154f) * scale)).coerceAtMost(1f))
     val railWidth = (size.width.value * 0.25f).coerceIn(56f, 100f)
     Row(modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor.copy(alpha = 0.94f)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Column(modifier = GlanceModifier.width(railWidth.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = GlanceModifier.width(railWidth.dp).fillMaxHeight().clickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = GlanceModifier.fillMaxWidth()) {
                 Text(text = "▲", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayPreviousAction>()))
                 Text(text = "▼", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayNextAction>()))
@@ -161,7 +161,7 @@ private fun CompactDayAgenda(event: CalendarOverviewEvent?, selectedDay: WidgetD
                 Text(text = "▲", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayPreviousAction>()))
                 Text(text = "▼", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayNextAction>()))
             }
-            Text(text = if (selectedDay.year != today.year) "${selectedDay.year}/${selectedDay.month}/${selectedDay.day}" else "${selectedDay.month}/${selectedDay.day} ⚙", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.primaryTextColor)), modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(widgetDeepLinkIntent(context, "settings", ""))), maxLines = 1)
+            Text(text = if (selectedDay.year != today.year) "${selectedDay.year}/${selectedDay.month}/${selectedDay.day}" else "${selectedDay.month}/${selectedDay.day}", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.primaryTextColor)), modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), maxLines = 1)
         }
         Column(modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(if (event?.id.isNullOrBlank()) dayWidgetIntent(context, selectedDay) else widgetDeepLinkIntent(context, "event", event!!.id)))) {
             val eventColor = widgetEventColor(event?.colorHex.orEmpty(), appearance.primaryTextColor)
