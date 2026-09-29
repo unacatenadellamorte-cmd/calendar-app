@@ -45,7 +45,7 @@ struct CalendarGridWidgetEntryView: View {
         let rowSpacing: CGFloat = isLarge ? 3 : 1
         let rows = CGFloat(max(1, gridDays.count / 7))
         let cellHeight = max(0, (availableHeight - 20 - 12 - 4 - rowSpacing * rows) / rows)
-        VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(CalendarGridData.monthTitle(entry.date, language: language))
                     .font(.system(size: 13, weight: .semibold))
@@ -84,10 +84,15 @@ struct CalendarGridWidgetEntryView: View {
         let number = day.key.split(separator: "-").last.map(String.init) ?? ""
         VStack(alignment: .leading, spacing: 1) {
             if isLarge {
-                Text(number)
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? .white : .primary) : .secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 1) {
+                    Text(number)
+                        .font(.system(size: 9, weight: .bold))
+                    Spacer(minLength: 0)
+                    if day.events.count > 2 {
+                        Text("+\(day.events.count - 2)").font(.system(size: 6, weight: .semibold))
+                    }
+                }
+                .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? .white : .primary) : .secondary)
                 ForEach(Array(day.events.prefix(2)), id: \.id) { event in
                     HStack(spacing: 2) {
                         if !event.filledLabel { Rectangle().fill(dayColor(event)).frame(width: 2) }
@@ -98,11 +103,6 @@ struct CalendarGridWidgetEntryView: View {
                     }
                     .padding(.horizontal, 2)
                     .background(dayColor(event).opacity(event.filledLabel ? 0.35 : 0))
-                }
-                if day.events.count > 2 {
-                    Text("+\(day.events.count - 2)")
-                        .font(.system(size: 7, weight: .semibold))
-                        .foregroundColor(.secondary)
                 }
             } else {
                 HStack(spacing: 2) {
