@@ -48,6 +48,35 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
 }
 
 describe('EventFormSheet', () => {
+  it('24色目のプリセットを選んで保存値へ渡す', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    await user.type(screen.getByLabelText('タイトル'), '予定');
+    await user.click(screen.getByRole('button', { name: '水浅葱 #06B6D4' }));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ labelColor: '#06B6D4' }));
+  });
+
+  it('自由色入力が小文字でもプリセット選択状態を大文字小文字無視で判定する', () => {
+    const { rerender } = setup();
+    fireEvent.change(screen.getByLabelText('ラベル色'), { target: { value: '#06b6d4' } });
+    expect(screen.getByRole('button', { name: '水浅葱 #06B6D4' })).toHaveAttribute('aria-pressed', 'true');
+    rerender(<EventFormSheet open editing={null} calendars={calendars} onClose={vi.fn()} onCreate={vi.fn()} onUpdate={vi.fn()} onSetReminder={vi.fn().mockResolvedValue(true)} />);
+  });
+
+  it('送信中は自由色入力とプリセットを無効化する', async () => {
+    const user = userEvent.setup();
+    let resolve!: (value: boolean) => void;
+    const onCreate = vi.fn(() => new Promise<boolean>((r) => { resolve = r; }));
+    setup({ onCreate });
+    await user.type(screen.getByLabelText('タイトル'), '予定');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(screen.getByLabelText('ラベル色')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '水浅葱 #06B6D4' })).toBeDisabled();
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    await act(async () => resolve(true));
+  });
+
   it('保存済みのローカル予定を開き直すと場所とURLを開ける（保存は行わない）', async () => {
     const user = userEvent.setup();
     const { onCreate, onUpdate } = setup({ editing: {

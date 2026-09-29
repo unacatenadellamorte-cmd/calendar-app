@@ -462,3 +462,14 @@ it('色なしの取込予定は従来の既定色を維持する', () => {
   const result = buildCalendarOverviewPayload([ev({ source: 'device' })], [cal({ color: '' })], '2026-09-25T00:00:00Z');
   expect(result.events[0]).toMatchObject({ filledLabel: false, colorHex: '#7A7A7A' });
 });
+
+it('代表予定ウィジェットでも自作の個別色を使い、外部はカレンダー色を保つ', () => {
+  const result = buildFeaturedWidgetPayload([
+    ev({ id: 'local', labelColor: '#FFCC00' }),
+    ev({ id: 'google', source: 'google', labelColor: '#FFCC00' }),
+  ], [cal({})], '2026-09-08T00:00:00.000Z');
+  expect(result).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'google', colorHex: '#0072B2' }),
+    expect.objectContaining({ id: 'local', colorHex: '#FFCC00' }),
+  ]));
+});

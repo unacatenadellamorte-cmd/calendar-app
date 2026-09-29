@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
 import type { Calendar } from '@/data/calendars';
+import { LabelColorPresets } from '@/ui/LabelColorPresets';
 interface CalendarFormSheetProps {
   open: boolean;
   /** 編集対象。null なら新規作成。 */
@@ -23,7 +24,7 @@ export function CalendarFormSheet({
 }: CalendarFormSheetProps) {
   useLanguage();
   const [name, setName] = useState('');
-  const [color, setColor] = useState<string>(CALENDAR_COLORS[0]!.hex);
+  const [color, setColor] = useState(CALENDAR_COLORS[0]!.hex);
   const [submitting, setSubmitting] = useState(false);
   const initializedKey = useRef<string | null>(null);
   useEffect(() => {
@@ -70,24 +71,12 @@ export function CalendarFormSheet({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="text-meta text-ink-secondary">{t('色')}</legend>
-          <div className="flex flex-wrap gap-2">
-            {CALENDAR_COLORS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                aria-label={t(c.name)}
-                aria-pressed={color === c.hex}
-                onClick={() => setColor(c.hex)}
-                className={[
-                  'h-11 w-11 rounded-sm border',
-                  color === c.hex ? 'border-accent' : 'border-border-hairline',
-                ].join(' ')}
-                style={{ backgroundColor: c.hex }}
-              >
-                {color === c.hex && <span aria-hidden="true" className="text-on-accent drop-shadow">✓</span>}
-              </button>
-            ))}
-          </div>
+          <LabelColorPresets
+            value={color}
+            onChange={setColor}
+            disabled={submitting}
+            includeHexInAriaLabel={false}
+          />
         </fieldset>
 
         <button

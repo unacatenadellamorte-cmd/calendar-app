@@ -365,5 +365,21 @@
   "再試行できない場合はサポートへ連絡": "Contactez l’assistance si vous ne pouvez pas réessayer",
   "保存状態を確認できません": "Impossible de vérifier l’état enregistré",
   "端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。": "La synchronisation et l’affichage des événements sont suspendus car l’état enregistré de cet appareil est illisible. Aucune suppression ne sera lancée.",
-  "保存状態を再確認": "Vérifier à nouveau l’état enregistré"
+  "保存状態を再確認": "Vérifier à nouveau l’état enregistré",
+  "薄荷": "Menthe",
+  "檸檬": "Citron",
+  "山吹": "Jaune doré",
+  "珊瑚": "Corail",
+  "赤": "Rouge",
+  "水色": "Bleu clair",
+  "紺": "Bleu marine",
+  "青緑": "Sarcelle",
+  "黄緑": "Citron vert",
+  "茶": "Marron",
+  "砂色": "Sable",
+  "灰": "Gris",
+  "薄灰": "Gris clair",
+  "薄紫": "Lavande",
+  "薄橙": "Pêche",
+  "水浅葱": "Cyan"
 }

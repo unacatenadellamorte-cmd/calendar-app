@@ -1,4 +1,5 @@
 import { getLocale } from '@/i18n';
+import { eventLabelColor } from '@/lib/event-label';
 import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useMemo } from 'react';
 import type { EventItem } from '@/data/events';
@@ -73,8 +74,7 @@ export function YearView({
                 {cells.map((cell) => {
                   const topEvent = byDay.get(cell.date)?.[0];
                   const dotColor = topEvent
-                    ? (calendarById.get(topEvent.calendarId)?.color ??
-                      'var(--color-ink-disabled)')
+                    ? eventLabelColor(topEvent, calendarById.get(topEvent.calendarId))
                     : undefined;
                   const cellYmd = ymd(cell.date);
                   const dayNumber = (
@@ -95,7 +95,7 @@ export function YearView({
                     <span
                       aria-hidden="true"
                       className="h-1 w-1 rounded-full"
-                      style={{ backgroundColor: dotColor }}
+                      style={{ backgroundColor: dotColor, outline: '1px solid var(--color-ink-secondary)' }}
                     />
                   );
                   const cellClassName = [

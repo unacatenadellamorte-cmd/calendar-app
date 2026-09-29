@@ -3,6 +3,7 @@ import { BottomSheet } from '@/ui/BottomSheet';
 import { t, useLanguage } from '@/i18n';
 import type { EventTag, NewEventTagInput } from '@/data/event-tags';
 import { labelTextColor } from '@/lib/event-label';
+import { LabelColorPresets } from '@/ui/LabelColorPresets';
 
 interface Props {
   open: boolean;
@@ -97,10 +98,12 @@ export function EventTagFormSheet({
             type="color"
             disabled={submitting}
             value={color}
-            onChange={(e) => setColor(e.target.value)}
+            onInput={(e) => setColor(e.currentTarget.value)}
+            onChange={(e) => setColor(e.currentTarget.value)}
             className="h-11 w-full rounded-sm border border-border-hairline bg-surface-base p-1"
           />
         </label>
+        <LabelColorPresets value={color} onChange={setColor} disabled={submitting} />
         <div className="flex gap-3">
           <label className="flex flex-1 flex-col gap-1">
             <span className="text-meta text-ink-secondary">{t('開始')}</span>

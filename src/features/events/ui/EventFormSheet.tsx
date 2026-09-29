@@ -16,6 +16,7 @@ import { eventLabelColor, labelTextColor } from '@/lib/event-label';
 import { applyEventTag } from '@/lib/event-tag';
 import { ReminderPicker } from './ReminderPicker';
 import { isAllowedExternalUrl, openExternalUrl, openMap } from '@/platform/externalLinks';
+import { LabelColorPresets } from '@/ui/LabelColorPresets';
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
   /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
@@ -324,10 +325,17 @@ export function EventFormSheet({
             <input
               type="color"
               value={previewColor}
-              onChange={(e) => set('labelColor', e.target.value)}
+              disabled={submitting}
+              onInput={(e) => set('labelColor', e.currentTarget.value)}
+              onChange={(e) => set('labelColor', e.currentTarget.value)}
               className="h-11 w-16 rounded-sm border border-border-hairline"
             />
           </label>
+          <LabelColorPresets
+            value={previewColor}
+            onChange={(value) => set('labelColor', value)}
+            disabled={submitting}
+          />
           <span
             className="truncate rounded-sm px-2 py-1 text-body"
             style={{

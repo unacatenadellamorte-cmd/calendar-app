@@ -365,5 +365,21 @@
   "再試行できない場合はサポートへ連絡": "Contact support if you cannot retry",
   "保存状態を確認できません": "Cannot check saved state",
   "端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。": "Sync and event display are paused because this device’s saved state cannot be read. No deletion will be started.",
-  "保存状態を再確認": "Check saved state again"
+  "保存状態を再確認": "Check saved state again",
+  "薄荷": "Mint",
+  "檸檬": "Lemon",
+  "山吹": "Golden yellow",
+  "珊瑚": "Coral",
+  "赤": "Red",
+  "水色": "Light blue",
+  "紺": "Navy",
+  "青緑": "Teal",
+  "黄緑": "Lime",
+  "茶": "Brown",
+  "砂色": "Sand",
+  "灰": "Gray",
+  "薄灰": "Light gray",
+  "薄紫": "Lavender",
+  "薄橙": "Peach",
+  "水浅葱": "Cyan"
 }

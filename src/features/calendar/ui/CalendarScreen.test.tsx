@@ -90,6 +90,22 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('同日の複数予定でも月表示は各ラベル色を保ち、取得内容の更新を反映する', () => {
+    const coloredEvents: EventItem[] = [
+      { ...sampleEvent, labelColor: '#FFCC00' },
+      { ...sampleEvent, id: 'e2', title: '別の予定', labelColor: '#06B6D4' },
+    ];
+    evState.events = coloredEvents;
+    const view = render(<CalendarScreen />);
+    const month = () => within(screen.getByTestId('month-grid'));
+    expect(month().getByRole('button', { name: /会議アルファ/ })).toHaveStyle({ backgroundColor: '#FFCC00' });
+    expect(month().getByRole('button', { name: /別の予定/ })).toHaveStyle({ backgroundColor: '#06B6D4' });
+    evState = { ...evState, events: coloredEvents.map(event => event.id === 'e1'
+      ? { ...event, labelColor: '#aabbcc' } : event) };
+    view.rerender(<CalendarScreen />);
+    expect(month().getByRole('button', { name: /会議アルファ/ })).toHaveStyle({ backgroundColor: '#aabbcc' });
+    expect(month().getByRole('button', { name: /別の予定/ })).toHaveStyle({ backgroundColor: '#06B6D4' });
+  });
   it('予定取得失敗ではリンクを消費せず、再取得成功後に開く', () => {
     evState = { ...evState, events: [], errorKey: 'events.listFailed' };
     const view = render(<CalendarScreen initialEventId="e1" initialRequestKey="retry-event" />);

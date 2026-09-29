@@ -117,7 +117,7 @@ export function buildFeaturedWidgetPayload(
     return [{
       id: event.id,
       calendarName: calendar?.name ?? '不明なカレンダー',
-      colorHex: calendar?.color ?? EXTERNAL_DEFAULT_COLOR,
+      colorHex: event.source === 'local' ? eventLabelColor(event, calendar) : calendar?.color ?? EXTERNAL_DEFAULT_COLOR,
       startsAtIso:
         event.allDay && event.eventDate
           ? localMidnightIso(event.eventDate)

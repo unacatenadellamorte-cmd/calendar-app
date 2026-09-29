@@ -365,5 +365,21 @@
   "再試行できない場合はサポートへ連絡": "Contacta con soporte si no puedes reintentarlo",
   "保存状態を確認できません": "No se puede comprobar el estado guardado",
   "端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。": "La sincronización y la visualización de eventos están pausadas porque no se puede leer el estado guardado del dispositivo. No se iniciará ninguna eliminación.",
-  "保存状態を再確認": "Volver a comprobar el estado guardado"
+  "保存状態を再確認": "Volver a comprobar el estado guardado",
+  "薄荷": "Menta",
+  "檸檬": "Limón",
+  "山吹": "Amarillo dorado",
+  "珊瑚": "Coral",
+  "赤": "Rojo",
+  "水色": "Azul claro",
+  "紺": "Azul marino",
+  "青緑": "Verde azulado",
+  "黄緑": "Lima",
+  "茶": "Marrón",
+  "砂色": "Arena",
+  "灰": "Gris",
+  "薄灰": "Gris claro",
+  "薄紫": "Lavanda",
+  "薄橙": "Melocotón",
+  "水浅葱": "Cian"
 }
