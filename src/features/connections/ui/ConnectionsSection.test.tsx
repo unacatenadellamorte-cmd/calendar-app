@@ -97,7 +97,8 @@ describe('ConnectionsSection', () => {
     expect(screen.getByRole('button', { name: '確認中…' })).toBeDisabled();
     complete(ok({ googleEmail: 'me@gmail.com' }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/connections/google/calendars'));
-    expect(getConnection).toHaveBeenCalledTimes(2);
+    // 接続状態の再取得はReactのeffectで走るため、その完了も待つ。
+    await waitFor(() => expect(getConnection).toHaveBeenCalledTimes(2));
     expect(refetch).toHaveBeenCalledOnce();
   });
 
