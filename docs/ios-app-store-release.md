@@ -94,3 +94,7 @@ Windowsで実施済み: 本番Webビルド、型検査、lint、認可/設定/�
 - [AppleのPrivacy Manifest同梱方法](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk)。
 - [AppleのApp Group設定](https://developer.apple.com/documentation/xcode/configuring-app-groups)。
 - [Appleの公開バージョン形式](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleshortversionstring)と[ビルド番号形式](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleversion)。
+
+## 2026-09-30の作成結果
+
+[配布CI](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/36663107316)で `b7f3b45` から1.0.20(21)の署名済みIPAと主App/WidgetのdSYMを作成。Macのnativeテスト、archive/exportと署名検証、秘密の後片づけも成功した。これはビルド完了であり、App Storeへの送信や実機認可確認の完了ではない。

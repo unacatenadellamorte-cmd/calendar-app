@@ -2,7 +2,7 @@
 title: 'iOSのApp Store公開用ビルド準備'
 type: chore
 created: '2026-09-30'
-status: in-review
+status: done
 route: dispatch
 baseline_commit: dfe856c1a099b9e0a8eb0b54cf3d7267f4822e84
 review_loop_iteration: 0
@@ -78,3 +78,13 @@ AC: iOSの場合に外部SDK認可へ進みWebViewログインを使わない。
 - 本番oauth-exchange配信完了。3つのGoogle関連functionでAndroid/iOS OPTIONS許可、未許可origin拒否を確認。
 - GitHub environmentの署名4秘密登録済み、許可branchはfeat/ios-app-store-20260930のみ。ユーザーの明示承認を受けメインがpush/Mac配布ビルドを実行する。
 - 正式version/buildは1.0.20/21。Mac署名・実機認可はこれから検証。
+
+### Mac配布ビルド完了
+- 実装コミット `b7f3b450364d333526da905494258295cf4373e8` の [CI 36663107316](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/36663107316) が成功。
+- MacでWeb全134ファイル/1219テスト、Node7、Python12、実Google認可プラグイン2シナリオ、Ruby2件30 assertions、Swift Widget10件を通過。
+- 主App/Widgetのarchiveおよびexport IPAで、署名・証明書・profile・Team/Bundle/App Group/version・PrivacyInfoを検証。一時鍵とprofileのcleanupも成功。
+- version 1.0.20、build21、iOS15以降、iPhone/iPad向け。
+- IPAのSHA256: `ee9cc51df090dafb4a508e4a05d06d3a41a93a9aa9918f92c8a485cfd282a29d`。
+- メインがダウンロード後も両Info.plist/Manifest、同梱profile、本番広告・Google・Supabase設定、秘密ファイル混入なし、両dSYMを検証。Windowsの以前のdistとは追加CSSなどによりハッシュ一致ではないため、バイト同一性は主張しない。
+- 初回の再利用workflow秘密参照失敗は環境付きjobの直接定義で解消。Mac互換P12へ変更し取込み成功。Google取消コードのSwift公開名差異は公式エラー値/domain比較へ修正。
+- 実機Google認可・Widget追加、App Storeアップロード/審査/公開は未実施。Swift推移依存の完全lockは保留。
