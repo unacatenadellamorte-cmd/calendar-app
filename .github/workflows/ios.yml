@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      capture:
+        description: ストア掲載用の実画面を架空データで撮影する
+        type: boolean
+        default: false
       upload:
         description: 検証済みの1.0.20 (21)をApp Store Connectへ送信する
         type: boolean
@@ -27,12 +31,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}-${{ inputs.upload && 'upload' || inputs.release && 'release' || 'validation' }}
+  group: ios-${{ github.workflow }}-${{ github.ref }}-${{ inputs.capture && 'capture' || inputs.upload && 'upload' || inputs.release && 'release' || 'validation' }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload) }}
 
 jobs:
   web:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload && !inputs.capture) }}
     name: Web側の回帰検証
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -57,7 +61,7 @@ jobs:
       - run: npm run build
 
   ios:
-    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload && !inputs.capture) }}
     name: Swift検証と署名なしシミュレータビルド
     runs-on: macos-15
     timeout-minutes: 30
@@ -138,7 +142,7 @@ jobs:
           retention-days: 7
 
   release:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release && !inputs.upload }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release && !inputs.upload && !inputs.capture }}
     runs-on: macos-15
     timeout-minutes: 45
     environment: ios-app-store
@@ -227,7 +231,7 @@ jobs:
           retention-days: 7
 
   upload:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload && !inputs.release }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload && !inputs.release && !inputs.capture }}
     name: 検証済みIPAをAppleへ送信
     runs-on: macos-15
     timeout-minutes: 25
@@ -275,3 +279,62 @@ jobs:
           unset ASC_API_PRIVATE_KEY
           xcrun altool --validate-app -f verified-build/Multi-calendar.ipa -t ios --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID"
           xcrun altool --upload-app -f verified-build/Multi-calendar.ipa -t ios --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID"
+
+  capture:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.capture && !inputs.release && !inputs.upload }}
+    name: iPhoneとiPadのストア画面を撮影
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      BUNDLE_GEMFILE: ${{ github.workspace }}/scripts/ios/Gemfile
+      VITE_ADMOB_PLATFORM: ios
+      VITE_ADMOB_MODE: test
+      VITE_SUPABASE_URL: http://127.0.0.1:5188
+      VITE_SUPABASE_ANON_KEY: demo-anon-key-for-local-capture-only
+      CAPTURE_OUTPUT: ${{ runner.temp }}/出力画像
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - run: bundle exec ruby scripts/ios/add-widget-target.rb
+      - name: 撮影専用ビルドでローカルfixture通信を許可
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          path = 'ios/App/App/Info.plist'
+          with open(path, 'rb') as stream:
+              info = plistlib.load(stream)
+          info['NSAppTransportSecurity'] = {'NSAllowsArbitraryLoads': True, 'NSAllowsLocalNetworking': True}
+          with open(path, 'wb') as stream:
+              plistlib.dump(info, stream)
+          PY
+      - name: シミュレータ専用アプリをビルド
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/CaptureDerivedData CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=1.0.20 CURRENT_PROJECT_VERSION=21 build > "$RUNNER_TEMP/capture-build.log" 2>&1
+      - run: python3 scripts/ios/capture-store.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-store-screenshots
+          path: ${{ runner.temp }}/出力画像
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-capture-build-log
+          path: ${{ runner.temp }}/capture-build.log
+          if-no-files-found: ignore
+          retention-days: 7
