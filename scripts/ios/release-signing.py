@@ -33,7 +33,10 @@ def diagnostic_tail(output, redactions):
     text = re.sub(r"(?im)^.*(?:PASSWORD|SECRET|TOKEN|_BASE64)\s*[=:].*$", "[秘密を含む設定行を非表示]", text)
     text = re.sub(r"(?i)(Bearer\s+)\S+", r"\1[非表示]", text)
     text = re.sub(r"[A-Za-z0-9_+/-]{120,}={0,2}", "[長い資格情報を非表示]", text)
-    return "\n".join(text.splitlines()[-80:])[-16000:]
+    lines = text.splitlines()
+    errors = [line[:1200] for line in lines if "error:" in line.lower() or "error " in line.lower()][-20:]
+    tail = [line[:400] for line in lines[-40:]]
+    return "\n".join(errors + tail)[-32000:]
 
 
 def run(args, diagnostic_redactions=None, **kwargs):

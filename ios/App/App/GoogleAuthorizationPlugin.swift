@@ -49,7 +49,8 @@ public class GoogleAuthorizationPlugin: CAPPlugin, CAPBridgedPlugin {
                     self.authorizing = false
                 }
                 if let error = error as NSError? {
-                    let cancelled = error.domain == kGIDSignInErrorDomain && error.code == GIDSignInErrorCode.canceled.rawValue
+                    // Googleの公開定義 kGIDSignInErrorCodeCanceled は -5。Swift側の列挙名変更に依存しない。
+                    let cancelled = error.domain == kGIDSignInErrorDomain && error.code == -5
                     call.reject("Googleカレンダーの認可を完了できませんでした。", cancelled ? "cancelled" : "authorization-failed")
                     return
                 }
