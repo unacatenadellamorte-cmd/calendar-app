@@ -20,6 +20,7 @@ vi.mock('@/data/shift-templates', () => ({
 const { useShiftTemplates } = await import('./useShiftTemplates');
 
 const tpl = (over: Partial<ShiftTemplate> = {}): ShiftTemplate => ({
+  allDay: false,
   id: 't1',
   name: '平日',
   startLocal: '17:00',

@@ -1,3 +1,4 @@
+import { normalizeTemplateTimes } from '@/lib/template-time';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { selectActive } from './soft-delete';
@@ -13,6 +14,7 @@ import { isNetworkError } from './net';
  */
 
 export interface ShiftTemplate {
+  allDay: boolean;
   id: string;
   name: string;
   /** 壁時計の開始 "HH:MM"。 */
@@ -28,6 +30,7 @@ export interface ShiftTemplate {
 }
 
 export interface NewShiftTemplateInput {
+  allDay?: boolean;
   name: string;
   startLocal: string;
   endLocal: string;
@@ -40,6 +43,7 @@ export interface NewShiftTemplateInput {
 export type ShiftTemplatePatch = Partial<NewShiftTemplateInput>;
 
 interface ShiftTemplateRow {
+  all_day: boolean;
   id: string;
   name: string;
   start_local: string;
@@ -54,13 +58,14 @@ interface ShiftTemplateRow {
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 const COLUMNS =
-  'id,name,start_local,end_local,break_minutes,hourly_wage,workplace_label,color,created_at,updated_at';
+  'id,all_day,name,start_local,end_local,break_minutes,hourly_wage,workplace_label,color,created_at,updated_at';
 
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
 function toTemplate(row: ShiftTemplateRow): ShiftTemplate {
   return {
     id: row.id,
+    allDay: row.all_day ?? false,
     name: row.name,
     startLocal: row.start_local,
     endLocal: row.end_local,
@@ -104,6 +109,7 @@ export function validateShiftTemplatePatch(
   patch: ShiftTemplatePatch,
 ): AppError | null {
   return validateFields({
+    allDay: patch.allDay ?? current.allDay,
     name: patch.name ?? current.name,
     startLocal: patch.startLocal ?? current.startLocal,
     endLocal: patch.endLocal ?? current.endLocal,
@@ -116,6 +122,7 @@ export function validateShiftTemplatePatch(
 }
 
 function validateFields(v: NewShiftTemplateInput): AppError | null {
+  v = normalizeInput(v);
   const name = v.name.trim();
   if (name.length < 1 || name.length > 100) {
     return appError('shift-template/invalid-name', 'shift-template/invalid-name');
@@ -139,8 +146,18 @@ function validateFields(v: NewShiftTemplateInput): AppError | null {
   return null;
 }
 
-function rowFromInput(input: NewShiftTemplateInput): Record<string, unknown> {
+function normalizeInput(input: NewShiftTemplateInput): NewShiftTemplateInput {
   return {
+    ...input,
+    ...normalizeTemplateTimes(input.allDay ?? false, input.startLocal, input.endLocal),
+    ...(input.allDay ? { breakMinutes: 0, hourlyWage: 0 } : {}),
+  };
+}
+
+function rowFromInput(input: NewShiftTemplateInput): Record<string, unknown> {
+  input = normalizeInput(input);
+  return {
+    all_day: input.allDay ?? false,
     name: input.name.trim(),
     start_local: input.startLocal,
     end_local: input.endLocal,
@@ -154,9 +171,12 @@ function rowFromInput(input: NewShiftTemplateInput): Record<string, unknown> {
 export async function listShiftTemplates(): Promise<Result<ShiftTemplate[]>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
-    const { data, error } = await selectActive('shift_templates', COLUMNS).order('created_at', {
-      ascending: true,
-    });
+    const { data, error } = await selectActive('shift_templates', COLUMNS).order(
+      'created_at',
+      {
+        ascending: true,
+      },
+    );
     if (error) return err(fromPostgrest(error));
     return ok((data as unknown as ShiftTemplateRow[]).map(toTemplate));
   } catch (e) {
@@ -193,7 +213,18 @@ export async function updateShiftTemplate(
   const invalid = validateShiftTemplatePatch(current, patch);
   if (invalid) return err(invalid);
 
+  if (patch.allDay ?? current.allDay) {
+    const normalized = normalizeInput({ ...current, ...patch, allDay: true });
+    patch = {
+      ...patch,
+      startLocal: normalized.startLocal,
+      endLocal: normalized.endLocal,
+      breakMinutes: 0,
+      hourlyWage: 0,
+    };
+  }
   const row: Record<string, unknown> = {};
+  if (patch.allDay !== undefined) row.all_day = patch.allDay;
   if (patch.name !== undefined) row.name = patch.name.trim();
   if (patch.startLocal !== undefined) row.start_local = patch.startLocal;
   if (patch.endLocal !== undefined) row.end_local = patch.endLocal;

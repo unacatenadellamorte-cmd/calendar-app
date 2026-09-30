@@ -1,9 +1,11 @@
+import { normalizeTemplateTimes } from '@/lib/template-time';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 
 export interface EventTag {
+  allDay: boolean;
   id: string;
   name: string;
   color: string;
@@ -14,6 +16,7 @@ export interface EventTag {
 }
 
 export interface NewEventTagInput {
+  allDay?: boolean;
   name: string;
   color: string;
   startLocal: string;
@@ -23,6 +26,7 @@ export interface NewEventTagInput {
 export type EventTagPatch = Partial<NewEventTagInput>;
 
 interface EventTagRow {
+  all_day: boolean;
   id: string;
   user_id?: string;
   name: string;
@@ -34,7 +38,7 @@ interface EventTagRow {
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
-const COLUMNS = 'id,name,color,start_local,end_local,created_at,updated_at';
+const COLUMNS = 'id,all_day,name,color,start_local,end_local,created_at,updated_at';
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 
@@ -45,6 +49,7 @@ function fromPostgrest(error: PostgrestError): AppError {
 function toEventTag(row: EventTagRow): EventTag {
   return {
     id: row.id,
+    allDay: row.all_day ?? false,
     name: row.name,
     color: row.color,
     startLocal: row.start_local,
@@ -61,6 +66,7 @@ function minutesOf(value: string): number | null {
 }
 
 function validateFields(input: NewEventTagInput): AppError | null {
+  input = normalizeInput(input);
   const name = input.name.trim();
   if (name.length < 1 || name.length > 200) {
     return appError('event-tag/invalid-name', 'event-tag/invalid-name');
@@ -85,6 +91,7 @@ export function validateEventTagPatch(
   patch: EventTagPatch,
 ): AppError | null {
   return validateFields({
+    allDay: patch.allDay ?? current.allDay,
     name: patch.name ?? current.name,
     color: patch.color ?? current.color,
     startLocal: patch.startLocal ?? current.startLocal,
@@ -92,8 +99,17 @@ export function validateEventTagPatch(
   });
 }
 
-function rowFromInput(input: NewEventTagInput): Record<string, unknown> {
+function normalizeInput(input: NewEventTagInput): NewEventTagInput {
   return {
+    ...input,
+    ...normalizeTemplateTimes(input.allDay ?? false, input.startLocal, input.endLocal),
+  };
+}
+
+function rowFromInput(input: NewEventTagInput): Record<string, unknown> {
+  input = normalizeInput(input);
+  return {
+    all_day: input.allDay ?? false,
     name: input.name.trim(),
     color: input.color,
     start_local: input.startLocal,
@@ -138,7 +154,12 @@ export async function updateEventTag(
   if (!supabase) return err(UNAVAILABLE);
   const invalid = validateEventTagPatch(current, patch);
   if (invalid) return err(invalid);
+  if (patch.allDay ?? current.allDay) {
+    const normalized = normalizeInput({ ...current, ...patch, allDay: true });
+    patch = { ...patch, startLocal: normalized.startLocal, endLocal: normalized.endLocal };
+  }
   const row: Record<string, unknown> = {};
+  if (patch.allDay !== undefined) row.all_day = patch.allDay;
   if (patch.name !== undefined) row.name = patch.name.trim();
   if (patch.color !== undefined) row.color = patch.color;
   if (patch.startLocal !== undefined) row.start_local = patch.startLocal;

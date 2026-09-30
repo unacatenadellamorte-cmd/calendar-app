@@ -1,3 +1,4 @@
+import { normalizeTemplateTimes } from '@/lib/template-time';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { t, useLanguage } from '@/i18n';
@@ -36,6 +37,7 @@ export function EventTagFormSheet({
 }: Props) {
   useLanguage();
   const [name, setName] = useState('');
+  const [allDay, setAllDay] = useState(false);
   const [color, setColor] = useState('#2563EB');
   const [startLocal, setStartLocal] = useState('09:00');
   const [endLocal, setEndLocal] = useState('18:00');
@@ -50,6 +52,7 @@ export function EventTagFormSheet({
     if (initialized.current === key) return;
     initialized.current = key;
     setName(editing?.name ?? '');
+    setAllDay(editing?.allDay ?? false);
     setColor(editing?.color ?? '#2563EB');
     setStartLocal(editing?.startLocal ?? '09:00');
     setEndLocal(editing?.endLocal ?? '18:00');
@@ -70,7 +73,12 @@ export function EventTagFormSheet({
           event.preventDefault();
           if (submitting) return;
           setSubmitting(true);
-          const done = await onSubmit({ name, color, startLocal, endLocal });
+          const done = await onSubmit({
+            name,
+            color,
+            allDay,
+            ...normalizeTemplateTimes(allDay, startLocal, endLocal),
+          });
           setSubmitting(false);
           if (done) onClose();
         }}
@@ -91,6 +99,17 @@ export function EventTagFormSheet({
             className={field}
           />
         </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={allDay}
+            disabled={submitting}
+            onChange={(e) => setAllDay(e.target.checked)}
+            className="h-5 w-5 accent-[var(--color-accent)]"
+          />
+          <span className="text-body text-ink-primary">{t('終日')}</span>
+        </label>
+
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('ラベル色')}</span>
           <input
@@ -104,31 +123,36 @@ export function EventTagFormSheet({
           />
         </label>
         <LabelColorPresets value={color} onChange={setColor} disabled={submitting} />
-        <div className="flex gap-3">
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('開始')}</span>
-            <input
-              aria-label={t('開始')}
-              type="time"
-              disabled={submitting}
-              value={startLocal}
-              onChange={(e) => setStartLocal(e.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('終了')}</span>
-            <input
-              aria-label={t('終了')}
-              type="time"
-              disabled={submitting}
-              value={endLocal}
-              onChange={(e) => setEndLocal(e.target.value)}
-              className={field}
-            />
-          </label>
-        </div>
-        <p className="text-meta text-ink-secondary">{t('終了が開始より前なら翌日終了')}</p>
+        {!allDay && (
+          <>
+            <div className="flex gap-3">
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-meta text-ink-secondary">{t('開始')}</span>
+                <input
+                  aria-label={t('開始')}
+                  type="time"
+                  disabled={submitting}
+                  value={startLocal}
+                  onChange={(e) => setStartLocal(e.target.value)}
+                  className={field}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-meta text-ink-secondary">{t('終了')}</span>
+                <input
+                  aria-label={t('終了')}
+                  type="time"
+                  disabled={submitting}
+                  value={endLocal}
+                  onChange={(e) => setEndLocal(e.target.value)}
+                  className={field}
+                />
+              </label>
+            </div>
+            <p className="text-meta text-ink-secondary">{t('終了が開始より前なら翌日終了')}</p>
+          </>
+        )}
+
         <div
           className="rounded-sm px-3 py-2 text-body"
           style={{ backgroundColor: color, color: labelTextColor(color) }}

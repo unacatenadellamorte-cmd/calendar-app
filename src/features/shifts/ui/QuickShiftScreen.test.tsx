@@ -29,6 +29,7 @@ const calendar: Calendar = {
 const shiftCalendar: Calendar = { ...calendar, id: 'shift', name: 'シフト', isShift: true };
 
 const tpl = (over: Partial<ShiftTemplate> = {}): ShiftTemplate => ({
+  allDay: false,
   id: 't1',
   name: '平日',
   startLocal: '17:00',

@@ -21,6 +21,7 @@ vi.mock('./shift-templates', () => ({ listShiftTemplates: () => listShiftTemplat
 const { buildExportBundle } = await import('./export');
 
 const tpl = (over: Partial<ShiftTemplate> = {}): ShiftTemplate => ({
+  allDay: false,
   id: 't1',
   name: '平日',
   startLocal: '17:00',

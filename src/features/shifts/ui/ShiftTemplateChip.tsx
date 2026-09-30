@@ -1,3 +1,4 @@
+import { t, useLanguage } from '@/i18n';
 import type { ShiftTemplate } from '@/data/shift-templates';
 
 interface ShiftTemplateChipProps {
@@ -10,6 +11,7 @@ interface ShiftTemplateChipProps {
  * 色だけで区別させないため、名前と時間帯を必ず併記する。
  */
 export function ShiftTemplateChip({ template, onTap }: ShiftTemplateChipProps) {
+  useLanguage();
   return (
     <button
       type="button"
@@ -23,7 +25,7 @@ export function ShiftTemplateChip({ template, onTap }: ShiftTemplateChipProps) {
       />
       <span className="font-medium">{template.name}</span>
       <span className="tabular text-ink-secondary">
-        {template.startLocal}–{template.endLocal}
+        {template.allDay ? t('終日') : `${template.startLocal}–${template.endLocal}`}
       </span>
     </button>
   );

@@ -5,12 +5,14 @@ import type { Calendar } from '@/data/calendars';
 import { EventFormSheet } from './EventFormSheet';
 import { openMap, openExternalUrl } from '@/platform/externalLinks';
 vi.mock('@/platform/externalLinks', async (original) => ({
-  ...await original<typeof import('@/platform/externalLinks')>(),
+  ...(await original<typeof import('@/platform/externalLinks')>()),
   openMap: vi.fn().mockResolvedValue(true),
   openExternalUrl: vi.fn().mockResolvedValue(true),
 }));
 
-const tagsMock = vi.hoisted(() => ({ list: vi.fn().mockResolvedValue({ ok: true, value: [] }) }));
+const tagsMock = vi.hoisted(() => ({
+  list: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+}));
 vi.mock('@/data/event-tags', () => ({ listEventTags: tagsMock.list }));
 
 const calendars: Calendar[] = [
@@ -60,14 +62,32 @@ describe('EventFormSheet', () => {
   it('自由色入力が小文字でもプリセット選択状態を大文字小文字無視で判定する', () => {
     const { rerender } = setup();
     fireEvent.change(screen.getByLabelText('ラベル色'), { target: { value: '#06b6d4' } });
-    expect(screen.getByRole('button', { name: '水浅葱 #06B6D4' })).toHaveAttribute('aria-pressed', 'true');
-    rerender(<EventFormSheet open editing={null} calendars={calendars} onClose={vi.fn()} onCreate={vi.fn()} onUpdate={vi.fn()} onSetReminder={vi.fn().mockResolvedValue(true)} />);
+    expect(screen.getByRole('button', { name: '水浅葱 #06B6D4' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    rerender(
+      <EventFormSheet
+        open
+        editing={null}
+        calendars={calendars}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onSetReminder={vi.fn().mockResolvedValue(true)}
+      />,
+    );
   });
 
   it('送信中は自由色入力とプリセットを無効化する', async () => {
     const user = userEvent.setup();
     let resolve!: (value: boolean) => void;
-    const onCreate = vi.fn(() => new Promise<boolean>((r) => { resolve = r; }));
+    const onCreate = vi.fn(
+      () =>
+        new Promise<boolean>((r) => {
+          resolve = r;
+        }),
+    );
     setup({ onCreate });
     await user.type(screen.getByLabelText('タイトル'), '予定');
     await user.click(screen.getByRole('button', { name: '保存' }));
@@ -79,14 +99,29 @@ describe('EventFormSheet', () => {
 
   it('保存済みのローカル予定を開き直すと場所とURLを開ける（保存は行わない）', async () => {
     const user = userEvent.setup();
-    const { onCreate, onUpdate } = setup({ editing: {
-      id: 'saved', calendarId: 'c1', title: '打合せ', source: 'local',
-      allDay: true, eventDate: '2026-09-19', startsAt: null, endsAt: null,
-      note: null, location: '京都駅', url: 'https://zoom.us/j/123',
-      breakMinutes: null, hourlyWage: null, workplaceLabel: null,
-      shiftTemplateId: null, reminderMinutes: null, isSecret: false,
-      createdAt: '', updatedAt: '',
-    } });
+    const { onCreate, onUpdate } = setup({
+      editing: {
+        id: 'saved',
+        calendarId: 'c1',
+        title: '打合せ',
+        source: 'local',
+        allDay: true,
+        eventDate: '2026-09-19',
+        startsAt: null,
+        endsAt: null,
+        note: null,
+        location: '京都駅',
+        url: 'https://zoom.us/j/123',
+        breakMinutes: null,
+        hourlyWage: null,
+        workplaceLabel: null,
+        shiftTemplateId: null,
+        reminderMinutes: null,
+        isSecret: false,
+        createdAt: '',
+        updatedAt: '',
+      },
+    });
     await user.click(screen.getByRole('button', { name: '地図を開く' }));
     expect(openMap).toHaveBeenCalledWith('京都駅');
     await user.click(screen.getByRole('button', { name: 'リンクを開く' }));
@@ -130,11 +165,18 @@ describe('EventFormSheet', () => {
     const user = userEvent.setup();
     setup();
     let finishFirst!: (ok: boolean) => void;
-    vi.mocked(openMap).mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }));
+    vi.mocked(openMap).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        }),
+    );
     await user.type(screen.getByLabelText('場所'), '京都駅');
     await user.click(screen.getByRole('button', { name: '地図を開く' }));
     await user.click(screen.getByRole('button', { name: '地図を開く' }));
-    await act(async () => { finishFirst(false); });
+    await act(async () => {
+      finishFirst(false);
+    });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -376,7 +418,8 @@ describe('EventFormSheet', () => {
     await user.type(screen.getByLabelText('予定URL'), 'https://zoom.us/j/123');
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(onCreate.mock.calls[0]![0]).toMatchObject({
-      location: '東京駅', url: 'https://zoom.us/j/123',
+      location: '東京駅',
+      url: 'https://zoom.us/j/123',
     });
   });
 
@@ -423,9 +466,17 @@ describe('EventFormSheet', () => {
   });
 });
 
-
 describe('予定タグの適用', () => {
-  const tag = { id: 'tag1', name: '夜勤', color: '#FFCC00', startLocal: '22:00', endLocal: '06:00', createdAt: '', updatedAt: '' };
+  const tag = {
+    allDay: false,
+    id: 'tag1',
+    name: '夜勤',
+    color: '#FFCC00',
+    startLocal: '22:00',
+    endLocal: '06:00',
+    createdAt: '',
+    updatedAt: '',
+  };
   it('対象日と日またぎを守って複写し、個別編集した色と名称を保存する', async () => {
     tagsMock.list.mockResolvedValueOnce({ ok: true, value: [tag] });
     const { onCreate } = setup({ seed: { date: '2026-12-31' } });
@@ -437,7 +488,9 @@ describe('予定タグの適用', () => {
     fireEvent.change(screen.getByLabelText('ラベル色'), { target: { value: '#009e73' } });
     fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '夜勤（変更）' } });
     await userEvent.click(screen.getByRole('button', { name: '保存' }));
-    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: '夜勤（変更）', labelColor: '#009e73', allDay: false }));
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '夜勤（変更）', labelColor: '#009e73', allDay: false }),
+    );
     expect(onCreate.mock.calls[0]![0]).not.toHaveProperty('tagId');
   });
   it('終日のフォームからタグを選んでも入力した日付を使う', async () => {
@@ -456,6 +509,129 @@ describe('予定タグの適用', () => {
     await screen.findByText('タグを読み込めませんでした。予定はそのまま入力できます。');
     fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '通常予定' } });
     await userEvent.click(screen.getByRole('button', { name: '保存' }));
-    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ title: '通常予定', labelColor: null }));
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '通常予定', labelColor: null }),
+    );
   });
 });
+
+it('夜勤を終日へ切り替えると編集日を使い、日付変更後も時刻と日差を保持する', async () => {
+  const user = userEvent.setup();
+  const editing = {
+    id: 'night',
+    calendarId: 'c1',
+    title: '夜勤',
+    source: 'local' as const,
+    allDay: false,
+    eventDate: null,
+    startsAt: new Date('2026-12-31T22:00').toISOString(),
+    endsAt: new Date('2027-01-01T06:00').toISOString(),
+    note: null,
+    breakMinutes: 60,
+    hourlyWage: 1100,
+    workplaceLabel: null,
+    shiftTemplateId: null,
+    reminderMinutes: null,
+    isSecret: false,
+    createdAt: '',
+    updatedAt: '',
+  };
+  const { onUpdate } = setup({ editing });
+  await user.click(screen.getByLabelText('終日'));
+  expect(screen.getByLabelText('日付')).toHaveValue('2026-12-31');
+  fireEvent.change(screen.getByLabelText('日付'), { target: { value: '2028-02-29' } });
+  await user.click(screen.getByLabelText('終日'));
+  expect(screen.getByLabelText('開始')).toHaveValue('2028-02-29T22:00');
+  expect(screen.getByLabelText('終了')).toHaveValue('2028-03-01T06:00');
+  await user.click(screen.getByRole('button', { name: '保存' }));
+  expect(onUpdate).toHaveBeenCalledWith(
+    editing,
+    expect.objectContaining({
+      allDay: false,
+      startsAt: new Date('2028-02-29T22:00').toISOString(),
+      endsAt: new Date('2028-03-01T06:00').toISOString(),
+    }),
+  );
+});
+
+it('終日タグの選択肢を表示し、選択日を変えずに終日予定を保存する', async () => {
+  tagsMock.list.mockResolvedValueOnce({
+    ok: true,
+    value: [
+      {
+        id: 'holiday',
+        name: '休み',
+        color: '#009E73',
+        allDay: true,
+        startLocal: '09:00',
+        endLocal: '18:00',
+      },
+    ],
+  });
+  const user = userEvent.setup();
+  const { onCreate } = setup({ seed: { date: '2026-09-30' } });
+  await screen.findByRole('option', { name: '休み (終日)' });
+  await user.selectOptions(screen.getByLabelText('タグ'), 'holiday');
+  expect(screen.getByLabelText('日付')).toHaveValue('2026-09-30');
+  expect(screen.queryByLabelText('開始')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '保存' }));
+  expect(onCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: '休み',
+      allDay: true,
+      eventDate: '2026-09-30',
+      labelColor: '#009E73',
+    }),
+  );
+});
+
+it('終日から通常へ戻すと新しく選んだ日付を使う', async () => {
+  const user = userEvent.setup();
+  setup({ seed: { date: '2026-09-30' } });
+  await user.click(screen.getByLabelText('終日'));
+  fireEvent.change(screen.getByLabelText('日付'), { target: { value: '2026-10-15' } });
+  await user.click(screen.getByLabelText('終日'));
+  expect(screen.getByLabelText('開始')).toHaveValue('2026-10-15T09:00');
+  expect(screen.getByLabelText('終了')).toHaveValue('2026-10-15T10:00');
+});
+
+it.each(['2020-01-15', '2030-12-31', '0099-05-06'])(
+  '保存済み終日予定 %s を時間指定へ戻すと元の日付の09:00〜10:00で保存できる',
+  async (date) => {
+    const editing = {
+      id: 'saved-all-day',
+      calendarId: 'c1',
+      title: '休日',
+      source: 'local' as const,
+      allDay: true,
+      eventDate: date,
+      startsAt: null,
+      endsAt: null,
+      note: null,
+      breakMinutes: null,
+      hourlyWage: null,
+      workplaceLabel: null,
+      shiftTemplateId: null,
+      reminderMinutes: null,
+      isSecret: false,
+      createdAt: '',
+      updatedAt: '',
+    };
+    const user = userEvent.setup();
+    const { onUpdate } = setup({ editing });
+    expect(screen.getByLabelText('終日')).toBeChecked();
+    expect(screen.getByLabelText('日付')).toHaveValue(date);
+    await user.click(screen.getByLabelText('終日'));
+    expect(screen.getByLabelText('開始')).toHaveValue(`${date}T09:00`);
+    expect(screen.getByLabelText('終了')).toHaveValue(`${date}T10:00`);
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onUpdate).toHaveBeenCalledWith(
+      editing,
+      expect.objectContaining({
+        allDay: false,
+        startsAt: new Date(`${date}T09:00`).toISOString(),
+        endsAt: new Date(`${date}T10:00`).toISOString(),
+      }),
+    );
+  },
+);

@@ -5,6 +5,7 @@ import type { ShiftTemplate } from '@/data/shift-templates';
 import { ShiftTemplateChip } from './ShiftTemplateChip';
 
 const tpl: ShiftTemplate = {
+  allDay: false,
   id: 't1',
   name: '平日',
   startLocal: '17:00',
@@ -32,4 +33,11 @@ describe('ShiftTemplateChip', () => {
     await user.click(screen.getByRole('button'));
     expect(onTap).toHaveBeenCalledWith(tpl);
   });
+});
+
+
+it('終日のシフトは時間帯の代わりに終日を表示する', () => {
+  render(<ShiftTemplateChip template={{ ...tpl, allDay: true }} onTap={vi.fn()} />);
+  expect(screen.getByRole('button')).toHaveTextContent('終日');
+  expect(screen.getByRole('button')).not.toHaveTextContent('17:00');
 });

@@ -16,6 +16,7 @@ vi.mock('@/data/event-tags', async () => {
 });
 
 const tag: EventTag = {
+  allDay: false,
   id: 'tag-1', name: '仕事', color: '#2563EB', startLocal: '09:00', endLocal: '18:00',
   createdAt: '2026-09-25T00:00:00Z', updatedAt: '2026-09-25T00:00:00Z',
 };
@@ -95,4 +96,15 @@ it('削除送信中は連打・入力・閉じ操作を抑止する', async () =
   expect(screen.getByRole('dialog')).toBeInTheDocument();
   await act(async () => finish(ok(undefined)));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+
+it('終日タグを一覧へ表示し、編集しても終日状態を復元する', async () => {
+  listEventTags.mockResolvedValueOnce(ok([{ ...tag, allDay: true }]));
+  render(<EventTagsScreen />);
+  const button = await screen.findByRole('button', { name: '仕事 終日' });
+  expect(button).not.toHaveTextContent('09:00');
+  await userEvent.setup().click(button);
+  expect(screen.getByLabelText('終日')).toBeChecked();
+  expect(screen.queryByLabelText('開始')).not.toBeInTheDocument();
 });

@@ -73,20 +73,22 @@ export async function createShifts(
   if (dates.length === 0) return ok([]);
 
   const rows = dates.map((date) => {
-    const { startsAt, endsAt } = buildShiftTimes(date, template.startLocal, template.endLocal);
+    const { startsAt, endsAt } = template.allDay
+      ? { startsAt: null, endsAt: null }
+      : buildShiftTimes(date, template.startLocal, template.endLocal);
     return {
       calendar_id: shiftCalendarId,
       title: template.name.trim(),
-      all_day: false,
+      all_day: template.allDay,
       starts_at: startsAt,
       ends_at: endsAt,
-      event_date: null,
+      event_date: template.allDay ? date : null,
       note: null,
       // 追加時の色を複写し、予定ごとの後からの色変更を保持する。
       label_color: template.color,
       source: 'local' as const,
-      break_minutes: template.breakMinutes,
-      hourly_wage: template.hourlyWage,
+      break_minutes: template.allDay ? 0 : template.breakMinutes,
+      hourly_wage: template.allDay ? 0 : template.hourlyWage,
       workplace_label: template.workplaceLabel?.trim() || null,
       shift_template_id: template.id,
     };

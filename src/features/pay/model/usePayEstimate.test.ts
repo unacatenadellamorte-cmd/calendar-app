@@ -131,3 +131,25 @@ describe('usePayEstimate', () => {
     expect(result.current.shiftCount).toBe(0);
   });
 });
+
+it('終日休日を加えても夜勤の金額と勤務件数は変わらない', () => {
+  const night = shiftEvent({
+    startsAt: new Date('2026-09-30T22:00').toISOString(),
+    endsAt: new Date('2026-10-01T06:00').toISOString(),
+  });
+  const holiday = shiftEvent({
+    id: 'holiday',
+    allDay: true,
+    eventDate: '2026-09-30',
+    startsAt: null,
+    endsAt: null,
+    breakMinutes: 0,
+    hourlyWage: 0,
+  });
+  const before = calculateMonthlyPay([night], [shiftCal], '2026-09');
+  const after = calculateMonthlyPay([night, holiday], [shiftCal], '2026-09');
+  expect(before.amount).toBe(7700);
+  expect(before.shiftCount).toBe(1);
+  expect(after.amount).toBe(before.amount);
+  expect(after.shiftCount).toBe(before.shiftCount);
+});

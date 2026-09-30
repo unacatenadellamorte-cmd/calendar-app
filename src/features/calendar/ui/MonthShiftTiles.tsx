@@ -320,8 +320,14 @@ export function MonthShiftTiles({
                 {template.name}
               </span>
               <span className="text-[10px] leading-tight text-ink-secondary">
-                <span className="block">{template.startLocal}–</span>
-                <span className="block">{template.endLocal}</span>
+                {template.allDay ? (
+                  t('終日')
+                ) : (
+                  <>
+                    <span className="block">{template.startLocal}–</span>
+                    <span className="block">{template.endLocal}</span>
+                  </>
+                )}
               </span>
             </button>
           ))}

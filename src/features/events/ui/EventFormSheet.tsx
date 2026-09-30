@@ -5,6 +5,8 @@ import { resolveMessage } from '@/data/messages';
 import { validateEventInput, type EventItem, type NewEventInput } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import {
+  isValidLocalDate,
+  localDateString,
   localInputToUtcIso,
   nowLocalInput,
   plusMinutesLocal,
@@ -87,9 +89,17 @@ function initialState(
     title: editing.title,
     calendarId: currentCalendar,
     allDay: editing.allDay,
-    startLocal: editing.startsAt ? utcIsoToLocalInput(editing.startsAt) : nowLocalInput(),
-    endLocal: editing.endsAt ? utcIsoToLocalInput(editing.endsAt) : nowLocalInput(60),
-    dateLocal: editing.eventDate ?? todayLocalDate(),
+    startLocal: editing.startsAt
+      ? utcIsoToLocalInput(editing.startsAt)
+      : `${editing.eventDate ?? todayLocalDate()}T09:00`,
+    endLocal: editing.endsAt
+      ? utcIsoToLocalInput(editing.endsAt)
+      : `${editing.eventDate ?? todayLocalDate()}T10:00`,
+    dateLocal:
+      editing.eventDate ??
+      (editing.startsAt
+        ? utcIsoToLocalInput(editing.startsAt).slice(0, 10)
+        : todayLocalDate()),
     note: editing.note ?? '',
     location: editing.location ?? '',
     url: editing.url ?? '',
@@ -194,6 +204,36 @@ export function EventFormSheet({
     setForm((f) => ({ ...f, [key]: value }));
     setErrorKey(null);
   };
+  const toggleAllDay = (allDay: boolean) => {
+    setForm((current) => {
+      if (allDay) {
+        return {
+          ...current,
+          allDay,
+          dateLocal: current.startLocal.slice(0, 10) || current.dateLocal,
+        };
+      }
+      const startDate = current.startLocal.slice(0, 10);
+      const endDate = current.endLocal.slice(0, 10);
+      // 暦日差を使い、夏時間の切替や夜勤の日またぎを維持する。
+      const dayOffset =
+        isValidLocalDate(startDate) && isValidLocalDate(endDate)
+          ? Math.round(
+              (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) /
+                86400000,
+            )
+          : 0;
+      const end = new Date(`${current.dateLocal}T12:00:00`);
+      end.setDate(end.getDate() + dayOffset);
+      return {
+        ...current,
+        allDay,
+        startLocal: `${current.dateLocal}T${current.startLocal.slice(11) || '09:00'}`,
+        endLocal: `${isValidLocalDate(current.dateLocal) ? localDateString(end).replace(/^\d+-/, `${String(end.getFullYear()).padStart(4, '0')}-`) : current.dateLocal}T${current.endLocal.slice(11) || '10:00'}`,
+      };
+    });
+    setErrorKey(null);
+  };
   const previewColor = eventLabelColor(
     { source: 'local', labelColor: form.labelColor },
     editableCalendars.find((c) => c.id === form.calendarId),
@@ -275,7 +315,7 @@ export function EventFormSheet({
             </option>
             {tags.map((tag) => (
               <option key={tag.id} value={tag.id}>
-                {tag.name} ({tag.startLocal}–{tag.endLocal})
+                {tag.name} ({tag.allDay ? t('終日') : `${tag.startLocal}–${tag.endLocal}`})
               </option>
             ))}
           </select>
@@ -303,6 +343,52 @@ export function EventFormSheet({
             className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
         </label>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.allDay}
+            onChange={(e) => toggleAllDay(e.target.checked)}
+            className="h-5 w-5 accent-[var(--color-accent)]"
+          />
+          <span className="text-body text-ink-primary">{t('終日')}</span>
+        </label>
+
+        {form.allDay ? (
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-ink-secondary">{t('日付')}</span>
+            <input
+              type="date"
+              value={form.dateLocal}
+              onChange={(e) => set('dateLocal', e.target.value)}
+              required
+              className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+            />
+          </label>
+        ) : (
+          <>
+            <label className="flex flex-col gap-1">
+              <span className="text-meta text-ink-secondary">{t('開始')}</span>
+              <input
+                type="datetime-local"
+                value={form.startLocal}
+                onChange={(e) => set('startLocal', e.target.value)}
+                required
+                className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-meta text-ink-secondary">{t('終了')}</span>
+              <input
+                type="datetime-local"
+                value={form.endLocal}
+                onChange={(e) => set('endLocal', e.target.value)}
+                required
+                className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+              />
+            </label>
+          </>
+        )}
 
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('カレンダー')}</span>
@@ -353,52 +439,6 @@ export function EventFormSheet({
             {t('カレンダーの色を使う')}
           </button>
         </div>
-
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={form.allDay}
-            onChange={(e) => set('allDay', e.target.checked)}
-            className="h-5 w-5 accent-[var(--color-accent)]"
-          />
-          <span className="text-body text-ink-primary">{t('終日')}</span>
-        </label>
-
-        {form.allDay ? (
-          <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('日付')}</span>
-            <input
-              type="date"
-              value={form.dateLocal}
-              onChange={(e) => set('dateLocal', e.target.value)}
-              required
-              className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
-            />
-          </label>
-        ) : (
-          <>
-            <label className="flex flex-col gap-1">
-              <span className="text-meta text-ink-secondary">{t('開始')}</span>
-              <input
-                type="datetime-local"
-                value={form.startLocal}
-                onChange={(e) => set('startLocal', e.target.value)}
-                required
-                className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-meta text-ink-secondary">{t('終了')}</span>
-              <input
-                type="datetime-local"
-                value={form.endLocal}
-                onChange={(e) => set('endLocal', e.target.value)}
-                required
-                className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
-              />
-            </label>
-          </>
-        )}
 
         <label className="flex items-center gap-2">
           <input

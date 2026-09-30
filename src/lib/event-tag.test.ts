@@ -4,7 +4,13 @@ import { eventLabelColor, labelTextColor } from './event-label';
 
 describe('タグの値の複写', () => {
   it('通常・月末・年末・うるう年の日付を保つ', () => {
-    const tag = { name: '夜勤', color: '#009E73', startLocal: '22:00', endLocal: '06:00' };
+    const tag = {
+      allDay: false,
+      name: '夜勤',
+      color: '#009E73',
+      startLocal: '22:00',
+      endLocal: '06:00',
+    };
     expect(applyEventTag(tag, '2026-09-30')?.endLocal).toBe('2026-10-01T06:00');
     expect(applyEventTag(tag, '2026-12-31')?.endLocal).toBe('2027-01-01T06:00');
     expect(applyEventTag(tag, '2028-02-28')?.endLocal).toBe('2028-02-29T06:00');
@@ -16,7 +22,13 @@ describe('タグの値の複写', () => {
     expect(applyEventTag(tag, '0099-12-31')?.endLocal).toBe('0100-01-01T06:00');
   });
   it('タグを後から変えても複写した値は変わらない', () => {
-    const tag = { name: '会議', color: '#009E73', startLocal: '09:00', endLocal: '10:00' };
+    const tag = {
+      allDay: false,
+      name: '会議',
+      color: '#009E73',
+      startLocal: '09:00',
+      endLocal: '10:00',
+    };
     const saved = applyEventTag(tag, '2026-09-25');
     tag.name = '新しい名前';
     tag.color = '#FFCC00';
@@ -39,3 +51,21 @@ describe('タグの値の複写', () => {
     expect(labelTextColor('#0072B2')).toBe('#FFFFFF');
   });
 });
+
+it.each(['2026-09-30', '2026-12-31', '2028-02-29'])(
+  '終日タグは選択日 %s と色・タイトルを複写する',
+  (date) => {
+    expect(
+      applyEventTag(
+        {
+          allDay: true,
+          name: '休み',
+          color: '#009E73',
+          startLocal: '09:00',
+          endLocal: '18:00',
+        },
+        date,
+      ),
+    ).toMatchObject({ allDay: true, dateLocal: date, title: '休み', labelColor: '#009E73' });
+  },
+);

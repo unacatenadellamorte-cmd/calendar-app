@@ -3,7 +3,7 @@ import { isValidLocalDate, localDateString } from './datetime';
 
 /** 日付を保ったままひな形の値を複写する。タグと保存済み予定は連動させない。 */
 export function applyEventTag(
-  tag: Pick<EventTag, 'name' | 'color' | 'startLocal' | 'endLocal'>,
+  tag: Pick<EventTag, 'name' | 'color' | 'startLocal' | 'endLocal' | 'allDay'>,
   date: string,
 ) {
   if (!isValidLocalDate(date)) return null;
@@ -12,7 +12,7 @@ export function applyEventTag(
   return {
     title: tag.name,
     labelColor: tag.color,
-    allDay: false,
+    allDay: tag.allDay ?? false,
     dateLocal: date,
     startLocal: `${date}T${tag.startLocal}`,
     endLocal: `${localDateString(next).replace(/^\d+-/, `${String(next.getFullYear()).padStart(4, '0')}-`)}T${tag.endLocal}`,

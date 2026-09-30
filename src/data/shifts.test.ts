@@ -31,6 +31,7 @@ async function load() {
 }
 
 const tpl: ShiftTemplate = {
+  allDay: false,
   id: 't1',
   name: '平日',
   startLocal: '17:00',
@@ -96,16 +97,20 @@ describe('createShifts', () => {
     const { createShifts } = await load();
     const result = await createShifts('shift', { ...tpl, color }, ['2026-09-08']);
     expect(result.ok && result.value[0]?.labelColor).toBe(color);
-    expect(calls.find(call => call.method === 'insert')?.args[0]).toEqual([
+    expect(calls.find((call) => call.method === 'insert')?.args[0]).toEqual([
       expect.objectContaining({ label_color: color }),
     ]);
-    expect((calls.find(call => call.method === 'select')?.args[0] as string).split(',')).toContain('label_color');
+    expect(
+      (calls.find((call) => call.method === 'select')?.args[0] as string).split(','),
+    ).toContain('label_color');
     const { cacheGetAll } = await import('./cache');
-    expect((await cacheGetAll('events')).find(event => event.id === 'ev1')?.labelColor).toBe(color);
+    expect((await cacheGetAll('events')).find((event) => event.id === 'ev1')?.labelColor).toBe(
+      color,
+    );
     const { listEvents } = await import('./events');
     const reloaded = await listEvents();
     expect(reloaded.ok && reloaded.value[0]?.labelColor).toBe(color);
-    const reloadSelect = calls.filter(call => call.method === 'select').at(-1);
+    const reloadSelect = calls.filter((call) => call.method === 'select').at(-1);
     expect((reloadSelect?.args[0] as string).split(',')).toContain('label_color');
   });
   it('1日ぶんを insert し、シフト属性つきの EventItem を返す', async () => {
@@ -160,5 +165,62 @@ describe('createShifts', () => {
     const r = await createShifts('shift', tpl, ['2026-09-08']);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/unavailable');
+  });
+});
+
+it('終日シフトを月末の各選択日へ登録し、時刻・給料を持ち越さない', async () => {
+  const dates = ['2026-09-30', '2026-10-01'];
+  queryResult = {
+    data: dates.map((date, i) =>
+      eventRow({
+        id: `holiday-${i}`,
+        all_day: true,
+        starts_at: null,
+        ends_at: null,
+        event_date: date,
+        break_minutes: 0,
+        hourly_wage: 0,
+        label_color: tpl.color,
+      }),
+    ),
+    error: null,
+  };
+  const { createShifts } = await load();
+  const created = await createShifts(
+    'shift',
+    { ...tpl, allDay: true, startLocal: '', endLocal: '' },
+    dates,
+  );
+  expect(calls.find((c) => c.method === 'insert')?.args[0]).toEqual(
+    dates.map((date) =>
+      expect.objectContaining({
+        all_day: true,
+        event_date: date,
+        starts_at: null,
+        ends_at: null,
+        break_minutes: 0,
+        hourly_wage: 0,
+        shift_template_id: tpl.id,
+        label_color: tpl.color,
+        workplace_label: tpl.workplaceLabel,
+        source: 'local',
+      }),
+    ),
+  );
+  expect(
+    created.ok && created.value.map((e) => [e.allDay, e.eventDate, e.startsAt, e.endsAt]),
+  ).toEqual(dates.map((date) => [true, date, null, null]));
+  const { cacheGetAll } = await import('./cache');
+  const cached = (await cacheGetAll('events')).filter((e) =>
+    ['holiday-0', 'holiday-1'].includes(e.id),
+  );
+  expect(cached).toHaveLength(2);
+  dates.forEach((date, index) => {
+    expect(cached.find((e) => e.id === `holiday-${index}`)).toMatchObject({
+      allDay: true,
+      eventDate: date,
+      startsAt: null,
+      endsAt: null,
+    });
   });
 });

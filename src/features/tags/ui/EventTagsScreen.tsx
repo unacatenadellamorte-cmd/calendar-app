@@ -72,7 +72,13 @@ function EventTagsScreenContent({ state }: { state: ReturnType<typeof useAuth>['
       ) : tags.loadErrorKey ? (
         <div className="flex flex-col gap-2 text-meta text-danger">
           <p role="alert">{errorText(tags.loadErrorKey)}</p>
-          <button type="button" onClick={() => void tags.reload()} className="self-start text-accent">{t('再試行')}</button>
+          <button
+            type="button"
+            onClick={() => void tags.reload()}
+            className="self-start text-accent"
+          >
+            {t('再試行')}
+          </button>
         </div>
       ) : tags.tags.length === 0 ? (
         <p className="text-meta text-ink-secondary">{t('まだ予定タグはありません。')}</p>
@@ -88,7 +94,7 @@ function EventTagsScreenContent({ state }: { state: ReturnType<typeof useAuth>['
               >
                 <span className="min-w-0 flex-1 truncate">{tag.name}</span>
                 <span className="shrink-0 text-meta">
-                  {tag.startLocal}–{tag.endLocal}
+                  {tag.allDay ? t('終日') : `${tag.startLocal}–${tag.endLocal}`}
                 </span>
               </button>
             </li>

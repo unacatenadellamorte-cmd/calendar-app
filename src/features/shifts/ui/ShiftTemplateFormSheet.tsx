@@ -1,3 +1,4 @@
+import { normalizeTemplateTimes } from '@/lib/template-time';
 import { t, useLanguage } from '@/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet } from '@/ui/BottomSheet';
@@ -30,6 +31,7 @@ export function ShiftTemplateFormSheet({
 }: ShiftTemplateFormSheetProps) {
   useLanguage();
   const [name, setName] = useState('');
+  const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('18:00');
   const [breakMinutes, setBreakMinutes] = useState('0');
@@ -47,6 +49,7 @@ export function ShiftTemplateFormSheet({
     if (initializedKey.current === key) return;
     initializedKey.current = key;
     setName(editing?.name ?? '');
+    setAllDay(editing?.allDay ?? false);
     setStart(editing?.startLocal ?? '09:00');
     setEnd(editing?.endLocal ?? '18:00');
     setBreakMinutes(String(editing?.breakMinutes ?? 0));
@@ -54,7 +57,7 @@ export function ShiftTemplateFormSheet({
     setWorkplace(editing?.workplaceLabel ?? '');
     setColor(editing?.color ?? nextUnusedColor(usedColors));
     setSubmitting(false);
-  // refetch で新しい配列が届いても、編集中のフォームを初期値へ戻さない。
+    // refetch で新しい配列が届いても、編集中のフォームを初期値へ戻さない。
   }, [open, editing, usedColors]);
   return (
     <BottomSheet
@@ -71,10 +74,10 @@ export function ShiftTemplateFormSheet({
           setSubmitting(true);
           const done = await onSubmit({
             name,
-            startLocal: start,
-            endLocal: end,
-            breakMinutes: Number(breakMinutes || 0),
-            hourlyWage: Number(hourlyWage),
+            allDay,
+            ...normalizeTemplateTimes(allDay, start, end),
+            breakMinutes: allDay ? 0 : Number(breakMinutes || 0),
+            hourlyWage: allDay ? 0 : Number(hourlyWage),
             workplaceLabel: workplace.trim() || null,
             color,
           });
@@ -98,51 +101,70 @@ export function ShiftTemplateFormSheet({
           />
         </label>
 
-        <div className="flex gap-3">
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('開始')}</span>
-            <input
-              type="time"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('終了')}</span>
-            <input
-              type="time"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              className={field}
-            />
-          </label>
-        </div>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={allDay}
+            disabled={submitting}
+            onChange={(e) => setAllDay(e.target.checked)}
+            className="h-5 w-5 accent-[var(--color-accent)]"
+          />
+          <span className="text-body text-ink-primary">{t('終日')}</span>
+        </label>
 
-        <div className="flex gap-3">
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('休憩(分)')}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={breakMinutes}
-              onChange={(e) => setBreakMinutes(e.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('時給(円)')}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={hourlyWage}
-              onChange={(e) => setHourlyWage(e.target.value)}
-              className={field}
-            />
-          </label>
-        </div>
+        {allDay ? (
+          <p className="text-meta text-ink-secondary">
+            {t('終日シフトは給料計算に含まれません。')}
+          </p>
+        ) : (
+          <>
+            <div className="flex gap-3">
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-meta text-ink-secondary">{t('開始')}</span>
+                <input
+                  type="time"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  className={field}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-meta text-ink-secondary">{t('終了')}</span>
+                <input
+                  type="time"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  className={field}
+                />
+              </label>
+            </div>
+
+            <div className="flex gap-3">
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-meta text-ink-secondary">{t('休憩(分)')}</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={breakMinutes}
+                  onChange={(e) => setBreakMinutes(e.target.value)}
+                  className={field}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-meta text-ink-secondary">{t('時給(円)')}</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={hourlyWage}
+                  onChange={(e) => setHourlyWage(e.target.value)}
+                  className={field}
+                />
+              </label>
+            </div>
+          </>
+        )}
 
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('勤務先ラベル(任意)')}</span>

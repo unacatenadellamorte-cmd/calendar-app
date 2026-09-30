@@ -9,7 +9,8 @@ import type { Calendar } from '@/data/calendars';
 import type { ShiftTemplate } from '@/data/shift-templates';
 
 const createShifts = vi.fn();
-const template: ShiftTemplate = { id: 't1', name: '夜勤', startLocal: '22:00', endLocal: '06:00', breakMinutes: 60, hourlyWage: 1200, workplaceLabel: null, color: '#009E73', createdAt: '', updatedAt: '' };
+const template: ShiftTemplate = {
+  allDay: false, id: 't1', name: '夜勤', startLocal: '22:00', endLocal: '06:00', breakMinutes: 60, hourlyWage: 1200, workplaceLabel: null, color: '#009E73', createdAt: '', updatedAt: '' };
 const calendar: Calendar = { id: 'shift', name: 'シフト', color: '#009E73', source: 'local', isShift: true, isVisible: true, priority: 0, createdAt: '', updatedAt: '' };
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('@/data/shifts', () => ({ createShifts: (...args: unknown[]) => createShifts(...args) }));
@@ -212,4 +213,24 @@ describe('月表示のシフトタイル', () => {
     render(<MonthShiftTiles events={[]} onDateChange={vi.fn()} onRemove={vi.fn()} date="2026-09-08" calendars={[]} enabled onCreated={vi.fn()} />);
     expect(screen.getByRole('button', { name: '夜勤を2026-09-08に追加' })).toBeDisabled();
   });
+});
+
+
+it('終日タイルは時刻を表示せず月末登録後も翌日へ進む', async () => {
+  window.localStorage.setItem('calendar-app.shift-auto-advance', 'true');
+  template.allDay = true;
+  createShifts.mockResolvedValue(ok([]));
+  const onDateChange = vi.fn();
+  try {
+    render(<MonthShiftTiles date="2026-09-30" calendars={[calendar]} enabled events={[]}
+      onDateChange={onDateChange} onRemove={vi.fn()} onCreated={vi.fn()} />);
+    const tile = screen.getByRole('button', { name: '夜勤を2026-09-30に追加' });
+    expect(tile).toHaveTextContent('終日');
+    expect(tile).not.toHaveTextContent('22:00');
+    await act(async () => { fireEvent.click(tile); });
+    expect(createShifts).toHaveBeenCalledWith(calendar.id, expect.objectContaining({ allDay: true }), ['2026-09-30']);
+    expect(onDateChange).toHaveBeenCalledWith('2026-10-01');
+  } finally {
+    template.allDay = false;
+  }
 });

@@ -32,6 +32,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   id: 'tag-1',
   name: '仕事',
   color: '#2563EB',
+  all_day: false,
   start_local: '22:00',
   end_local: '06:00',
   created_at: '2026-09-25T00:00:00Z',
@@ -84,9 +85,54 @@ describe('event-tags data', () => {
   it('更新は変更フィールドだけ送り、戻り値を変換する', async () => {
     result = { data: row({ name: '休み' }), error: null };
     const { updateEventTag } = await import('./event-tags');
-    const current = { id: 'tag-1', name: '仕事', color: '#2563EB', startLocal: '22:00', endLocal: '06:00', createdAt: '', updatedAt: '' };
+    const current = {
+      allDay: false,
+      id: 'tag-1',
+      name: '仕事',
+      color: '#2563EB',
+      startLocal: '22:00',
+      endLocal: '06:00',
+      createdAt: '',
+      updatedAt: '',
+    };
     const updated = await updateEventTag(current, { name: '休み' });
     expect(updated.ok && updated.value.name).toBe('休み');
     expect(calls.find((call) => call.method === 'update')?.args[0]).toEqual({ name: '休み' });
   });
+});
+
+it('終日タグを正規化して作成・再取得し、編集のフラグを保存する', async () => {
+  const { createEventTag, listEventTags, updateEventTag } = await import('./event-tags');
+  result = {
+    data: row({ all_day: true, start_local: '09:00', end_local: '18:00' }),
+    error: null,
+  };
+  const created = await createEventTag(input({ allDay: true, startLocal: '', endLocal: '' }));
+  expect(created.ok && created.value.allDay).toBe(true);
+  expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({
+    all_day: true,
+    start_local: '09:00',
+    end_local: '18:00',
+  });
+  result = { data: [row(), row({ all_day: true })], error: null };
+  const listed = await listEventTags();
+  expect(listed.ok && listed.value.map((t) => t.allDay)).toEqual([false, true]);
+  if (!listed.ok) throw new Error('一覧取得失敗');
+  result = { data: row({ all_day: true }), error: null };
+  const updated = await updateEventTag(listed.value[0]!, {
+    allDay: true,
+    startLocal: '09:00',
+    endLocal: '09:00',
+  });
+  expect(updated.ok && updated.value.allDay).toBe(true);
+  expect(calls.filter((c) => c.method === 'update').at(-1)?.args[0]).toMatchObject({
+    all_day: true,
+    start_local: '09:00',
+    end_local: '18:00',
+  });
+  expect(
+    calls
+      .filter((c) => c.method === 'select')
+      .every((c) => String(c.args[0]).split(',').includes('all_day')),
+  ).toBe(true);
 });

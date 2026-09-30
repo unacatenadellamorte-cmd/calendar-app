@@ -39,6 +39,7 @@ async function load() {
 const row = (over: Record<string, unknown> = {}) => ({
   id: 't1',
   name: '平日',
+  all_day: false,
   start_local: '17:00',
   end_local: '22:00',
   break_minutes: 30,
@@ -98,7 +99,7 @@ describe('createShiftTemplate バリデーション', () => {
       queryResult = { data: row({ color: hex }), error: null };
       const result = await createShiftTemplate(input({ color: hex }));
       expect(result.ok && result.value.color).toBe(hex);
-      const inserted = calls.filter(call => call.method === 'insert').at(-1)?.args[0];
+      const inserted = calls.filter((call) => call.method === 'insert').at(-1)?.args[0];
       expect(inserted).toEqual(expect.objectContaining({ color: hex }));
     }
   });
@@ -107,7 +108,11 @@ describe('createShiftTemplate バリデーション', () => {
     ['時刻不正', { startLocal: '0900' }, 'shift-template/invalid-time'],
     ['開始=終了', { startLocal: '10:00', endLocal: '10:00' }, 'shift-template/invalid-time'],
     ['休憩が負', { breakMinutes: -5 }, 'shift-template/invalid-break'],
-    ['休憩 >= 実働', { startLocal: '17:00', endLocal: '22:00', breakMinutes: 300 }, 'shift-template/invalid-break'],
+    [
+      '休憩 >= 実働',
+      { startLocal: '17:00', endLocal: '22:00', breakMinutes: 300 },
+      'shift-template/invalid-break',
+    ],
     ['時給が負', { hourlyWage: -1 }, 'shift-template/invalid-wage'],
     ['色がプリセット外', { color: '#123456' }, 'shift-template/invalid-color'],
   ];
@@ -120,9 +125,14 @@ describe('createShiftTemplate バリデーション', () => {
   });
 
   it('日またぎシフト(休憩 < 実働)は通る', async () => {
-    queryResult = { data: row({ start_local: '22:00', end_local: '06:00', break_minutes: 60 }), error: null };
+    queryResult = {
+      data: row({ start_local: '22:00', end_local: '06:00', break_minutes: 60 }),
+      error: null,
+    };
     const { createShiftTemplate } = await load();
-    const r = await createShiftTemplate(input({ startLocal: '22:00', endLocal: '06:00', breakMinutes: 60 }) as never);
+    const r = await createShiftTemplate(
+      input({ startLocal: '22:00', endLocal: '06:00', breakMinutes: 60 }) as never,
+    );
     expect(r.ok).toBe(true);
   });
 });
@@ -134,7 +144,12 @@ describe('shift-templates.ts data 層', () => {
     const r = await listShiftTemplates();
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value[0]).toMatchObject({ id: 't1', startLocal: '17:00', breakMinutes: 30, workplaceLabel: null });
+      expect(r.value[0]).toMatchObject({
+        id: 't1',
+        startLocal: '17:00',
+        breakMinutes: 30,
+        workplaceLabel: null,
+      });
       expect(r.value[1]).toMatchObject({ id: 't2', workplaceLabel: 'カフェ' });
     }
     expect(calls.map((c) => c.method)).toContain('is');
@@ -152,9 +167,17 @@ describe('shift-templates.ts data 層', () => {
     queryResult = { data: row({ name: '早番' }), error: null };
     const { updateShiftTemplate } = await load();
     const current = {
-      id: 't1', name: '平日', startLocal: '17:00', endLocal: '22:00',
-      breakMinutes: 30, hourlyWage: 1100, workplaceLabel: null, color: '#009E73',
-      createdAt: '', updatedAt: '',
+      allDay: false,
+      id: 't1',
+      name: '平日',
+      startLocal: '17:00',
+      endLocal: '22:00',
+      breakMinutes: 30,
+      hourlyWage: 1100,
+      workplaceLabel: null,
+      color: '#009E73',
+      createdAt: '',
+      updatedAt: '',
     };
     const r = await updateShiftTemplate(current, { name: '早番' });
     expect(r.ok && r.value.name).toBe('早番');
@@ -186,4 +209,86 @@ describe('shift-templates.ts data 層', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/query');
   });
+});
+
+it('終日の作成・一覧・編集でフラグを保持し、非表示の不正値を正規化する', async () => {
+  const { createShiftTemplate, listShiftTemplates, updateShiftTemplate } = await load();
+  queryResult = {
+    data: row({
+      all_day: true,
+      start_local: '09:00',
+      end_local: '18:00',
+      break_minutes: 0,
+      hourly_wage: 0,
+    }),
+    error: null,
+  };
+  const created = await createShiftTemplate(
+    input({ allDay: true, startLocal: '', endLocal: '', breakMinutes: -1, hourlyWage: NaN }),
+  );
+  expect(created.ok && created.value.allDay).toBe(true);
+  expect(calls.find((c) => c.method === 'insert')?.args[0]).toMatchObject({
+    all_day: true,
+    start_local: '09:00',
+    end_local: '18:00',
+    break_minutes: 0,
+    hourly_wage: 0,
+  });
+  queryResult = { data: [row({ all_day: true }), row()], error: null };
+  const listed = await listShiftTemplates();
+  expect(listed.ok && listed.value.map((t) => t.allDay)).toEqual([true, false]);
+  if (!listed.ok) throw new Error('一覧取得失敗');
+  queryResult = { data: row({ all_day: false }), error: null };
+  await updateShiftTemplate(listed.value[0]!, { allDay: false });
+  expect(calls.filter((c) => c.method === 'update').at(-1)?.args[0]).toEqual({
+    all_day: false,
+  });
+  expect(
+    calls
+      .filter((c) => c.method === 'select')
+      .every((c) => String(c.args[0]).split(',').includes('all_day')),
+  ).toBe(true);
+});
+
+it('時刻付きから終日へ更新したpayloadを保存し、再取得でも時刻を維持して給料を除外する', async () => {
+  // 固定レスポンスではなく、更新payloadを保存した行から応答を組み立てる。
+  let stored: Record<string, unknown> = row();
+  from.mockImplementation(() => {
+    const chain = makeChain();
+    let single = false;
+    chain.update = (payload: Record<string, unknown>) => {
+      calls.push({ method: 'update', args: [payload] });
+      stored = { ...stored, ...payload };
+      return chain;
+    };
+    chain.single = () => {
+      single = true;
+      return chain;
+    };
+    chain.then = (resolve: (value: unknown) => unknown) =>
+      resolve({ data: single ? { ...stored } : [{ ...stored }], error: null });
+    return chain;
+  });
+  const { listShiftTemplates, updateShiftTemplate } = await load();
+  const initial = await listShiftTemplates();
+  expect(initial.ok && initial.value[0]?.allDay).toBe(false);
+  if (!initial.ok) throw new Error('一覧取得失敗');
+  const updated = await updateShiftTemplate(initial.value[0]!, { allDay: true });
+  expect(calls.find((c) => c.method === 'update')?.args[0]).toEqual({
+    all_day: true,
+    start_local: '17:00',
+    end_local: '22:00',
+    break_minutes: 0,
+    hourly_wage: 0,
+  });
+  const expected = {
+    allDay: true,
+    startLocal: '17:00',
+    endLocal: '22:00',
+    breakMinutes: 0,
+    hourlyWage: 0,
+  };
+  expect(updated.ok && updated.value).toMatchObject(expected);
+  const reloaded = await listShiftTemplates();
+  expect(reloaded.ok && reloaded.value[0]).toMatchObject(expected);
 });
