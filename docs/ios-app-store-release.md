@@ -1,6 +1,6 @@
 # iOS App Store用のビルドと登録
 
-この経路は配布署名されたIPAの生成までを行う。App Storeへのアップロード・審査提出は行わない。未署名検証と既存の `build:ios:device` は引き続きテスト広告を使う。
+`release=true` は配布署名されたIPAを生成する。別の `upload=true` は、実行ID・SHA256・バージョンを固定した検証済みIPAだけをApp Store Connectへ送信する。審査提出は掲載情報を確認して別途実行する。未署名検証と既存の `build:ios:device` は引き続きテスト広告を使う。
 
 ## 識別子と認可
 
@@ -77,6 +77,12 @@ Environmentを公開ビルド対象のブランチへ限定する。通常のpus
 アーティファクトは検証済み `Multi-calendar.ipa` と、クラッシュ解析用の `Multi-calendar-dSYMs.zip`。両方を7日間保存する。p12、keychain、元プロファイル、`.env`、署名作業ディレクトリ、archive全体はアップロードしない。IPA内部の `embedded.mobileprovision` はAppleの配布形式に必要な署名構成物なので含む。生の署名素材ファイルと区別して検査する。CIは提出・アップロードを実行しない。
 
 ローカルでの公開Web検証は `IOS_RELEASE_VERSION` / `IOS_RELEASE_BUILD` を設定して `npm run build:ios:release`。端末検証用は従来どおり `npm run build:ios:device` を使い、テスト広告を維持する。
+
+## 掲載画像とアイコン
+
+`capture=true` はiOS 18.5のiPhone 16 Plus・iPad Pro 13-inchで日本語・英語の実画面を撮影する。架空データのローカルサーバーを使い、撮影専用成果物にだけ開始URLと通信設定を加える。本番配布IPAにはこれらの撮影設定を含めない。生成画像は共通の `出力画像/` へダウンロードし、ダイアログ・空白・通信エラーがないことを目視確認してから登録する。
+
+iOS AppIconはAndroid版と同じ1024角の元画像を使う。RGB画素を維持したまま不要なアルファチャンネルを除去した。アイコン変更を含む配布ビルドは1.0.20 (22)、[配布CI](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/36713168893)で作成・署名検証済み。
 
 ## PrivacyInfoと確認の限界
 
