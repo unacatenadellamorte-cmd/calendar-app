@@ -104,3 +104,9 @@ Windowsで実施済み: 本番Webビルド、型検査、lint、認可/設定/�
 ## 2026-09-30の作成結果
 
 [配布CI](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/36663107316)で `b7f3b45` から1.0.20(21)の署名済みIPAと主App/WidgetのdSYMを作成。Macのnativeテスト、archive/exportと署名検証、秘密の後片づけも成功した。これはビルド完了であり、App Storeへの送信や実機認可確認の完了ではない。
+
+### 同日21:32の審査提出結果
+
+Androidと同じアイコンに差し替えた **1.0.20 (22)** を[送信CI](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/36713820166)でAppleへ送信し、VALIDを確認して提出対象に選択した。日英・iPhone/iPadの掲載画像8枚、公開済みプライバシー申告、審査情報を揃えて審査提出した。App Store Connect画面と公式APIで **WAITING_FOR_REVIEW（審査待ち）**、公開方式 **MANUAL（手動）** を確認済み。
+
+無料、日本を含むEU以外の148地域に設定。Google OAuthはテスト公開のため、一般公開操作の前に公開状態を見直す。iOS実機のGoogle連携とWidgetの機能確認は、審査提出の完了とは別に残る。
