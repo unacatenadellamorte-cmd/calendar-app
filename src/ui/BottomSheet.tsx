@@ -90,7 +90,7 @@ export function BottomSheet({
           transform: `translateY(${closing ? '100%' : `${offset}px`})`,
           transition: closing || offset === 0 ? 'transform 180ms ease-out' : 'none',
         }}
-        className="relative mx-auto flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-t-lg bg-surface-base px-4 pb-4 shadow-lg"
+        className="bottom-sheet relative mx-auto flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-t-lg bg-surface-base px-4 pb-4 shadow-lg"
       >
         <button
           type="button"
@@ -130,7 +130,7 @@ export function BottomSheet({
           <span className="text-[10px] text-ink-secondary">{t('下にスライドして閉じる')}</span>
         </button>
         <h2 className="shrink-0 text-body font-semibold text-ink-primary">{title}</h2>
-        <div className="mt-3 overflow-y-auto overscroll-contain pb-6">{children}</div>
+        <div className="bottom-sheet-content mt-3 overflow-y-auto overscroll-contain pb-6">{children}</div>
       </div>
     </div>,
     document.body,

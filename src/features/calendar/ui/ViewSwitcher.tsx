@@ -55,7 +55,7 @@ export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
             aria-checked={active}
             onClick={() => onChange(value)}
             className={[
-              'calendar-view-option min-h-11 px-3',
+              'calendar-view-option min-h-11 min-w-0 flex-1 px-2 [overflow-wrap:anywhere]',
               active ? 'bg-accent-weak font-semibold text-accent' : 'text-ink-secondary',
             ].join(' ')}
           >
