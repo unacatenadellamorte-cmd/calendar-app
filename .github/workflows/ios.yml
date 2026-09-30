@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # 本番データへ接続しない。ビルドされたアプリはお試しモードで確認する。
+      # 接続設定を持たないコンパイル検証専用。実機利用時はbuild:ios:deviceで再ビルドする。
       VITE_SUPABASE_URL: ''
       VITE_SUPABASE_ANON_KEY: ''
     steps:

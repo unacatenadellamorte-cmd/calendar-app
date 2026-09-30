@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build --workspace @calendar-app/core && vite build",
+    "build:ios:device": "npm run build --workspace @calendar-app/core && node scripts/ios/build-device-web.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
