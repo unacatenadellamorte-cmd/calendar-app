@@ -19,7 +19,7 @@ class Handler(fixture.Handler):
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(data)))
         self.send_header('Access-Control-Allow-Origin', 'capacitor://localhost')
-        self.send_header('Access-Control-Allow-Headers', 'authorization, apikey, content-type, prefer, x-client-info')
+        self.send_header('Access-Control-Allow-Headers', 'authorization, apikey, content-type, prefer, x-client-info, accept-profile, content-profile, x-supabase-api-version, range')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
         self.end_headers()
         self.wfile.write(data)
@@ -39,6 +39,8 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 output = Path(os.environ['CAPTURE_OUTPUT'])
 output.mkdir(parents=True, exist_ok=True)
 app = ROOT / 'ios/CaptureDerivedData/Build/Products/Debug-iphonesimulator/App.app'
+index = app / 'public/index.html'
+original_index = index.read_text(encoding='utf-8')
 devices = json.loads(run('xcrun', 'simctl', 'list', 'devices', 'available', '-j'))['devices']
 available = [device for runtime, entries in devices.items() if 'iOS-18-5' in runtime for device in entries]
 print('撮影環境: iOS 18.5', flush=True)
@@ -54,17 +56,18 @@ try:
             run('xcrun', 'simctl', 'boot', udid)
         run('xcrun', 'simctl', 'bootstatus', udid, '-b')
         run('xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--batteryState', 'charged', '--batteryLevel', '100')
-        run('xcrun', 'simctl', 'install', udid, str(app))
         for language, region in [('ja', 'ja_JP'), ('en', 'en_US')]:
-            subprocess.run(['xcrun', 'simctl', 'terminate', udid, 'jp.ryo.multicalendar'], capture_output=True, timeout=30)
-            run('xcrun', 'simctl', 'launch', udid, 'jp.ryo.multicalendar', '-AppleLanguages', f'({language})', '-AppleLocale', region)
-            time.sleep(8)
-            for label, url in [('calendar', 'calendar-app://day/2026-09-26'), ('event', 'calendar-app://create/2026-09-26'), ('settings', 'calendar-app://settings/')]:
-                run('xcrun', 'simctl', 'openurl', udid, url)
-                time.sleep(4)
+            for label, route in [('calendar', '/calendar?date=2026-09-26'), ('event', '/calendar?create=2026-09-26'), ('settings', '/settings')]:
+                subprocess.run(['xcrun', 'simctl', 'terminate', udid, 'jp.ryo.multicalendar'], capture_output=True, timeout=30)
+                # 撮影用成果物の開始URLのみを指定し、アプリ本体の描画処理は変更しない。
+                startup = '<script>history.replaceState(null,"",' + json.dumps(route) + ');localStorage.setItem("calendar-app.language",' + json.dumps(language) + ');</script>'
+                index.write_text(original_index.replace('<head>', '<head>' + startup, 1), encoding='utf-8')
+                run('xcrun', 'simctl', 'install', udid, str(app))
+                run('xcrun', 'simctl', 'launch', udid, 'jp.ryo.multicalendar', '-AppleLanguages', f'({language})', '-AppleLocale', region)
+                time.sleep(15)
                 name = f'20260930_ios_{family}_{language}_{label}.png'
                 run('xcrun', 'simctl', 'io', udid, 'screenshot', str(output / name))
-                manifest.append({'file': name, 'device': device['name'], 'language': language, 'route': url, 'data': '架空データのみ'})
+                manifest.append({'file': name, 'device': device['name'], 'language': language, 'route': route, 'data': '架空データのみ'})
         run('xcrun', 'simctl', 'shutdown', udid)
 finally:
     server.shutdown()
