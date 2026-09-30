@@ -60,7 +60,7 @@ Environmentを公開ビルド対象のブランチへ限定する。通常のpus
 
 ## 起動と検証
 
-既存の `iOSビルド検証` (`ios.yml`) を手動起動し、`release=true`、`version`、`build` を渡すと、同じコミットの `ios-release.yml` を呼ぶ。通常の未署名web/iosジョブはその呼出しでは実行しない。既定の `release=false` とpush/PRでは従来の未署名検証を実行する。これにより新しいworkflowの既定ブランチへの先行登録は不要になる。`ios-release.yml` 自身からの手動起動にも対応する。
+既存の `iOSビルド検証` (`ios.yml`) を手動起動し、`release=true`、`version`、`build` を渡すと、同じファイル内の環境付き配布jobを実行する。通常の未署名web/iosジョブはその呼出しでは実行しない。既定の `release=false` とpush/PRでは従来の未署名検証を実行する。初回CIで再利用workflow内のenvironment秘密を受け取れなかったため、既存workflowにも同じ配布jobを直接定義している。新workflowの既定ブランチへの先行登録は不要。`ios-release.yml` 自身からの手動起動にも対応する。
 
 `version` は `1.0.20` のような整数3区切り、`build` は1〜9桁の正の整数。ストアで既に使った番号の自動照合は行わないため、担当者が未使用の番号を指定する。
 
