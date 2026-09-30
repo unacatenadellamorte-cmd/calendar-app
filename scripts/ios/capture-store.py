@@ -40,9 +40,10 @@ output = Path(os.environ['CAPTURE_OUTPUT'])
 output.mkdir(parents=True, exist_ok=True)
 app = ROOT / 'ios/CaptureDerivedData/Build/Products/Debug-iphonesimulator/App.app'
 devices = json.loads(run('xcrun', 'simctl', 'list', 'devices', 'available', '-j'))['devices']
-available = [device for runtime, entries in devices.items() if 'iOS' in runtime for device in entries]
+available = [device for runtime, entries in devices.items() if 'iOS-18-5' in runtime for device in entries]
+print('撮影環境: iOS 18.5', flush=True)
 targets = [
-    ('iphone', next(device for name in ['iPhone 17 Pro Max', 'iPhone 16 Pro Max', 'iPhone 16 Plus'] for device in available if device['name'] == name)),
+    ('iphone', next(device for device in available if device['name'] == 'iPhone 16 Plus')),
     ('ipad', next(device for device in available if 'iPad Pro 13-inch' in device['name'])),
 ]
 manifest = []
@@ -55,7 +56,7 @@ try:
         run('xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--batteryState', 'charged', '--batteryLevel', '100')
         run('xcrun', 'simctl', 'install', udid, str(app))
         for language, region in [('ja', 'ja_JP'), ('en', 'en_US')]:
-            subprocess.run(['xcrun', 'simctl', 'terminate', udid, 'jp.ryo.multicalendar'], capture_output=True)
+            subprocess.run(['xcrun', 'simctl', 'terminate', udid, 'jp.ryo.multicalendar'], capture_output=True, timeout=30)
             run('xcrun', 'simctl', 'launch', udid, 'jp.ryo.multicalendar', '-AppleLanguages', f'({language})', '-AppleLocale', region)
             time.sleep(8)
             for label, url in [('calendar', 'calendar-app://day/2026-09-26'), ('event', 'calendar-app://create/2026-09-26'), ('settings', 'calendar-app://settings/')]:
