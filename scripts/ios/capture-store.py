@@ -26,7 +26,12 @@ class Handler(fixture.Handler):
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True).strip()
+    print('実行:', ' '.join(args), flush=True)
+    # 起動したサービスが出力パイプを保持しても待ち続けないよう、通常操作は直接出力する。
+    if args[:4] == ('xcrun', 'simctl', 'list', 'devices'):
+        return subprocess.check_output(args, text=True, timeout=60).strip()
+    subprocess.run(args, check=True, timeout=240)
+    return ''
 
 
 server = fixture.ThreadingHTTPServer(('127.0.0.1', 5188), Handler)
