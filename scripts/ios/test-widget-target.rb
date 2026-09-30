@@ -13,7 +13,7 @@ class WidgetTargetTest < Minitest::Test
       FileUtils.cp_r(File.join(root, 'ios/App/App.xcodeproj'), temp)
       FileUtils.cp_r(File.join(root, 'ios/App/FeaturedEventsWidget'), temp)
       FileUtils.mkdir_p(File.join(temp, 'App'))
-      FileUtils.cp(File.join(root, 'ios/App/App/App.entitlements'), File.join(temp, 'App'))
+      FileUtils.cp(Dir[File.join(root, 'ios/App/App/{App.entitlements,GoogleAuthorizationPlugin.swift,PrivacyInfo.xcprivacy}')], File.join(temp, 'App'))
       path = File.join(temp, 'App.xcodeproj')
       script = File.join(__dir__, 'add-widget-target.rb')
       assert system(RbConfig.ruby, script, path), '初回生成に失敗'
@@ -47,6 +47,13 @@ class WidgetTargetTest < Minitest::Test
           assert_equal ['group.jp.ryo.multicalendar.widget'], plist['com.apple.security.application-groups']
         end
       end
+      [app, widget].each do |target|
+        manifests = target.resources_build_phase.files_references.select { |ref| ref.path == 'PrivacyInfo.xcprivacy' }
+        assert_equal 1, manifests.length
+        assert File.file?(manifests.first.real_path)
+      end
+      assert_equal 1, app.package_product_dependencies.count { |product| product.product_name == 'GoogleSignIn' }
+      assert_equal 1, app.source_build_phase.files_references.count { |ref| ref.path == 'GoogleAuthorizationPlugin.swift' }
       assert app.package_product_dependencies.any? { |product| product.product_name == 'CapApp-SPM' }, '既存SPM依存が消失'
     end
   end
@@ -61,7 +68,7 @@ class WidgetTargetTest < Minitest::Test
       project.save
       FileUtils.cp_r(File.join(root, 'ios/App/FeaturedEventsWidget'), temp)
       FileUtils.mkdir_p(File.join(temp, 'App'))
-      FileUtils.cp(File.join(root, 'ios/App/App/App.entitlements'), File.join(temp, 'App'))
+      FileUtils.cp(Dir[File.join(root, 'ios/App/App/{App.entitlements,GoogleAuthorizationPlugin.swift,PrivacyInfo.xcprivacy}')], File.join(temp, 'App'))
       assert system(RbConfig.ruby, File.join(__dir__, 'add-widget-target.rb'), path)
       targets = Xcodeproj::Project.open(path).targets
       assert_equal %w[App FeaturedEventsWidget], targets.map(&:name)

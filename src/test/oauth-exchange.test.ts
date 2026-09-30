@@ -32,7 +32,7 @@ beforeEach(() => {
     SUPABASE_URL: 'https://database.example.test', SUPABASE_SERVICE_ROLE_KEY: 'server-key',
     GOOGLE_OAUTH_CLIENT_ID: 'web-client', GOOGLE_OAUTH_CLIENT_SECRET: 'server-secret',
     GOOGLE_OAUTH_REDIRECT_URI: 'https://app.example.test/connections/google/callback',
-    APP_ORIGIN: 'https://app.example.test', APP_ORIGINS: 'https://localhost',
+    APP_ORIGIN: 'https://app.example.test', APP_ORIGINS: 'https://localhost,capacitor://localhost',
   };
   const deno = { env: { get: (name: string) => env[name] }, serve: (callback: typeof handler) => { handler = callback; } };
   const corsExports = {};
@@ -54,9 +54,8 @@ function request(body: Record<string, unknown>, origin = 'https://localhost') {
     body: JSON.stringify(body),
   });
 }
-const androidBody = { platform: 'android', expectedUserId: 'user-a', code: 'native-code' };
-
-describe('oauth-exchangeのAndroid/Web境界', () => {
+describe.each(['android', 'ios'])('oauth-exchangeの%s/Web境界', (platform) => {
+  const androidBody = { platform, expectedUserId: 'user-a', code: 'native-code' };
   it('Androidコードは空のredirect_uriで交換し本人のVault保存だけを呼ぶ', async () => {
     const response = await handler(request(androidBody));
     expect(response.status).toBe(200);
@@ -130,7 +129,7 @@ describe('oauth-exchangeのAndroid/Web境界', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it.each(['https://localhost', 'https://app.example.test', 'https://untrusted.example.test'])('CORSは明示したオリジンのみ返す: %s', async (origin) => {
+  it.each(['https://localhost', 'capacitor://localhost', 'https://app.example.test', 'https://untrusted.example.test'])('CORSは明示したオリジンのみ返す: %s', async (origin) => {
     const response = await handler(new Request('https://edge.example.test', { method: 'OPTIONS', headers: { Origin: origin } }));
     expect(response.status).toBe(204);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin.includes('untrusted') ? null : origin);

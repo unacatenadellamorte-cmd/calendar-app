@@ -5,16 +5,30 @@ on:
     branches: [main, 'feature/ios-widget-ci']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: App Store配布ビルドを実行する（未指定なら署名なし検証）
+        type: boolean
+        default: false
+      version:
+        description: 公開バージョン（配布時のみ必須）
+        type: string
+        default: ''
+      build:
+        description: ビルド番号（配布時のみ必須）
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ios-${{ github.workflow }}-${{ github.ref }}-${{ inputs.release && 'release' || 'validation' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || !inputs.release }}
 
 jobs:
   web:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.release }}
     name: Web側の回帰検証
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -34,9 +48,12 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: node --test scripts/ios/*.test.mjs
+      - run: python3 scripts/ios/test-release-signing.py
       - run: npm run build
 
   ios:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.release }}
     name: Swift検証と署名なしシミュレータビルド
     runs-on: macos-15
     timeout-minutes: 30
@@ -68,6 +85,8 @@ jobs:
         run: bundle exec ruby scripts/ios/test-widget-target.rb
       - name: ウィジェットをXcodeプロジェクトに追加
         run: bundle exec ruby scripts/ios/add-widget-target.rb
+      - name: 実プラグインのGoogle認可状態を検証
+        run: python3 scripts/ios/test-google-authorization.py
       - name: Swiftの共有データ契約を検証
         run: swift test --package-path ios/App/FeaturedEventsWidget
       - name: アプリとウィジェットをビルド
@@ -90,6 +109,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=1.0.19 CURRENT_PROJECT_VERSION=20 \
             archive 2>&1 | tee ios-archive.log
           test -d ios/UnsignedApp.xcarchive/Products/Applications/App.app/PlugIns/FeaturedEventsWidget.appex
+          python3 scripts/ios/release-signing.py manifests ios/UnsignedApp.xcarchive/Products/Applications/App.app
       - name: 署名なし成果物を保存
         shell: bash
         run: |
@@ -112,3 +132,10 @@ jobs:
             ios-archive.log
           if-no-files-found: ignore
           retention-days: 7
+
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+    uses: ./.github/workflows/ios-release.yml
+    with:
+      version: ${{ inputs.version }}
+      build: ${{ inputs.build }}

@@ -83,6 +83,46 @@ build_file = embed.files.find { |file| file.file_ref == widget.product_reference
 build_file ||= embed.add_file_reference(widget.product_reference, true)
 build_file.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
 
+# Google SDKはCapacitorが再生成するPackage.swiftの外に置き、同期後も保持する。
+%w[GoogleAuthorizationPlugin.swift].each do |path|
+  abort "必要なファイルが無い: #{path}" unless File.file?(File.join(File.dirname(project_path), 'App', path))
+  ref = app_group.files.find { |item| item.path == path } || app_group.new_file(path)
+  app.source_build_phase.add_file_reference(ref, true)
+end
+[[app, app_group, 'App'], [widget, group, widget_name]].each do |target, target_group, directory|
+  path = File.join(File.dirname(project_path), directory, 'PrivacyInfo.xcprivacy')
+  abort 'プライバシー宣言が無い' unless File.file?(path)
+  manifest = Xcodeproj::Plist.read_from_path(path)
+  reasons = manifest.fetch('NSPrivacyAccessedAPITypes').find { |item| item['NSPrivacyAccessedAPIType'] == 'NSPrivacyAccessedAPICategoryUserDefaults' }
+  abort 'App Groupの利用理由が無い' unless reasons&.fetch('NSPrivacyAccessedAPITypeReasons')&.include?('1C8F.1')
+  ref = target_group.files.find { |item| item.path == 'PrivacyInfo.xcprivacy' } || target_group.new_file('PrivacyInfo.xcprivacy')
+  target.resources_build_phase.add_file_reference(ref, true)
+end
+repository = 'https://github.com/google/GoogleSignIn-iOS'
+package = project.root_object.package_references.find { |item| item.is_a?(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference) && item.repositoryURL == repository }
+unless package
+  package = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+  package.repositoryURL = repository
+  project.root_object.package_references << package
+end
+package.requirement = { 'kind' => 'exactVersion', 'version' => '9.2.0' }
+product = app.package_product_dependencies.find { |item| item.product_name == 'GoogleSignIn' }
+unless product
+  product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+  product.product_name = 'GoogleSignIn'
+  app.package_product_dependencies << product
+end
+product.package = package
+unless app.frameworks_build_phase.files.any? { |item| item.product_ref == product }
+  file = project.new(Xcodeproj::Project::Object::PBXBuildFile)
+  file.product_ref = product
+  app.frameworks_build_phase.files << file
+end
+app.build_configurations.each do |config|
+  %w[GOOGLE_IOS_CLIENT_ID GOOGLE_SERVER_CLIENT_ID GOOGLE_IOS_REVERSED_CLIENT_ID].each do |key|
+    config.build_settings[key] = ENV.fetch(key, config.build_settings.fetch(key, ''))
+  end
+end
 project.save
 # CIのクリーンなチェックアウトでも-scheme Appを解決できるよう共有スキームを保存する。
 scheme_path = File.join(project_path, 'xcshareddata/xcschemes/App.xcscheme')

@@ -6,8 +6,9 @@ interface GoogleAuthorizationPlugin {
 
 const GoogleAuthorization = registerPlugin<GoogleAuthorizationPlugin>('GoogleAuthorization');
 
-export function isAndroidGoogleAuthorization(): boolean {
-  return Capacitor.getPlatform() === 'android';
+export function nativeGoogleAuthorizationPlatform(): 'android' | 'ios' | null {
+  const platform = Capacitor.getPlatform();
+  return platform === 'android' || platform === 'ios' ? platform : null;
 }
 
 /** 認可コードだけを受け渡す。長期トークンはサーバーだけで扱う。 */

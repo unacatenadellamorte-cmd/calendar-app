@@ -1,5 +1,5 @@
 import { buildGoogleAuthUrl, GOOGLE_CALENDAR_SCOPES } from '@core';
-import { authorizeGoogle, isAndroidGoogleAuthorization } from '@/platform/googleAuthorization';
+import { authorizeGoogle, nativeGoogleAuthorizationPlatform } from '@/platform/googleAuthorization';
 import { supabase } from './supabase';
 import { selectActive } from './soft-delete';
 import { env } from './env';
@@ -60,14 +60,15 @@ function randomState(): string {
 }
 
 /**
- * Webはstate付き同意画面へ遷移し、AndroidはSDKから取得したコードを交換する。
- * Androidの成功結果だけがUIの接続状態再取得を開始する。
+ * Webはstate付き同意画面へ遷移し、Android/iOSはSDKから取得したコードを交換する。
+ * ネイティブの成功結果だけがUIの接続状態再取得を開始する。
  */
 let connecting = false;
 
 export async function startGoogleConnect(): Promise<Result<{ googleEmail: string | null }> | void> {
   if (connecting) return err(appError('connection/exchange-failed', 'connection/exchange-failed'));
-  if (isAndroidGoogleAuthorization()) return connectAndroidGoogle();
+  const platform = nativeGoogleAuthorizationPlatform();
+  if (platform) return connectNativeGoogle(platform);
   if (!env.googleOauthClientId) return err(UNAVAILABLE);
   const state = randomState();
   try {
@@ -86,7 +87,7 @@ export async function startGoogleConnect(): Promise<Result<{ googleEmail: string
 
 
 /** 認可開始時の利用者を固定し、交換直前の同一利用者のJWTを明示して使う。 */
-async function connectAndroidGoogle(): Promise<Result<{ googleEmail: string | null }>> {
+async function connectNativeGoogle(platform: 'android' | 'ios'): Promise<Result<{ googleEmail: string | null }>> {
   if (!supabase || !env.googleOauthClientId) return err(UNAVAILABLE);
   connecting = true;
   let unsubscribe: (() => void) | undefined;
@@ -98,13 +99,13 @@ async function connectAndroidGoogle(): Promise<Result<{ googleEmail: string | nu
     }
     let changed = false;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, current) => {
-      if (!current || current.user.id !== session.user.id) changed = true;
+      if (!current || current.user.is_anonymous || current.user.id !== session.user.id) changed = true;
     });
     unsubscribe = () => listener.subscription.unsubscribe();
     const authorization = await authorizeGoogle(env.googleOauthClientId);
     const current = await supabase.auth.getSession();
     const exchangeSession = current.data.session;
-    if (changed || current.error || !exchangeSession || exchangeSession.user.id !== session.user.id) {
+    if (changed || current.error || !exchangeSession || exchangeSession.user.is_anonymous || exchangeSession.user.id !== session.user.id) {
       return err(appError('connection/not-authenticated', 'connection/not-authenticated'));
     }
     if (!authorization.code || !GOOGLE_CALENDAR_SCOPES.every((scope) => authorization.grantedScopes?.includes(scope))) {
@@ -112,7 +113,7 @@ async function connectAndroidGoogle(): Promise<Result<{ googleEmail: string | nu
     }
     const result = await invokeFn<{ googleEmail: string | null } | null>(
       'oauth-exchange',
-      { code: authorization.code, platform: 'android', expectedUserId: session.user.id },
+      { code: authorization.code, platform, expectedUserId: session.user.id },
       slugToConnectionKey,
       'connection/exchange-failed',
       exchangeSession.access_token,
