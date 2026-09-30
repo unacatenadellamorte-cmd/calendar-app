@@ -43,7 +43,8 @@ def run(args, diagnostic_redactions=None, **kwargs):
         if Path(args[0]).name == "xcodebuild" and diagnostic_redactions is not None:
             require(not any(os.environ.get(key) for key in ("IOS_DISTRIBUTION_P12_BASE64", "IOS_DISTRIBUTION_P12_PASSWORD", "IOS_APP_PROFILE_BASE64", "IOS_WIDGET_PROFILE_BASE64")), "秘密環境変数の除去前はXcode診断を表示できません。")
             print("xcodebuildの診断（秘密を除いた末尾）:\n" + diagnostic_tail(result.stdout + b"\n" + result.stderr, diagnostic_redactions), file=sys.stderr)
-        raise ValueError("配布署名のコマンドに失敗しました: " + Path(args[0]).name)
+        operation = " " + args[1] if Path(args[0]).name == "security" and len(args) > 1 and args[1] in {"cms", "list-keychains", "create-keychain", "set-keychain-settings", "unlock-keychain", "import", "set-key-partition-list", "find-identity", "delete-keychain"} else ""
+        raise ValueError("配布署名のコマンドに失敗しました: " + Path(args[0]).name + operation)
     return result.stdout
 
 
