@@ -56,14 +56,17 @@ try:
             run('xcrun', 'simctl', 'boot', udid)
         run('xcrun', 'simctl', 'bootstatus', udid, '-b')
         run('xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--batteryState', 'charged', '--batteryLevel', '100')
+        launched = False
         for language, region in [('ja', 'ja_JP'), ('en', 'en_US')]:
             for label, route in [('calendar', '/calendar?date=2026-09-26'), ('event', '/calendar?create=2026-09-26'), ('settings', '/settings')]:
-                subprocess.run(['xcrun', 'simctl', 'terminate', udid, 'jp.ryo.multicalendar'], capture_output=True, timeout=30)
+                if launched:
+                    run('xcrun', 'simctl', 'terminate', udid, 'jp.ryo.multicalendar')
                 # 撮影用成果物の開始URLのみを指定し、アプリ本体の描画処理は変更しない。
                 startup = '<script>history.replaceState(null,"",' + json.dumps(route) + ');localStorage.setItem("calendar-app.language",' + json.dumps(language) + ');</script>'
                 index.write_text(original_index.replace('<head>', '<head>' + startup, 1), encoding='utf-8')
                 run('xcrun', 'simctl', 'install', udid, str(app))
                 run('xcrun', 'simctl', 'launch', udid, 'jp.ryo.multicalendar', '-AppleLanguages', f'({language})', '-AppleLocale', region)
+                launched = True
                 time.sleep(15)
                 name = f'20260930_ios_{family}_{language}_{label}.png'
                 run('xcrun', 'simctl', 'io', udid, 'screenshot', str(output / name))
