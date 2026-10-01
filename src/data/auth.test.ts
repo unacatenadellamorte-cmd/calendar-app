@@ -41,6 +41,8 @@ const fakeSession = (overrides: Record<string, unknown> = {}) => ({
   user: { id: 'u1', is_anonymous: false, email: 'a@b.com', ...overrides },
 });
 const authErr = (message: string, code?: string) => ({ message, code, name: 'AuthApiError' });
+const CONFIRMATION_URL =
+  'https://unacatenadellamorte-cmd.github.io/calendar-app/auth-confirmation.html';
 
 beforeEach(() => {
   vi.resetModules();
@@ -61,12 +63,26 @@ describe('auth.ts', () => {
     expect(looksLikeEmail('nope')).toBe(false);
   });
 
-  it('signUpWithPassword: 成功でセッションを返す', async () => {
+  it('signUpWithPassword: セッションが返れば即時完了とし、確認後の戻り先を固定URLで指定する', async () => {
     authMock.signUp.mockResolvedValue({ data: { session: fakeSession() }, error: null });
     const { signUpWithPassword } = await importAuth();
     const r = await signUpWithPassword(' a@b.com ', 'secret1');
-    expect(r.ok).toBe(true);
-    expect(authMock.signUp).toHaveBeenCalledWith({ email: 'a@b.com', password: 'secret1' });
+    expect(r).toEqual({ ok: true, value: { status: 'complete' } });
+    expect(authMock.signUp).toHaveBeenCalledWith({
+      email: 'a@b.com',
+      password: 'secret1',
+      options: { emailRedirectTo: CONFIRMATION_URL },
+    });
+  });
+
+  it('signUpWithPassword: セッションが無ければ確認待ちを返す', async () => {
+    authMock.signUp.mockResolvedValue({
+      data: { user: { id: 'u1', email: 'a@b.com' }, session: null },
+      error: null,
+    });
+    const { signUpWithPassword } = await importAuth();
+    const r = await signUpWithPassword(' a@b.com ', 'secret1');
+    expect(r).toEqual({ ok: true, value: { status: 'confirmation-pending', email: 'a@b.com' } });
   });
 
   it('signInWithPassword: 成功でセッションを返す', async () => {
@@ -126,15 +142,93 @@ describe('auth.ts', () => {
     expect(r.ok).toBe(true);
   });
 
-  it('upgradeToPassword: updateUser を呼ぶ', async () => {
-    authMock.updateUser.mockResolvedValue({ data: { user: fakeSession().user }, error: null });
+  it('upgradeToPassword: 確認済みで返れば即時完了。同じ uid のまま updateUser だけを呼ぶ', async () => {
+    authMock.updateUser.mockResolvedValue({
+      data: { user: fakeSession({ email: 'A@b.com', email_confirmed_at: '2026-10-01T00:00:00Z' }).user },
+      error: null,
+    });
+    const { upgradeToPassword } = await importAuth();
+    const r = await upgradeToPassword(' a@b.com ', 'secret1');
+    expect(r).toEqual({ ok: true, value: { status: 'complete' } });
+    expect(authMock.updateUser).toHaveBeenCalledTimes(1);
+    expect(authMock.updateUser).toHaveBeenCalledWith(
+      { email: 'a@b.com', password: 'secret1' },
+      { emailRedirectTo: CONFIRMATION_URL },
+    );
+    // 新規登録や再サインインをすると uid が変わる。
+    expect(authMock.signUp).not.toHaveBeenCalled();
+    expect(authMock.signInAnonymously).not.toHaveBeenCalled();
+    expect(authMock.signOut).not.toHaveBeenCalled();
+  });
+
+  it('upgradeToPassword: 成功応答でも new_email に保留された匿名ユーザーは確認待ち', async () => {
+    authMock.updateUser.mockResolvedValue({
+      data: {
+        user: {
+          id: 'u1',
+          is_anonymous: true,
+          email: '',
+          new_email: 'a@b.com',
+          email_change_sent_at: '2026-10-01T00:00:00Z',
+        },
+      },
+      error: null,
+    });
     const { upgradeToPassword } = await importAuth();
     const r = await upgradeToPassword('a@b.com', 'secret1');
-    expect(r.ok).toBe(true);
-    expect(authMock.updateUser).toHaveBeenCalledWith({
-      email: 'a@b.com',
-      password: 'secret1',
+    expect(r).toEqual({ ok: true, value: { status: 'confirmation-pending', email: 'a@b.com' } });
+  });
+
+  it.each([
+    ['確認日時が無い', { email: 'a@b.com' }],
+    ['メールアドレスが要求と違う', { email: 'old@b.com', email_confirmed_at: '2026-10-01T00:00:00Z' }],
+    ['匿名のまま', { is_anonymous: true, email_confirmed_at: '2026-10-01T00:00:00Z' }],
+  ])('upgradeToPassword: %s 応答は完了扱いしない', async (_label, user) => {
+    authMock.updateUser.mockResolvedValue({ data: { user: fakeSession(user).user }, error: null });
+    const { upgradeToPassword } = await importAuth();
+    const r = await upgradeToPassword('a@b.com', 'secret1');
+    expect(r.ok && r.value.status).toBe('confirmation-pending');
+  });
+
+  it('upgradeToPassword: 確認メールの送信上限を個別の messageKey にする', async () => {
+    authMock.updateUser.mockResolvedValue({
+      data: { user: null },
+      error: { ...authErr('email rate limit exceeded', 'over_email_send_rate_limit'), status: 429 },
     });
+    const { upgradeToPassword } = await importAuth();
+    const r = await upgradeToPassword('a@b.com', 'secret1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('auth/email-rate-limited');
+  });
+
+  it('upgradeToPassword: 個別に扱わないエラーは再実行せず、汎用のエラーとして返す', async () => {
+    authMock.updateUser.mockResolvedValue({
+      data: { user: null },
+      error: authErr('New password should be different from the old password.', 'same_password'),
+    });
+    const { upgradeToPassword } = await importAuth();
+    const r = await upgradeToPassword('c@d.com', 'secret1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('auth/unknown');
+    expect(authMock.updateUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('upgradeToPassword: ユーザーが返らない成功応答は完了扱いしない', async () => {
+    authMock.updateUser.mockResolvedValue({ data: { user: null }, error: null });
+    const { upgradeToPassword } = await importAuth();
+    const r = await upgradeToPassword('a@b.com', 'secret1');
+    expect(r.ok).toBe(false);
+  });
+
+  it('signInWithPassword: メール未確認を個別の messageKey にする', async () => {
+    authMock.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: authErr('Email not confirmed', 'email_not_confirmed'),
+    });
+    const { signInWithPassword } = await importAuth();
+    const r = await signInWithPassword('a@b.com', 'secret1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('auth/email-not-confirmed');
   });
 
   it('signOut: 成功で ok(void)', async () => {

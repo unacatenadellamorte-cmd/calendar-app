@@ -13,7 +13,7 @@ export function AuthScreen() {
   const { state } = useAuth();
   const navigate = useNavigate();
   const isGuest = state === 'guest';
-  const { form, setMode, setEmail, setPassword, submit } = useAuthForm({
+  const { form, setMode, setEmail, setPassword, changeEmail, submit } = useAuthForm({
     isGuest,
     onSuccess: () => navigate('/settings'),
   });
@@ -23,6 +23,36 @@ export function AuthScreen() {
         <p className="text-body text-ink-secondary">
           {t('ローカル開発では認証は無効です。Supabase を設定すると利用できます。')}
         </p>
+      </Screen>
+    );
+  }
+  // 確認メール待ち。登録は未完了なので設定へ戻さず、次の手順を案内する。
+  if (form.pendingEmail) {
+    return (
+      <Screen title={t('確認メールを送信しました')}>
+        <div role="status" className="mt-1 flex flex-col gap-3 text-body text-ink-primary">
+          <p>{t('{0} に確認メールを送信しました。登録はまだ完了していません。', [form.pendingEmail])}</p>
+          <p>
+            {t(
+              '届いたメールのリンクを開いて確認してください。複数届いている場合は最新のメールを使ってください。',
+            )}
+          </p>
+          <p>
+            {t(
+              '確認が終わったらこのアプリに戻り、同じメールアドレスとパスワードでログインしてください。',
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMode('signin')}
+          className="mt-6 min-h-11 w-full rounded-sm bg-accent px-4 text-body font-semibold text-on-accent"
+        >
+          {t('ログインへ進む')}
+        </button>
+        <button type="button" onClick={changeEmail} className="mt-4 min-h-11 text-meta text-accent">
+          {t('別のメールアドレスで登録する')}
+        </button>
       </Screen>
     );
   }
@@ -55,6 +85,7 @@ export function AuthScreen() {
             inputMode="email"
             required
             value={form.email}
+            readOnly={form.submitting}
             onChange={(e) => setEmail(e.target.value)}
             className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
@@ -68,6 +99,7 @@ export function AuthScreen() {
             required
             minLength={6}
             value={form.password}
+            readOnly={form.submitting}
             onChange={(e) => setPassword(e.target.value)}
             className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
@@ -90,6 +122,7 @@ export function AuthScreen() {
 
       <button
         type="button"
+        disabled={form.submitting}
         onClick={() => setMode(isSignup ? 'signin' : 'signup')}
         className="mt-4 min-h-11 text-meta text-accent"
       >
