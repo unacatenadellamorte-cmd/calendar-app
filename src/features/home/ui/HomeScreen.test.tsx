@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -67,6 +67,9 @@ function renderHome() {
 }
 
 beforeEach(() => {
+  // 日付付きの検証データに合わせ、実行日の月替わりに依存させない。
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-08T00:00:00+09:00'));
   navigateMock.mockClear();
   window.localStorage.clear();
   resetFeaturedCountForTests();
@@ -187,3 +190,6 @@ describe('HomeScreen', () => {
     });
   });
 });
+
+// 他のテストへ固定日付を持ち越さない。
+afterEach(() => vi.useRealTimers());
