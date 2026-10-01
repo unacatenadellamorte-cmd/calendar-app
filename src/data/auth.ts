@@ -89,14 +89,34 @@ async function runAccountDeletion(resumeOnly: boolean): Promise<Result<void>> {
   }
 }
 
+/**
+ * 確認メールのリンクが戻る固定の受け皿(public/auth-confirmation.html)。
+ * Supabase 側の許可 URL と完全一致させる。
+ */
+export const AUTH_CONFIRMATION_URL =
+  'https://unacatenadellamorte-cmd.github.io/calendar-app/auth-confirmation.html';
+
+/** 登録要求の結果。確認メール待ちは、登録完了と区別して返す。 */
+export type SignUpOutcome =
+  | { status: 'complete' }
+  | { status: 'confirmation-pending'; email: string };
+
 export async function signUpWithPassword(
   email: string,
   password: string,
-): Promise<Result<Session | null>> {
+): Promise<Result<SignUpOutcome>> {
   if (!supabase) return err(UNAVAILABLE);
-  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+  const address = email.trim();
+  const { data, error } = await supabase.auth.signUp({
+    email: address,
+    password,
+    options: { emailRedirectTo: AUTH_CONFIRMATION_URL },
+  });
   if (error) return err(normalizeAuthError(error));
-  return ok(data.session);
+  // セッションが返るのはメール確認が不要な設定だけ。無ければ確認メール待ち。
+  return ok(
+    data.session ? { status: 'complete' } : { status: 'confirmation-pending', email: address },
+  );
 }
 
 export async function signInWithPassword(
@@ -112,15 +132,29 @@ export async function signInWithPassword(
   return ok(data.session);
 }
 
-/** 匿名セッションから同じ uid のままメールアカウントへ昇格する。 */
+/**
+ * 匿名セッションから同じ uid のままメールアカウントへ昇格する。
+ * メール確認が必要な設定では、updateUser は成功応答でも user.email を変えず
+ * new_email に保留する。その間は匿名のままなので、確認待ちとして返す。
+ */
 export async function upgradeToPassword(
   email: string,
   password: string,
-): Promise<Result<void>> {
+): Promise<Result<SignUpOutcome>> {
   if (!supabase) return err(UNAVAILABLE);
-  const { error } = await supabase.auth.updateUser({ email: email.trim(), password });
+  const address = email.trim();
+  const { data, error } = await supabase.auth.updateUser(
+    { email: address, password },
+    { emailRedirectTo: AUTH_CONFIRMATION_URL },
+  );
   if (error) return err(normalizeAuthError(error));
-  return ok(undefined);
+  const user = data.user;
+  if (!user) return err(appError('auth/unknown', 'auth/unknown'));
+  const confirmed =
+    !user.is_anonymous &&
+    Boolean(user.email_confirmed_at) &&
+    user.email?.toLowerCase() === address.toLowerCase();
+  return ok(confirmed ? { status: 'complete' } : { status: 'confirmation-pending', email: address });
 }
 
 export async function signOut(): Promise<Result<void>> {

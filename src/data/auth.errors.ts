@@ -13,6 +13,12 @@ export const AUTH_MESSAGES: Record<string, string> = {
   'auth/weak-password': 'パスワードは6文字以上にしてください',
   'auth/invalid-email': 'メールアドレスの形式が正しくありません',
   'auth/rate-limited': '試行が多すぎます。少し時間をおいてください',
+  'auth/email-not-confirmed':
+    'メールアドレスの確認が完了していません。確認メールのリンクを開いてからログインしてください',
+  'auth/email-rate-limited':
+    '確認メールの送信回数が上限に達しました。届いている最新のメールを確認するか、時間をおいてください',
+  'auth/confirmation-recently-sent':
+    '確認メールは送信済みです。最新のメールを確認するか、1分ほど待ってからお試しください',
   'auth/unavailable': 'ローカル開発では認証は無効です',
   'auth/network': '通信に失敗しました。接続を確認してください',
   'auth/unknown': 'エラーが発生しました。もう一度お試しください',
@@ -45,6 +51,13 @@ export function normalizeAuthError(error: AuthError | Error): AppError {
   }
   if (code === 'validation_failed' && raw.includes('email')) {
     return appError('auth/invalid-email', 'auth/invalid-email', error);
+  }
+  if (code === 'email_not_confirmed' || raw.includes('email not confirmed')) {
+    return appError('auth/email-not-confirmed', 'auth/email-not-confirmed', error);
+  }
+  // 確認メールの送信上限は 429 でも、待てば届く旨を別文言で案内する。
+  if (code === 'over_email_send_rate_limit' || raw.includes('email rate limit exceeded')) {
+    return appError('auth/email-rate-limited', 'auth/email-rate-limited', error);
   }
   if (code === 'over_request_rate_limit' || status === 429) {
     return appError('auth/rate-limited', 'auth/rate-limited', error);

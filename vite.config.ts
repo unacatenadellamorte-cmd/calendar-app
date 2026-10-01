@@ -29,10 +29,13 @@ export default defineConfig(({ mode }) => {
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        // メール確認の受け皿は事前キャッシュせず、常にネットワークの HTML を使う。
+        globIgnores: ['**/node_modules/**/*', '**/auth-confirmation.html'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         // Supabase の API/Auth は SW でキャッシュしない(表示キャッシュは IndexedDB 一本。AD-1)。
-        navigateFallbackDenylist: [/^\/api/],
+        // 受け皿は GitHub Pages 配下とローカル直下のどちらでも index.html へ差し替えない。
+        navigateFallbackDenylist: [/^\/api/, /^(?:\/calendar-app)?\/auth-confirmation\.html(?:\?|$)/],
       },
       manifest: {
         name: 'Multi calendar',
