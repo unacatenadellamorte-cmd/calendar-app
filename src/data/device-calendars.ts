@@ -2,7 +2,10 @@ import { supabase } from './supabase';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
-import { listDeviceCalendars as listNativeCalendars } from '@/platform/deviceCalendar';
+import {
+  checkDeviceCalendarPermission,
+  listDeviceCalendars as listNativeCalendars,
+} from '@/platform/deviceCalendar';
 
 /**
  * 取り込むカレンダーの選択(Story 5.2)。data-access レイヤ。
@@ -107,6 +110,10 @@ export async function refreshDeviceCalendarCatalog(
 ): Promise<Result<{ count: number }>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
+    // 未許可の空一覧を、端末側のカレンダー削除と取り違えない。
+    if ((await checkDeviceCalendarPermission()) !== 'granted') {
+      return err(appError('connection/permission-denied', 'connection/permission-denied'));
+    }
     const native = await listNativeCalendars();
 
     // iOS は権限が後から取り消されても listCalendars() が例外を投げず空配列を返す。
