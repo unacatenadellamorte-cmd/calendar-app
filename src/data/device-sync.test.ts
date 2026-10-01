@@ -50,8 +50,10 @@ vi.mock('./device-connections', () => ({
   getDeviceConnection: (...a: unknown[]) => getDeviceConnection(...a),
 }));
 
+const checkDeviceCalendarPermission = vi.fn();
 const listDeviceEventsInRange = vi.fn();
 vi.mock('@/platform/deviceCalendar', () => ({
+  checkDeviceCalendarPermission: () => checkDeviceCalendarPermission(),
   listDeviceEventsInRange: (...a: unknown[]) => listDeviceEventsInRange(...a),
 }));
 
@@ -87,6 +89,7 @@ beforeEach(() => {
   from.mockClear();
   supabaseValue = { from };
   getDeviceConnection.mockReset();
+  checkDeviceCalendarPermission.mockReset().mockResolvedValue('granted');
   listDeviceEventsInRange.mockReset();
   resyncAllReminders.mockReset();
   resyncAllReminders.mockResolvedValue(undefined);
@@ -107,9 +110,7 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('接続の取得に失敗したらそのまま伝播する', async () => {
-    getDeviceConnection.mockResolvedValue(
-      err(appError('data/query', 'data/query')),
-    );
+    getDeviceConnection.mockResolvedValue(err(appError('data/query', 'data/query')));
     const { syncDeviceCalendarsNow } = await load();
     const r = await syncDeviceCalendarsNow();
     expect(r.ok).toBe(false);
@@ -117,7 +118,9 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('選択済みカレンダーが0件なら何もせず {synced:[],errors:[]}', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [{ data: [], error: null }]; // connection_calendars
     const { syncDeviceCalendarsNow } = await load();
     const r = await syncDeviceCalendarsNow();
@@ -129,7 +132,9 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('選択済みカレンダーの新規予定を正規化して INSERT する(upsert は使わない)', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [
       {
         data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
@@ -171,7 +176,9 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('既存の予定(論理削除済み含む)は UPDATE で復活・更新する', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [
       {
         data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
@@ -197,7 +204,9 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('端末側で消えた予定を論理削除する(時間窓内・応答に無い外部ID)', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     const nowIso = new Date().toISOString();
     responseQueue = [
       {
@@ -240,7 +249,9 @@ describe('syncDeviceCalendarsNow', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-14T20:00:00.000Z')); // = JST 2026-06-15T05:00:00
     try {
-      getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+      getDeviceConnection.mockResolvedValue(
+        ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+      );
       responseQueue = [
         {
           data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
@@ -255,7 +266,8 @@ describe('syncDeviceCalendarsNow', () => {
       const { syncDeviceCalendarsNow } = await load();
       const r = await syncDeviceCalendarsNow();
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.value.synced).toEqual([{ calendar: '仕事', upserted: 0, deleted: 0 }]);
+      if (r.ok)
+        expect(r.value.synced).toEqual([{ calendar: '仕事', upserted: 0, deleted: 0 }]);
       expect(calls.some((c) => c.table === 'events' && c.method === 'in')).toBe(false);
     } finally {
       vi.useRealTimers();
@@ -263,7 +275,9 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('時間窓外の既存予定は削除差分の対象にしない', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     const farPastIso = new Date(Date.now() - 9_999 * 86_400_000).toISOString();
     responseQueue = [
       {
@@ -281,7 +295,9 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('削除差分用の既存イベント SELECT に安全マージンの limit を付ける', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [
       {
         data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
@@ -297,12 +313,22 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('1カレンダーの失敗は他を止めない', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [
       {
         data: [
-          { calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '失敗するカレンダー' },
-          { calendar_id: 'cal-b-id', external_calendar_id: 'cal-b', summary: '成功するカレンダー' },
+          {
+            calendar_id: 'cal-a-id',
+            external_calendar_id: 'cal-a',
+            summary: '失敗するカレンダー',
+          },
+          {
+            calendar_id: 'cal-b-id',
+            external_calendar_id: 'cal-b',
+            summary: '成功するカレンダー',
+          },
         ],
         error: null,
       },
@@ -319,15 +345,24 @@ describe('syncDeviceCalendarsNow', () => {
     const r = await syncDeviceCalendarsNow();
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value.errors).toEqual([{ calendar: '失敗するカレンダー', error: 'sync-failed' }]);
-      expect(r.value.synced).toEqual([{ calendar: '成功するカレンダー', upserted: 1, deleted: 0 }]);
+      expect(r.value.errors).toEqual([
+        { calendar: '失敗するカレンダー', error: 'sync-failed' },
+      ]);
+      expect(r.value.synced).toEqual([
+        { calendar: '成功するカレンダー', upserted: 1, deleted: 0 },
+      ]);
     }
   });
 
   it('端末側の一覧取得(listDeviceEventsInRange)自体が失敗したら sync/failed', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [
-      { data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }], error: null },
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
     ];
     listDeviceEventsInRange.mockRejectedValue(new Error('permission revoked'));
     const { syncDeviceCalendarsNow } = await load();
@@ -337,9 +372,14 @@ describe('syncDeviceCalendarsNow', () => {
   });
 
   it('オフラインなら data/offline', async () => {
-    getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
     responseQueue = [
-      { data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }], error: null },
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
     ];
     listDeviceEventsInRange.mockRejectedValue(new Error('Failed to fetch'));
     const { syncDeviceCalendarsNow } = await load();
@@ -371,4 +411,69 @@ describe('syncDeviceCalendarsNow', () => {
     await syncDeviceCalendarsNow();
     expect(getDeviceConnection).toHaveBeenCalledTimes(2);
   });
+});
+
+describe('取り込み時の端末権限', () => {
+  it.each(['denied', 'prompt', 'prompt-with-rationale'])(
+    '権限 %s では読み取りも予定の書き込みもせず、許可後に再試行できる',
+    async (permission) => {
+      getDeviceConnection.mockResolvedValue(
+        ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+      );
+      const targets = {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      };
+      responseQueue = [targets];
+      checkDeviceCalendarPermission.mockResolvedValue(permission);
+      const { syncDeviceCalendarsNow } = await load();
+      const denied = await syncDeviceCalendarsNow();
+      expect(denied.ok).toBe(false);
+      if (!denied.ok) expect(denied.error.messageKey).toBe('connection/permission-denied');
+      expect(listDeviceEventsInRange).not.toHaveBeenCalled();
+      expect(calls.some((c) => c.table === 'events')).toBe(false);
+      expect(resyncAllReminders).not.toHaveBeenCalled();
+      expect(refreshFeaturedWidget).not.toHaveBeenCalled();
+
+      checkDeviceCalendarPermission.mockResolvedValue('granted');
+      responseQueue = [
+        targets,
+        { data: [], error: null },
+        { error: null },
+        { data: [], error: null },
+      ];
+      listDeviceEventsInRange.mockResolvedValue([rawEvent()]);
+      const retried = await syncDeviceCalendarsNow();
+      expect(retried.ok && retried.value.synced).toEqual([
+        { calendar: '仕事', upserted: 1, deleted: 0 },
+      ]);
+    },
+  );
+});
+
+it('権限確認の例外では読み取り・書き込みを止め、次の取り込みを妨げない', async () => {
+  getDeviceConnection.mockResolvedValue(
+    ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+  );
+  const targets = {
+    data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+    error: null,
+  };
+  responseQueue = [targets];
+  checkDeviceCalendarPermission.mockRejectedValueOnce(new Error('権限状態を取得できない'));
+  const { syncDeviceCalendarsNow } = await load();
+  expect((await syncDeviceCalendarsNow()).ok).toBe(false);
+  expect(listDeviceEventsInRange).not.toHaveBeenCalled();
+  expect(calls.some((c) => c.table === 'events')).toBe(false);
+  responseQueue = [
+    targets,
+    { data: [], error: null },
+    { error: null },
+    { data: [], error: null },
+  ];
+  listDeviceEventsInRange.mockResolvedValue([rawEvent()]);
+  const retried = await syncDeviceCalendarsNow();
+  expect(retried.ok && retried.value.synced).toEqual([
+    { calendar: '仕事', upserted: 1, deleted: 0 },
+  ]);
 });

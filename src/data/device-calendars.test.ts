@@ -26,7 +26,18 @@ function makeBuilder(table: string) {
       calls.push({ table, method, args });
       return chain;
     };
-  for (const m of ['select', 'eq', 'is', 'order', 'limit', 'in', 'returns', 'insert', 'update', 'upsert']) {
+  for (const m of [
+    'select',
+    'eq',
+    'is',
+    'order',
+    'limit',
+    'in',
+    'returns',
+    'insert',
+    'update',
+    'upsert',
+  ]) {
     chain[m] = record(m);
   }
   chain.maybeSingle = async () => {
@@ -51,8 +62,10 @@ vi.mock('@/data/supabase', () => ({
   },
 }));
 
+const checkDeviceCalendarPermission = vi.fn();
 const listNativeCalendars = vi.fn();
 vi.mock('@/platform/deviceCalendar', () => ({
+  checkDeviceCalendarPermission: () => checkDeviceCalendarPermission(),
   listDeviceCalendars: (...a: unknown[]) => listNativeCalendars(...a),
 }));
 
@@ -66,6 +79,7 @@ beforeEach(() => {
   responseQueue = [];
   from.mockClear();
   supabaseValue = { from };
+  checkDeviceCalendarPermission.mockReset().mockResolvedValue('granted');
   listNativeCalendars.mockReset();
 });
 
@@ -74,7 +88,12 @@ describe('listDeviceCalendars', () => {
     responseQueue = [
       {
         data: [
-          { external_calendar_id: 'a', summary: '仕事', background_color: '#FF0000', selected: true },
+          {
+            external_calendar_id: 'a',
+            summary: '仕事',
+            background_color: '#FF0000',
+            selected: true,
+          },
         ],
         error: null,
       },
@@ -84,7 +103,12 @@ describe('listDeviceCalendars', () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.value).toEqual([
-        { externalCalendarId: 'a', summary: '仕事', backgroundColor: '#FF0000', selected: true },
+        {
+          externalCalendarId: 'a',
+          summary: '仕事',
+          backgroundColor: '#FF0000',
+          selected: true,
+        },
       ]);
     }
   });
@@ -140,9 +164,9 @@ describe('refreshDeviceCalendarCatalog', () => {
     expect(r.ok).toBe(true);
 
     const upsertCall = calls.find((c) => c.method === 'upsert');
-    expect((upsertCall?.args[0] as Array<{ background_color: string | null }>)[0]?.background_color).toBe(
-      DEFAULT_COLOR,
-    );
+    expect(
+      (upsertCall?.args[0] as Array<{ background_color: string | null }>)[0]?.background_color,
+    ).toBe(DEFAULT_COLOR);
   });
 
   it('応答に無くなった候補をカタログから外し、紐づく calendars 行も論理削除する', async () => {
@@ -163,16 +187,24 @@ describe('refreshDeviceCalendarCatalog', () => {
     const r = await refreshDeviceCalendarCatalog('conn1');
     expect(r.ok).toBe(true);
 
-    const ccDeactivate = calls.find((c) => c.table === 'connection_calendars' && c.method === 'in');
+    const ccDeactivate = calls.find(
+      (c) => c.table === 'connection_calendars' && c.method === 'in',
+    );
     expect(ccDeactivate?.args).toEqual(['id', ['cc-b']]);
-    const ccUpdate = calls.find((c) => c.table === 'connection_calendars' && c.method === 'update');
+    const ccUpdate = calls.find(
+      (c) => c.table === 'connection_calendars' && c.method === 'update',
+    );
     expect(ccUpdate?.args[0]).toMatchObject({ selected: false });
-    expect((ccUpdate?.args[0] as { deleted_at: string }).deleted_at).toEqual(expect.any(String));
+    expect((ccUpdate?.args[0] as { deleted_at: string }).deleted_at).toEqual(
+      expect.any(String),
+    );
 
     const calDeactivate = calls.find((c) => c.table === 'calendars' && c.method === 'in');
     expect(calDeactivate?.args).toEqual(['id', ['cal-b']]);
     const calUpdate = calls.find((c) => c.table === 'calendars' && c.method === 'update');
-    expect((calUpdate?.args[0] as { deleted_at: string }).deleted_at).toEqual(expect.any(String));
+    expect((calUpdate?.args[0] as { deleted_at: string }).deleted_at).toEqual(
+      expect.any(String),
+    );
   });
 
   it('端末の一覧が空でも既存の選択済みカタログが無ければ何もせず成功する', async () => {
@@ -208,7 +240,10 @@ describe('refreshDeviceCalendarCatalog', () => {
 describe('setDeviceCalendarSelected', () => {
   it('オン(新規): calendars を insert(source=device)し、connection_calendars を更新する', async () => {
     responseQueue = [
-      { data: { id: 'cc1', summary: '仕事', background_color: '#FF0000', calendar_id: null }, error: null },
+      {
+        data: { id: 'cc1', summary: '仕事', background_color: '#FF0000', calendar_id: null },
+        error: null,
+      },
       { data: { id: 'cal1' }, error: null },
       { error: null },
     ];
@@ -228,7 +263,10 @@ describe('setDeviceCalendarSelected', () => {
 
   it('オン(復活): 既存 calendars 行を最下位優先度で復活させる', async () => {
     responseQueue = [
-      { data: { id: 'cc1', summary: '仕事', background_color: null, calendar_id: 'cal1' }, error: null },
+      {
+        data: { id: 'cc1', summary: '仕事', background_color: null, calendar_id: 'cal1' },
+        error: null,
+      },
       { data: { priority: 4 }, error: null },
       { error: null },
       { error: null },
@@ -255,7 +293,10 @@ describe('setDeviceCalendarSelected', () => {
 
   it('オフ: calendars 行を論理削除し、connection_calendars.selected を false にする', async () => {
     responseQueue = [
-      { data: { id: 'cc1', summary: '仕事', background_color: null, calendar_id: 'cal1' }, error: null },
+      {
+        data: { id: 'cc1', summary: '仕事', background_color: null, calendar_id: 'cal1' },
+        error: null,
+      },
       { error: null },
       { error: null },
     ];
@@ -265,7 +306,9 @@ describe('setDeviceCalendarSelected', () => {
 
     const deleteCall = calls.find((c) => c.table === 'calendars' && c.method === 'update');
     expect(deleteCall?.args[0]).toHaveProperty('deleted_at');
-    const ccUpdate = calls.find((c) => c.table === 'connection_calendars' && c.method === 'update');
+    const ccUpdate = calls.find(
+      (c) => c.table === 'connection_calendars' && c.method === 'update',
+    );
     expect(ccUpdate?.args[0]).toEqual({ selected: false });
   });
 
@@ -280,7 +323,10 @@ describe('setDeviceCalendarSelected', () => {
   it('オン: 端末側のタイトルが長すぎる/空でも calendars.name の制約内に正規化する', async () => {
     const longTitle = 'あ'.repeat(150);
     responseQueue = [
-      { data: { id: 'cc1', summary: longTitle, background_color: null, calendar_id: null }, error: null },
+      {
+        data: { id: 'cc1', summary: longTitle, background_color: null, calendar_id: null },
+        error: null,
+      },
       { data: { id: 'cal1' }, error: null },
       { error: null },
     ];
@@ -294,7 +340,10 @@ describe('setDeviceCalendarSelected', () => {
 
   it('オン: 端末側のタイトルが空白のみなら DEFAULT_NAME にフォールバックする', async () => {
     responseQueue = [
-      { data: { id: 'cc1', summary: '   ', background_color: null, calendar_id: null }, error: null },
+      {
+        data: { id: 'cc1', summary: '   ', background_color: null, calendar_id: null },
+        error: null,
+      },
       { data: { id: 'cal1' }, error: null },
       { error: null },
     ];
@@ -304,4 +353,27 @@ describe('setDeviceCalendarSelected', () => {
     const insertCall = calls.find((c) => c.table === 'calendars' && c.method === 'insert');
     expect((insertCall?.args[0] as { name: string }).name).toBe(DEFAULT_NAME);
   });
+});
+
+describe('カレンダー一覧更新時の端末権限', () => {
+  it.each(['denied', 'prompt', 'prompt-with-rationale'])(
+    '権限 %s では既存カレンダーを変更しない',
+    async (permission) => {
+      checkDeviceCalendarPermission.mockResolvedValue(permission);
+      const { refreshDeviceCalendarCatalog } = await load();
+      const result = await refreshDeviceCalendarCatalog('conn1');
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error.messageKey).toBe('connection/permission-denied');
+      expect(listNativeCalendars).not.toHaveBeenCalled();
+      expect(from).not.toHaveBeenCalled();
+    },
+  );
+});
+
+it('権限確認の例外では一覧取得・DB変更を実行しない', async () => {
+  checkDeviceCalendarPermission.mockRejectedValueOnce(new Error('権限状態を取得できない'));
+  const { refreshDeviceCalendarCatalog } = await load();
+  expect((await refreshDeviceCalendarCatalog('conn1')).ok).toBe(false);
+  expect(listNativeCalendars).not.toHaveBeenCalled();
+  expect(from).not.toHaveBeenCalled();
 });

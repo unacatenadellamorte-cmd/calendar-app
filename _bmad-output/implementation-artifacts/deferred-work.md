@@ -174,3 +174,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-widget-selected-day-cold-navigation.md`
   summary: Android 7〜11で日ウィジェットの切替応答時間を実測する（medium、未検証）。
   evidence: リストのサービス互換のため旧OSではGlance通常更新経路を維持。今回の実機・エミュレータは新OSであり、旧OSの1秒以内応答は未検証。
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-device-calendar-permission-20261001.md`
+  summary: 端末の一覧読み取り中にカレンダー権限が失効する場合の競合を検証する（中程度・未検証）。
+  evidence: 権限確認後、一覧APIが未許可を空一覧として返しプロセスが存続すると差分削除に進む可能性がある。実機でその順序とAPI結果を確認する必要がある。今回の未許可からの開始は読み取り前ガードで対処。

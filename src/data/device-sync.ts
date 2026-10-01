@@ -3,8 +3,16 @@ import { selectActive } from './soft-delete';
 import { appError, err, ok, type Result } from './result';
 import { isNetworkError } from './net';
 import { getDeviceConnection } from './device-connections';
-import { listDeviceEventsInRange } from '@/platform/deviceCalendar';
-import { normalizeDeviceEvent, toDeviceEventRow, deletedExternalIds, type EventRow } from '@core';
+import {
+  checkDeviceCalendarPermission,
+  listDeviceEventsInRange,
+} from '@/platform/deviceCalendar';
+import {
+  normalizeDeviceEvent,
+  toDeviceEventRow,
+  deletedExternalIds,
+  type EventRow,
+} from '@core';
 import { resyncAllReminders } from './reminders';
 import { refreshFeaturedWidget } from '@/platform/widget';
 
@@ -99,8 +107,9 @@ async function syncOneCalendar(
       (existing ?? []).map((r) => [r.external_id, r.id] as const),
     );
 
-    const toInsert: Array<EventRow & { calendar_id: string; connection_id: string; source: 'device' }> =
-      [];
+    const toInsert: Array<
+      EventRow & { calendar_id: string; connection_id: string; source: 'device' }
+    > = [];
     for (const [externalId, row] of byExternalId) {
       const existingId = existingIdByExternalId.get(externalId);
       if (existingId) {
@@ -175,6 +184,11 @@ async function runSyncDeviceCalendarsNow(): Promise<Result<SyncRunResult>> {
     );
     if (targets.length === 0) return ok({ synced: [], errors: [] });
 
+    // 接続情報はクラウドに残っても、この端末の権限は取り消されることがある。
+    if ((await checkDeviceCalendarPermission()) !== 'granted') {
+      return err(appError('connection/permission-denied', 'connection/permission-denied'));
+    }
+
     const { min: windowMin, max: windowMax } = syncWindowMs();
     const rawEvents = await listDeviceEventsInRange(windowMin, windowMax);
 
@@ -183,7 +197,9 @@ async function runSyncDeviceCalendarsNow(): Promise<Result<SyncRunResult>> {
 
     for (const target of targets) {
       try {
-        synced.push(await syncOneCalendar(connection.id, target, rawEvents, windowMin, windowMax));
+        synced.push(
+          await syncOneCalendar(connection.id, target, rawEvents, windowMin, windowMax),
+        );
       } catch (e) {
         console.warn(`device-sync: ${target.summary} failed`, (e as Error)?.message);
         errors.push({ calendar: target.summary, error: 'sync-failed' });
