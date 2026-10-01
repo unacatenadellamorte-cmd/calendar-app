@@ -48,3 +48,16 @@ Appleは返信本文と審査情報メモの両方への記載を指定。既存
 - 審査メッセージ: https://appstoreconnect.apple.com/apps/6817586147/distribution/reviewsubmissions/details/6e285884-c8bb-4842-8d63-2050514d572d
 - AppleのOS更新情報: https://support.apple.com/en-ca/100100
 - 内部TestFlight: https://developer.apple.com/help/app-store-connect/test-a-beta-version/add-internal-testers/
+
+## 進行中の記録
+
+- App Store Connectの審査メモへ追加説明を保存し、APIで本文の一致と既存ログイン認証情報の保持を確認。動画に関する完了主張は未記載。
+- TestFlight内部グループ「実機審査確認」を作成。自動配信なし。本人宛の招待を送る直前で確認待ち。
+- 初回CIは9月固定データと実行日10月の不一致で既存画面テスト23件が失敗。2つの画面テストでDateのみ固定し、長押しのタイマーテストは独立した全タイマー固定を維持。影響65件成功。
+- 再ビルドCI: https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/36855039541
+- 録画のApple公式手順: https://support.apple.com/ja-jp/102653
+
+- ユーザー承認後、本人をTestFlight内部テスターへ追加。Apple画面で1人登録・ビルド未追加を確認。新ビルド処理後に配信する。
+
+- 1.0.20 (23)のMac配布CI 36855039541成功。主App/Widgetの署名とバージョンを検証し、ローカル取得後も両Info.plistを確認。IPA SHA256: 1e45194869641987af8534f993333d448e6e385792b0e04d1621ce6ea5339e14。
+- Appleアップロードjobの取得元run、IPAハッシュ、build番号をこの23へ限定して更新。
