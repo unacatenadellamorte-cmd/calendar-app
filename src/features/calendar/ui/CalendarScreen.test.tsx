@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
@@ -66,6 +66,9 @@ vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }
 const { CalendarScreen } = await import('./CalendarScreen');
 
 beforeEach(() => {
+  // 日付付きの検証データに合わせ、実行日の月替わりに依存させない。
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-08T00:00:00+09:00'));
   navigateMock.mockClear();
   authState = { state: 'guest' };
   secretState = { unlocked: false };
@@ -189,7 +192,9 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
   });
   it('予定のある日でも予定チップを長押しすると、その日の新規追加レイヤーを直接開く', () => {
+    vi.useRealTimers();
     vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-08T00:00:00+09:00'));
     try {
       render(<CalendarScreen />);
       const chip = screen.getByRole('button', { name: /会議アルファ/ });
@@ -744,3 +749,6 @@ describe('CalendarScreen', () => {
     });
   });
 });
+
+// 他のテストへ固定日付を持ち越さない。
+afterEach(() => vi.useRealTimers());
