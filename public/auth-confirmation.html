@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="referrer" content="no-referrer" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
+<meta name="robots" content="noindex" />
+<title>Multi calendar メール確認</title>
+<script>
+(function () {
+  var STATES = ['confirmed', 'more', 'expired', 'failed', 'unknown'];
+  // メール確認として受け付ける種別。パスワード再設定などは対象外。
+  var CONFIRMATION_TYPES = ['signup', 'email_change'];
+
+  function classify() {
+    var query = new URLSearchParams(location.search);
+    var fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+    var has = function (name) { return query.has(name) || fragment.has(name); };
+    if (has('error') || has('error_code') || has('error_description')) {
+      return (fragment.get('error_code') || query.get('error_code')) === 'otp_expired' ? 'expired' : 'failed';
+    }
+    // 未交換の認証コードだけ、空のトークン、対象外の種別は受付と扱わない。
+    if (fragment.get('access_token') && CONFIRMATION_TYPES.indexOf(fragment.get('type')) >= 0) {
+      return 'confirmed';
+    }
+    if (fragment.get('message') || query.get('message')) return 'more';
+    return 'unknown';
+  }
+
+  // URL に付いた認証情報は、種別だけを判定してすぐ URL から消す。
+  // 値そのものは画面・記録・保存領域のどこにも渡さない。履歴には判定した種別名だけを残す。
+  function consume() {
+    if (!location.search && !location.hash) {
+      // 消去済みの履歴を表示し直すときは、その履歴の種別名を使う。
+      var kept = history.state && history.state.authResult;
+      return STATES.indexOf(kept) >= 0 ? kept : 'unknown';
+    }
+    var result = classify();
+    try {
+      history.replaceState({ authResult: result }, '', location.pathname);
+    } catch (e) {
+      location.replace(location.pathname);
+    }
+    return result;
+  }
+  var state = consume();
+
+  var retry = {
+    ja: 'ログインできない場合は、アプリからもう一度登録し、最新の確認メールのリンクを開いてください。',
+    en: 'If you cannot log in, register again from the app and open the link in the latest confirmation email.'
+  };
+  var texts = {
+    ja: {
+      footer: 'このページでログインは行われません。このページは閉じてかまいません。',
+      confirmed: ['メールアドレスの確認を受け付けました', 'Multi calendar アプリに戻り、登録したメールアドレスとパスワードでログインしてください。', retry.ja],
+      more: ['確認はまだ完了していません', 'ほかにも確認メールが届いている場合は、そのメールのリンクも開いてください。すべて確認したあと、Multi calendar アプリに戻ってログインしてください。', retry.ja],
+      expired: ['このリンクは使えません', 'リンクの有効期限が切れているか、すでに使用されています。確認が済んでいる場合は、Multi calendar アプリに戻ってログインしてください。', retry.ja],
+      failed: ['確認を完了できませんでした', 'Multi calendar アプリに戻ってログインをお試しください。', retry.ja],
+      unknown: ['確認結果を表示できません', 'このページは確認メールのリンクから開くページです。確認が済んでいる場合は、Multi calendar アプリに戻ってログインしてください。', retry.ja]
+    },
+    en: {
+      footer: 'You are not logged in on this page. You can close it.',
+      confirmed: ['Your email confirmation was accepted', 'Return to the Multi calendar app and log in with the email address and password you registered.', retry.en],
+      more: ['Confirmation is not complete yet', 'If you received another confirmation email, open the link in that email too. After confirming all of them, return to the Multi calendar app and log in.', retry.en],
+      expired: ['This link cannot be used', 'The link has expired or has already been used. If you have already confirmed, return to the Multi calendar app and log in.', retry.en],
+      failed: ['Confirmation could not be completed', 'Return to the Multi calendar app and try logging in.', retry.en],
+      unknown: ['The confirmation result cannot be shown', 'This page is opened from the link in a confirmation email. If you have already confirmed, return to the Multi calendar app and log in.', retry.en]
+    }
+  };
+
+  function render() {
+    var preferred = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    var lang = preferred.toLowerCase().indexOf('ja') === 0 ? 'ja' : 'en';
+    var text = texts[lang];
+    document.documentElement.lang = lang;
+    document.title = lang === 'ja' ? 'Multi calendar メール確認' : 'Multi calendar email confirmation';
+    document.getElementById('result').setAttribute('data-state', state);
+    document.getElementById('title').textContent = text[state][0];
+    document.getElementById('body').textContent = text[state][1];
+    document.getElementById('note').textContent = text[state][2];
+    document.getElementById('footer').textContent = text.footer;
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', render, { once: true });
+  } else {
+    render();
+  }
+  // 同じタブでハッシュだけが変わる移動や履歴の移動では、ページは読み直されない。
+  // そのたびに判定し直し、URL を消して表示を更新する。
+  function refresh() {
+    state = consume();
+    if (document.readyState !== 'loading') render();
+  }
+  window.addEventListener('hashchange', refresh);
+  window.addEventListener('popstate', refresh);
+  window.addEventListener('pageshow', refresh);
+})();
+</script>
+<style>body{font-family:system-ui,sans-serif;line-height:1.8;color:#172033;background:#f6f8fb;margin:0}main{max-width:760px;margin:auto;padding:32px 20px}article{background:white;padding:24px;border-radius:16px}h1{font-size:1.4rem;margin-top:0}#footer{color:#5b6475;font-size:.9rem}</style>
+</head>
+<body><main><article id="result" data-state="unknown" aria-live="polite">
+<h1 id="title">確認結果を表示できません</h1>
+<p id="body">このページは確認メールのリンクから開くページです。確認が済んでいる場合は、Multi calendar アプリに戻ってログインしてください。</p>
+<p id="note">ログインできない場合は、アプリからもう一度登録し、最新の確認メールのリンクを開いてください。</p>
+<p id="footer">このページでログインは行われません。このページは閉じてかまいません。</p>
+<noscript><p>The confirmation result cannot be shown. If you have already confirmed, return to the Multi calendar app and log in.</p></noscript>
+</article></main></body></html>
