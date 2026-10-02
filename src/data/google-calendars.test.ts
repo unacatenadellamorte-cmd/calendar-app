@@ -8,13 +8,20 @@ let queryResult: { data: unknown; error: unknown } = { data: null, error: null }
 let invokeResult: { data: unknown; error: unknown } = { data: null, error: null };
 const invoke = vi.fn(async () => invokeResult);
 
-function makeChain() {
+/** テーブルごとの .eq() 呼び出し(接続 ID で絞っているかの検証用)。 */
+let eqCalls: { table: string; args: unknown[] }[] = [];
+
+function makeChain(table: string) {
   const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'is', 'order', 'returns']) chain[m] = () => chain;
+  for (const m of ['select', 'is', 'order', 'returns']) chain[m] = () => chain;
+  chain.eq = (...args: unknown[]) => {
+    eqCalls.push({ table, args });
+    return chain;
+  };
   chain.then = (resolve: (v: unknown) => unknown) => resolve(queryResult);
   return chain;
 }
-const from = vi.fn(() => makeChain());
+const from = vi.fn((table: string) => makeChain(table));
 let supabaseValue: unknown = { from, functions: { invoke } };
 
 vi.mock('@/data/supabase', () => ({
@@ -31,6 +38,7 @@ beforeEach(() => {
   vi.resetModules();
   queryResult = { data: null, error: null };
   invokeResult = { data: null, error: null };
+  eqCalls = [];
   invoke.mockClear();
   from.mockClear();
   supabaseValue = { from, functions: { invoke } };
@@ -46,7 +54,7 @@ describe('listConnectionCalendars', () => {
       error: null,
     };
     const { listConnectionCalendars } = await load();
-    const r = await listConnectionCalendars();
+    const r = await listConnectionCalendars('conn-1');
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.value[0]).toMatchObject({
@@ -76,15 +84,23 @@ describe('listConnectionCalendars', () => {
       error: null,
     };
     const { listConnectionCalendars } = await load();
-    const r = await listConnectionCalendars();
+    const r = await listConnectionCalendars('conn-1');
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value[0]!.lastSyncedAt).toBe('2026-09-10T12:00:00Z');
+  });
+
+  it('カタログも取り込み状態も指定した接続の分だけを読む(別アカウントと混ざらない)', async () => {
+    queryResult = { data: [], error: null };
+    const { listConnectionCalendars } = await load();
+    await listConnectionCalendars('conn-2');
+    expect(eqCalls).toContainEqual({ table: 'connection_calendars', args: ['connection_id', 'conn-2'] });
+    expect(eqCalls).toContainEqual({ table: 'sync_state', args: ['connection_id', 'conn-2'] });
   });
 
   it('クエリエラーは data/query', async () => {
     queryResult = { data: null, error: { message: 'x' } };
     const { listConnectionCalendars } = await load();
-    const r = await listConnectionCalendars();
+    const r = await listConnectionCalendars('conn-1');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/query');
   });
@@ -94,10 +110,13 @@ describe('refreshGoogleCalendars', () => {
   it('成功で count を返す', async () => {
     invokeResult = { data: { count: 3 }, error: null };
     const { refreshGoogleCalendars } = await load();
-    const r = await refreshGoogleCalendars();
+    const r = await refreshGoogleCalendars('conn-1');
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.count).toBe(3);
-    expect(invoke).toHaveBeenCalledWith('google-calendars', { body: { action: 'refresh' } });
+    // 複数アカウント対応: 対象の接続 ID を必ず送る(省略すると2接続時に 400 になる)
+    expect(invoke).toHaveBeenCalledWith('google-calendars', {
+      body: { action: 'refresh', connection_id: 'conn-1' },
+    });
   });
 
   it('関数が reauth-needed を返したら connection/reauth-needed', async () => {
@@ -106,7 +125,7 @@ describe('refreshGoogleCalendars', () => {
       error: { context: new Response(JSON.stringify({ error: 'reauth-needed' }), { status: 400 }) },
     };
     const { refreshGoogleCalendars } = await load();
-    const r = await refreshGoogleCalendars();
+    const r = await refreshGoogleCalendars('conn-1');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('connection/reauth-needed');
   });
@@ -114,21 +133,34 @@ describe('refreshGoogleCalendars', () => {
   it('関数へ到達できない場合はオフライン扱い', async () => {
     invokeResult = { data: null, error: { name: 'FunctionsFetchError' } };
     const { refreshGoogleCalendars } = await load();
-    const r = await refreshGoogleCalendars();
+    const r = await refreshGoogleCalendars('conn-1');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/offline');
   });
 });
 
 describe('setGoogleCalendarSelected', () => {
-  it('action:set と externalCalendarId / selected を渡す', async () => {
+  it('action:set と connection_id / externalCalendarId / selected を渡す', async () => {
     invokeResult = { data: { ok: true }, error: null };
     const { setGoogleCalendarSelected } = await load();
-    const r = await setGoogleCalendarSelected('a@g', true);
+    const r = await setGoogleCalendarSelected('conn-1', 'a@g', true);
     expect(r.ok).toBe(true);
     expect(invoke).toHaveBeenCalledWith('google-calendars', {
-      body: { action: 'set', externalCalendarId: 'a@g', selected: true },
+      body: { action: 'set', connection_id: 'conn-1', externalCalendarId: 'a@g', selected: true },
     });
+  });
+
+  it('関数が connection/ambiguous を返したら connection/ambiguous', async () => {
+    invokeResult = {
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: 'connection/ambiguous' }), { status: 400 }),
+      },
+    };
+    const { setGoogleCalendarSelected } = await load();
+    const r = await setGoogleCalendarSelected('conn-1', 'a@g', true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('connection/ambiguous');
   });
 
   it('不明な slug は calendars-failed に丸める', async () => {
@@ -137,7 +169,7 @@ describe('setGoogleCalendarSelected', () => {
       error: { context: new Response(JSON.stringify({ error: 'weird' }), { status: 500 }) },
     };
     const { setGoogleCalendarSelected } = await load();
-    const r = await setGoogleCalendarSelected('a@g', false);
+    const r = await setGoogleCalendarSelected('conn-1', 'a@g', false);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('connection/calendars-failed');
   });

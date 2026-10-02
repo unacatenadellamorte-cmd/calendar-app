@@ -179,6 +179,11 @@ async function handle(req: Request): Promise<Response> {
     p_google_email: googleEmail,
   });
   if (rpcError) {
+    // 接続上限に達した場合は 403 で返す。
+    if (rpcError.message.includes('connection_limit_reached')) {
+      console.warn('oauth-exchange: connection limit reached', userId);
+      return jsonResponse(req, { error: 'connection/limit-reached' }, 403);
+    }
     console.error('oauth-exchange: upsert_google_connection failed', rpcError.message);
     return jsonResponse(req, { error: 'exchange-failed' }, 500);
   }

@@ -1,26 +1,34 @@
 import { t, useLanguage } from '@/i18n';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { env } from '@/data/env';
 import { resolveMessage } from '@/data/messages';
 import { formatEventTime } from '@/lib/datetime';
-import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
+import { useGoogleConnections } from '@/features/connections/model/useGoogleConnections';
 import { useGoogleCalendars } from '@/features/connections/model/useGoogleCalendars';
+
 /**
- * `/connections/google/calendars`(Story 3.2)。
- * 接続した Google アカウントのカレンダー候補を出し、取り込む対象を選ぶ。
+ * `/connections/google/calendars`(Story 3.2 / CAP-3)。
+ * 接続した Google アカウントごとにカレンダー候補を出し、取り込む対象を選ぶ。
  * オンにすると source='google' のカレンダーとして一覧・表示に加わる(予定同期は 3.3)。
+ *
+ * 複数アカウント: active の接続ごとに {@link GoogleAccountCalendars} を1つ出す。
+ * suspended(課金失効で停止中)の接続は取り込みもカレンダー選択もしないので出さない。
+ * `?connection=<id>` があればそのアカウントだけを出す(設定画面の各行から来る導線)。
  */
 export function GoogleCalendarPicker() {
   useLanguage();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { state } = useAuth();
   const connectionEnabled = env.hasSupabase && env.hasGoogleOauth && state === 'authenticated';
-  const { connection, loading: connLoading } = useGoogleConnection(connectionEnabled);
-  const enabled = connectionEnabled && !!connection;
-  const { choices, loading, refreshing, errorKey, refresh, toggle } =
-    useGoogleCalendars(enabled);
+  const { connections, loading: connLoading } = useGoogleConnections(connectionEnabled);
+  const active = connections.filter((c) => c.status === 'active');
+  const requested = params.get('connection');
+  const focused = requested ? active.filter((c) => c.id === requested) : [];
+  // 指定された接続が見つからない(解除済み・停止中など)ときは全アカウントを出す。
+  const shown = focused.length > 0 ? focused : active;
   if (connLoading) {
     return (
       <Screen title={t('取り込むカレンダー')}>
@@ -28,7 +36,7 @@ export function GoogleCalendarPicker() {
       </Screen>
     );
   }
-  if (!enabled) {
+  if (!connectionEnabled || shown.length === 0) {
     return (
       <Screen title={t('取り込むカレンダー')}>
         <div className="mt-4 rounded-md border border-border-hairline bg-surface-raised p-4">
@@ -44,41 +52,68 @@ export function GoogleCalendarPicker() {
       </Screen>
     );
   }
-  const selectedCount = choices.filter((c) => c.selected).length;
   return (
-    <Screen
-      title={t('取り込むカレンダー')}
-      action={
+    <Screen title={t('取り込むカレンダー')}>
+      <p className="mt-1 text-meta text-ink-secondary">
+        {t('オンにしたカレンダーの予定を読み取り専用で取り込みます。')}
+      </p>
+      {shown.map((c) => (
+        <GoogleAccountCalendars
+          key={c.id}
+          connectionId={c.id}
+          email={c.googleEmail ?? t('Google アカウント')}
+        />
+      ))}
+    </Screen>
+  );
+}
+
+interface GoogleAccountCalendarsProps {
+  /** 対象の接続 ID。google-calendars 関数へそのまま渡す。 */
+  connectionId: string;
+  /** 見出しに出すアカウント名(メール)。 */
+  email: string;
+}
+
+/** 1つの Google アカウント分のカレンダー候補(見出し・更新・オン/オフ)。 */
+export function GoogleAccountCalendars({ connectionId, email }: GoogleAccountCalendarsProps) {
+  useLanguage();
+  const { choices, loading, refreshing, errorKey, refresh, toggle } =
+    useGoogleCalendars(connectionId);
+  const selectedCount = choices.filter((c) => c.selected).length;
+  const headingId = `google-account-${connectionId}`;
+  return (
+    <section aria-labelledby={headingId} className="mt-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 id={headingId} className="min-w-0 truncate text-body font-semibold text-ink-primary">
+          {email}
+        </h2>
         <button
           type="button"
           onClick={() => void refresh()}
           disabled={refreshing}
-          className="min-h-11 text-meta text-accent disabled:opacity-60"
+          aria-label={t('{0} のカレンダーを更新', [email])}
+          className="min-h-11 shrink-0 text-meta text-accent disabled:opacity-60"
         >
           {refreshing ? t('同期中') : t('更新')}
         </button>
-      }
-    >
-      <p className="mt-1 text-meta text-ink-secondary">
-        {t('オンにしたカレンダーの予定を読み取り専用で取り込みます。{0} 件選択中。', [
-          selectedCount,
-        ])}
-      </p>
+      </div>
+      <p className="text-meta text-ink-secondary">{t('{0} 件選択中。', [selectedCount])}</p>
 
       {errorKey && (
-        <p role="alert" className="mt-3 text-meta text-danger">
+        <p role="alert" className="mt-2 text-meta text-danger">
           {resolveMessage(errorKey)}
         </p>
       )}
 
       {loading ? (
-        <p className="mt-4 text-meta text-ink-secondary">{t('読み込み中…')}</p>
+        <p className="mt-3 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : choices.length === 0 ? (
-        <p className="mt-4 text-meta text-ink-secondary">
+        <p className="mt-3 text-meta text-ink-secondary">
           {t('取り込めるカレンダーが見つかりませんでした。')}
         </p>
       ) : (
-        <ul className="mt-3 overflow-hidden rounded-md border border-border-hairline bg-surface-raised">
+        <ul className="mt-2 overflow-hidden rounded-md border border-border-hairline bg-surface-raised">
           {choices.map((c, i) => (
             <li
               key={c.externalCalendarId}
@@ -113,6 +148,6 @@ export function GoogleCalendarPicker() {
           ))}
         </ul>
       )}
-    </Screen>
+    </section>
   );
 }

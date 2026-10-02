@@ -19,8 +19,11 @@ interface State {
  * 取り込むカレンダーの候補一覧とオン/オフ(Story 3.2)。
  * マウント時にカタログを即描画し、続けて Google から取り直す。
  * トグルは楽観更新 + 失敗でロールバック。
+ * 複数 Google アカウント対応(CAP-3): 1つの接続(`connectionId`)単位で扱う。
+ * null なら何も読まない。
  */
-export function useGoogleCalendars(enabled: boolean) {
+export function useGoogleCalendars(connectionId: string | null) {
+  const enabled = connectionId !== null;
   const [state, setState] = useState<State>({
     choices: [],
     loading: enabled,
@@ -30,14 +33,16 @@ export function useGoogleCalendars(enabled: boolean) {
   const pending = useRef(new Set<string>());
 
   const reloadCatalog = useCallback(async () => {
-    const result = await listConnectionCalendars();
+    if (connectionId === null) return null;
+    const result = await listConnectionCalendars(connectionId);
     if (result.ok) setState((s) => ({ ...s, choices: result.value }));
     return result;
-  }, []);
+  }, [connectionId]);
 
   const refresh = useCallback(async () => {
+    if (connectionId === null) return;
     setState((s) => ({ ...s, refreshing: true, errorKey: null }));
-    const result = await refreshGoogleCalendars();
+    const result = await refreshGoogleCalendars(connectionId);
     if (result.ok) {
       await reloadCatalog();
       setState((s) => ({ ...s, refreshing: false }));
@@ -45,7 +50,7 @@ export function useGoogleCalendars(enabled: boolean) {
       // 取り直しに失敗しても、直近のカタログは出し続ける。
       setState((s) => ({ ...s, refreshing: false, errorKey: result.error.messageKey }));
     }
-  }, [reloadCatalog]);
+  }, [connectionId, reloadCatalog]);
 
   useEffect(() => {
     if (!enabled) {
@@ -65,6 +70,7 @@ export function useGoogleCalendars(enabled: boolean) {
   }, [enabled, reloadCatalog, refresh]);
 
   const toggle = useCallback(async (externalCalendarId: string, selected: boolean) => {
+    if (connectionId === null) return;
     if (pending.current.has(externalCalendarId)) return;
     pending.current.add(externalCalendarId);
     setState((s) => ({
@@ -74,7 +80,7 @@ export function useGoogleCalendars(enabled: boolean) {
         c.externalCalendarId === externalCalendarId ? { ...c, selected } : c,
       ),
     }));
-    const result = await setGoogleCalendarSelected(externalCalendarId, selected);
+    const result = await setGoogleCalendarSelected(connectionId, externalCalendarId, selected);
     pending.current.delete(externalCalendarId);
     if (!result.ok) {
       setState((s) => ({
@@ -85,7 +91,7 @@ export function useGoogleCalendars(enabled: boolean) {
         ),
       }));
     }
-  }, []);
+  }, [connectionId]);
 
   return { ...state, refresh, toggle };
 }

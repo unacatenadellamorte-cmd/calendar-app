@@ -16,6 +16,8 @@ interface CalendarRowProps {
   syncError?: string | null;
   onRetry?: () => void;
   retrying?: boolean;
+  /** 取り込み元のアカウント(Google のメール)。複数アカウントの見分け用(CAP-3)。 */
+  accountLabel?: string | null;
 }
 const SOURCE_LABEL: Record<Calendar['source'], string> = {
   get local() {
@@ -43,6 +45,7 @@ export function CalendarRow({
   syncError,
   onRetry,
   retrying,
+  accountLabel,
 }: CalendarRowProps) {
   useLanguage();
   const showSyncError = calendar.source === 'google' && Boolean(syncError);
@@ -97,6 +100,7 @@ export function CalendarRow({
             <span className="block text-meta text-ink-secondary">
               <span className="sr-only">{t('優先度 {0}/{1}、', [rank, total])}</span>
               {SOURCE_LABEL[calendar.source]}
+              {accountLabel && <span className="break-all"> · {accountLabel}</span>}
             </span>
           </span>
         </button>

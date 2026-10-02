@@ -39,6 +39,18 @@ vi.mock('@/features/connections/model/useCalendarSyncStatus', () => ({
   useCalendarSyncStatus: () => syncStatus,
 }));
 
+const googleConnections = {
+  connections: [] as { id: string; googleEmail: string | null; status: 'active' | 'suspended' }[],
+};
+vi.mock('@/features/connections/model/useGoogleConnections', () => ({
+  useGoogleConnections: () => ({
+    connections: googleConnections.connections,
+    loading: false,
+    errorKey: null,
+    refresh: vi.fn(),
+  }),
+}));
+
 const { CalendarsScreen } = await import('./CalendarsScreen');
 
 const cal = (over: Partial<Calendar> = {}): Calendar => ({
@@ -76,6 +88,7 @@ beforeEach(() => {
   syncStatus.retryErrorKey = null;
   syncStatus.retry.mockReset();
   syncStatus.reload.mockReset();
+  googleConnections.connections = [];
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -173,5 +186,31 @@ describe('CalendarsScreen', () => {
     syncStatus.retryErrorKey = 'sync/failed';
     renderScreen();
     expect(screen.getByText('取り込みに失敗しました。時間をおいてもう一度お試しください')).toBeInTheDocument();
+  });
+
+  it('Google 由来のカレンダーには取り込み元アカウントのメールを併記する(複数アカウント)', () => {
+    authState.current = 'authenticated';
+    googleConnections.connections = [
+      { id: 'g1', googleEmail: 'me@gmail.com', status: 'active' },
+      { id: 'g2', googleEmail: 'work@gmail.com', status: 'active' },
+    ];
+    hookValue.calendars = [
+      cal({ id: 'a', name: '個人', source: 'google', externalConnectionId: 'g1' }),
+      cal({ id: 'b', name: '会議', source: 'google', externalConnectionId: 'g2' }),
+      cal({ id: 'c', name: 'ローカル予定', source: 'local', externalConnectionId: null }),
+    ];
+    renderScreen();
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('Google · me@gmail.com');
+    expect(rows[1]).toHaveTextContent('Google · work@gmail.com');
+    expect(rows[2]).not.toHaveTextContent('@gmail.com');
+  });
+
+  it('接続が見つからない Google カレンダーは種別だけを出す', () => {
+    authState.current = 'authenticated';
+    hookValue.calendars = [cal({ id: 'a', name: '個人', source: 'google', externalConnectionId: 'gone' })];
+    renderScreen();
+    expect(screen.getByRole('listitem')).not.toHaveTextContent('·');
+    expect(screen.getByRole('listitem')).toHaveTextContent('Google');
   });
 });

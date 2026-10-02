@@ -69,9 +69,12 @@ public class GoogleAuthorizationPlugin extends Plugin {
             }
             pending = call;
             try {
+                // 複数Googleアカウント対応: 既に認可済みのアカウントへ自動で決まらないよう、
+                // 毎回アカウント選択を求める(Web側の prompt=consent select_account と揃える)。
                 AuthorizationRequest request = AuthorizationRequest.builder()
                     .setRequestedScopes(SCOPES)
                     .requestOfflineAccess(clientId, true)
+                    .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
                     .build();
                 Identity.getAuthorizationClient(getActivity()).authorize(request)
                     .addOnSuccessListener(result -> {

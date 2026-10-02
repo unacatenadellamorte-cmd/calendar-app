@@ -21,12 +21,17 @@ const invoke = vi.fn(async () => invokeResult);
 const rpc = vi.fn(async () => rpcResult);
 
 let eqCalls: unknown[][] = [];
+let orderCalls: unknown[][] = [];
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'is', 'order', 'limit']) {
+  for (const m of ['select', 'is', 'limit', 'returns']) {
     chain[m] = () => chain;
   }
+  chain.order = (...args: unknown[]) => {
+    orderCalls.push(args);
+    return chain;
+  };
   chain.eq = (...args: unknown[]) => {
     eqCalls.push(args);
     return chain;
@@ -97,6 +102,7 @@ beforeEach(() => {
   invokeResult = { data: null, error: null };
   rpcResult = { data: null, error: null };
   eqCalls = [];
+  orderCalls = [];
   invoke.mockClear();
   rpc.mockClear();
   from.mockClear();
@@ -129,8 +135,31 @@ describe('startGoogleConnect', () => {
     const url = new URL(assign.mock.calls[0]![0] as string);
     expect(url.origin + url.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
     expect(url.searchParams.get('state')).toBe(state);
-    expect(url.searchParams.get('prompt')).toBe('consent');
+    // 複数接続対応: 2つ目のアカウントを選べるよう、毎回アカウント選択を出す
+    expect(url.searchParams.get('prompt')).toBe('consent select_account');
+    expect(url.searchParams.getAll('prompt')).toHaveLength(1);
     expect(url.searchParams.get('redirect_uri')).toContain('/connections/google/callback');
+    // refresh_token を得るための既存パラメータは保つ
+    expect(url.searchParams.get('access_type')).toBe('offline');
+    expect(url.searchParams.get('response_type')).toBe('code');
+  });
+});
+
+describe('withAccountChooser', () => {
+  it('prompt を consent select_account に置き換え、他のパラメータは変えない', async () => {
+    const { withAccountChooser } = await load();
+    const out = new URL(
+      withAccountChooser('https://accounts.google.com/o/oauth2/v2/auth?prompt=consent&state=s&scope=a+b'),
+    );
+    expect(out.searchParams.getAll('prompt')).toEqual(['consent select_account']);
+    expect(out.searchParams.get('state')).toBe('s');
+    expect(out.searchParams.get('scope')).toBe('a b');
+  });
+
+  it('prompt が無い URL にも付ける', async () => {
+    const { withAccountChooser } = await load();
+    const out = new URL(withAccountChooser('https://accounts.google.com/o/oauth2/v2/auth?state=s'));
+    expect(out.searchParams.get('prompt')).toBe('consent select_account');
   });
 });
 
@@ -176,6 +205,20 @@ describe('completeGoogleConnect', () => {
     const r = await completeGoogleConnect(new URLSearchParams({ code: 'c', state: 's' }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('connection/no-refresh-token');
+  });
+
+  it('接続上限の 403 {error:"connection/limit-reached"} は connection/limit-reached', async () => {
+    sessionStorage.setItem(STATE_KEY, 's');
+    invokeResult = {
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: 'connection/limit-reached' }), { status: 403 }),
+      },
+    };
+    const { completeGoogleConnect } = await load();
+    const r = await completeGoogleConnect(new URLSearchParams({ code: 'c', state: 's' }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('connection/limit-reached');
   });
 
   it('本文が読めないエラーは汎用 exchange-failed', async () => {
@@ -242,6 +285,44 @@ describe('getConnection', () => {
   });
 });
 
+describe('listConnections', () => {
+  it('全接続を camelCase + status 付きで作成順に返す', async () => {
+    queryResult = {
+      data: [
+        { id: 'c1', provider: 'google', google_email: 'a@gmail.com', created_at: '2026-09-10T00:00:00Z', status: 'active' },
+        { id: 'c2', provider: 'google', google_email: null, created_at: '2026-10-01T00:00:00Z', status: 'suspended' },
+      ],
+      error: null,
+    };
+    const { listConnections } = await load();
+    const r = await listConnections();
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value).toEqual([
+        { id: 'c1', provider: 'google', googleEmail: 'a@gmail.com', createdAt: '2026-09-10T00:00:00Z', status: 'active' },
+        { id: 'c2', provider: 'google', googleEmail: null, createdAt: '2026-10-01T00:00:00Z', status: 'suspended' },
+      ]);
+    }
+    expect(eqCalls).toContainEqual(['provider', 'google']);
+    expect(orderCalls).toContainEqual(['created_at', { ascending: true }]);
+  });
+
+  it('行が無ければ空配列', async () => {
+    queryResult = { data: null, error: null };
+    const { listConnections } = await load();
+    const r = await listConnections();
+    expect(r).toEqual({ ok: true, value: [] });
+  });
+
+  it('クエリエラーは data/query', async () => {
+    queryResult = { data: null, error: { message: 'nope' } };
+    const { listConnections } = await load();
+    const r = await listConnections();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.messageKey).toBe('data/query');
+  });
+});
+
 describe('getDisconnectImpact', () => {
   it('events / calendars の件数を返す', async () => {
     queryResult = { data: null, error: null, count: 252 };
@@ -261,11 +342,11 @@ describe('getDisconnectImpact', () => {
 });
 
 describe('disconnectGoogle', () => {
-  it('RPC の返り値(消えた件数)を返す', async () => {
+  it('RPC の返り値(消えた件数)を返す。複数接続対応で connectionId を渡す', async () => {
     rpcResult = { data: { deleted: true, events: 252, calendars: 1 }, error: null };
     const { disconnectGoogle } = await load();
-    const r = await disconnectGoogle();
-    expect(rpc).toHaveBeenCalledWith('disconnect_google_connection');
+    const r = await disconnectGoogle('conn-id-123');
+    expect(rpc).toHaveBeenCalledWith('disconnect_google_connection', { p_connection_id: 'conn-id-123' });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value).toEqual({ events: 252, calendars: 1 });
   });
@@ -273,7 +354,7 @@ describe('disconnectGoogle', () => {
   it('接続が無くても冪等に成功(deleted:false)', async () => {
     rpcResult = { data: { deleted: false, events: 0, calendars: 0 }, error: null };
     const { disconnectGoogle } = await load();
-    const r = await disconnectGoogle();
+    const r = await disconnectGoogle('conn-id-123');
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value).toEqual({ events: 0, calendars: 0 });
   });
@@ -281,7 +362,7 @@ describe('disconnectGoogle', () => {
   it('RPC エラーは connection/disconnect-failed', async () => {
     rpcResult = { data: null, error: { message: 'boom' } };
     const { disconnectGoogle } = await load();
-    const r = await disconnectGoogle();
+    const r = await disconnectGoogle('conn-id-123');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('connection/disconnect-failed');
   });
@@ -289,7 +370,7 @@ describe('disconnectGoogle', () => {
   it('ネットワーク障害はオフライン扱い', async () => {
     rpcResult = { data: null, error: { message: 'Failed to fetch' } };
     const { disconnectGoogle } = await load();
-    const r = await disconnectGoogle();
+    const r = await disconnectGoogle('conn-id-123');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.messageKey).toBe('data/offline');
   });
@@ -331,6 +412,18 @@ describe('AndroidのGoogle認可', () => {
     });
     expect(assign).not.toHaveBeenCalled();
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('接続上限の 403 は connection/limit-reached(Android でも同じ文言へ)', async () => {
+    invokeResult = {
+      data: null,
+      error: {
+        context: new Response(JSON.stringify({ error: 'connection/limit-reached' }), { status: 403 }),
+      },
+    };
+    const { startGoogleConnect } = await load();
+    const r = await startGoogleConnect();
+    expect(r && !r.ok && r.error.messageKey).toBe('connection/limit-reached');
   });
 
   it.each([

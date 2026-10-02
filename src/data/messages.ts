@@ -57,6 +57,12 @@ const DATA_MESSAGES: Record<string, string> = {
     '端末カレンダーに接続できませんでした。もう一度お試しください',
   'connection/calendar-not-found':
     'このカレンダーは一覧に見つかりませんでした。更新してもう一度お試しください',
+  // oauth-exchange の 403(CAP-3)。無料=1件、複数アカウント契約時も上限がある。
+  'connection/limit-reached':
+    '接続できる Google アカウント数の上限に達しました。無料プランでは1つまで接続でき、複数アカウントは有料プランで利用できます',
+  // google-calendars の 400。クライアントは常に接続 ID を渡すので通常は出ない。
+  'connection/ambiguous':
+    'どの Google アカウントの操作か判断できませんでした。画面を開き直してもう一度お試しください',
   'notification/permission-denied':
     '通知が許可されていません。端末の設定から許可すると通知が届きます',
   'notification/unavailable':

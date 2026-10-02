@@ -10,15 +10,19 @@ import {
   getDisconnectImpact,
   startGoogleConnect,
   type DisconnectImpact,
+  type GoogleConnectionInfo,
 } from '@/data/connections';
 import { listSyncState } from '@/data/google-sync';
 import { connectDevice, disconnectDevice } from '@/data/device-connections';
 import { isDeviceCalendarSupported } from '@/platform/deviceCalendar';
 import { formatEventTime } from '@/lib/datetime';
-import { useGoogleConnection } from '@/features/connections/model/useGoogleConnection';
+import { useGoogleConnections } from '@/features/connections/model/useGoogleConnections';
 import { useGoogleSync } from '@/features/connections/model/useGoogleSync';
 import { useDeviceConnection } from '@/features/connections/model/useDeviceConnection';
 import { useDeviceSync } from '@/features/connections/model/useDeviceSync';
+import { useEntitlements } from '@/features/billing/model/useEntitlements';
+import { hasSeenPlanSheet, markPlanSheetSeen } from '@/features/billing/model/planSheetSeen';
+import { PlanSheet } from '@/features/billing/ui/PlanSheet';
 import { DisconnectSheet } from './DisconnectSheet';
 /** Google/端末で共通の「今すぐ取り込み」結果表示(構造だけ見るので型は共有しない)。 */
 interface SyncResultLike {
@@ -45,7 +49,12 @@ function formatSyncResultLine(result: SyncResultLike | null): string | null {
  * 状態別:
  *  - unavailable / OAuth 未設定: 無効表示
  *  - guest:          ログインへ誘導
- *  - authenticated:  接続中なら email + 取り込むカレンダー導線 + 「今すぐ取り込み」+「接続を解除」、未接続なら「Google を接続」
+ *  - authenticated:  接続中ならアカウントごとに email + 取り込むカレンダー導線 +「解除」、
+ *                    全体の「今すぐ取り込み」+「Google アカウントを追加」。未接続なら「Google を接続」
+ * 複数 Google アカウント(CAP-3): suspended(課金失効で停止中)の接続は「停止中」と出し、
+ * 取り込み・カレンダー選択の導線は出さない(解除はできる)。
+ * プラン案内(CAP-5): 初回の「Google を接続」と、権利なしでの「Google アカウントを追加」で
+ * PlanSheet を出す。無料の1アカウント接続は初回シートからいつでも選べる。
  * 端末カレンダーブロックも同じパターン(取り込み・解除は Story 5.3)。
  */
 export function ConnectionsSection() {
@@ -62,29 +71,36 @@ export function ConnectionsSection() {
   const [connecting, setConnecting] = useState(false);
   const navigate = useNavigate();
   const { refetch } = useOnline();
-  const { connection, loading, errorKey, refresh } = useGoogleConnection(
+  // 複数 Google 接続対応: 接続一覧を取得
+  const { connections, loading, errorKey, refresh } = useGoogleConnections(
     env.hasSupabase && env.hasGoogleOauth,
   );
+  const activeConnections = connections.filter((c) => c.status === 'active');
+  const { hasMultiAccount } = useEntitlements();
+  // プラン案内シート(CAP-5)。null = 閉じている。
+  const [planSheet, setPlanSheet] = useState<'first-connect' | 'add-account' | null>(null);
   const [actionErrorKey, setActionErrorKey] = useState<string | null>(null);
-  // 接続解除の確認シート(Story 3.4)。
+  // 接続解除の確認シート(Story 3.4)。複数接続対応で connectionId を保持。
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [selectedConnection, setSelectedConnection] = useState<GoogleConnectionInfo | null>(null);
   const [impact, setImpact] = useState<DisconnectImpact | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectErrorKey, setDisconnectErrorKey] = useState<string | null>(null);
   const [disconnectedLine, setDisconnectedLine] = useState<string | null>(null);
-  const openDisconnect = () => {
-    if (!connection) return;
+  const openDisconnect = (conn: GoogleConnectionInfo) => {
+    setSelectedConnection(conn);
     setImpact(null);
     setDisconnectErrorKey(null);
     setDisconnectOpen(true);
-    void getDisconnectImpact(connection.id).then((r) => {
+    void getDisconnectImpact(conn.id).then((r) => {
       if (r.ok) setImpact(r.value);
     });
   };
   const confirmDisconnect = async () => {
+    if (!selectedConnection) return;
     setDisconnecting(true);
     setDisconnectErrorKey(null);
-    const result = await disconnectGoogle();
+    const result = await disconnectGoogle(selectedConnection.id);
     setDisconnecting(false);
     if (!result.ok) {
       setDisconnectErrorKey(result.error.messageKey);
@@ -119,9 +135,6 @@ export function ConnectionsSection() {
     setActionErrorKey(null);
     void runSync();
   };
-  useEffect(() => {
-    if (connection) void reloadSyncState();
-  }, [connection, reloadSyncState]);
   const onConnect = async () => {
     if (connectBusy.current) return;
     connectBusy.current = true;
@@ -141,6 +154,29 @@ export function ConnectionsSection() {
       connectBusy.current = false;
       if (currentAuth.current !== null) setConnecting(false);
     }
+  };
+  // 接続0件の「Google を接続」: 初回だけプラン案内を出す(無料で1つ接続するも選べる)。
+  const onFirstConnectClick = () => {
+    if (connectBusy.current) return;
+    if (hasSeenPlanSheet()) void onConnect();
+    else setPlanSheet('first-connect');
+  };
+  // 接続1件以上の「Google アカウントを追加」: 複数アカウントの権利があれば直接認可へ。
+  // 権利が無ければプラン案内(無料で続けるボタンは無い)。最終的な上限はサーバーが強制し、
+  // 超過は connection/limit-reached として表示される(権利の取得遅延などの保険)。
+  const onAddAccountClick = () => {
+    if (connectBusy.current) return;
+    if (hasMultiAccount) void onConnect();
+    else setPlanSheet('add-account');
+  };
+  const closePlanSheet = () => {
+    if (planSheet === 'first-connect') markPlanSheetSeen();
+    setPlanSheet(null);
+  };
+  const continueFree = () => {
+    markPlanSheetSeen();
+    setPlanSheet(null);
+    void onConnect();
   };
   // 端末カレンダー接続(Story 5.2)。OAuth を持たないため env.hasGoogleOauth には依存しない。
   // Web/PWA ビルドでは機能自体が原理的に成立しないため、ブロックごと出さない。
@@ -168,6 +204,11 @@ export function ConnectionsSection() {
     refreshDevice();
   };
   const runResultLine = formatSyncResultLine(lastRun);
+  // 取り込み状態は全接続の最後の時刻を追跡する。複数接続対応で connection → connections に。
+  useEffect(() => {
+    if (connections.length > 0) void reloadSyncState();
+  }, [connections.length, reloadSyncState]);
+
   // 端末カレンダーの「今すぐ取り込み」(Story 5.3)。フォアグラウンド復帰時の自動取り込みは
   // src/app/DeviceSyncOnResume.tsx。成功したら月/週/リストの予定を取り直す(refetch)。
   const onDeviceSyncDone = useCallback(() => {
@@ -248,38 +289,77 @@ export function ConnectionsSection() {
           </>
         ) : loading ? (
           <p className="text-meta text-ink-secondary">{t('読み込み中…')}</p>
-        ) : connection ? (
+        ) : connections.length > 0 ? (
           <>
             <p className="text-meta text-ink-secondary">{t('Google に接続中')}</p>
-            <p className="mt-1 text-body text-ink-primary">
-              {connection.googleEmail ?? t('Google カレンダー')}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/connections/google/calendars')}
-              className="mt-3 flex min-h-11 w-full items-center justify-between rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
-            >
-              {t('取り込むカレンダーを選ぶ')}
-              <span aria-hidden="true" className="text-ink-secondary">
-                ›
-              </span>
-            </button>
+            {/* 複数接続対応: 接続済みアカウントごとの行 */}
+            <ul className="mt-3 overflow-hidden rounded-md border border-border-hairline bg-surface-raised">
+              {connections.map((conn, i) => {
+                const label = conn.googleEmail ?? t('Google アカウント');
+                return (
+                  <li
+                    key={conn.id}
+                    className={['px-4 py-3', i > 0 ? 'border-t border-border-hairline' : ''].join(' ')}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-body text-ink-primary">{label}</p>
+                        {conn.status === 'suspended' && (
+                          <p className="mt-1 text-meta text-ink-secondary">
+                            {t('停止中: 取り込みを止めています。有料プランの再契約で再開します。')}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openDisconnect(conn)}
+                        aria-label={t('{0} の接続を解除', [label])}
+                        className="min-h-11 shrink-0 px-2 text-meta text-danger"
+                      >
+                        {t('解除')}
+                      </button>
+                    </div>
+                    {conn.status === 'active' && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/connections/google/calendars?connection=${encodeURIComponent(conn.id)}`,
+                          )
+                        }
+                        aria-label={t('{0} の取り込むカレンダーを選ぶ', [label])}
+                        className="mt-2 flex min-h-11 w-full items-center justify-between rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
+                      >
+                        {t('取り込むカレンダーを選ぶ')}
+                        <span aria-hidden="true" className="text-ink-secondary">
+                          ›
+                        </span>
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
 
-            <button
-              type="button"
-              onClick={startGoogleSync}
-              disabled={syncing}
-              aria-label={t('Google の今すぐ取り込み')}
-              className="mt-2 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-60"
-            >
-              {syncing ? t('同期中') : t('今すぐ取り込み')}
-            </button>
+            {activeConnections.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={startGoogleSync}
+                  disabled={syncing}
+                  aria-label={t('Google の今すぐ取り込み')}
+                  className="mt-3 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-60"
+                >
+                  {syncing ? t('同期中') : t('今すぐ取り込み')}
+                </button>
 
-            <p className="mt-2 text-meta text-ink-secondary">
-              {lastSyncedAt
-                ? t('最終取り込み: {0}', [formatEventTime(lastSyncedAt)])
-                : t('まだ取り込んでいません')}
-            </p>
+                <p className="mt-2 text-meta text-ink-secondary">
+                  {lastSyncedAt
+                    ? t('最終取り込み: {0}', [formatEventTime(lastSyncedAt)])
+                    : t('まだ取り込んでいません')}
+                </p>
+              </>
+            )}
 
             {syncing ? (
               <p role="status" className="mt-1 text-meta text-ink-secondary">
@@ -297,13 +377,19 @@ export function ConnectionsSection() {
               )
             )}
 
+            {disconnectedLine && (
+              <p role="status" className="mt-1 text-meta text-ink-secondary">
+                {disconnectedLine}
+              </p>
+            )}
+
             <button
               type="button"
-              onClick={openDisconnect}
-              aria-label={t('Google の接続を解除')}
-              className="mt-3 min-h-11 w-full rounded-sm px-4 text-meta text-danger"
+              onClick={onAddAccountClick}
+              disabled={connecting}
+              className="mt-3 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-accent disabled:opacity-60"
             >
-              {t('接続を解除')}
+              {connecting ? t('確認中…') : t('Google アカウントを追加')}
             </button>
           </>
         ) : (
@@ -319,7 +405,7 @@ export function ConnectionsSection() {
             )}
             <button
               type="button"
-              onClick={() => void onConnect()}
+              onClick={onFirstConnectClick}
               disabled={connecting}
               className="mt-3 min-h-11 w-full rounded-sm bg-accent px-4 text-body font-semibold text-on-accent"
             >
@@ -441,12 +527,26 @@ export function ConnectionsSection() {
 
       <DisconnectSheet
         open={disconnectOpen}
-        title={t('Google 接続を解除')}
+        title={
+          selectedConnection
+            ? t('{0} の接続を解除', [selectedConnection.googleEmail ?? t('Google アカウント')])
+            : t('Google 接続を解除')
+        }
         impact={impact}
         busy={disconnecting}
         errorKey={disconnectErrorKey}
         onConfirm={() => void confirmDisconnect()}
-        onClose={() => setDisconnectOpen(false)}
+        onClose={() => {
+          setDisconnectOpen(false);
+          setSelectedConnection(null);
+        }}
+      />
+
+      <PlanSheet
+        open={planSheet !== null}
+        reason={planSheet ?? 'first-connect'}
+        onClose={closePlanSheet}
+        onContinueFree={planSheet === 'first-connect' ? continueFree : undefined}
       />
 
       <DisconnectSheet

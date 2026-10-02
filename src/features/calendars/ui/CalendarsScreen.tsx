@@ -4,7 +4,9 @@ import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { resolveMessage } from '@/data/messages';
 import type { Calendar } from '@/data/calendars';
+import { env } from '@/data/env';
 import { useCalendarSyncStatus } from '@/features/connections/model/useCalendarSyncStatus';
+import { useGoogleConnections } from '@/features/connections/model/useGoogleConnections';
 import { useCalendars } from '../model/useCalendars';
 import { CalendarRow } from './CalendarRow';
 import { CalendarFormSheet } from './CalendarFormSheet';
@@ -14,6 +16,12 @@ export function CalendarsScreen() {
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const sync = useCalendarSyncStatus(enabled);
+  // Google 由来のカレンダーにアカウント(メール)を併記する(CAP-3)。
+  // calendars.external_connection_id と接続一覧を突き合わせる。取得できなければ併記しないだけ。
+  const { connections } = useGoogleConnections(env.hasSupabase && env.hasGoogleOauth);
+  const emailByConnectionId = new Map(
+    connections.map((c) => [c.id, c.googleEmail] as const),
+  );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Calendar | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -108,6 +116,11 @@ export function CalendarsScreen() {
               syncError={sync.errorByCalendarId.get(c.id) ?? null}
               onRetry={() => void sync.retry()}
               retrying={sync.retrying}
+              accountLabel={
+                c.source === 'google' && c.externalConnectionId
+                  ? (emailByConnectionId.get(c.externalConnectionId) ?? null)
+                  : null
+              }
             />
           ))}
         </ul>

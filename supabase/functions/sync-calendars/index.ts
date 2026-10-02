@@ -80,14 +80,15 @@ async function handle(req: Request): Promise<Response> {
     if (userError || !userData?.user) return jsonResponse(req, { error: 'not-authenticated' }, 401);
     scopeUserId = userData.user.id;
 
-    const { data: conn } = await admin
+    // 複数接続対応: active な接続が1件以上あるかを確認。
+    const { data: conns } = await admin
       .from('connections')
       .select('id')
       .eq('user_id', scopeUserId)
       .eq('provider', 'google')
-      .is('deleted_at', null)
-      .maybeSingle();
-    if (!conn) return jsonResponse(req, { error: 'not-connected' }, 409);
+      .eq('status', 'active')
+      .is('deleted_at', null);
+    if (!conns || conns.length === 0) return jsonResponse(req, { error: 'not-connected' }, 409);
   }
 
   // 取り込み対象。

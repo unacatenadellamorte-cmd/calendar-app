@@ -48,15 +48,40 @@ async function handle(req: Request): Promise<Response> {
   });
 
   // 3) 接続を引く。
-  const { data: conn } = await admin
-    .from('connections')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('provider', 'google')
-    .is('deleted_at', null)
-    .maybeSingle();
-  if (!conn) return jsonResponse(req, { error: 'not-connected' }, 409);
-  const connectionId = conn.id as string;
+  // リクエストボディに connection_id があれば それを使い、なければ未削除・active の接続を自動判定。
+  let connectionId: string | undefined;
+  if (typeof body.connection_id === 'string' && body.connection_id) {
+    // connection_id が指定されている。所有権を検証。
+    const { data: conn } = await admin
+      .from('connections')
+      .select('id')
+      .eq('id', body.connection_id)
+      .eq('user_id', userId)
+      .eq('provider', 'google')
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!conn) return jsonResponse(req, { error: 'not-connected' }, 403);
+    connectionId = conn.id as string;
+  } else {
+    // connection_id 省略時: 未削除・active の接続を確認。
+    const { data: conns } = await admin
+      .from('connections')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('provider', 'google')
+      .eq('status', 'active')
+      .is('deleted_at', null);
+    const activeConns = (conns ?? []) as Array<{ id: string }>;
+
+    if (activeConns.length === 0) {
+      return jsonResponse(req, { error: 'not-connected' }, 409);
+    } else if (activeConns.length > 1) {
+      // 複数の接続がある場合、connection_id を指定してもらう。
+      return jsonResponse(req, { error: 'connection/ambiguous' }, 400);
+    }
+    connectionId = activeConns[0].id;
+  }
 
   if (action === 'set') {
     const externalCalendarId = typeof body.externalCalendarId === 'string' ? body.externalCalendarId : '';

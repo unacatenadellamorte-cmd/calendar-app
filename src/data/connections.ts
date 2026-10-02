@@ -29,6 +29,11 @@ export interface Connection {
   createdAt: string;
 }
 
+export interface GoogleConnectionInfo extends Connection {
+  /** 接続の状態: 'active' または 'suspended'。 */
+  status: 'active' | 'suspended';
+}
+
 interface ConnectionRow {
   id: string;
   provider: 'google';
@@ -36,8 +41,13 @@ interface ConnectionRow {
   created_at: string;
 }
 
+interface GoogleConnectionInfoRow extends ConnectionRow {
+  status: 'active' | 'suspended';
+}
+
 const UNAVAILABLE = appError('connection/unavailable', 'connection/unavailable');
 const COLUMNS = 'id,provider,google_email,created_at';
+const COLUMNS_WITH_STATUS = 'id,provider,google_email,created_at,status';
 
 function toConnection(row: ConnectionRow): Connection {
   return {
@@ -45,6 +55,16 @@ function toConnection(row: ConnectionRow): Connection {
     provider: row.provider,
     googleEmail: row.google_email,
     createdAt: row.created_at,
+  };
+}
+
+function toGoogleConnectionInfo(row: GoogleConnectionInfoRow): GoogleConnectionInfo {
+  return {
+    id: row.id,
+    provider: row.provider,
+    googleEmail: row.google_email,
+    createdAt: row.created_at,
+    status: row.status,
   };
 }
 
@@ -62,6 +82,7 @@ function randomState(): string {
 /**
  * Webはstate付き同意画面へ遷移し、AndroidはSDKから取得したコードを交換する。
  * Androidの成功結果だけがUIの接続状態再取得を開始する。
+ * Web では複数接続対応のため prompt に select_account を加える(withAccountChooser)。
  */
 let connecting = false;
 
@@ -76,12 +97,27 @@ export async function startGoogleConnect(): Promise<Result<{ googleEmail: string
     // sessionStorage 不可でも state 照合以外は成立する。ただし CSRF 保護が効かないので中止。
     return err(appError('connection/state-mismatch', 'connection/state-mismatch'));
   }
-  const url = buildGoogleAuthUrl({
-    clientId: env.googleOauthClientId,
-    redirectUri: googleRedirectUri(),
-    state,
-  });
-  window.location.assign(url);
+  window.location.assign(
+    withAccountChooser(
+      buildGoogleAuthUrl({
+        clientId: env.googleOauthClientId,
+        redirectUri: googleRedirectUri(),
+        state,
+      }),
+    ),
+  );
+}
+
+/**
+ * 認可 URL の `prompt` を `consent select_account` にする(複数アカウント対応、CAP-3)。
+ * ブラウザが既に1つの Google アカウントでログイン済みでも、毎回アカウント選択画面を
+ * 出して2つ目のアカウントを選べるようにする。`consent` は refresh_token を確実に
+ * 得るために残す。core の buildGoogleAuthUrl は変更せず、ここで URL として上書きする。
+ */
+export function withAccountChooser(authUrl: string): string {
+  const url = new URL(authUrl);
+  url.searchParams.set('prompt', 'consent select_account');
+  return url.toString();
 }
 
 
@@ -180,6 +216,8 @@ function slugToConnectionKey(slug: string): string {
   if (slug === 'not-authenticated') return 'connection/not-authenticated';
   if (slug === 'no-refresh-token') return 'connection/no-refresh-token';
   if (slug === 'cancelled') return 'connection/cancelled';
+  if (slug === 'connection/limit-reached') return 'connection/limit-reached';
+  if (slug === 'connection/ambiguous') return 'connection/ambiguous';
   return 'connection/exchange-failed';
 }
 
@@ -221,11 +259,12 @@ export async function getDisconnectImpact(
  * Google 接続を解除する(Story 3.4)。`disconnect_google_connection` RPC が
  * 取り込んだ予定・カレンダー行・接続・Vault secret を実削除する。冪等。
  * 返り値は実際に消えた件数。
+ * 複数接続対応: connectionId を p_connection_id として渡す。
  */
-export async function disconnectGoogle(): Promise<Result<DisconnectImpact>> {
+export async function disconnectGoogle(connectionId: string): Promise<Result<DisconnectImpact>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
-    const { data, error } = await supabase.rpc('disconnect_google_connection');
+    const { data, error } = await supabase.rpc('disconnect_google_connection', { p_connection_id: connectionId });
     if (error) {
       if (isNetworkError(error)) return err(appError('data/offline', 'data/offline', error));
       return err(appError('connection/disconnect-failed', 'connection/disconnect-failed', error));
@@ -253,6 +292,25 @@ export async function getConnection(): Promise<Result<Connection | null>> {
       .maybeSingle<ConnectionRow>();
     if (error) return err(appError('data/query', 'data/query', error));
     return ok(data ? toConnection(data) : null);
+  } catch (e) {
+    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
+    return err(appError('data/query', 'data/query', e));
+  }
+}
+
+/**
+ * 自分のすべての Google 接続を一覧で返す(active と suspended を含む)。
+ * 作成順(昇順)で返す。
+ */
+export async function listConnections(): Promise<Result<GoogleConnectionInfo[]>> {
+  if (!supabase) return err(UNAVAILABLE);
+  try {
+    const { data, error } = await selectActive('connections', COLUMNS_WITH_STATUS)
+      .eq('provider', 'google')
+      .order('created_at', { ascending: true })
+      .returns<GoogleConnectionInfoRow[]>();
+    if (error) return err(appError('data/query', 'data/query', error));
+    return ok((data ?? []).map(toGoogleConnectionInfo));
   } catch (e) {
     if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
     return err(appError('data/query', 'data/query', e));

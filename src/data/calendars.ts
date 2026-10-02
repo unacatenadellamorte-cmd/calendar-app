@@ -35,6 +35,12 @@ export interface Calendar {
   priority: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * 取り込み元の接続 ID(source が google / device のとき)。ローカルは null。
+   * 複数 Google アカウント(CAP-3)で、どのアカウントのカレンダーかを表示するのに使う。
+   * オフライン作成・旧キャッシュでは欠けていることがある(undefined)。
+   */
+  externalConnectionId?: string | null;
 }
 
 export interface NewCalendarInput {
@@ -54,10 +60,12 @@ interface CalendarRow {
   priority: number;
   created_at: string;
   updated_at: string;
+  external_connection_id?: string | null;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
-const COLUMNS = 'id,name,color,source,is_shift,is_visible,priority,created_at,updated_at';
+const COLUMNS =
+  'id,name,color,source,is_shift,is_visible,priority,created_at,updated_at,external_connection_id';
 
 function toCalendar(row: CalendarRow): Calendar {
   return {
@@ -70,6 +78,7 @@ function toCalendar(row: CalendarRow): Calendar {
     priority: row.priority,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    externalConnectionId: row.external_connection_id ?? null,
   };
 }
 
