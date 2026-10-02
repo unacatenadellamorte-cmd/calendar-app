@@ -15,6 +15,7 @@ import { AccountSection } from './AccountSection';
 import { DataSection } from './DataSection';
 import { ConnectionsSection } from '@/features/connections/ui/ConnectionsSection';
 import { MapAppSection } from './MapAppSection';
+import { PlanSection } from '@/features/billing/ui/PlanSection';
 import {
   useMonthEventSize,
   type MonthEventSize,
@@ -217,6 +218,8 @@ export function SettingsScreen() {
       </section>
 
       <AccountSection />
+
+      <PlanSection />
 
       <ConnectionsSection />
 

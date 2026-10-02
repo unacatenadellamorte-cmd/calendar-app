@@ -11,7 +11,15 @@ export interface EntitlementsState {
   /** 予定反映を使える(calendar_write または multi_account。B は A を内包する)。 */
   canWrite: boolean;
   reload: () => void;
+  /**
+   * いま DB から再取得して反映する(購入後のポーリング用)。取得できたら判定結果、
+   * 未ログイン・失敗なら null。同じユーザーの他の useEntitlements にも反映する。
+   */
+  refresh: () => Promise<Pick<EntitlementsState, 'hasMultiAccount' | 'canWrite'> | null>;
 }
+
+type Listener = (userId: string, rows: Entitlement[]) => void;
+const listeners = new Set<Listener>();
 
 /** 権利行の一覧から表示用の判定を作る(期限切れは無効)。 */
 export function deriveEntitlements(
@@ -55,6 +63,26 @@ export function useEntitlements(): EntitlementsState {
   }, [active, userId, nonce]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  // 他のインスタンス(設定画面と PlanSheet など)が再取得した結果を取り込む。
+  useEffect(() => {
+    if (!userId) return;
+    const listener: Listener = (uid, next) => {
+      if (uid === userId) setRows(next);
+    };
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, [userId]);
+
+  const refresh = useCallback(async () => {
+    if (!active || !userId) return null;
+    const result = await listMyEntitlements();
+    if (!result.ok) return null;
+    listeners.forEach((listener) => listener(userId, result.value));
+    return deriveEntitlements(result.value);
+  }, [active, userId]);
   // 未ログインへ切り替わった直後の描画でも、前の利用者の権利を使わない。
-  return { loading, ...deriveEntitlements(active ? rows : []), reload };
+  return { loading, ...deriveEntitlements(active ? rows : []), reload, refresh };
 }

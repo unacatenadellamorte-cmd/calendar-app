@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_ADMOB_PLATFORM?: 'android' | 'ios';
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  readonly VITE_REVENUECAT_ANDROID_KEY?: string;
+  readonly VITE_REVENUECAT_IOS_KEY?: string;
 }
 
 interface ImportMeta {

@@ -412,3 +412,9 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# RevenueCat Webhook は RevenueCat が呼ぶので、Supabase ゲートウェイの JWT 検証を外す。
+# 認証は関数内で Authorization ヘッダを REVENUECAT_WEBHOOK_AUTH と照合する。
+# 他の関数は verify_jwt の既定(true)のまま。
+[functions.revenuecat-webhook]
+verify_jwt = false

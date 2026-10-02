@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { PlanSheet } from './PlanSheet';
 import { PLANS } from '../model/plans';
 
+// PlanSheet は usePurchase / useEntitlements 経由で認証状態を読む。この既存テストは
+// Web(課金SDK無効)・未ログイン相当で、従来どおり「準備中」の表示を確かめる。
+vi.mock('@/app/auth-context', () => ({ useAuth: () => ({ state: 'guest', session: null }) }));
+
 describe('PlanSheet', () => {
   it('プラン2枚に機能説明と仮の価格を出し、購入ボタンは「準備中」で押せない', () => {
     render(<PlanSheet open reason="first-connect" onClose={vi.fn()} onContinueFree={vi.fn()} />);

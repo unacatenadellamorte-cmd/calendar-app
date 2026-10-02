@@ -13,18 +13,26 @@ export interface AppEnv {
   googleOauthClientId: string | undefined;
   /** Google 接続フローを出せるか(client ID が設定済み)。 */
   hasGoogleOauth: boolean;
+  /** RevenueCat の公開 SDK キー(Android)。secret key ではない。課金 CAP-1。 */
+  revenueCatAndroidKey?: string | undefined;
+  /** RevenueCat の公開 SDK キー(iOS)。secret key ではない。 */
+  revenueCatIosKey?: string | undefined;
 }
 
 export function readEnv(): AppEnv {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() || undefined;
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || undefined;
   const googleOauthClientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID?.trim() || undefined;
+  const revenueCatAndroidKey = import.meta.env.VITE_REVENUECAT_ANDROID_KEY?.trim() || undefined;
+  const revenueCatIosKey = import.meta.env.VITE_REVENUECAT_IOS_KEY?.trim() || undefined;
   return {
     supabaseUrl,
     supabaseAnonKey,
     hasSupabase: Boolean(supabaseUrl && supabaseAnonKey),
     googleOauthClientId,
     hasGoogleOauth: Boolean(googleOauthClientId),
+    revenueCatAndroidKey,
+    revenueCatIosKey,
   };
 }
 

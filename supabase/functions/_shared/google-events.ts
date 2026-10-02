@@ -1,7 +1,7 @@
 // === 生成ファイル。手で編集しない。 ===
 // 一次ソース: packages/core/src/google-events.ts
 // 再生成: node scripts/sync-edge-shared.mjs
-// 一致の保証: packages/core/src/google-events.parity.test.ts
+// 一致の保証: packages/core/src/*.parity.test.ts
 
 /**
  * Google Calendar API v3 のイベント JSON を、このアプリの予定形に正規化する純ロジック

@@ -21,13 +21,17 @@ const targets = [
     src: 'packages/core/src/google-events.ts',
     dest: 'supabase/functions/_shared/google-events.ts',
   },
+  {
+    src: 'packages/core/src/revenuecat-webhook.ts',
+    dest: 'supabase/functions/_shared/revenuecat-webhook.ts',
+  },
 ];
 
 const HEADER =
   '// === 生成ファイル。手で編集しない。 ===\n' +
   '// 一次ソース: {src}\n' +
   '// 再生成: node scripts/sync-edge-shared.mjs\n' +
-  '// 一致の保証: packages/core/src/google-events.parity.test.ts\n\n';
+  '// 一致の保証: packages/core/src/*.parity.test.ts\n\n';
 
 /** 一次ソースから生成後の中身を作る。 */
 function render(srcRel) {

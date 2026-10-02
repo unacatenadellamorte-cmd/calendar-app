@@ -63,6 +63,17 @@ const DATA_MESSAGES: Record<string, string> = {
   // google-calendars の 400。クライアントは常に接続 ID を渡すので通常は出ない。
   'connection/ambiguous':
     'どの Google アカウントの操作か判断できませんでした。画面を開き直してもう一度お試しください',
+  // 課金(RevenueCat。CAP-1)。ユーザーのキャンセルはエラーにしないのでここには無い。
+  'purchase/unavailable': 'この環境では購入できません',
+  'purchase/login-required': '購入にはログインが必要です',
+  'purchase/configure-failed': '課金の準備に失敗しました。時間をおいてもう一度お試しください',
+  'purchase/offerings-failed': '商品の情報を取得できませんでした。時間をおいてもう一度お試しください',
+  'purchase/product-missing': 'このプランの商品が見つかりませんでした。時間をおいてもう一度お試しください',
+  'purchase/failed': '購入を完了できませんでした。もう一度お試しください',
+  'purchase/offline': '通信できませんでした。接続を確認してもう一度お試しください',
+  'purchase/pending': '購入は承認待ちです。承認されると反映されます',
+  'purchase/restore-failed': '購入を復元できませんでした。もう一度お試しください',
+  'purchase/management-failed': '購読の管理画面を開けませんでした。ストアの購読管理から確認してください',
   'notification/permission-denied':
     '通知が許可されていません。端末の設定から許可すると通知が届きます',
   'notification/unavailable':
