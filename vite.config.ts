@@ -8,7 +8,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const ads = resolveAdsConfig({ ...loadEnv(mode, process.cwd(), ''), ...process.env });
-  const nativeTarget = process.env.VITE_NATIVE_TARGET;
+  const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
+  const nativeTarget = env.VITE_NATIVE_TARGET;
   const isNativeBuild = nativeTarget === 'android' || nativeTarget === 'ios';
   return ({
   define: { __ADMOB_CONFIG__: JSON.stringify(ads) },

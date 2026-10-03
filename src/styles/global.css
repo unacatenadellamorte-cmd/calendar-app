@@ -102,7 +102,7 @@ body {
   max-width: 100%;
   overflow-wrap: anywhere;
   overscroll-behavior-x: none;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
 }
 
 /* flex内のフォームは入力欄の固有幅まで広がらず、狭い端末では列幅へ縮む。 */

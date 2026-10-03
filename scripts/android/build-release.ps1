@@ -40,6 +40,14 @@ try {
     $env:VITE_NATIVE_TARGET = 'android'
     & npm.cmd run build
     if ($LASTEXITCODE -ne 0) { throw 'Webビルドに失敗しました。' }
+    $serviceWorker = Join-Path (Join-Path $projectRoot 'dist') 'sw.js'
+    if (-not (Test-Path -LiteralPath $serviceWorker -PathType Leaf)) { throw 'Service Workerが生成されませんでした。' }
+    $serviceWorkerSource = Get-Content -Raw -LiteralPath $serviceWorker
+    if ($serviceWorkerSource -notmatch 'registration\.unregister\s*\(' -or
+        $serviceWorkerSource -notmatch 'caches\.keys\s*\(' -or
+        $serviceWorkerSource -notmatch 'caches\.delete\s*\(') {
+        throw 'ネイティブ配布用Service Workerの自己破棄契約を確認できませんでした。'
+    }
     & npx.cmd cap sync android
     if ($LASTEXITCODE -ne 0) { throw 'Android同期に失敗しました。' }
     $gradleArgs = @('-p', 'android', ':app:testDebugUnitTest', ':app:lintRelease', ':app:bundleRelease', '--console=plain')

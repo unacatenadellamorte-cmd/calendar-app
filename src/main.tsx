@@ -22,23 +22,32 @@ initLanguage();
 initTheme();
 initMonthEventSize();
 if (!isAccountDataBlocked()) void initBackground();
-void cleanupNativeServiceWorker();
-
 const rootEl = document.getElementById('root');
 if (!rootEl) {
   throw new Error('#root が見つかりません');
 }
+const appRoot = rootEl;
 
-createRoot(rootEl).render(
-  <StrictMode>
-    <AuthProvider>
-      <PurchasesSync />
-      <BrowserRouter>
-        <AppRoutes />
-        <DeepLinkListener />
-        <DeviceSyncOnResume />
-        <WidgetSync />
-      </BrowserRouter>
-    </AuthProvider>
-  </StrictMode>,
-);
+async function startApp() {
+  try {
+    await cleanupNativeServiceWorker();
+  } catch (error) {
+    // 掃除に失敗しても画面は起動し、マーカーを残さず次回起動で再試行する。
+    console.warn('[calendar-app] 旧Service Workerの掃除に失敗しました。', error);
+  }
+  createRoot(appRoot).render(
+    <StrictMode>
+      <AuthProvider>
+        <PurchasesSync />
+        <BrowserRouter>
+          <AppRoutes />
+          <DeepLinkListener />
+          <DeviceSyncOnResume />
+          <WidgetSync />
+        </BrowserRouter>
+      </AuthProvider>
+    </StrictMode>,
+  );
+}
+
+void startApp();

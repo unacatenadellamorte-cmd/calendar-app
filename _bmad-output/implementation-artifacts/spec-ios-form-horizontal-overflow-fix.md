@@ -2,7 +2,7 @@
 title: 'iOS入力シートの横揺れ修正とApple再提出'
 type: 'bugfix'
 created: '2026-10-03'
-status: 'in-progress'
+status: 'in-review'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '3fc1d4405f0da0d3faacd63d3fd2993967b484f0'
@@ -52,32 +52,64 @@ context:
 - [x] `src/ui/BottomSheet.tsx`, `src/styles/global.css` -- 本文を幅内へ拘束し横スクロール・パンを止める。
 - [x] `src/ui/BottomSheet.test.tsx` と関連フォームテスト -- 横幅と既存操作を回帰検証する。
 - [x] Web全体 -- 型検査・lint・テスト・ビルドを通す。
-- [ ] iOS -- 1.0.23（25）の署名済みIPAとWidget、本番設定を照合する。
-- [ ] App Store Connect -- 新IPAを選択し、審査情報を更新して再審査へ送る。
+- [x] iOS -- 追加の更新キャッシュ修正を含む1.0.23（26）の署名済みIPAとWidget、本番設定を照合する。
+- [x] App Store Connect -- 1.0.23（26）、サブスクリプショングループ、月額プラン2件を同じ提出物として再審査へ送る。
+- [x] Google Play -- 1.0.23（versionCode 25）をAlphaクローズドテストへ審査送信する。
 
 **Acceptance Criteria:**
 - Given 3つの入力シート, when 横へドラッグする, then 端末幅からずれず横位置が変化しない。
 - Given 320px相当の幅, when 2列の時刻・数値入力と24色を表示する, then 入力欄は幅内へ縮み色は折り返し、横スクロール領域を作らない。
-- Given 修正済みコミット, when 配布ビルドする, then 1.0.23（25）のアプリとWidgetが署名検証を通る。
-- Given Appleへのアップロード完了, when App Store Connectを確認する, then 新ビルドで再審査の提出状態を確認できる。
+- Given 修正済みコミット, when 配布ビルドする, then 1.0.23（26）のアプリとWidgetが署名検証を通る。
+- Given Appleへのアップロード完了, when App Store Connectを確認する, then 1.0.23（26）と課金4項目が「審査待ち」であることを確認できる。
 
 ## Implementation Notes
 
 - `BottomSheet`のオーバーレイ、パネル、本文へ幅上限と横方向の非表示を追加し、本文のタッチ操作を`pan-y`へ限定した。縦スクロールと下方向ドラッグは既存実装を維持。
 - 320px幅の実ブラウザーで予定・シフト・タグを測定。全画面でdocument、dialog、form、本文の`scrollWidth === clientWidth`、本文の`overflow-x: hidden`と`touch-action: pan-y`を確認。シフトとタグの2列入力は各130.5pxへ縮小し、右端289pxで本文内に収まった。
-- 関連4ファイル53テスト、全体1,467テスト、型検査、lint（既存warning 1件のみ）、Webビルドに成功。
+- Androidネイティブシェルが古いPWAキャッシュを表示し続け、版24でプラン画面が見えない問題を追加で確認した。ネイティブではservice workerを自己破棄し、旧キャッシュと登録を消すよう修正した。
+- レビュー後、ピンチ拡大を維持し、旧Service Workerまたはキャッシュがある場合だけ画面描画前に掃除・再読込するよう補強した。失敗時は完了印を残さず次回起動で再試行する。
+- ネイティブ配布の`sw.js`が登録解除とキャッシュ削除を含むことをAndroid・iOS配布スクリプトで検証する契約を追加した。
+- 関連4ファイル53テスト、全体150ファイル・1,471テスト、型検査、lint（既存warning 1件のみ）、Webビルドに成功。
+- Google Playで審査中のAndroid 1.0.23（versionCode 25）AABはSHA-256 `99A1795E8A1CA16733A9F782E499CD5C4D70A674264B02943D39782DBAE3E0FB`。レビュー修正を含む差し替え用versionCode 26 AABは署名・Gradleテスト・lint・bundle成功、SHA-256 `8F317FBFF56626A8A8383CE988BEC6B0E2AD913524D5E3C9FDE6A60A26E717B8`。
+- iOS 1.0.23（26）のIPAはWidget・本番設定・署名を照合済み。SHA-256は`6D5F4240ACB8202982E113B523D2682DA35F034A3622FC38B83F11A0BAD2E706`。
+- Google PlayはAlphaクローズドテストの「審査中の変更」、App Store Connectはアプリ版・サブスクリプショングループ・月額プラン2件の計4項目が「審査待ち」になった。
 
 ## Spec Change Log
 
+- 2026-10-03: 版24でプラン画面が見えなかった原因をネイティブPWAキャッシュと特定し、service worker自己破棄を追加したため配布番号をAndroid 25・iOS 26へ更新した。Appleの初回サブスクリプション審査要件に合わせ、アプリ版と課金3項目を同じ提出物へ統合した。入力シート修正、Widget、本番設定を維持した。
+- 2026-10-03: レビュー指摘を受け、不要な初回再読込、掃除失敗時の未処理、ピンチ拡大阻害、配布`sw.js`の検証不足を局所修正した。既存の横幅拘束・縦スクロール・課金・Google連携を維持した。差し替え候補をAndroid versionCode 26・iOS build 27とし、現行のGoogle 25／Apple 26審査は次セッションまで維持する。
+
 ## Review Triage Log
+
+| ID | 判定 | 証拠と処理 |
+|---|---|---|
+| blind-1 | medium | `pan-y`単独指定は本文から始めるピンチ拡大を無効にする。横パン禁止を維持して`pinch-zoom`を許可するpatch。 |
+| blind-2 | medium | 旧登録・キャッシュがなくても初回は必ず`reload()`し、描画と非同期競合する。旧状態がある時だけ描画前に掃除・再読込するpatch。 |
+| blind-3 | medium | Storage、Service Worker、Cache APIの拒否が未処理Promiseになる。失敗時は起動を続け、完了印を付けず次回再試行するpatch。 |
+| blind-4 | medium | 掃除テストは実装ソースの文字列3件しか検査せず、条件逆転や完了印削除でも通る。状態ベースの実行テストへ置換するpatch。 |
+| blind-5 | low | 現行の配布スクリプトは`process.env`へ正しい値を設定するが、`.env`経由ではビルド時と実行時が分岐し得る。環境入力と`android`/`ios`判定を統一する直接patch。 |
+| blind-6 | low | 単体テストは実レイアウトを測らないが、320px実ブラウザーで3フォームの寸法・横位置・縦操作を確認済み。ブラウザー試験基盤の追加はこの低頻度の検証不足に対して過大なためreject。 |
+| edge-1 | medium | blind-3と同じ失敗経路を独立確認。例外捕捉と次回再試行を行うpatch。 |
+| edge-2 | medium | blind-2と同じ新規起動時の不要再読込を独立確認。旧状態の有無で再読込を制御するpatch。 |
+| edge-3 | medium | blind-1と同じピンチ拡大阻害を独立確認。`pan-y pinch-zoom`へ直すpatch。 |
+| edge-4 | false | ビルド25は追加の更新キャッシュ障害発見前の承認時点で、ユーザー承認後にiOS 26へ更新して提出済み。非凍結の変更履歴と受入条件が最終提出番号を記録しており、ワークフロー照合は正しい。 |
+| verification-1 | medium | 実行テストが存在しないことを全参照検索で確認済み。ネイティブ削除、Web無処理、2回目無処理、失敗後再試行を実行検証するpatch。 |
+| verification-2 | medium | `selfDestroying`成果物の契約検証が配布経路に存在しない。Android・iOSの配布ビルド後に生成`sw.js`を検証し、検証器を局所テストするpatch。 |
+| verification-3 | low | 実寸を測る自動ブラウザーテストはないが、今回の3フォームは320px実ブラウザーで検証済み。将来回帰の可能性に対して新規E2E基盤は過大なためrejectし、手動検証記録を維持する。 |
 
 ## Verification
 
 **Commands:**
 - `npm test -- src/ui/BottomSheet.test.tsx src/features/events/ui/EventFormSheet.test.tsx src/features/shifts/ui/ShiftTemplateFormSheet.test.tsx src/features/tags/ui/EventTagFormSheet.test.tsx` -- 関連回帰成功
-- `npm run typecheck && npm run lint && npm test && npm run build` -- Web全体の検証成功
-- GitHub ActionsのiOS配布ワークフロー -- Swift、Widget、署名、archive、IPA照合成功
+- `npm run typecheck && npm run lint && npm test && npm run build` -- 型検査、lint（既存warning 1件）、150ファイル・1,471テスト、Webビルド成功
+- `node --test scripts/ios/*.test.mjs` -- 公開設定・署名補助・自己破棄Service Worker契約を含む局所テスト成功
+- `VITE_NATIVE_TARGET=android npm run build` -- 自己破棄Service Worker生成と契約照合成功
+- `scripts/android/build-release.ps1`（JDK 21、署名あり） -- versionCode 26のGradle単体テスト・release lint・AAB生成成功
+- GitHub Actions `37092922180` -- Swift、Widget、署名、archive、iOS 1.0.23（26）のIPA照合成功
+- GitHub Actions `37093415511` -- iOS 1.0.23（26）のApp Store Connectアップロード成功
+- Android AABのversionCode、versionName、アップロード鍵SHA-1、SHA-256を照合済み
 
 **Manual checks:**
 - iPhone幅で横ドラッグが発生せず、縦スクロールと保存・閉じる操作が維持されること。
-- App Store Connectで1.0.23（25）の処理・選択・再審査送信を確認すること。
+- App Store Connectで1.0.23（26）と課金4項目が「審査待ち」であることを確認済み。
+- Google Play Consoleで1.0.23（versionCode 25）がAlphaクローズドテストの「審査中の変更」であることを確認済み。

@@ -130,7 +130,7 @@ export function BottomSheet({
           <span className="text-[10px] text-ink-secondary">{t('下にスライドして閉じる')}</span>
         </button>
         <h2 className="shrink-0 text-body font-semibold text-ink-primary">{title}</h2>
-        <div className="bottom-sheet-content mt-3 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain pb-6 touch-pan-y">
+        <div className="bottom-sheet-content mt-3 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain pb-6">
           {children}
         </div>
       </div>

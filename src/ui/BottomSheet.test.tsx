@@ -78,6 +78,6 @@ describe('入力レイヤー', () => {
     const panel = screen.getByRole('dialog');
     const content = screen.getByTestId('wide-content').parentElement;
     expect(panel).toHaveClass('min-w-0', 'max-w-2xl', 'overflow-x-hidden');
-    expect(content).toHaveClass('w-full', 'min-w-0', 'max-w-full', 'overflow-x-hidden', 'touch-pan-y');
+    expect(content).toHaveClass('w-full', 'min-w-0', 'max-w-full', 'overflow-x-hidden');
   });
 });

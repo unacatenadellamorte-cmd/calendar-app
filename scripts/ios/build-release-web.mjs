@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build, loadEnv } from 'vite';
+import { assertSelfDestroyingServiceWorker } from '../native-service-worker-contract.mjs';
 import { validateDeviceEnv } from './build-device-web.mjs';
 
 class ReleaseConfigError extends Error {}
@@ -83,6 +84,7 @@ export async function buildReleaseWeb() {
       ads.bannerId !== env.VITE_ADMOB_IOS_BANNER_ID || ads.debugEea || ads.testDeviceIds.length) {
     throw new ReleaseConfigError('成果物の広告設定が本番設定と一致しません。');
   }
+  assertSelfDestroyingServiceWorker(await readFile('dist/sw.js', 'utf8'));
   const names = await readdir('dist/assets');
   const scripts = (await Promise.all(names.filter((name) => name.endsWith('.js')).map((name) => readFile(`dist/assets/${name}`, 'utf8')))).join('');
   if (![url, key, env.VITE_GOOGLE_OAUTH_CLIENT_ID, env.VITE_REVENUECAT_IOS_KEY].every((value) => scripts.includes(value))) {
