@@ -1,6 +1,6 @@
 # Play Console: サブスクリプション作成と RevenueCat 連携の手順(2026-10-02)
 
-> 2026-10-03更新: 販売アカウント登録済み。署名済み1.0.21／22をAlphaへ未公開保存済み（審査提出・配信なし）。下記2商品は日本向け月額300円／1,000円、基本プラン `monthly` で作成・有効化済み。RevenueCatのGoogle認証と実購入検証は未完了。最新結果は [検証記録](paid-features-verification-20261003.md) を参照。付録の未署名ビルド・署名キー未発見・singleTaskの記述は過去時点の記録。
+> 2026-10-03更新: 販売アカウント登録済み。署名済み1.0.21／22をAlphaへ未公開保存済み（審査提出・配信なし）。下記2商品は日本向け月額300円／1,000円、基本プラン `monthly` で作成・有効化済み。RevenueCatのGoogle認証3項目は成功、Playのテスト通知も受信済み。実機の購入・復元等は未検証。最新結果は [検証記録](paid-features-verification-20261003.md) を参照。以下の手順と付録は作成時点の履歴を含む。
 
 RevenueCat 側(プロジェクト・Android アプリ・Entitlement・商品・Offering・Webhook)は設定済み。
 この手順書は、**ユーザー本人が Play Console / Google Cloud で行う作業**。ID は RevenueCat 側と**完全一致**させる。
@@ -33,7 +33,7 @@ RevenueCat 側(プロジェクト・Android アプリ・Entitlement・商品・O
 
 ## 2. RevenueCat が購入を検証できるようにする(**これが無いと権利が付与されない**)
 
-RevenueCat の Android アプリ「Multi calendar (Android)」には現在、サービスアカウントの認証情報が未登録。
+2026-10-03にAndroidアプリ「Multi calendar (Android)」へ専用サービスアカウントの認証JSONを登録し、有効を確認済み。3 APIも有効化済み。通知トピックは `projects/calendar-app-508202/topics/Play-Store-Notifications`。以下は設定手順の参照用。
 
 1. Google Cloud コンソールでサービスアカウントを作成し、JSON キーを発行する(既存の Google Cloud プロジェクトでも新規でもよい。Google Play Android Developer API を有効化)。
 2. Play Console → ユーザーと権限 → ユーザーを招待 → そのサービスアカウントのメールを追加し、権限

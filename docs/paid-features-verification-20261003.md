@@ -57,11 +57,19 @@
 
 Google Playの2商品は作成・有効化済み。`calendar_write_monthly`（予定反映）は月額300円、`multi_account_monthly`（複数アカウント）は月額1,000円。いずれも基本プランIDは `monthly`、1か月ごとの自動更新、日本のみ。無料試用は作成していない。猶予7日・一時停止期間の自動計算・再定期購入許可は既定値のまま。AABを検証画面まで保存したことで商品作成が可能になった。リリースの審査提出・配信はしていない。
 
+### Google購入検証と通知連携（2026-10-03完了）
+
+- ユーザーが専用アカウント・鍵作成、必要権限、RevenueCatへのJSON登録を承認。API共通・Play Developer・Google Cloud規約への同意と3 APIの有効化も操作直前に承認した。
+- Cloudプロジェクト `calendar-app-508202` で `androidpublisher.googleapis.com`、`playdeveloperreporting.googleapis.com`、`pubsub.googleapis.com` が有効であることを画面で確認。
+- `revenuecat-service-account@calendar-app-508202.iam.gserviceaccount.com` を作成。CloudはPub/Sub編集者とモニタリング閲覧者。PlayはMulti calendarだけにアプリ情報閲覧、従属する品質情報閲覧、売上データ表示、注文と定期購入管理を付与。アカウント全体・公開・ストア掲載管理の権限は付与していない。
+- JSON鍵はRevenueCatの既存Androidアプリ `app329cb0a5d3` に保存。ローカルの鍵は `C:\Users\Ryo\secure-keys\multi-calendar-revenuecat\` に保管し、現在のWindowsユーザーとSYSTEMだけのアクセス権にした。秘密値はGit・チャット・本記録に含めていない。
+- 当初は購入検証が権限不足。商品説明を一時変更して保存し、元の83文字へ戻す公式の反映促進手順を実行した時間帯に、RevenueCatが「Valid credentials（認証情報は有効）」へ変化。購入検証、商品一覧、定期購入・基本プラン一覧の3項目が成功。反映待ちの解消と再保存の因果関係は断定しない。
+- 通知トピック `projects/calendar-app-508202/topics/Play-Store-Notifications` をRevenueCatが作成。初回の接続は権限エラーだったが、トピックは存在していた。Google Playの送信元 `google-play-developer-notifications@system.gserviceaccount.com` に、このトピック限定のPub/Subパブリッシャーを付与し、既存トピックとして接続すると成功。サービスアカウントを管理者へ昇格していない。
+- Playのリアルタイム通知を有効化し、同トピックと「定期購入、取り消し済みの購入、すべての1回限りのアイテム」を保存。テスト通知を送信し、RevenueCatの最終受信 `2026-10-03 00:44 UTC（日本時間09:44）` を確認。通知だけから未登録購入を取り込む追加機能は既定の無効のまま。
+- 証拠画像はAI作業場の `出力画像/20261003_multi-calendar_revenuecat-valid.jpg` と `20261003_multi-calendar_revenuecat-connected.jpg`。
+
 課金全体を完了とは扱わない。以下にはまだ実施証拠がない。
 
-- RevenueCatのGoogleサービスアカウント認証、必要最小限のPlay権限、購入通知の連携。
-  - 画面で認証JSONが未登録であることを再確認。Google Cloudの `calendar-app-508202` はサービスアカウント0件。`revenuecat-service-account` の作成フォームを記入し、未送信で停止した。
-  - 次の確認対象は専用アカウント・鍵の作成、同アプリの購入情報閲覧と注文／定期購入管理、CloudのPub/Sub編集とMonitoring閲覧、認証JSONのRevenueCatへの登録。権限付与・鍵作成・転送はまだ行っていない。ストア掲載内容の管理は購入検証だけには使わないため、初期の付与対象から外す。
 - 実機の購入・復元・プラン変更・失効からWebhook、5件制御、追加OAuth、Googleへの作成・編集・削除までの通し検証。認可取り消し時、秘密化時の削除、再取り込み除外も実Googleで確認する。
 - iOSのRevenueCat公開キー、ストア商品・グループ・鍵、Xcodeビルド、Sandbox購入。
 - 更新したプライバシーポリシーの公開、利用条件の公開リンク、PlayとApp Storeの購入データ申告、Google OAuthスコープの公開審査状態。
@@ -74,3 +82,5 @@ Obsidianへの保存は未実施。saveスキルが参照する `operation-trans
 - [RevenueCatのCapacitor導入要件](https://www.revenuecat.com/docs/getting-started/installation/capacitor)
 - [Google Calendar PATCHの仕様](https://developers.google.com/workspace/calendar/api/v3/reference/events/patch)
 - [Google Play定期購入の管理](https://support.google.com/googleplay/android-developer/answer/140504)
+- [RevenueCatのGoogle認証設定と反映促進手順](https://www.revenuecat.com/docs/service-credentials/creating-play-service-credentials)
+- [RevenueCatのGoogle購入通知設定](https://www.revenuecat.com/docs/platform-resources/server-notifications/google-server-notifications)
