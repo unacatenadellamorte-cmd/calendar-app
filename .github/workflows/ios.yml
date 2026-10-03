@@ -5,16 +5,38 @@ on:
     branches: [main, 'feature/ios-widget-ci']
   pull_request:
   workflow_dispatch:
+    inputs:
+      capture:
+        description: ストア掲載用の実画面を架空データで撮影する
+        type: boolean
+        default: false
+      upload:
+        description: 検証済みの1.0.20 (23)をApp Store Connectへ送信する
+        type: boolean
+        default: false
+      release:
+        description: App Store配布ビルドを実行する（未指定なら署名なし検証）
+        type: boolean
+        default: false
+      version:
+        description: 公開バージョン（配布時のみ必須）
+        type: string
+        default: ''
+      build:
+        description: ビルド番号（配布時のみ必須）
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ios-${{ github.workflow }}-${{ github.ref }}-${{ inputs.capture && 'capture' || inputs.upload && 'upload' || inputs.release && 'release' || 'validation' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload) }}
 
 jobs:
   web:
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload && !inputs.capture) }}
     name: Web側の回帰検証
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -34,9 +56,12 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: node --test scripts/ios/*.test.mjs
+      - run: python3 scripts/ios/test-release-signing.py
       - run: npm run build
 
   ios:
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.release && !inputs.upload && !inputs.capture) }}
     name: Swift検証と署名なしシミュレータビルド
     runs-on: macos-15
     timeout-minutes: 30
@@ -68,6 +93,8 @@ jobs:
         run: bundle exec ruby scripts/ios/test-widget-target.rb
       - name: ウィジェットをXcodeプロジェクトに追加
         run: bundle exec ruby scripts/ios/add-widget-target.rb
+      - name: 実プラグインのGoogle認可状態を検証
+        run: python3 scripts/ios/test-google-authorization.py
       - name: Swiftの共有データ契約を検証
         run: swift test --package-path ios/App/FeaturedEventsWidget
       - name: アプリとウィジェットをビルド
@@ -90,6 +117,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=1.0.19 CURRENT_PROJECT_VERSION=20 \
             archive 2>&1 | tee ios-archive.log
           test -d ios/UnsignedApp.xcarchive/Products/Applications/App.app/PlugIns/FeaturedEventsWidget.appex
+          python3 scripts/ios/release-signing.py manifests ios/UnsignedApp.xcarchive/Products/Applications/App.app
       - name: 署名なし成果物を保存
         shell: bash
         run: |
@@ -110,5 +138,205 @@ jobs:
           path: |
             ios-build.log
             ios-archive.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release && !inputs.upload && !inputs.capture }}
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: ios-app-store
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      BUNDLE_GEMFILE: ${{ github.workspace }}/scripts/ios/Gemfile
+      IOS_RELEASE_VERSION: ${{ inputs.version }}
+      IOS_RELEASE_BUILD: ${{ inputs.build }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      VITE_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_SERVER_CLIENT_ID: ${{ vars.VITE_GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
+      GOOGLE_IOS_REVERSED_CLIENT_ID: ${{ vars.GOOGLE_IOS_REVERSED_CLIENT_ID }}
+      VITE_ADMOB_PLATFORM: ios
+      VITE_ADMOB_MODE: production
+      ADMOB_IOS_APP_ID: ${{ vars.ADMOB_IOS_APP_ID }}
+      VITE_ADMOB_IOS_BANNER_ID: ${{ vars.VITE_ADMOB_IOS_BANNER_ID }}
+      VITE_PRIVACY_POLICY_URL: ${{ vars.VITE_PRIVACY_POLICY_URL }}
+      VITE_REVENUECAT_IOS_KEY: ${{ vars.VITE_REVENUECAT_IOS_KEY }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - run: xcodebuild -version
+      - run: npm ci
+      - name: 手動入力と公開設定の不足を検出
+        run: |
+          node --input-type=module -e "import {validateReleaseEnv,validateReleaseVersion} from './scripts/ios/build-release-web.mjs'; validateReleaseEnv(process.env); validateReleaseVersion(process.env.IOS_RELEASE_VERSION,process.env.IOS_RELEASE_BUILD);"
+      - name: 配布秘密の不足を検出
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_APP_PROFILE_BASE64: ${{ secrets.IOS_APP_PROFILE_BASE64 }}
+          IOS_WIDGET_PROFILE_BASE64: ${{ secrets.IOS_WIDGET_PROFILE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import os
+          for name in ('APPLE_TEAM_ID', 'IOS_DISTRIBUTION_P12_BASE64', 'IOS_DISTRIBUTION_P12_PASSWORD', 'IOS_APP_PROFILE_BASE64', 'IOS_WIDGET_PROFILE_BASE64'):
+              if not os.environ.get(name):
+                  raise SystemExit(name + 'が未設定です。')
+          PY
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: node --test scripts/ios/*.test.mjs
+      - run: python3 scripts/ios/test-release-signing.py
+      - run: python3 scripts/ios/test-google-authorization.py
+      - run: npm run build:ios:release
+      - run: npx cap sync ios
+      - name: ネイティブ構成の生成と冪等性を検証
+        run: |
+          bundle exec ruby scripts/ios/test-widget-target.rb
+          bundle exec ruby scripts/ios/add-widget-target.rb
+          swift test --package-path ios/App/FeaturedEventsWidget
+      - name: 配布署名・archive・IPAを検証
+        shell: bash
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_APP_PROFILE_BASE64: ${{ secrets.IOS_APP_PROFILE_BASE64 }}
+          IOS_WIDGET_PROFILE_BASE64: ${{ secrets.IOS_WIDGET_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          trap 'python3 scripts/ios/release-signing.py cleanup' EXIT
+          python3 scripts/ios/release-signing.py
+      - name: 一時鍵とプロファイルを削除
+        if: always()
+        run: python3 scripts/ios/release-signing.py cleanup
+      - name: 検証済みIPAとdSYMを保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-store-ipa
+          path: |
+            ios-release-artifacts/Multi-calendar.ipa
+            ios-release-artifacts/Multi-calendar-dSYMs.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  upload:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload && !inputs.release && !inputs.capture }}
+    name: 検証済みIPAをAppleへ送信
+    runs-on: macos-15
+    timeout-minutes: 25
+    environment: ios-app-store
+    permissions:
+      actions: read
+      contents: read
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - name: 検証済みビルドの成果物を取得
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-app-store-ipa
+          run-id: 36855039541
+          github-token: ${{ github.token }}
+          path: verified-build
+      - name: 成果物のハッシュとバージョンを照合
+        run: |
+          python3 - <<'PY'
+          import hashlib, pathlib, plistlib, zipfile
+          ipa = pathlib.Path('verified-build/Multi-calendar.ipa')
+          assert hashlib.sha256(ipa.read_bytes()).hexdigest() == '1e45194869641987af8534f993333d448e6e385792b0e04d1621ce6ea5339e14', '検証済みIPAと一致しません'
+          with zipfile.ZipFile(ipa) as archive:
+              info = plistlib.loads(archive.read('Payload/App.app/Info.plist'))
+              assert info['CFBundleIdentifier'] == 'jp.ryo.multicalendar'
+              assert info['CFBundleShortVersionString'] == '1.0.20'
+              assert info['CFBundleVersion'] == '23'
+          print('検証済みIPAの同一性を確認しました。')
+          PY
+      - name: Appleへアップロード
+        env:
+          ASC_API_PRIVATE_KEY: ${{ secrets.ASC_API_PRIVATE_KEY }}
+          ASC_API_KEY_ID: ${{ vars.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ vars.ASC_API_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export API_PRIVATE_KEYS_DIR="$RUNNER_TEMP/asc-upload-keys"
+          mkdir -m 700 "$API_PRIVATE_KEYS_DIR"
+          trap 'rm -f "$API_PRIVATE_KEYS_DIR/AuthKey_${ASC_API_KEY_ID}.p8"; rmdir "$API_PRIVATE_KEYS_DIR"' EXIT
+          test -n "$ASC_API_PRIVATE_KEY" && test -n "$ASC_API_KEY_ID" && test -n "$ASC_API_ISSUER_ID"
+          umask 077
+          printf '%s' "$ASC_API_PRIVATE_KEY" > "$API_PRIVATE_KEYS_DIR/AuthKey_${ASC_API_KEY_ID}.p8"
+          unset ASC_API_PRIVATE_KEY
+          xcrun altool --validate-app -f verified-build/Multi-calendar.ipa -t ios --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID"
+          xcrun altool --upload-app -f verified-build/Multi-calendar.ipa -t ios --apiKey "$ASC_API_KEY_ID" --apiIssuer "$ASC_API_ISSUER_ID"
+
+  capture:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.capture && !inputs.release && !inputs.upload }}
+    name: iPhoneとiPadのストア画面を撮影
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      BUNDLE_GEMFILE: ${{ github.workspace }}/scripts/ios/Gemfile
+      VITE_ADMOB_PLATFORM: ios
+      VITE_ADMOB_MODE: test
+      VITE_SUPABASE_URL: http://127.0.0.1:5188
+      VITE_SUPABASE_ANON_KEY: demo-anon-key-for-local-capture-only
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - run: bundle exec ruby scripts/ios/add-widget-target.rb
+      - name: 撮影専用ビルドでローカルfixture通信を許可
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          path = 'ios/App/App/Info.plist'
+          with open(path, 'rb') as stream:
+              info = plistlib.load(stream)
+          info['NSAppTransportSecurity'] = {'NSAllowsArbitraryLoads': True, 'NSAllowsLocalNetworking': True}
+          with open(path, 'wb') as stream:
+              plistlib.dump(info, stream)
+          PY
+      - name: シミュレータ専用アプリをビルド
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/CaptureDerivedData CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=1.0.20 CURRENT_PROJECT_VERSION=21 build > "$RUNNER_TEMP/capture-build.log" 2>&1
+      - run: python3 scripts/ios/capture-store.py
+        env:
+          CAPTURE_OUTPUT: ${{ runner.temp }}/出力画像
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-store-screenshots
+          path: ${{ runner.temp }}/出力画像
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ios-capture-build-log
+          path: ${{ runner.temp }}/capture-build.log
           if-no-files-found: ignore
           retention-days: 7

@@ -20,7 +20,8 @@
     "postinstall": "node scripts/android/patch-admob.mjs && node scripts/ios/patch-admob.mjs",
     "patch:admob": "node scripts/android/patch-admob.mjs && node scripts/ios/patch-admob.mjs",
     "sync:ios-ads": "node scripts/ios/sync-admob-config.mjs",
-    "capacitor:sync:after": "node scripts/ios/sync-admob-config.mjs"
+    "capacitor:sync:after": "node scripts/ios/sync-admob-config.mjs",
+    "build:ios:release": "npm run build --workspace @calendar-app/core && node scripts/ios/build-release-web.mjs"
   },
   "dependencies": {
     "@calendar-app/core": "*",

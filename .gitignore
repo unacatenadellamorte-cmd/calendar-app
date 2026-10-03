@@ -22,3 +22,10 @@ _bmad/render/
 supabase/.branches/
 supabase/.temp/
 supabase/.env
+
+# iOS配布の署名素材・ローカル成果物
+*.p12
+*.mobileprovision
+*.keychain-db
+ios-release-artifacts/
+__pycache__/

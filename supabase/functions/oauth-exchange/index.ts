@@ -6,7 +6,7 @@
 //
 // 必要な関数シークレット(Supabase ダッシュボード → Edge Functions → Secrets):
 //   GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REDIRECT_URI
-//   APP_ORIGIN / APP_ORIGINS: WebとAndroidの明示許可オリジン。
+//   APP_ORIGIN / APP_ORIGINS: WebとAndroid/iOSの明示許可オリジン。
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY は実行時に自動注入される。
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -95,10 +95,9 @@ async function handle(req: Request): Promise<Response> {
   } catch {
     // フォールスルー
   }
-  if (platform !== undefined && platform !== 'android' && platform !== 'web') {
+  if (platform !== undefined && platform !== 'android' && platform !== 'ios' && platform !== 'web') {
     return jsonResponse(req, { error: 'exchange-failed' }, 400);
   }
-  const android = platform === 'android';
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -113,7 +112,8 @@ async function handle(req: Request): Promise<Response> {
     if (!allowed || !conn?.google_email) return jsonResponse(req, { error: 'write-not-allowed' }, 403);
     expectedEmail = conn.google_email;
   }
-  if (android && (expectedUserId !== userId || userData.user.is_anonymous)) {
+  const native = platform === 'android' || platform === 'ios';
+  if (native && (expectedUserId !== userId || userData.user.is_anonymous)) {
     return jsonResponse(req, { error: 'not-authenticated' }, 401);
   }
   if (!code) return jsonResponse(req, { error: 'exchange-failed' }, 400);
@@ -125,9 +125,9 @@ async function handle(req: Request): Promise<Response> {
     console.error('oauth-exchange: missing GOOGLE_OAUTH_CLIENT_ID / _SECRET');
     return jsonResponse(req, { error: 'exchange-failed' }, 500);
   }
-  // Webは既存のリダイレクト先を維持する。Androidのサーバー用コードは空文字で交換する。
-  const effectiveRedirect = android ? '' : redirectUri ?? configuredRedirect ?? '';
-  if (android && redirectUri !== undefined) {
+  // Webは既存のリダイレクト先を維持する。ネイティブのサーバー用コードは空文字で交換する。
+  const effectiveRedirect = native ? '' : redirectUri ?? configuredRedirect ?? '';
+  if (native && redirectUri !== undefined) {
     return jsonResponse(req, { error: 'exchange-failed' }, 400);
   }
 
@@ -157,8 +157,8 @@ async function handle(req: Request): Promise<Response> {
     return jsonResponse(req, { error: parsed.reason }, 400);
   }
 
-  // Androidはコード交換で返されたスコープをサーバーでも確認する。
-  if (android || writeConnectionId) {
+  // ネイティブまたは追加書込み認可は、コード交換で返されたスコープを確認する。
+  if (native || writeConnectionId) {
     const scope = (tokenJson as Record<string, unknown>).scope;
     const granted = typeof scope === 'string' ? scope.split(/\s+/) : [];
     if (![
@@ -178,11 +178,11 @@ async function handle(req: Request): Promise<Response> {
     });
     if (listRes.ok) {
       googleEmail = primaryEmailFromCalendarList(await listRes.json());
-    } else if (android) {
+    } else if (native) {
       return jsonResponse(req, { error: 'exchange-failed' }, 502);
     }
   } catch {
-    if (android) return jsonResponse(req, { error: 'exchange-failed' }, 502);
+    if (native) return jsonResponse(req, { error: 'exchange-failed' }, 502);
     // Webの既存フローではメール取得はベストエフォート。
   }
 

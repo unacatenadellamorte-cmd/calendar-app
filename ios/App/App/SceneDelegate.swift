@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import GoogleSignIn
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
@@ -8,14 +9,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        window?.rootViewController = CalendarBridgeViewController()
         window?.makeKeyAndVisible()
 
+        // コールド起動時もGoogleの戻りURLをSDKへ渡す。既存リンクは従来の経路で処理する。
+        for context in connectionOptions.urlContexts {
+            _ = GIDSignIn.sharedInstance.handle(context.url)
+        }
+        // Capacitorはcold start時のURLとuserActivityをviewDidAppear後に配送するため、
+        // ConnectionOptionsを加工せずそのまま渡す。
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
-        SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
+        let remaining = URLContexts.filter { !GIDSignIn.sharedInstance.handle($0.url) }
+        if !remaining.isEmpty {
+            SceneDelegateProxy.shared.scene(scene, openURLContexts: remaining)
+        }
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {

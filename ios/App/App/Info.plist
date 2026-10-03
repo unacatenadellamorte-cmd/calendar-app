@@ -29,6 +29,10 @@
 		(形式の解釈は src/app/DeepLinkListener.tsx が行う)。
 		Xcode でのビルド確認は本ストーリーの対象外(Mac 環境確保後のフォローアップ)。
 	-->
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>GIDServerClientID</key>
+	<string>$(GOOGLE_SERVER_CLIENT_ID)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -37,6 +41,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>calendar-app</string>
+				<string>$(GOOGLE_IOS_REVERSED_CLIENT_ID)</string>
 			</array>
 		</dict>
 	</array>

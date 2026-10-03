@@ -1,0 +1,11 @@
+Additional information for Guideline 2.1 (2026-10-01)
+
+Purpose and audience: Multi Calendar is a personal calendar and shift planner for adults, including shift workers and people managing work and private schedules. It combines color-coded calendars, shift templates, wage estimates, reminders and home-screen widgets. Wage estimates are user-entered calculations, not payroll or financial transactions.
+
+Access and main features: Launch the app and use guest mode or sign in with the app review credentials already provided. Settings > Account allows registration/login. Create a calendar, open Calendar, choose a date and add an event (timed or all-day). Create shift templates in Settings and apply them from Calendar's shift entry screen. Settings > Calendar connections provides optional Google and device calendar imports; choose calendars and run Import now. Grant calendar access in iOS Settings when required. Google authorization uses the separate Google review account already provided. Add widgets from the home screen. No sample files are required.
+
+Account deletion: Settings > Account > Delete account > acknowledge the data-loss notice > Permanently delete. This deletes the app account and its associated cloud/local data. Original events in Google and device calendars remain unchanged. Test deletion only with a disposable account.
+
+Services: Supabase (email/password and guest authentication, app database/storage and server functions); Google Calendar API and Google Sign-In (optional read-only calendar import); Apple EventKit (optional device calendar import); Google AdMob (banner advertisements and consent); Apple local notifications and WidgetKit. No AI service, payment processor, subscription or in-app purchase is used.
+
+Regions and content: Core features are consistent across the selected countries. Language, device time zone, ad availability and consent screens can vary. The initial distribution excludes EU countries. Entries and profile images are private to the user's account; the app has no public feed, chat or user-to-user content sharing. No public-user reporting/blocking flow applies. No regulated services or third-party entertainment catalog. Calendar data is accessed only with user authorization.
