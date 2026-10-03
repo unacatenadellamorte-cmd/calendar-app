@@ -132,3 +132,11 @@ context:
 - 新提出 `cfa63106-c4eb-4296-860a-52697142e210` は2026-10-03 14:22 JSTに送信。アプリ1.0.23（27）、Multi calendar 有料プラングループ、複数アカウント、予定反映の4項目すべてが画面上「審査待ち」。APIも`WAITING_FOR_REVIEW`、項目数4、選択build ID `23b097be-a433-4d37-ad30-4447b08254e1`、`releaseType: MANUAL`を確認した。
 - 承認後の一般公開操作、実ユーザー端末の変更・削除、実機購入・復元QAは行っていない。仕様書の`done`は今回の修正・成果物検証・再提出の完了を表し、ストア承認や一般公開の完了ではない。
 - 詳細・証跡: `docs/store-replacement-submitted-20261003.md`。
+
+## 2026-10-04 Appleメタデータ指摘の修正
+
+- 2026-10-03 22:01のApple自動メッセージで、3.1.2（サブスクリプション）のEULAリンク不足を指摘された。これはApp Store掲載概要の問題で、入力シートやキャッシュ修正の却下を意味しない。
+- 日英の既存概要を保持し、Apple標準EULAの機能するURL `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/` をそれぞれの末尾に追加・保存した。独自EULAや法的設定は変更していない。
+- 同じbuild 27・課金3項目を維持し、修正内容をAppleへ返信。2026-10-04 00:52:50 JSTに同じ提出 `cfa63106-c4eb-4296-860a-52697142e210` を再提出した。
+- 画面で4項目すべて審査待ち、公式APIで提出・アプリ版の`WAITING_FOR_REVIEW`、項目数4、選択build 27、`releaseType: MANUAL`を確認。コードや成果物を変更しておらず、仕様書の修正・配布完了としての`done`を維持した。ストア承認は未確認。
+- 再発防止として、全有効ローカライズの概要にEULA URLがあることを提出前の確認事項へ記録した。詳細は `docs/apple-eula-metadata-fix-20261004.md`。
