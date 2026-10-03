@@ -2,7 +2,7 @@
 title: 'iOS入力シートの横揺れ修正とApple再提出'
 type: 'bugfix'
 created: '2026-10-03'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '3fc1d4405f0da0d3faacd63d3fd2993967b484f0'
@@ -52,15 +52,15 @@ context:
 - [x] `src/ui/BottomSheet.tsx`, `src/styles/global.css` -- 本文を幅内へ拘束し横スクロール・パンを止める。
 - [x] `src/ui/BottomSheet.test.tsx` と関連フォームテスト -- 横幅と既存操作を回帰検証する。
 - [x] Web全体 -- 型検査・lint・テスト・ビルドを通す。
-- [x] iOS -- 追加の更新キャッシュ修正を含む1.0.23（26）の署名済みIPAとWidget、本番設定を照合する。
-- [x] App Store Connect -- 1.0.23（26）、サブスクリプショングループ、月額プラン2件を同じ提出物として再審査へ送る。
-- [x] Google Play -- 1.0.23（versionCode 25）をAlphaクローズドテストへ審査送信する。
+- [x] iOS -- レビュー修正を含む1.0.23（27）の署名済みIPAとWidget、本番設定を照合する。
+- [x] App Store Connect -- 1.0.23（27）、サブスクリプショングループ、月額プラン2件を同じ提出物として再審査へ送る。
+- [x] Google Play -- 1.0.23（versionCode 26）をAlphaクローズドテストへ審査送信する。
 
 **Acceptance Criteria:**
 - Given 3つの入力シート, when 横へドラッグする, then 端末幅からずれず横位置が変化しない。
 - Given 320px相当の幅, when 2列の時刻・数値入力と24色を表示する, then 入力欄は幅内へ縮み色は折り返し、横スクロール領域を作らない。
-- Given 修正済みコミット, when 配布ビルドする, then 1.0.23（26）のアプリとWidgetが署名検証を通る。
-- Given Appleへのアップロード完了, when App Store Connectを確認する, then 1.0.23（26）と課金4項目が「審査待ち」であることを確認できる。
+- Given 修正済みコミット, when 配布ビルドする, then 1.0.23（27）のアプリとWidgetが署名検証を通る。
+- Given Appleへのアップロード完了, when App Store Connectを確認する, then 1.0.23（27）と課金3項目の計4項目が「審査待ち」であることを確認できる。
 
 ## Implementation Notes
 
@@ -123,3 +123,12 @@ context:
 - Google code 25は確認中に審査が終わり、Alphaで選択したテスターへ100%公開済みとなった。こちらで現行変更の削除・公開操作はしていない。次回はcode 26の新しいAlphaリリースを作成して審査へ送る。
 - Appleの現行build 26と課金3項目は審査待ちを維持。ユーザー指定の「差し替え直前」へ到達したため、提出キャンセル・更新提出は行っていない。仕様書の`in-review`を維持し、差し替え再提出後に`done`へ進める。
 - 詳細と証跡は `docs/store-replacement-ready-20261003.md`。
+
+## 2026-10-03 差し替え・再提出完了
+
+- ユーザーの「続けて」を受け、準備済みAndroid code 26とApple build 27への差し替え・再提出を実行した。追加のコード変更や成果物再生成はしていない。
+- Google Play: 新しいAlphaリリース7にcode 26だけを追加し、code 25は新リリースから除外。リリース名は「1.0.23 入力画面・更新キャッシュ修正（26）」、対象は既存Alphaテスターの100%。審査送信操作後に「審査中の変更」を確認。クイックチェック完了後に審査へ自動送信される状態であり、code 26の配信開始はまだ確認していない。対応端末の増減なし、難読化解除ファイル未添付の警告1件のみ。
+- Apple: 旧提出 `276c1a0f-d1a9-4949-9343-cf7a34facf46` を取り下げ、アプリ版の選択をbuild 26から27へ変更。既存の審査メモはビルド番号だけ27へ更新し、審査アカウント・課金情報は維持した。
+- 新提出 `cfa63106-c4eb-4296-860a-52697142e210` は2026-10-03 14:22 JSTに送信。アプリ1.0.23（27）、Multi calendar 有料プラングループ、複数アカウント、予定反映の4項目すべてが画面上「審査待ち」。APIも`WAITING_FOR_REVIEW`、項目数4、選択build ID `23b097be-a433-4d37-ad30-4447b08254e1`、`releaseType: MANUAL`を確認した。
+- 承認後の一般公開操作、実ユーザー端末の変更・削除、実機購入・復元QAは行っていない。仕様書の`done`は今回の修正・成果物検証・再提出の完了を表し、ストア承認や一般公開の完了ではない。
+- 詳細・証跡: `docs/store-replacement-submitted-20261003.md`。
