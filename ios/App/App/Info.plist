@@ -22,6 +22,9 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- 独自暗号は実装せず、通信はOS提供の標準暗号だけを使用する。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!--
 		ディープリンク(ARCHITECTURE-SPINE Epic5 AD-16 / AD-18)。
 		スキーム calendar-app:// は識別子変更後も既存リンクとの互換性のため維持する。

@@ -8,6 +8,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const ads = resolveAdsConfig({ ...loadEnv(mode, process.cwd(), ''), ...process.env });
+  const nativeTarget = process.env.VITE_NATIVE_TARGET;
+  const isNativeBuild = nativeTarget === 'android' || nativeTarget === 'ios';
   return ({
   define: { __ADMOB_CONFIG__: JSON.stringify(ads) },
   plugins: [
@@ -23,6 +25,8 @@ export default defineConfig(({ mode }) => {
       // テスト実行時は Service Worker まわりを無効化する。
       disable: mode === 'test',
       registerType: 'prompt',
+      // ネイティブ更新時だけ、旧Webキャッシュを自動的に破棄する。
+      selfDestroying: isNativeBuild,
       // 登録は src/app/PwaUpdatePrompt.tsx の useRegisterSW が行う。
       injectRegister: null,
       devOptions: { enabled: false },

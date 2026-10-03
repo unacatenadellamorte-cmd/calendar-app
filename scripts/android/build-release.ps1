@@ -20,9 +20,11 @@ if (-not $Unsigned) {
 }
 
 $previousBuildRoot = $env:ANDROID_BUILD_ROOT
+$previousNativeTarget = $env:VITE_NATIVE_TARGET
 Push-Location $projectRoot
 try {
     $env:ANDROID_BUILD_ROOT = $BuildRoot
+    $env:VITE_NATIVE_TARGET = 'android'
     & npm.cmd run build
     if ($LASTEXITCODE -ne 0) { throw 'Webビルドに失敗しました。' }
     & npx.cmd cap sync android
@@ -38,5 +40,6 @@ try {
     Get-FileHash -LiteralPath $bundle -Algorithm SHA256
 } finally {
     $env:ANDROID_BUILD_ROOT = $previousBuildRoot
+    if ($null -eq $previousNativeTarget) { Remove-Item Env:VITE_NATIVE_TARGET -ErrorAction SilentlyContinue } else { $env:VITE_NATIVE_TARGET = $previousNativeTarget }
     Pop-Location
 }

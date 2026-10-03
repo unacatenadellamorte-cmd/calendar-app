@@ -12,6 +12,7 @@ import { DeepLinkListener } from '@/app/DeepLinkListener';
 import { DeviceSyncOnResume } from '@/app/DeviceSyncOnResume';
 import { WidgetSync } from '@/app/WidgetSync';
 import { PurchasesSync } from '@/app/PurchasesSync';
+import { cleanupNativeServiceWorker } from '@/platform/nativeServiceWorkerCleanup';
 // Supabase クライアントの初期化(モジュール副作用)。未設定なら警告が1行出るだけ。
 import '@/data/supabase';
 import './styles/global.css';
@@ -21,6 +22,7 @@ initLanguage();
 initTheme();
 initMonthEventSize();
 if (!isAccountDataBlocked()) void initBackground();
+void cleanupNativeServiceWorker();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

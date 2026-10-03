@@ -70,7 +70,14 @@ export async function buildReleaseWeb() {
   if ((await response.json()).external?.email !== true) throw new ReleaseConfigError('Supabaseのメール認証が有効ではありません。');
   for (const name of publicKeys) if (env[name] !== undefined) process.env[name] = env[name];
   process.env.ADMOB_IOS_APP_ID = env.ADMOB_IOS_APP_ID;
-  await build({ mode: 'production', build: { sourcemap: false } });
+  const previousNativeTarget = process.env.VITE_NATIVE_TARGET;
+  try {
+    process.env.VITE_NATIVE_TARGET = 'ios';
+    await build({ mode: 'production', build: { sourcemap: false } });
+  } finally {
+    if (previousNativeTarget === undefined) delete process.env.VITE_NATIVE_TARGET;
+    else process.env.VITE_NATIVE_TARGET = previousNativeTarget;
+  }
   const ads = JSON.parse(await readFile('dist/admob-config.json', 'utf8'));
   if (ads.platform !== 'ios' || ads.mode !== 'production' || ads.appId !== env.ADMOB_IOS_APP_ID ||
       ads.bannerId !== env.VITE_ADMOB_IOS_BANNER_ID || ads.debugEea || ads.testDeviceIds.length) {
