@@ -15,6 +15,19 @@ if (-not $Unsigned) {
     if (-not (Test-Path -LiteralPath $env:ANDROID_KEYSTORE_PATH -PathType Leaf)) {
         throw '指定したキーストアが存在しません。'
     }
+
+    # 別アプリの鍵で署名してもAAB生成自体は成功するため、Play登録済みの
+    # Multi calendarアップロード証明書と一致することをビルド前に確かめる。
+    $expectedUploadSha1 = 'F8B5AC884AC40E5E4934F9B5CC4CEE1EE1A8773E'
+    $keytoolOutput = & keytool -list -v `
+        -keystore $env:ANDROID_KEYSTORE_PATH `
+        -alias $env:ANDROID_KEY_ALIAS `
+        -storepass:env ANDROID_KEYSTORE_PASSWORD 2>&1
+    if ($LASTEXITCODE -ne 0) { throw '提出用キーストアの証明書を確認できませんでした。' }
+    $sha1Line = $keytoolOutput | Select-String -Pattern 'SHA1:\s*([0-9A-F:]+)' | Select-Object -First 1
+    if (-not $sha1Line -or (($sha1Line.Matches[0].Groups[1].Value -replace ':', '').ToUpperInvariant() -ne $expectedUploadSha1)) {
+        throw '提出用キーストアがMulti calendarのGoogle Playアップロード鍵と一致しません。'
+    }
 } elseif ($env:ANDROID_KEYSTORE_PATH) {
     throw '未署名検証では署名用環境変数を設定していないターミナルを使ってください。'
 }
