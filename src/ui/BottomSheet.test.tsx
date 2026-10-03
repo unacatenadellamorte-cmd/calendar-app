@@ -69,4 +69,15 @@ describe('入力レイヤー', () => {
     act(() => back.close?.());
     expect(close).not.toHaveBeenCalled();
   });
+  it('本文を端末幅に拘束し、横スクロールと横パンを許可しない', () => {
+    render(
+      <BottomSheet open title="入力" onClose={vi.fn()}>
+        <div data-testid="wide-content" style={{ width: '600px' }} />
+      </BottomSheet>,
+    );
+    const panel = screen.getByRole('dialog');
+    const content = screen.getByTestId('wide-content').parentElement;
+    expect(panel).toHaveClass('min-w-0', 'max-w-2xl', 'overflow-x-hidden');
+    expect(content).toHaveClass('w-full', 'min-w-0', 'max-w-full', 'overflow-x-hidden', 'touch-pan-y');
+  });
 });

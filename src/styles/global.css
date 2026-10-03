@@ -97,7 +97,13 @@ body {
   padding-left: calc(1rem + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
   padding-right: calc(1rem + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
 }
-.bottom-sheet-content { min-width: 0; overflow-wrap: anywhere; }
+.bottom-sheet-content {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
 
 /* flex内のフォームは入力欄の固有幅まで広がらず、狭い端末では列幅へ縮む。 */
 form, fieldset, label { min-width: 0; }
