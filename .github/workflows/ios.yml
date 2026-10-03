@@ -11,7 +11,7 @@ on:
         type: boolean
         default: false
       upload:
-        description: 検証済みの1.0.23 (26)をApp Store Connectへ送信する
+        description: 検証済みの1.0.23 (27)をApp Store Connectへ送信する
         type: boolean
         default: false
       release:
@@ -247,7 +247,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ios-app-store-ipa
-          run-id: 37092922180
+          run-id: 37098312898
           github-token: ${{ github.token }}
           path: verified-build
       - name: 成果物のハッシュとバージョンを照合
@@ -255,12 +255,12 @@ jobs:
           python3 - <<'PY'
           import hashlib, pathlib, plistlib, zipfile
           ipa = pathlib.Path('verified-build/Multi-calendar.ipa')
-          assert hashlib.sha256(ipa.read_bytes()).hexdigest() == '6d5f4240acb8202982e113b523d2682da35f034a3622fc38b83f11a0bad2e706', '検証済みIPAと一致しません'
+          assert hashlib.sha256(ipa.read_bytes()).hexdigest() == '3eef691d448e73b2077e697093c90e32f77ed0939c1a7cffcbad476f52378ec8', '検証済みIPAと一致しません'
           with zipfile.ZipFile(ipa) as archive:
               info = plistlib.loads(archive.read('Payload/App.app/Info.plist'))
               assert info['CFBundleIdentifier'] == 'jp.ryo.multicalendar'
               assert info['CFBundleShortVersionString'] == '1.0.23'
-              assert info['CFBundleVersion'] == '26'
+              assert info['CFBundleVersion'] == '27'
           print('検証済みIPAの同一性を確認しました。')
           PY
       - name: Appleへアップロード
