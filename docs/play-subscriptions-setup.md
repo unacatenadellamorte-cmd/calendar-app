@@ -1,5 +1,7 @@
 # Play Console: サブスクリプション作成と RevenueCat 連携の手順(2026-10-02)
 
+> 2026-10-03更新: 販売アカウント登録済み。署名済み1.0.21／22をAlphaへ未公開保存済み（審査提出・配信なし）。下記2商品は日本向け月額300円／1,000円、基本プラン `monthly` で作成・有効化済み。RevenueCatのGoogle認証と実購入検証は未完了。最新結果は [検証記録](paid-features-verification-20261003.md) を参照。付録の未署名ビルド・署名キー未発見・singleTaskの記述は過去時点の記録。
+
 RevenueCat 側(プロジェクト・Android アプリ・Entitlement・商品・Offering・Webhook)は設定済み。
 この手順書は、**ユーザー本人が Play Console / Google Cloud で行う作業**。ID は RevenueCat 側と**完全一致**させる。
 

@@ -46,6 +46,7 @@ async function handle(req: Request): Promise<Response> {
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  await admin.rpc('reconcile_google_connections', { p_user_id: userId });
 
   // 3) 接続を引く。
   // リクエストボディに connection_id があれば それを使い、なければ未削除・active の接続を自動判定。
@@ -101,8 +102,9 @@ async function handle(req: Request): Promise<Response> {
   }
 
   // action === 'refresh'
-  const { data: refreshToken, error: rtError } = await admin.rpc('get_google_refresh_token', {
+  const { data: refreshToken, error: rtError } = await admin.rpc('get_google_connection_token', {
     p_user_id: userId,
+    p_connection_id: connectionId,
   });
   if (rtError || typeof refreshToken !== 'string' || !refreshToken) {
     return jsonResponse(req, { error: 'reauth-needed' }, 400);

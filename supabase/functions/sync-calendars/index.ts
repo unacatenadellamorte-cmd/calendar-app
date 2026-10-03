@@ -120,8 +120,9 @@ async function handle(req: Request): Promise<Response> {
   for (const [connectionId, list] of byConnection) {
     const userId = list[0].user_id;
 
-    const { data: refreshToken, error: rtError } = await admin.rpc('get_google_refresh_token', {
+    const { data: refreshToken, error: rtError } = await admin.rpc('get_google_connection_token', {
       p_user_id: userId,
+      p_connection_id: connectionId,
     });
     if (rtError || typeof refreshToken !== 'string' || !refreshToken) {
       for (const t of list) {
@@ -170,7 +171,19 @@ async function handle(req: Request): Promise<Response> {
         // 正規化 + external_id で重複排除(同一バッチ内の ON CONFLICT 二重更新を避ける)。
         // RPC の p_events は snake_case(toEventRow で写す)。
         const byExternalId = new Map<string, EventRow>();
+        // 別接続経由で同じGoogleカレンダーを読む場合も、自分が反映したコピーを除外する。
+        const pushedIds = new Set<string>();
+        // APIの件数上限を超えても除外漏れが起きないよう、取得した予定IDを小分けに照合する。
+        const rawIds = [...new Set(raw.flatMap(item => item.id ? [item.id] : []))];
+        for (let offset = 0; offset < rawIds.length; offset += 200) {
+          const { data: links, error: linkError } = await admin.from('event_google_links')
+            .select('google_event_id').eq('user_id', userId).eq('google_calendar_id', t.external_calendar_id)
+            .in('google_event_id', rawIds.slice(offset, offset + 200));
+          if (linkError) throw new Error('push-links-unavailable');
+          for (const link of links ?? []) pushedIds.add(link.google_event_id);
+        }
         for (const item of raw) {
+          if (pushedIds.has(item.id ?? '')) continue;
           const n = normalizeGoogleEvent(item);
           if (n) byExternalId.set(n.externalId, toEventRow(n));
         }

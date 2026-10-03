@@ -17,7 +17,8 @@ let package = Package(
         .package(name: "CapacitorAppLauncher", path: "../../../node_modules/@capacitor/app-launcher"),
         .package(name: "CapacitorLocalNotifications", path: "../../../node_modules/@capacitor/local-notifications"),
         .package(name: "EbarooniCapacitorCalendar", path: "../../../node_modules/@ebarooni/capacitor-calendar"),
-        .package(name: "CapacitorWidgetBridge", path: "../../../node_modules/capacitor-widget-bridge")
+        .package(name: "CapacitorWidgetBridge", path: "../../../node_modules/capacitor-widget-bridge"),
+        .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/@revenuecat/purchases-capacitor")
     ],
     targets: [
         .target(
@@ -30,7 +31,8 @@ let package = Package(
                 .product(name: "CapacitorAppLauncher", package: "CapacitorAppLauncher"),
                 .product(name: "CapacitorLocalNotifications", package: "CapacitorLocalNotifications"),
                 .product(name: "EbarooniCapacitorCalendar", package: "EbarooniCapacitorCalendar"),
-                .product(name: "CapacitorWidgetBridge", package: "CapacitorWidgetBridge")
+                .product(name: "CapacitorWidgetBridge", package: "CapacitorWidgetBridge"),
+                .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor")
             ]
         )
     ]

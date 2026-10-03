@@ -93,7 +93,9 @@ beforeEach(() => {
   localStorage.setItem(PLAN_SHEET_SEEN_KEY, '1');
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // 読み込み後のeffectを解決してからモックを片付ける。
+  await act(async () => {});
   vi.restoreAllMocks();
   localStorage.clear();
 });

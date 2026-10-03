@@ -19,6 +19,7 @@ import { applyEventTag } from '@/lib/event-tag';
 import { ReminderPicker } from './ReminderPicker';
 import { isAllowedExternalUrl, openExternalUrl, openMap } from '@/platform/externalLinks';
 import { LabelColorPresets } from '@/ui/LabelColorPresets';
+import { GooglePushStatus } from '@/features/google-push/ui/GooglePushStatus';
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
   /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
@@ -556,6 +557,7 @@ export function EventFormSheet({
           </button>
         )}
       </form>
+      {open && editing?.source === 'local' && <GooglePushStatus key={editing.id} eventId={editing.id} />}
     </BottomSheet>
   );
 }

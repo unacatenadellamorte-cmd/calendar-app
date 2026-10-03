@@ -7,6 +7,7 @@ import { PLANS, formatPlanPrice, type PlanPrice } from '../model/plans';
 import { useEntitlements } from '../model/useEntitlements';
 import { usePurchase } from '../model/usePurchase';
 import { purchaseStatusText } from './purchaseStatusText';
+import { SubscriptionNotice } from './SubscriptionNotice';
 
 interface PlanSheetProps {
   open: boolean;
@@ -123,6 +124,7 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
           );
         })}
       </ul>
+      <SubscriptionNotice />
 
       {(notice || progress) && (
         <p role="status" className="mt-2 text-meta text-ink-secondary">

@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import type { Calendar } from '@/data/calendars';
 import { EventFormSheet } from './EventFormSheet';
+vi.mock('@/features/google-push/ui/GooglePushStatus', () => ({ GooglePushStatus: () => null }));
 import { openMap, openExternalUrl } from '@/platform/externalLinks';
 vi.mock('@/platform/externalLinks', async (original) => ({
   ...(await original<typeof import('@/platform/externalLinks')>()),

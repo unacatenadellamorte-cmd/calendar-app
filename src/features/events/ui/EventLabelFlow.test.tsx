@@ -6,6 +6,7 @@ import type { Calendar } from '@/data/calendars';
 import type { EventItem } from '@/data/events';
 import { useEvents } from '../model/useEvents';
 import { EventFormSheet } from './EventFormSheet';
+vi.mock('@/features/google-push/ui/GooglePushStatus', () => ({ GooglePushStatus: () => null }));
 import { MonthView } from '@/features/calendar/ui/MonthView';
 import { groupEventsByDay, makePriorityOf } from '@/lib/calendar-view';
 

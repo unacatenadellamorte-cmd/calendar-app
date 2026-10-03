@@ -17,6 +17,8 @@ import { invokeFn } from './edge';
 
 /** CSRF 対策の state を置く sessionStorage キー。 */
 const STATE_KEY = 'calendar-app.google-oauth-state';
+const WRITE_KEY = 'calendar-app.google-oauth-write';
+const WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 
 /** コールバックのルートパス。Google Cloud の「承認済みリダイレクト URI」と一致させる。 */
 export const GOOGLE_CALLBACK_PATH = '/connections/google/callback';
@@ -30,6 +32,7 @@ export interface Connection {
 }
 
 export interface GoogleConnectionInfo extends Connection {
+  writeGranted?: boolean;
   /** 接続の状態: 'active' または 'suspended'。 */
   status: 'active' | 'suspended';
 }
@@ -42,12 +45,13 @@ interface ConnectionRow {
 }
 
 interface GoogleConnectionInfoRow extends ConnectionRow {
+  write_granted?: boolean;
   status: 'active' | 'suspended';
 }
 
 const UNAVAILABLE = appError('connection/unavailable', 'connection/unavailable');
 const COLUMNS = 'id,provider,google_email,created_at';
-const COLUMNS_WITH_STATUS = 'id,provider,google_email,created_at,status';
+const COLUMNS_WITH_STATUS = 'id,provider,google_email,created_at,status,write_granted';
 
 function toConnection(row: ConnectionRow): Connection {
   return {
@@ -65,6 +69,7 @@ function toGoogleConnectionInfo(row: GoogleConnectionInfoRow): GoogleConnectionI
     googleEmail: row.google_email,
     createdAt: row.created_at,
     status: row.status,
+    writeGranted: row.write_granted === true,
   };
 }
 
@@ -86,13 +91,20 @@ function randomState(): string {
  */
 let connecting = false;
 
-export async function startGoogleConnect(): Promise<Result<{ googleEmail: string | null }> | void> {
+export async function startGoogleConnect(options?: { writeConnectionId: string }): Promise<Result<{ googleEmail: string | null }> | void> {
   if (connecting) return err(appError('connection/exchange-failed', 'connection/exchange-failed'));
-  if (isAndroidGoogleAuthorization()) return connectAndroidGoogle();
+  if (isAndroidGoogleAuthorization()) return connectAndroidGoogle(options?.writeConnectionId);
   if (!env.googleOauthClientId) return err(UNAVAILABLE);
   const state = randomState();
   try {
     sessionStorage.setItem(STATE_KEY, state);
+    sessionStorage.removeItem(WRITE_KEY);
+    if (options) {
+      const current = await supabase?.auth.getSession();
+      const user = current?.data.session?.user;
+      if (!user || user.is_anonymous) return err(appError('connection/not-authenticated', 'connection/not-authenticated'));
+      sessionStorage.setItem(WRITE_KEY, JSON.stringify({ connectionId: options.writeConnectionId, userId: user.id }));
+    }
   } catch {
     // sessionStorage 不可でも state 照合以外は成立する。ただし CSRF 保護が効かないので中止。
     return err(appError('connection/state-mismatch', 'connection/state-mismatch'));
@@ -103,6 +115,7 @@ export async function startGoogleConnect(): Promise<Result<{ googleEmail: string
         clientId: env.googleOauthClientId,
         redirectUri: googleRedirectUri(),
         state,
+        ...(options ? { scopes: [GOOGLE_CALENDAR_SCOPES[0], WRITE_SCOPE] } : {}),
       }),
     ),
   );
@@ -122,7 +135,7 @@ export function withAccountChooser(authUrl: string): string {
 
 
 /** 認可開始時の利用者を固定し、交換直前の同一利用者のJWTを明示して使う。 */
-async function connectAndroidGoogle(): Promise<Result<{ googleEmail: string | null }>> {
+async function connectAndroidGoogle(writeConnectionId?: string): Promise<Result<{ googleEmail: string | null }>> {
   if (!supabase || !env.googleOauthClientId) return err(UNAVAILABLE);
   connecting = true;
   let unsubscribe: (() => void) | undefined;
@@ -137,18 +150,20 @@ async function connectAndroidGoogle(): Promise<Result<{ googleEmail: string | nu
       if (!current || current.user.id !== session.user.id) changed = true;
     });
     unsubscribe = () => listener.subscription.unsubscribe();
-    const authorization = await authorizeGoogle(env.googleOauthClientId);
+    const authorization = writeConnectionId ? await authorizeGoogle(env.googleOauthClientId, true) : await authorizeGoogle(env.googleOauthClientId);
     const current = await supabase.auth.getSession();
     const exchangeSession = current.data.session;
     if (changed || current.error || !exchangeSession || exchangeSession.user.id !== session.user.id) {
       return err(appError('connection/not-authenticated', 'connection/not-authenticated'));
     }
-    if (!authorization.code || !GOOGLE_CALENDAR_SCOPES.every((scope) => authorization.grantedScopes?.includes(scope))) {
+    const scopes = writeConnectionId ? [GOOGLE_CALENDAR_SCOPES[0], WRITE_SCOPE] : GOOGLE_CALENDAR_SCOPES;
+    if (!authorization.code || !scopes.every((scope) => authorization.grantedScopes?.includes(scope) || (scope === GOOGLE_CALENDAR_SCOPES[1] && authorization.grantedScopes?.includes(WRITE_SCOPE)))) {
       return err(appError('connection/exchange-failed', 'connection/exchange-failed'));
     }
     const result = await invokeFn<{ googleEmail: string | null } | null>(
       'oauth-exchange',
-      { code: authorization.code, platform: 'android', expectedUserId: session.user.id },
+      { code: authorization.code, platform: 'android', expectedUserId: session.user.id,
+        ...(writeConnectionId ? { writeConnectionId } : {}) },
       slugToConnectionKey,
       'connection/exchange-failed',
       exchangeSession.access_token,
@@ -193,6 +208,9 @@ export async function completeGoogleConnect(params: URLSearchParams): Promise<
   }
 
   const code = params.get('code');
+  let write: { connectionId: string; userId: string } | null = null;
+  try { write = JSON.parse(sessionStorage.getItem(WRITE_KEY) ?? 'null'); sessionStorage.removeItem(WRITE_KEY); }
+  catch { return err(appError('connection/state-mismatch', 'connection/state-mismatch')); }
   const returnedState = params.get('state');
   const storedState = safeReadState();
   safeClearState();
@@ -203,7 +221,7 @@ export async function completeGoogleConnect(params: URLSearchParams): Promise<
 
   const result = await invokeFn<{ googleEmail: string | null } | null>(
     'oauth-exchange',
-    { code, redirectUri: googleRedirectUri() },
+    { code, redirectUri: googleRedirectUri(), ...(write ? { writeConnectionId: write.connectionId, expectedUserId: write.userId } : {}) },
     slugToConnectionKey,
     'connection/exchange-failed',
   );

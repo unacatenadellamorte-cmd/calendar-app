@@ -299,8 +299,8 @@ describe('listConnections', () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.value).toEqual([
-        { id: 'c1', provider: 'google', googleEmail: 'a@gmail.com', createdAt: '2026-09-10T00:00:00Z', status: 'active' },
-        { id: 'c2', provider: 'google', googleEmail: null, createdAt: '2026-10-01T00:00:00Z', status: 'suspended' },
+        { id: 'c1', provider: 'google', googleEmail: 'a@gmail.com', createdAt: '2026-09-10T00:00:00Z', status: 'active', writeGranted: false },
+        { id: 'c2', provider: 'google', googleEmail: null, createdAt: '2026-10-01T00:00:00Z', status: 'suspended', writeGranted: false },
       ]);
     }
     expect(eqCalls).toContainEqual(['provider', 'google']);

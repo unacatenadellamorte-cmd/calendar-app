@@ -197,14 +197,13 @@ export type PurchaseOutcome = 'purchased' | 'cancelled';
  */
 async function findOldProductId(plan: EntitlementName): Promise<string | null> {
   if (plan !== 'multi_account' || currentPlatform() !== 'android') return null;
-  try {
+  {
+    // 旧契約の確認失敗を未契約扱いにすると二重契約になるため、例外は購入処理へ返す。
     const { customerInfo } = await Purchases.getCustomerInfo();
     const old = PRODUCT_IDS.calendar_write;
     return (
       customerInfo.activeSubscriptions.find((id) => id === old || id.startsWith(`${old}:`)) ?? null
     );
-  } catch {
-    return null;
   }
 }
 

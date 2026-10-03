@@ -2,6 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/auth-context';
 import { useState } from 'react';
+import { SubscriptionNotice } from '@/features/billing/ui/SubscriptionNotice';
 /**
  * 設定画面のアカウント欄。状態別に表示を変える。
  *  - unavailable: ローカル開発では無効
@@ -66,6 +67,7 @@ export function AccountSection() {
           <div className="mt-4 border-t border-border-hairline pt-4">
             {!confirming ? <button type="button" className="min-h-11 text-danger" onClick={() => setConfirming(true)}>{t('アカウントを削除')}</button> : (
               <div role="group" aria-label={t('アカウント削除の確認')}>
+                <SubscriptionNotice />
                 <p>{t('アカウント、予定、プロフィール、シフト、タグ、連携認証情報を削除します。この端末のキャッシュ、未送信操作、通知、ウィジェット、背景画像も消去します。')}</p>
                 <p className="mt-2">{t('Google・端末カレンダーの原本は削除しません。削除は取り消せません。')}</p>
                 <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />{t('対象データが失われることを確認しました')}</label>

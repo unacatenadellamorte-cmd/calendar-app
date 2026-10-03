@@ -79,6 +79,8 @@ Apple の Sandbox テスター、Google Play のライセンステスター、�
 - Web プラットフォーム: プラグインの `dist/esm/web.js` はモック実装(`getOfferings` は空、`purchasePackage` 等は mock 有効時のみ値を返す。`web.js` 内のエラーメッセージは 'Web not supported in this plugin.')。**Web での公式な動作保証は確認できていない**ため、本アプリでは Web では SDK を一切呼ばない。
 
 ## 5. 未確認・要判断
+
+2026-10-03追記: BILLING権限のマージ、AndroidのsingleTop化、iOSのRevenueCatプラグイン・SPM依存・In-App Purchase設定を確認済み。Google Playの2商品も作成・有効化済み。下記の対応項目は過去時点の記録で、実機購入とディープリンクは引き続き未検証。最新結果は [検証記録](paid-features-verification-20261003.md) を参照。
 - Android の BILLING 権限が自動でマージされるか(上記)。
 - Android の `launchMode="singleTask"` を変えるべきか(公式は standard / singleTop を要求。OAuth・ディープリンクとの兼ね合いは実機確認)。
 - Android の StoreProduct.identifier の形式(`商品ID` か `商品ID:ベースプランID` か)。CustomerInfo の `activeSubscriptions` の形式も同様に未確認(旧商品IDはその値をそのまま渡している)。

@@ -74,7 +74,7 @@ async function handle(req: Request): Promise<Response> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: userData, error: userError } = await userClient.auth.getUser();
-  if (userError || !userData?.user) {
+  if (userError || !userData?.user || userData.user.is_anonymous) {
     return jsonResponse(req, { error: 'not-authenticated' }, 401);
   }
   const userId = userData.user.id;
@@ -84,10 +84,12 @@ async function handle(req: Request): Promise<Response> {
   let redirectUri: string | undefined;
   let platform: unknown;
   let expectedUserId: unknown;
+  let writeConnectionId: string | undefined;
   try {
     const body = await req.json();
     platform = body?.platform;
     expectedUserId = body?.expectedUserId;
+    writeConnectionId = typeof body?.writeConnectionId === 'string' ? body.writeConnectionId : undefined;
     code = typeof body?.code === 'string' ? body.code : undefined;
     redirectUri = typeof body?.redirectUri === 'string' ? body.redirectUri : undefined;
   } catch {
@@ -97,6 +99,20 @@ async function handle(req: Request): Promise<Response> {
     return jsonResponse(req, { error: 'exchange-failed' }, 400);
   }
   const android = platform === 'android';
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  let expectedEmail: string | null = null;
+  if (writeConnectionId) {
+    if (expectedUserId !== userId) return jsonResponse(req, { error: 'not-authenticated' }, 401);
+    const { data: allowed } = await adminClient.rpc('can_google_write', { p_user_id: userId });
+    await adminClient.rpc('reconcile_google_connections', { p_user_id: userId });
+    const { data: conn } = await adminClient.from('connections').select('google_email')
+      .eq('id', writeConnectionId).eq('user_id', userId).eq('provider', 'google')
+      .eq('status', 'active').is('deleted_at', null).maybeSingle();
+    if (!allowed || !conn?.google_email) return jsonResponse(req, { error: 'write-not-allowed' }, 403);
+    expectedEmail = conn.google_email;
+  }
   if (android && (expectedUserId !== userId || userData.user.is_anonymous)) {
     return jsonResponse(req, { error: 'not-authenticated' }, 401);
   }
@@ -142,13 +158,14 @@ async function handle(req: Request): Promise<Response> {
   }
 
   // Androidはコード交換で返されたスコープをサーバーでも確認する。
-  if (android) {
+  if (android || writeConnectionId) {
     const scope = (tokenJson as Record<string, unknown>).scope;
     const granted = typeof scope === 'string' ? scope.split(/\s+/) : [];
     if (![
       'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
-      'https://www.googleapis.com/auth/calendar.events.readonly',
-    ].every((required) => granted.includes(required))) {
+      writeConnectionId ? 'https://www.googleapis.com/auth/calendar.events' : 'https://www.googleapis.com/auth/calendar.events.readonly',
+    ].every((required) => granted.includes(required) ||
+      (required.endsWith('calendar.events.readonly') && granted.includes('https://www.googleapis.com/auth/calendar.events')))) {
       return jsonResponse(req, { error: 'exchange-failed' }, 400);
     }
   }
@@ -170,13 +187,16 @@ async function handle(req: Request): Promise<Response> {
   }
 
   // 5) refresh_token を Vault へ、connections を upsert(service_role)。
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  if (!googleEmail || (expectedEmail && googleEmail.toLowerCase() !== expectedEmail.toLowerCase())) {
+    return jsonResponse(req, { error: 'account-mismatch' }, 400);
+  }
+  const grantedScope = (tokenJson as Record<string, unknown>).scope;
+  const writeGranted = typeof grantedScope === 'string' && grantedScope.split(/\s+/).includes('https://www.googleapis.com/auth/calendar.events');
   const { error: rpcError } = await adminClient.rpc('upsert_google_connection', {
     p_user_id: userId,
     p_refresh_token: parsed.refreshToken,
     p_google_email: googleEmail,
+    p_write_granted: writeGranted,
   });
   if (rpcError) {
     // 接続上限に達した場合は 403 で返す。

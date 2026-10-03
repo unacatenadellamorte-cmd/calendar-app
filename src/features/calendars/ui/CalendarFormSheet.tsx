@@ -4,6 +4,7 @@ import { BottomSheet } from '@/ui/BottomSheet';
 import { CALENDAR_COLORS, nextUnusedColor } from '@/data/calendar-colors';
 import type { Calendar } from '@/data/calendars';
 import { LabelColorPresets } from '@/ui/LabelColorPresets';
+import { GooglePushSettings } from '@/features/google-push/ui/GooglePushSettings';
 interface CalendarFormSheetProps {
   open: boolean;
   /** 編集対象。null なら新規作成。 */
@@ -97,6 +98,7 @@ export function CalendarFormSheet({
           </button>
         )}
       </form>
+      {open && editing?.source === 'local' && <GooglePushSettings key={editing.id} calendarId={editing.id} />}
     </BottomSheet>
   );
 }

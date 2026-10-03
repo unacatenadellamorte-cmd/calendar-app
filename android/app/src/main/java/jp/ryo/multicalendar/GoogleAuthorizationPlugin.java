@@ -29,6 +29,7 @@ public class GoogleAuthorizationPlugin extends Plugin {
     );
     private ActivityResultLauncher<IntentSenderRequest> launcher;
     private PluginCall pending;
+    private List<Scope> requestedScopes = SCOPES;
 
     @Override
     public void load() {
@@ -68,11 +69,14 @@ public class GoogleAuthorizationPlugin extends Plugin {
                 return;
             }
             pending = call;
+            requestedScopes = Boolean.TRUE.equals(call.getBoolean("write", false))
+                ? Arrays.asList(new Scope("https://www.googleapis.com/auth/calendar.calendarlist.readonly"),
+                    new Scope("https://www.googleapis.com/auth/calendar.events")) : SCOPES;
             try {
                 // 複数Googleアカウント対応: 既に認可済みのアカウントへ自動で決まらないよう、
                 // 毎回アカウント選択を求める(Web側の prompt=consent select_account と揃える)。
                 AuthorizationRequest request = AuthorizationRequest.builder()
-                    .setRequestedScopes(SCOPES)
+                    .setRequestedScopes(requestedScopes)
                     .requestOfflineAccess(clientId, true)
                     .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
                     .build();
@@ -111,7 +115,9 @@ public class GoogleAuthorizationPlugin extends Plugin {
         String code = result.getServerAuthCode();
         List<String> granted = result.getGrantedScopes();
         if (code == null || code.isEmpty() || granted == null
-            || !SCOPES.stream().allMatch(scope -> granted.contains(scope.getScopeUri()))) {
+            || !requestedScopes.stream().allMatch(scope -> granted.contains(scope.getScopeUri())
+                || (scope.getScopeUri().equals("https://www.googleapis.com/auth/calendar.events.readonly")
+                    && granted.contains("https://www.googleapis.com/auth/calendar.events")))) {
             rejectPending("exchange-failed");
             return;
         }

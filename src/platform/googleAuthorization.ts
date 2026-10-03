@@ -1,7 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface GoogleAuthorizationPlugin {
-  authorize(options: { serverClientId: string }): Promise<{ code: string; grantedScopes: string[] }>;
+  authorize(options: { serverClientId: string; write?: boolean }): Promise<{ code: string; grantedScopes: string[] }>;
 }
 
 const GoogleAuthorization = registerPlugin<GoogleAuthorizationPlugin>('GoogleAuthorization');
@@ -11,6 +11,6 @@ export function isAndroidGoogleAuthorization(): boolean {
 }
 
 /** 認可コードだけを受け渡す。長期トークンはサーバーだけで扱う。 */
-export function authorizeGoogle(serverClientId: string) {
-  return GoogleAuthorization.authorize({ serverClientId });
+export function authorizeGoogle(serverClientId: string, write = false) {
+  return GoogleAuthorization.authorize(write ? { serverClientId, write: true } : { serverClientId });
 }

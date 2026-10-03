@@ -215,6 +215,12 @@ describe('購入', () => {
       storeProductChangeInfo: { oldProductIdentifier: 'calendar_write_monthly:base' },
     });
   });
+  it('旧契約の確認に失敗したら二重契約を避けるため購入を中止する', async () => {
+    plugin.getCustomerInfo.mockRejectedValue(new Error('通信失敗'));
+    await purchases.configurePurchases('u1');
+    expect((await purchases.purchasePlan('multi_account')).ok).toBe(false);
+    expect(plugin.purchasePackage).not.toHaveBeenCalled();
+  });
   it('iOS では商品変更情報を渡さない(同一グループのストア処理に任せる)', async () => {
     platform = 'ios';
     plugin.getCustomerInfo.mockResolvedValue({

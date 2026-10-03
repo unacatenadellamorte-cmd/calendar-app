@@ -16,6 +16,7 @@ const config: CapacitorConfig = {
       '@capacitor-community/admob',
       '@capacitor/app', '@capacitor/app-launcher', '@capacitor/local-notifications',
       '@ebarooni/capacitor-calendar', 'capacitor-widget-bridge',
+      '@revenuecat/purchases-capacitor',
     ],
   },
 };

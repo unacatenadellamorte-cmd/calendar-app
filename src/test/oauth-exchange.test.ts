@@ -12,6 +12,9 @@ const source = (path: string) => transpileModule(readFileSync(resolve(root, path
 const scopes = 'https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events.readonly';
 const rpc = vi.fn();
 const fetchMock = vi.fn();
+const update = vi.fn();
+let writeAllowed = true;
+let connectionEmail = 'review@example.test';
 let handler: (request: Request) => Promise<Response>;
 let tokenBody: Record<string, unknown>;
 let userError: unknown;
@@ -19,7 +22,13 @@ let userId: string;
 let anonymous: boolean;
 
 beforeEach(() => {
-  rpc.mockReset().mockResolvedValue({ error: null });
+  rpc.mockReset().mockImplementation(async (name: string) => ({ data: name === 'can_google_write' ? writeAllowed : 'connection-a', error: null }));
+  update.mockReset(); writeAllowed=true; connectionEmail='review@example.test';
+  const query = { select: () => query, eq: () => query, is: () => query,
+    update: (value: unknown) => { update(value); return query; },
+    maybeSingle: async () => ({ data: { google_email: connectionEmail }, error: null }),
+    then: (fn: (value: unknown) => unknown) => Promise.resolve({ error: null }).then(fn),
+  };
   fetchMock.mockReset().mockImplementation(async (url: string) => {
     if (url.includes('/token')) return Response.json(tokenBody);
     return Response.json({ items: [{ primary: true, id: 'review@example.test' }] });
@@ -43,7 +52,7 @@ beforeEach(() => {
     require: (name: string) => name.includes('supabase-js') ? {
       createClient: () => ({ auth: { getUser: async () => ({
         data: { user: { id: userId, is_anonymous: anonymous } }, error: userError,
-      }) }, rpc }),
+      }) }, rpc, from: () => query }),
     } : corsExports,
   });
 });
@@ -57,6 +66,28 @@ function request(body: Record<string, unknown>, origin = 'https://localhost') {
 const androidBody = { platform: 'android', expectedUserId: 'user-a', code: 'native-code' };
 
 describe('oauth-exchangeのAndroid/Web境界', () => {
+  it('追加認可は本人の接続・有料権利・書き込みスコープが揃えば有効化する', async () => {
+    tokenBody.scope=scopes.replace('calendar.events.readonly','calendar.events');
+    const response=await handler(request({...androidBody,writeConnectionId:'connection-a'}));
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith('upsert_google_connection', expect.objectContaining({p_write_granted:true}));
+  });
+  it('別のGoogleアカウントを選んだ追加認可は既存トークンを置換しない', async () => {
+    tokenBody.scope=scopes.replace('calendar.events.readonly','calendar.events');
+    connectionEmail='other@example.test';
+    expect((await handler(request({...androidBody,writeConnectionId:'connection-a'}))).status).toBe(400);
+    expect(rpc.mock.calls.some(c=>c[0]==='upsert_google_connection')).toBe(false);
+  });
+  it('無料利用者は追加認可のトークン交換を開始しない', async () => {
+    writeAllowed=false;
+    expect((await handler(request({...androidBody,writeConnectionId:'connection-a'}))).status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('匿名利用者はWeb連携もできない', async () => {
+    anonymous=true;
+    expect((await handler(request({code:'web-code'}))).status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('Androidコードは空のredirect_uriで交換し本人のVault保存だけを呼ぶ', async () => {
     const response = await handler(request(androidBody));
     expect(response.status).toBe(200);
@@ -66,6 +97,7 @@ describe('oauth-exchangeのAndroid/Web境界', () => {
     expect(sent.get('client_id')).toBe('web-client');
     expect(rpc).toHaveBeenCalledWith('upsert_google_connection', {
       p_user_id: 'user-a', p_refresh_token: 'refresh', p_google_email: 'review@example.test',
+      p_write_granted: false,
     });
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://localhost');
   });

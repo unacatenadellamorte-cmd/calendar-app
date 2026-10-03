@@ -17,6 +17,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** @type {{ src: string; dest: string }[]} */
 const targets = [
+  { src: 'packages/core/src/google-push.ts', dest: 'supabase/functions/_shared/google-push.ts' },
   {
     src: 'packages/core/src/google-events.ts',
     dest: 'supabase/functions/_shared/google-events.ts',

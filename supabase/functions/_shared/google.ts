@@ -1,6 +1,6 @@
 // Google Calendar API v3 の読み取り(Story 3.2 / 3.3、ARCHITECTURE-SPINE AD-2 / AD-3)。
 // refresh_token → access_token の交換と Google への読み取りリクエストはここに集約する。
-// 書き込みスコープは要求しない。アプリから Google へ書き戻す関数はコードベースに置かない。
+// 有料の書き込みは追加認可した接続だけをpush-events側で扱う。
 
 import type { GoogleEventRaw } from './google-events.ts';
 
@@ -20,6 +20,7 @@ export async function refreshAccessToken(
   try {
     const res = await fetch(GOOGLE_TOKEN_ENDPOINT, {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         refresh_token: refreshToken,
