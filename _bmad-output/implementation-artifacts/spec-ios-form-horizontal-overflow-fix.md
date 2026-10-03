@@ -113,3 +113,13 @@ context:
 - iPhone幅で横ドラッグが発生せず、縦スクロールと保存・閉じる操作が維持されること。
 - App Store Connectで1.0.23（26）と課金4項目が「審査待ち」であることを確認済み。
 - Google Play Consoleで1.0.23（versionCode 25）がAlphaクローズドテストの「審査中の変更」であることを確認済み。
+
+## 2026-10-03 差し替え直前までの引継ぎ結果
+
+- 指定された `8424325811f2fcf2b61f941b65a413eb71fcd25b` から、GitHub Actions `37098312898` でiOS 1.0.23（27）を作成した。全1,471テスト、型検査、lint、iOS補助8件、署名条件12件、Widget Swift 10件、archiveとIPAのアプリ・Widget署名検証に成功。
+- IPAは8,464,747 bytes、SHA-256 `3eef691d448e73b2077e697093c90e32f77ed0939c1a7cffcbad476f52378ec8`。手元でも両Info.plist、本番Supabase・Google OAuth・RevenueCat・AdMob・プライバシーURL、自己破棄Service Workerを照合した。
+- uploadジョブをrun・SHA-256・build 27へ固定した `2d0140b986447c656c0bfabc05532af81999f177` をpushし、送信CI `37098879979` が検証・アップロードともエラーなしで成功。App Store Connect画面で「提出準備完了」、APIで`VALID`。ビルドID `23b097be-a433-4d37-ad30-4447b08254e1`。
+- Android code 26をGoogle Play成果物ライブラリへアップロードし、1.0.23・未公開・リリース0件・対象SDK 36・16KB対応を確認した。AABハッシュとアップロード鍵は前記値に一致。
+- Google code 25は確認中に審査が終わり、Alphaで選択したテスターへ100%公開済みとなった。こちらで現行変更の削除・公開操作はしていない。次回はcode 26の新しいAlphaリリースを作成して審査へ送る。
+- Appleの現行build 26と課金3項目は審査待ちを維持。ユーザー指定の「差し替え直前」へ到達したため、提出キャンセル・更新提出は行っていない。仕様書の`in-review`を維持し、差し替え再提出後に`done`へ進める。
+- 詳細と証跡は `docs/store-replacement-ready-20261003.md`。
