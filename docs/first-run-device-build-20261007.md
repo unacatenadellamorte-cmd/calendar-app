@@ -38,4 +38,4 @@ CIで型・lint・Web回帰1,548件（157ファイル）、Node8件、署名Pyth
 
 取得後にもZIP整合性、両Bundleの1.0.24（28）、App Store用プロファイル・共有領域、Google戻り先、本番広告、最新初回進捗・スタンプ・本番バックエンド設定、旧静的キャッシュ破棄コード、両dSYMを照合。実機起動・登録・購入・Google接続は未確認。IPAはApp Store配布署名で、直接端末へインストールできると断定しない。TestFlightを更新するにはAppleアップロードとテスト配信への追加が別途必要。
 
-Appleアップロード・TestFlight追加・一般公開・認証／課金設定・有料メールプランは変更していない。本番変更は承認されたスタンプDBの1件だけ。
+この作成段階ではAppleアップロード・TestFlight追加・一般公開・認証／課金設定・有料メールプランは変更していない。本番変更は承認されたスタンプDBの1件だけ。その後の承認によるApple送信・TestFlight28追加・Android27配信提出は[first-run-test-distribution-20261007.md](first-run-test-distribution-20261007.md)に記録。
