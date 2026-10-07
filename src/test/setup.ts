@@ -9,7 +9,7 @@ import { resetDeletionStateForTests } from '@/data/account-deletion-state';
 
 beforeEach(() => {
   resetDeletionStateForTests();
-  applyLanguage('ja');
+  if (typeof document !== 'undefined') applyLanguage('ja');
   // 各テストで IndexedDB をまっさらにする。
   globalThis.indexedDB = new IDBFactory();
   resetLocalDbForTests();
@@ -22,5 +22,5 @@ afterEach(() => {
   } catch {
     // ignore
   }
-  document.documentElement.removeAttribute('data-theme');
+  if (typeof document !== 'undefined') document.documentElement.removeAttribute('data-theme');
 });

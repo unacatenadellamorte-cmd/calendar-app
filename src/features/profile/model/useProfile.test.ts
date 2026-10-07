@@ -28,6 +28,30 @@ beforeEach(() => {
 });
 
 describe('useProfile', () => {
+  it('認証確定で有効になった最初の描画から、初回取得が終わるまでは待機する', async () => {
+    let finish!: (value: ReturnType<typeof ok<Profile | null>>) => void;
+    getProfile.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const states: boolean[] = [];
+    const { result, rerender } = renderHook(
+      ({ enabled }) => {
+        const state = useProfile(enabled);
+        if (enabled) states.push(state.loading);
+        return state;
+      },
+      { initialProps: { enabled: false } },
+    );
+    rerender({ enabled: true });
+    expect(states.every(Boolean)).toBe(true);
+    expect(result.current.loading).toBe(true);
+    await act(async () => finish(ok(profile)));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.profile).toEqual(profile);
+  });
   it('enabled=false のとき読み込まない', () => {
     const { result } = renderHook(() => useProfile(false));
     expect(getProfile).not.toHaveBeenCalled();
@@ -72,7 +96,9 @@ describe('useProfile', () => {
 
   it('create: 失敗したら errorKey をセットし false を返す(loadErrorKey は変えない)', async () => {
     getProfile.mockResolvedValue(ok(null));
-    createProfile.mockResolvedValue(err(appError('profile/invalid-name', 'profile/invalid-name')));
+    createProfile.mockResolvedValue(
+      err(appError('profile/invalid-name', 'profile/invalid-name')),
+    );
     const { result } = renderHook(() => useProfile(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {

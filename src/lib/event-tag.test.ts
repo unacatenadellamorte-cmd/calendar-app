@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyEventTag } from './event-tag';
 import { eventLabelColor, labelTextColor } from './event-label';
+import { applyLanguage } from '@/i18n';
 
 describe('タグの値の複写', () => {
   it('通常・月末・年末・うるう年の日付を保つ', () => {
@@ -38,6 +39,33 @@ describe('タグの値の複写', () => {
       labelColor: '#009E73',
       startLocal: '2026-09-25T09:00',
     });
+  });
+  it('名称なしタグは内部件名を保ち、スタンプのみ表示する予定値へ複写する', () => {
+    applyLanguage('en');
+    const tag: {
+      allDay: boolean;
+      name: string;
+      stampId: 'work' | 'meeting';
+      color: string;
+      startLocal: string;
+      endLocal: string;
+    } = {
+      allDay: false,
+      name: '',
+      stampId: 'work',
+      color: '#009E73',
+      startLocal: '09:00',
+      endLocal: '10:00',
+    };
+    const saved = applyEventTag(tag, '2026-09-25');
+    expect(saved).toMatchObject({ title: 'Work', stampId: 'work', stampOnly: true });
+    tag.stampId = 'meeting';
+    expect(saved).toMatchObject({ title: 'Work', stampId: 'work' });
+    expect(applyEventTag({ ...tag, name: '手入力の名称' }, '2026-09-25')).toMatchObject({
+      title: '手入力の名称',
+      stampOnly: false,
+    });
+    applyLanguage('ja');
   });
   it('外部色は上書きせず、明暗背景の文字を読みやすくする', () => {
     expect(

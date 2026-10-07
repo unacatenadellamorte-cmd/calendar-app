@@ -1,6 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { isLabelColor } from '@/lib/event-label';
+import { isEventStampId, type EventStampId } from '@/lib/event-stamps';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isNetworkError, isOffline } from './net';
@@ -37,6 +38,8 @@ export interface EventItem {
   location?: string | null;
   url?: string | null;
   labelColor?: string | null;
+  stampId?: EventStampId | null;
+  stampOnly?: boolean;
   source: EventSource;
   /** シフト属性(AD-8)。シフト実体以外はすべて null。 */
   breakMinutes: number | null;
@@ -82,6 +85,8 @@ export type NewEventInput = {
   location?: string | null;
   url?: string | null;
   labelColor?: string | null;
+  stampId?: EventStampId | null;
+  stampOnly?: boolean;
 } & (TimedInput | AllDayInput);
 
 export type EventPatch = Partial<{
@@ -96,6 +101,8 @@ export type EventPatch = Partial<{
   location?: string | null;
   url?: string | null;
   labelColor?: string | null;
+  stampId?: EventStampId | null;
+  stampOnly?: boolean;
 }>;
 
 export interface EventRange {
@@ -128,13 +135,15 @@ export interface EventRow {
   location?: string | null;
   event_url?: string | null;
   label_color?: string | null;
+  stamp_id?: string | null;
+  stamp_only?: boolean | null;
   created_at: string;
   updated_at: string;
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 export const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,location,event_url,label_color,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,location,event_url,label_color,stamp_id,stamp_only,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
 
 export function toEvent(row: EventRow): EventItem {
   return {
@@ -149,6 +158,8 @@ export function toEvent(row: EventRow): EventItem {
     location: row.location ?? null,
     url: row.event_url ?? null,
     labelColor: row.label_color ?? null,
+    stampId: isEventStampId(row.stamp_id) ? row.stamp_id : null,
+    stampOnly: row.stamp_only ?? false,
     source: row.source,
     breakMinutes: row.break_minutes ?? null,
     hourlyWage: row.hourly_wage ?? null,
@@ -163,7 +174,14 @@ export function toEvent(row: EventRow): EventItem {
 
 /** 旧キャッシュ(新列を持たない行)も読み出し時に同じ nullable 形へ揃える。 */
 function normalizeCachedEvent(event: EventItem): EventItem {
-  return { ...event, location: event.location ?? null, url: event.url ?? null, labelColor: event.labelColor ?? null };
+  return {
+    ...event,
+    location: event.location ?? null,
+    url: event.url ?? null,
+    labelColor: event.labelColor ?? null,
+    stampId: isEventStampId(event.stampId) ? event.stampId : null,
+    stampOnly: event.stampOnly ?? false,
+  };
 }
 
 /**
@@ -185,7 +203,9 @@ function fromPostgrest(error: PostgrestError): AppError {
  */
 async function validateWritableCalendar(calendarId: string): Promise<AppError | null> {
   if (isOffline()) {
-    const cached = (await cacheGetAll('calendars')).find((calendar) => calendar.id === calendarId);
+    const cached = (await cacheGetAll('calendars')).find(
+      (calendar) => calendar.id === calendarId,
+    );
     return !cached || cached.source !== 'local'
       ? appError('event/calendar-not-writable', 'event/calendar-not-writable')
       : null;
@@ -222,6 +242,8 @@ interface EventInputShape {
   location?: string | null;
   url?: string | null;
   labelColor?: string | null;
+  stampId?: string | null;
+  stampOnly?: boolean;
 }
 
 const LOCATION_MAX = 1000;
@@ -229,7 +251,9 @@ const URL_MAX = 2048;
 function validEventUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && Boolean(parsed.hostname);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') && Boolean(parsed.hostname)
+    );
   } catch {
     return false;
   }
@@ -237,7 +261,10 @@ function validEventUrl(value: string): boolean {
 
 /** 入力の妥当性。問題なければ null。表示層向けの messageKey を持つ AppError を返す。 */
 export function validateEventInput(input: EventInputShape): AppError | null {
-  if (input.labelColor != null && !isLabelColor(input.labelColor)) return appError('event/invalid-color', 'event/invalid-color');
+  if (input.stampId != null && !isEventStampId(input.stampId))
+    return appError('event/invalid-stamp', 'event/invalid-stamp');
+  if (input.labelColor != null && !isLabelColor(input.labelColor))
+    return appError('event/invalid-color', 'event/invalid-color');
   if (input.title.trim().length < 1 || input.title.trim().length > 200) {
     return appError('event/invalid-title', 'event/invalid-title');
   }
@@ -268,6 +295,8 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
     location: input.location?.trim() || null,
     event_url: input.url?.trim() || null,
     label_color: input.labelColor ?? null,
+    stamp_id: input.stampId ?? null,
+    stamp_only: input.stampOnly ?? false,
     all_day: input.allDay,
     source: 'local' as const,
     is_secret: input.isSecret ?? false,
@@ -301,7 +330,8 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
   try {
     const { data, error } = await query;
     if (error) {
-      if (isNetworkError(error)) return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
+      if (isNetworkError(error))
+        return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
       return err(fromPostgrest(error));
     }
     const mapped = (data as unknown as EventRow[]).map(toEvent);
@@ -343,7 +373,10 @@ export async function createEvent(input: NewEventInput): Promise<Result<EventIte
 
 /** patch に含まれる項目だけを検証する。 */
 export function validateEventPatch(patch: EventPatch): AppError | null {
-  if (patch.labelColor != null && !isLabelColor(patch.labelColor)) return appError('event/invalid-color', 'event/invalid-color');
+  if (patch.stampId != null && !isEventStampId(patch.stampId))
+    return appError('event/invalid-stamp', 'event/invalid-stamp');
+  if (patch.labelColor != null && !isLabelColor(patch.labelColor))
+    return appError('event/invalid-color', 'event/invalid-color');
   if (patch.title !== undefined) {
     const t = patch.title.trim();
     if (t.length < 1 || t.length > 200)
@@ -352,8 +385,11 @@ export function validateEventPatch(patch: EventPatch): AppError | null {
   if ((patch.location?.trim().length ?? 0) > LOCATION_MAX) {
     return appError('event/invalid-location', 'event/invalid-location');
   }
-  if (patch.url !== undefined && patch.url !== null &&
-      (patch.url.trim().length > URL_MAX || !validEventUrl(patch.url.trim()))) {
+  if (
+    patch.url !== undefined &&
+    patch.url !== null &&
+    (patch.url.trim().length > URL_MAX || !validEventUrl(patch.url.trim()))
+  ) {
     return appError('event/invalid-url', 'event/invalid-url');
   }
   const touchesTime =
@@ -404,6 +440,8 @@ export async function updateEvent(
   if (patch.location !== undefined) row.location = patch.location?.trim() || null;
   if (patch.url !== undefined) row.event_url = patch.url?.trim() || null;
   if (patch.labelColor !== undefined) row.label_color = patch.labelColor;
+  if (patch.stampId !== undefined) row.stamp_id = patch.stampId;
+  if (patch.stampOnly !== undefined) row.stamp_only = patch.stampOnly;
   if (patch.allDay !== undefined) row.all_day = patch.allDay;
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;

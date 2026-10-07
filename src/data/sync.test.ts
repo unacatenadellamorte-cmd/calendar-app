@@ -74,11 +74,44 @@ beforeEach(() => {
 });
 
 describe('flushOutbox', () => {
+  it('接続復帰でスタンプの作成・変更値を送り、再取得後の表示値を保つ', async () => {
+    const stamped = { ...ev('real'), stampId: 'work' as const, stampOnly: true };
+    const renamed = { ...stamped, title: '勤務', stampOnly: false };
+    await enqueue({
+      entity: 'event',
+      op: 'create',
+      targetId: 'temp',
+      payload: { title: '仕事', stampId: 'work', stampOnly: true },
+    });
+    await enqueue({
+      entity: 'event',
+      op: 'update',
+      targetId: 'temp',
+      payload: { title: '勤務', stampOnly: false },
+    });
+    createEvent.mockResolvedValue(ok(stamped));
+    updateEvent.mockResolvedValue(ok(renamed));
+    expect((await flushOutbox()).flushed).toBe(2);
+    expect(createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ stampId: 'work', stampOnly: true }),
+    );
+    expect(updateEvent).toHaveBeenCalledWith(
+      { id: 'real', source: 'local' },
+      { title: '勤務', stampOnly: false },
+    );
+    expect(await cacheGetAll('events')).toEqual([renamed]);
+    expect(await listOutbox()).toHaveLength(0);
+  });
   it('削除中に返った遅延同期でキャッシュを復活させず後続処理を止める', async () => {
     await enqueue({ entity: 'event', op: 'create', targetId: '旧予定' });
     await enqueue({ entity: 'event', op: 'delete', targetId: '次の予定' });
     let complete!: (value: ReturnType<typeof ok<EventItem>>) => void;
-    createEvent.mockImplementation(() => new Promise((resolve) => { complete = resolve; }));
+    createEvent.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
     const pending = flushOutbox();
     await vi.waitFor(() => expect(createEvent).toHaveBeenCalled());
     writeDeletion({ userId: '本人', phase: 'local' });
@@ -103,8 +136,18 @@ describe('flushOutbox', () => {
   });
 
   it('作成でサーバーが別 id を返したら、後続の update に実 id を適用する', async () => {
-    await enqueue({ entity: 'event', op: 'create', targetId: 'temp', payload: { id: 'temp' } });
-    await enqueue({ entity: 'event', op: 'update', targetId: 'temp', payload: { title: 'y' } });
+    await enqueue({
+      entity: 'event',
+      op: 'create',
+      targetId: 'temp',
+      payload: { id: 'temp' },
+    });
+    await enqueue({
+      entity: 'event',
+      op: 'update',
+      targetId: 'temp',
+      payload: { title: 'y' },
+    });
     createEvent.mockResolvedValue(ok(ev('real')));
     updateEvent.mockResolvedValue(ok(ev('real')));
 
@@ -114,7 +157,12 @@ describe('flushOutbox', () => {
   });
 
   it('恒久エラーの項目は破棄して継続する', async () => {
-    await enqueue({ entity: 'event', op: 'update', targetId: 'gone', payload: { title: 'z' } });
+    await enqueue({
+      entity: 'event',
+      op: 'update',
+      targetId: 'gone',
+      payload: { title: 'z' },
+    });
     await enqueue({ entity: 'event', op: 'delete', targetId: 'e2' });
     updateEvent.mockResolvedValue(err(appError('data/query', 'data/query', { code: '404' })));
     deleteEvent.mockResolvedValue(ok(undefined));
@@ -160,8 +208,15 @@ describe('flushOutbox', () => {
     });
 
     it('0件(全部破棄 or 何も無し)のときは呼ばない', async () => {
-      await enqueue({ entity: 'event', op: 'update', targetId: 'gone', payload: { title: 'z' } });
-      updateEvent.mockResolvedValue(err(appError('data/query', 'data/query', { code: '404' })));
+      await enqueue({
+        entity: 'event',
+        op: 'update',
+        targetId: 'gone',
+        payload: { title: 'z' },
+      });
+      updateEvent.mockResolvedValue(
+        err(appError('data/query', 'data/query', { code: '404' })),
+      );
 
       const result = await flushOutbox();
       expect(result).toMatchObject({ flushed: 0, dropped: 1 });
@@ -169,7 +224,12 @@ describe('flushOutbox', () => {
     });
 
     it('ネットワーク障害で中断したときは呼ばない', async () => {
-      await enqueue({ entity: 'event', op: 'update', targetId: 'e1', payload: { title: 'a' } });
+      await enqueue({
+        entity: 'event',
+        op: 'update',
+        targetId: 'e1',
+        payload: { title: 'a' },
+      });
       updateEvent.mockResolvedValue(
         err(appError('data/query', 'data/query', new TypeError('Failed to fetch'))),
       );

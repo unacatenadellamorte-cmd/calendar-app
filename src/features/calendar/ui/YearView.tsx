@@ -1,11 +1,13 @@
 import { getLocale } from '@/i18n';
-import { eventLabelColor } from '@/lib/event-label';
+import { eventLabelColor, labelTextColor } from '@/lib/event-label';
 import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useMemo } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { groupEventsByDay, makePriorityOf, monthGridDays, ymd } from '@/lib/calendar-view';
 import { formatMonthTitle } from '@/lib/datetime';
+import { EventStamp } from '@/ui/EventStamp';
+import { eventStampName, isEventStampId } from '@/lib/event-stamps';
 interface YearViewProps {
   cursor: string;
   events: EventItem[];
@@ -19,7 +21,7 @@ interface YearViewProps {
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 /**
  * 年ビュー。cursor の年の1〜12月ぶん、既存の `monthGridDays`(日曜始まり)のミニグリッドを縦1列に並べる。
- * 予定は月ビューと同じ優先度規則で日ごとに1件へ代表させ、その色のドットだけを表示する
+ * 予定は月ビューと同じ優先度規則で日ごとに1件へ代表させ、スタンプか色のドットを表示する
  * (タイトル・時刻はスペースが無いため出さない。詳細は月見出し/日付タップで月ビューへ)。
  *
  * 月境界のはみ出し日(前後月の inMonth: false セル)は、その実体(inMonth: true)を
@@ -73,6 +75,7 @@ export function YearView({
               <div className="grid grid-cols-7 border-t border-l border-border-hairline">
                 {cells.map((cell) => {
                   const topEvent = byDay.get(cell.date)?.[0];
+                  const stampId = isEventStampId(topEvent?.stampId) ? topEvent.stampId : null;
                   const dotColor = topEvent
                     ? eventLabelColor(topEvent, calendarById.get(topEvent.calendarId))
                     : undefined;
@@ -91,13 +94,25 @@ export function YearView({
                       {cell.day}
                     </span>
                   );
-                  const dot = topEvent && (
-                    <span
-                      aria-hidden="true"
-                      className="h-1 w-1 rounded-full"
-                      style={{ backgroundColor: dotColor, outline: '1px solid var(--color-ink-secondary)' }}
-                    />
-                  );
+                  const dot =
+                    topEvent &&
+                    (stampId ? (
+                      <span
+                        className="rounded-sm px-0.5"
+                        style={{ backgroundColor: dotColor, color: labelTextColor(dotColor!) }}
+                      >
+                        <EventStamp id={stampId} size="1.1em" label={false} />
+                      </span>
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="h-1 w-1 rounded-full"
+                        style={{
+                          backgroundColor: dotColor,
+                          outline: '1px solid var(--color-ink-secondary)',
+                        }}
+                      />
+                    ));
                   const cellClassName = [
                     'flex min-h-11 flex-col items-center justify-center gap-0.5 border-r border-b border-border-hairline',
                     cell.inMonth ? 'bg-surface-base' : 'bg-surface-sunken',
@@ -120,7 +135,9 @@ export function YearView({
                         cellYmd.year,
                         cellYmd.month,
                         cellYmd.day,
-                        topEvent ? t('(予定あり)') : '',
+                        topEvent
+                          ? t('(予定あり)') + (stampId ? ` ${t(eventStampName(stampId))}` : '')
+                          : '',
                       ])}
                       className={cellClassName}
                     >

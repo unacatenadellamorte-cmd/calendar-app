@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { appError, err, ok } from '@/data/result';
 import type { Profile } from '@/data/profiles';
 import { Screen } from '@/ui/Screen';
+import { TUTORIAL_COMPLETED_KEY } from '@/features/tutorial/model/tutorial-state';
 
 /**
  * 回帰テスト(コードレビュー指摘): `AppShell` / `OnboardingScreen` / `ProfileScreen` が
@@ -39,7 +40,14 @@ function renderShell(initialPath = '/') {
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<AppShell />}>
-          <Route index element={<Screen title="ホーム画面" showProfileHeader>ホーム画面</Screen>} />
+          <Route
+            index
+            element={
+              <Screen title="ホーム画面" showProfileHeader>
+                ホーム画面
+              </Screen>
+            }
+          />
           <Route path="profile" element={<ProfileScreen />} />
         </Route>
       </Routes>
@@ -48,6 +56,7 @@ function renderShell(initialPath = '/') {
 }
 
 beforeEach(() => {
+  localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
   authState = 'guest';
   getProfile.mockReset();
   createProfile.mockReset();

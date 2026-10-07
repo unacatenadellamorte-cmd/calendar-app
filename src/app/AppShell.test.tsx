@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
+import { TUTORIAL_COMPLETED_KEY } from '@/features/tutorial/model/tutorial-state';
 
 /**
  * オンボーディング(profiles 行なし)分岐・取得エラー分岐・通常表示 + 上部アバター分岐を検証する。
@@ -84,7 +85,14 @@ function renderShell() {
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<AppShell />}>
-          <Route index element={<Screen title="ホーム画面" showProfileHeader>ホーム画面</Screen>} />
+          <Route
+            index
+            element={
+              <Screen title="ホーム画面" showProfileHeader>
+                ホーム画面
+              </Screen>
+            }
+          />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -92,6 +100,8 @@ function renderShell() {
 }
 
 beforeEach(() => {
+  // 既存のプロフィール分岐試験は案内完了後の状態で行う。
+  localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
   authState = 'guest';
   profileState = { profile: null, loading: false, errorKey: null, loadErrorKey: null };
   reload.mockReset();
@@ -114,6 +124,82 @@ afterEach(() => {
 });
 
 describe('AppShell', () => {
+  it('新規利用で案内を表示し、スキップ後は名前設定へ進み再表示しない', async () => {
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    const view = renderShell();
+    expect(
+      screen.getByRole('heading', { name: '予定をカレンダーに登録' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'ようこそ' })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'スキップ' }));
+    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBe('1');
+    view.unmount();
+    renderShell();
+    expect(
+      screen.queryByRole('heading', { name: '予定をカレンダーに登録' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('初回フラグがない既存利用者には案内を表示しない', () => {
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    profileState.profile = { id: 'u1', displayName: '花子', avatarDataUrl: null };
+    renderShell();
+    expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '予定をカレンダーに登録' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBe('1');
+  });
+
+  it('全ページ完了後の再起動でも案内を表示しない', async () => {
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    const view = renderShell();
+    const user = userEvent.setup();
+    for (let i = 0; i < 4; i++) await user.click(screen.getByRole('button', { name: '次へ' }));
+    await user.click(screen.getByRole('button', { name: '使いはじめる' }));
+    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    view.unmount();
+    renderShell();
+    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
+  });
+
+  it('未完了でも認証・プロフィール取得中は案内を表示しない', () => {
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    authState = 'loading';
+    profileState.loading = true;
+    renderShell();
+    expect(screen.getByText('読み込み中…')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
+    expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBeNull();
+  });
+
+  it('案内完了を保存できなくても名前設定へ進める', async () => {
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('保存不可');
+    });
+    try {
+      renderShell();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'スキップ' }));
+      expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    } finally {
+      storage.mockRestore();
+    }
+  });
+
+  it('未完了でも取得失敗を初回案内へ倒さない', () => {
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    profileState.loadErrorKey = 'data/query';
+    renderShell();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: '予定をカレンダーに登録' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBeNull();
+  });
+
   it('profiles 行が無ければオンボーディングを表示し、下タブ・Outlet は出さない', () => {
     renderShell();
     expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
@@ -133,7 +219,9 @@ describe('AppShell', () => {
     };
     renderShell();
     expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'メインナビゲーション' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: 'メインナビゲーション' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'プロフィール' })).toBeInTheDocument();
   });
 
@@ -244,7 +332,9 @@ describe('AppShell', () => {
 
       expect(secretState.lock).toHaveBeenCalledTimes(1);
       expect(navigateMock).not.toHaveBeenCalled();
-      expect(screen.queryByRole('dialog', { name: 'シークレットモードを解除' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('dialog', { name: 'シークレットモードを解除' }),
+      ).not.toBeInTheDocument();
     });
 
     it('300ms以内に2回タップ かつ ロック中・パスコード設定済みなら、クイック解除シートが開く', () => {
@@ -257,7 +347,9 @@ describe('AppShell', () => {
       fireEvent.click(avatar);
       fireEvent.click(avatar);
 
-      expect(screen.getByRole('dialog', { name: 'シークレットモードを解除' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('dialog', { name: 'シークレットモードを解除' }),
+      ).toBeInTheDocument();
       expect(secretState.lock).not.toHaveBeenCalled();
       expect(navigateMock).not.toHaveBeenCalled();
     });
@@ -321,7 +413,9 @@ describe('AppShell', () => {
       // secretPasscodeHash が非 null(hasPasscode=true)・unlocked=false(既定)という実際の
       // SecretModeProvider の Context 値どおりにクイック解除シートが開けば、AvatarNav が
       // SecretModeProvider の配下で正しく useSecretMode() を読めている証拠になる。
-      expect(screen.getByRole('dialog', { name: 'シークレットモードを解除' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('dialog', { name: 'シークレットモードを解除' }),
+      ).toBeInTheDocument();
     });
   });
 });

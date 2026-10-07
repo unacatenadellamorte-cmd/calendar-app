@@ -16,7 +16,13 @@ const calendar: Calendar = {
   createdAt: '',
   updatedAt: '',
 };
-const lowCalendar: Calendar = { ...calendar, id: 'c2', name: '低優先', color: '#009E73', priority: 1 };
+const lowCalendar: Calendar = {
+  ...calendar,
+  id: 'c2',
+  name: '低優先',
+  color: '#009E73',
+  priority: 1,
+};
 const calendarById = new Map([
   ['c1', calendar],
   ['c2', lowCalendar],
@@ -60,6 +66,24 @@ function setup(events: EventItem[] = []) {
 }
 
 describe('YearView', () => {
+  it('代表予定のスタンプを件名なしで表示し、未知IDなら従来ドットを残す', () => {
+    setup([
+      ev({ stampId: 'work', stampOnly: true }),
+      ev({
+        id: 'unknown',
+        allDay: true,
+        eventDate: '2026-09-09',
+        stampId: 'future' as never,
+        stampOnly: true,
+      }),
+    ]);
+    const cell = screen.getByRole('button', { name: '2026年9月8日を開く(予定あり) 仕事' });
+    expect(cell.querySelector('svg')).toBeInTheDocument();
+    expect(cell).not.toHaveTextContent('会議');
+    const unknown = screen.getByRole('button', { name: '2026年9月9日を開く(予定あり)' });
+    expect(unknown.querySelector('svg')).toBeNull();
+    expect(unknown.querySelector('[aria-hidden]')).toHaveStyle({ backgroundColor: '#C6413B' });
+  });
   it('1〜12月ぶんの月見出しとミニグリッドを縦に並べる', () => {
     setup();
     for (let m = 1; m <= 12; m += 1) {
@@ -81,8 +105,18 @@ describe('YearView', () => {
 
   it('同日に複数カレンダーの予定があるとき、優先度が高いカレンダーの色を1つだけ出す', () => {
     setup([
-      ev({ id: 'low', calendarId: 'c2', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }),
-      ev({ id: 'high', calendarId: 'c1', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
+      ev({
+        id: 'low',
+        calendarId: 'c2',
+        startsAt: '2026-09-08T00:00:00Z',
+        endsAt: '2026-09-08T01:00:00Z',
+      }),
+      ev({
+        id: 'high',
+        calendarId: 'c1',
+        startsAt: '2026-09-08T05:00:00Z',
+        endsAt: '2026-09-08T06:00:00Z',
+      }),
     ]);
     const cell = screen.getByRole('button', { name: '2026年9月8日を開く(予定あり)' });
     const dots = cell.querySelectorAll('[aria-hidden="true"]');
@@ -116,5 +150,7 @@ describe('YearView', () => {
 it('年表示でも自作予定の個別ラベル色を優先する', () => {
   setup([ev({ labelColor: '#FFCC00' })]);
   const day = screen.getByRole('button', { name: '2026年9月8日を開く(予定あり)' });
-  expect(day.querySelector('[aria-hidden="true"]')).toHaveStyle({ backgroundColor: '#FFCC00' });
+  expect(day.querySelector('[aria-hidden="true"]')).toHaveStyle({
+    backgroundColor: '#FFCC00',
+  });
 });

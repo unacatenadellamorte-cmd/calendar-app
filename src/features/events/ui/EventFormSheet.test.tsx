@@ -3,7 +3,9 @@ import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import type { Calendar } from '@/data/calendars';
 import { EventFormSheet } from './EventFormSheet';
-vi.mock('@/features/google-push/ui/GooglePushStatus', () => ({ GooglePushStatus: () => null }));
+vi.mock('@/features/google-push/ui/GooglePushStatus', () => ({
+  GooglePushStatus: () => null,
+}));
 import { openMap, openExternalUrl } from '@/platform/externalLinks';
 vi.mock('@/platform/externalLinks', async (original) => ({
   ...(await original<typeof import('@/platform/externalLinks')>()),
@@ -493,6 +495,25 @@ describe('予定タグの適用', () => {
       expect.objectContaining({ title: '夜勤（変更）', labelColor: '#009e73', allDay: false }),
     );
     expect(onCreate.mock.calls[0]![0]).not.toHaveProperty('tagId');
+  });
+  it('名称なしスタンプタグを適用し、手入力と保存失敗後の入力値を保つ', async () => {
+    const stampedTag = { ...tag, name: '', stampId: 'work' };
+    tagsMock.list.mockResolvedValueOnce({ ok: true, value: [stampedTag] });
+    const onCreate = vi.fn().mockResolvedValue(false);
+    setup({ seed: { date: '2026-12-31' }, onCreate });
+    await waitFor(() => expect(screen.getByLabelText('タグ')).not.toBeDisabled());
+    await userEvent.selectOptions(screen.getByLabelText('タグ'), 'tag1');
+    expect(screen.getByLabelText('タイトル')).toHaveValue('仕事');
+    expect(screen.getByRole('button', { name: '仕事' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.change(screen.getByLabelText('タイトル'), { target: { value: '勤務' } });
+    await userEvent.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '勤務', stampId: 'work', stampOnly: false }),
+    );
+    expect(screen.getByLabelText('タイトル')).toHaveValue('勤務');
   });
   it('終日のフォームからタグを選んでも入力した日付を使う', async () => {
     tagsMock.list.mockResolvedValueOnce({ ok: true, value: [tag] });

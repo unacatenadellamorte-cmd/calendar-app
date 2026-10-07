@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { err, ok, appError } from '@/data/result';
 import type { EventTag } from '@/data/event-tags';
@@ -8,17 +8,26 @@ const listEventTags = vi.fn();
 const createEventTag = vi.fn();
 const updateEventTag = vi.fn();
 const deleteEventTag = vi.fn();
-let authState: { state: string; session: { user: { id: string } } | null } = { state: 'guest', session: null };
+let authState: { state: string; session: { user: { id: string } } | null } = {
+  state: 'guest',
+  session: null,
+};
 vi.mock('@/app/auth-context', () => ({ useAuth: () => authState }));
 vi.mock('@/data/event-tags', async () => {
-  const actual = await vi.importActual<typeof import('@/data/event-tags')>('@/data/event-tags');
+  const actual =
+    await vi.importActual<typeof import('@/data/event-tags')>('@/data/event-tags');
   return { ...actual, listEventTags, createEventTag, updateEventTag, deleteEventTag };
 });
 
 const tag: EventTag = {
   allDay: false,
-  id: 'tag-1', name: '仕事', color: '#2563EB', startLocal: '09:00', endLocal: '18:00',
-  createdAt: '2026-09-25T00:00:00Z', updatedAt: '2026-09-25T00:00:00Z',
+  id: 'tag-1',
+  name: '仕事',
+  color: '#2563EB',
+  startLocal: '09:00',
+  endLocal: '18:00',
+  createdAt: '2026-09-25T00:00:00Z',
+  updatedAt: '2026-09-25T00:00:00Z',
 };
 const { EventTagsScreen } = await import('./EventTagsScreen');
 
@@ -31,7 +40,9 @@ beforeEach(() => {
 describe('EventTagsScreen', () => {
   it('一覧取得失敗を未登録扱いにせず、再試行で表示する', async () => {
     const user = userEvent.setup();
-    listEventTags.mockResolvedValueOnce(err(appError('data/query', 'data/query'))).mockResolvedValueOnce(ok([tag]));
+    listEventTags
+      .mockResolvedValueOnce(err(appError('data/query', 'data/query')))
+      .mockResolvedValueOnce(ok([tag]));
     render(<EventTagsScreen />);
     expect(await screen.findByRole('alert')).toHaveTextContent('読み込みに失敗しました');
     expect(screen.queryByText('まだ予定タグはありません。')).not.toBeInTheDocument();
@@ -50,14 +61,17 @@ describe('EventTagsScreen', () => {
     await user.click(screen.getByRole('button', { name: '保存' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('保存に失敗しました');
     expect(input).toHaveValue('休み');
-    expect(screen.getByRole('button', { name: /仕事/ })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list')).getByRole('button', { name: /仕事/ }),
+    ).toBeInTheDocument();
   });
 });
 
-
 it('削除失敗でもタグと入力が残り、再試行成功でだけフォームを閉じる', async () => {
   const user = userEvent.setup();
-  deleteEventTag.mockResolvedValueOnce(err(appError('data/query', 'data/query'))).mockResolvedValueOnce(ok(undefined));
+  deleteEventTag
+    .mockResolvedValueOnce(err(appError('data/query', 'data/query')))
+    .mockResolvedValueOnce(ok(undefined));
   render(<EventTagsScreen />);
   await user.click(await screen.findByRole('button', { name: /仕事/ }));
   await user.click(screen.getByRole('button', { name: 'この予定タグを削除' }));
@@ -83,7 +97,12 @@ it('利用者が変われば前の一覧と編集中の値を破棄する', asyn
 
 it('削除送信中は連打・入力・閉じ操作を抑止する', async () => {
   let finish!: (value: unknown) => void;
-  deleteEventTag.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  deleteEventTag.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
   const user = userEvent.setup();
   render(<EventTagsScreen />);
   await user.click(await screen.findByRole('button', { name: /仕事/ }));
@@ -97,7 +116,6 @@ it('削除送信中は連打・入力・閉じ操作を抑止する', async () =
   await act(async () => finish(ok(undefined)));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
-
 
 it('終日タグを一覧へ表示し、編集しても終日状態を復元する', async () => {
   listEventTags.mockResolvedValueOnce(ok([{ ...tag, allDay: true }]));

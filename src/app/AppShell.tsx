@@ -13,6 +13,11 @@ import { resolveMessage } from '@/data/messages';
 import { useProfile } from '@/features/profile/model/useProfile';
 import { AvatarIcon } from '@/features/profile/ui/AvatarIcon';
 import { OnboardingScreen } from '@/features/profile/ui/OnboardingScreen';
+import { FirstRunTutorial } from '@/features/tutorial/ui/FirstRunTutorial';
+import {
+  completeTutorial,
+  hasCompletedTutorial,
+} from '@/features/tutorial/model/tutorial-state';
 import type { Profile } from '@/data/profiles';
 import type { ProfileOutletContext } from './profile-outlet-context';
 import { ProfileHeaderProvider } from '@/ui/profile-header-context';
@@ -54,6 +59,18 @@ export function AppShell() {
   const showWaiting = authResolving || (enabled && loading);
   const showProfileError = !showWaiting && enabled && Boolean(loadErrorKey);
   const needsOnboarding = !showWaiting && !showProfileError && enabled && profile === null;
+  const [tutorialDone, setTutorialDone] = useState(hasCompletedTutorial);
+  useEffect(() => {
+    // 既存プロフィールは更新後の初回案内対象にしない。取得失敗とは区別する。
+    if (!showWaiting && !showProfileError && enabled && profile && !tutorialDone) {
+      completeTutorial();
+      setTutorialDone(true);
+    }
+  }, [showWaiting, showProfileError, enabled, profile, tutorialDone]);
+  const finishTutorial = () => {
+    completeTutorial();
+    setTutorialDone(true);
+  };
   const outletContext: ProfileOutletContext = { profile, loading, errorKey, update, reload };
   return (
     <OnlineProvider>
@@ -84,6 +101,8 @@ export function AppShell() {
                 {t('もう一度試す')}
               </button>
             </div>
+          ) : needsOnboarding && !tutorialDone ? (
+            <FirstRunTutorial onFinish={finishTutorial} />
           ) : needsOnboarding ? (
             <OnboardingScreen create={create} errorKey={errorKey} />
           ) : (

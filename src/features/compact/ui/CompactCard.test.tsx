@@ -45,6 +45,19 @@ const calendarById = new Map<string, Calendar>([
 ]);
 
 describe('CompactCard', () => {
+  it('ホームのスタンプのみ予定も内部件名を隠し、絵を読み上げる', () => {
+    render(
+      <CompactCard
+        featured={[
+          ev({ title: '内部件名', stampId: 'work', stampOnly: true, calendarId: 'high' }),
+        ]}
+        calendarById={calendarById}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('内部件名')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '仕事' })).toBeInTheDocument();
+  });
   it('0件なら「この後の予定はありません」を1行で静かに(感嘆符なし)', () => {
     render(<CompactCard featured={[]} calendarById={calendarById} onSelect={vi.fn()} />);
     const msg = screen.getByText('この後の予定はありません');
@@ -88,7 +101,9 @@ describe('CompactCard', () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const target = ev({ id: 'a', title: '役員会議', calendarId: 'high' });
-    render(<CompactCard featured={[target]} calendarById={calendarById} onSelect={onSelect} />);
+    render(
+      <CompactCard featured={[target]} calendarById={calendarById} onSelect={onSelect} />,
+    );
     await user.click(screen.getByRole('button', { name: /役員会議/ }));
     expect(onSelect).toHaveBeenCalledWith(target);
   });

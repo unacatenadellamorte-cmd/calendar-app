@@ -5,6 +5,8 @@ import type { Calendar } from '@/data/calendars';
 import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
 import { ReminderPicker } from './ReminderPicker';
 import { openExternalUrl, openMap } from '@/platform/externalLinks';
+import { EventStamp } from '@/ui/EventStamp';
+import { isEventStampId } from '@/lib/event-stamps';
 interface EventDetailSheetProps {
   /** null なら閉じている。 */
   event: EventItem | null;
@@ -35,11 +37,15 @@ export function EventDetailSheet({
     }
     return '';
   })();
+  const stampId = event && isEventStampId(event.stampId) ? event.stampId : null;
   return (
     <BottomSheet open={event !== null} title={t('予定の詳細')} onClose={onClose}>
       {event && (
         <div className="space-y-3">
-          <p className="text-body font-semibold text-ink-primary">{event.title}</p>
+          <p className="flex items-center gap-2 text-body font-semibold text-ink-primary">
+            {stampId && <EventStamp id={stampId} />}
+            {!(event.stampOnly && stampId) && event.title}
+          </p>
 
           <p className="text-meta text-ink-secondary tabular">{when}</p>
 
@@ -60,9 +66,11 @@ export function EventDetailSheet({
             <button
               type="button"
               className="block text-left text-body text-accent underline"
-              onClick={() => void openMap(event.location!).then((ok) => {
-                if (!ok) window.alert(t('地図を開けませんでした'));
-              })}
+              onClick={() =>
+                void openMap(event.location!).then((ok) => {
+                  if (!ok) window.alert(t('地図を開けませんでした'));
+                })
+              }
             >
               {event.location}
             </button>
@@ -71,9 +79,11 @@ export function EventDetailSheet({
             <button
               type="button"
               className="block max-w-full break-all text-left text-body text-accent underline"
-              onClick={() => void openExternalUrl(event.url!).then((ok) => {
-                if (!ok) window.alert(t('リンクを開けませんでした'));
-              })}
+              onClick={() =>
+                void openExternalUrl(event.url!).then((ok) => {
+                  if (!ok) window.alert(t('リンクを開けませんでした'));
+                })
+              }
             >
               {event.url}
             </button>

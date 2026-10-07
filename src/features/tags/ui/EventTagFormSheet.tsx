@@ -5,6 +5,9 @@ import { t, useLanguage } from '@/i18n';
 import type { EventTag, NewEventTagInput } from '@/data/event-tags';
 import { labelTextColor } from '@/lib/event-label';
 import { LabelColorPresets } from '@/ui/LabelColorPresets';
+import { StampPicker } from '@/ui/StampPicker';
+import { EventStamp } from '@/ui/EventStamp';
+import type { EventStampId } from '@/lib/event-stamps';
 
 interface Props {
   open: boolean;
@@ -20,9 +23,10 @@ const field =
 
 function errorText(key: string): string {
   const messages: Record<string, string> = {
-    'event-tag/invalid-name': '予定名称を1〜200文字で入力してください',
+    'event-tag/invalid-name': '予定名称またはスタンプを設定してください（名称は200文字まで）',
     'event-tag/invalid-color': 'ラベル色は6桁のカラーコードで入力してください',
     'event-tag/invalid-time': '開始・終了時刻を入力し、異なる時刻にしてください',
+    'event-tag/invalid-stamp': 'スタンプを選び直してください',
   };
   return t(messages[key] ?? '保存に失敗しました。もう一度お試しください');
 }
@@ -37,6 +41,7 @@ export function EventTagFormSheet({
 }: Props) {
   useLanguage();
   const [name, setName] = useState('');
+  const [stampId, setStampId] = useState<EventStampId | null>(null);
   const [allDay, setAllDay] = useState(false);
   const [color, setColor] = useState('#2563EB');
   const [startLocal, setStartLocal] = useState('09:00');
@@ -52,6 +57,7 @@ export function EventTagFormSheet({
     if (initialized.current === key) return;
     initialized.current = key;
     setName(editing?.name ?? '');
+    setStampId(editing?.stampId ?? null);
     setAllDay(editing?.allDay ?? false);
     setColor(editing?.color ?? '#2563EB');
     setStartLocal(editing?.startLocal ?? '09:00');
@@ -75,6 +81,7 @@ export function EventTagFormSheet({
           setSubmitting(true);
           const done = await onSubmit({
             name,
+            stampId,
             color,
             allDay,
             ...normalizeTemplateTimes(allDay, startLocal, endLocal),
@@ -99,6 +106,17 @@ export function EventTagFormSheet({
             className={field}
           />
         </label>
+        <p className="text-meta text-ink-secondary">
+          {t(
+            'スタンプがあれば予定名称は空欄でも登録でき、カレンダーでは絵だけで表示できます。',
+          )}
+        </p>
+        <StampPicker
+          value={stampId}
+          color={color}
+          onChange={setStampId}
+          disabled={submitting}
+        />
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -157,7 +175,10 @@ export function EventTagFormSheet({
           className="rounded-sm px-3 py-2 text-body"
           style={{ backgroundColor: color, color: labelTextColor(color) }}
         >
-          <span className="block min-w-0 truncate">{name || t('予定のプレビュー')}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            {stampId && <EventStamp id={stampId} color={labelTextColor(color)} />}
+            <span className="truncate">{name || (stampId ? '' : t('予定のプレビュー'))}</span>
+          </span>
         </div>
         <button
           type="submit"

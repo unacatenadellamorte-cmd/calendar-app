@@ -15,7 +15,7 @@ import { err, ok, type Result } from './result';
 export interface ExportBundle {
   app: 'calendar-app';
   /** 予定タグを追加した形式。 */
-  schemaVersion: 3;
+  schemaVersion: 4;
   /** 書き出した時刻(UTC ISO)。 */
   exportedAt: string;
   calendars: Calendar[];
@@ -47,7 +47,7 @@ export async function buildExportBundle(): Promise<Result<ExportBundle>> {
   return ok({
     app: 'calendar-app',
     eventTags: tags.value,
-    schemaVersion: 3,
+    schemaVersion: 4,
     exportedAt: new Date().toISOString(),
     calendars: localCalendars,
     // ローカル予定のうち、書き出すカレンダーに属すものだけ(削除済みカレンダーの

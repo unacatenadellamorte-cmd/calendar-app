@@ -23,6 +23,7 @@ import {
 export function useProfile(enabled: boolean) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(enabled);
+  const [initialLoadSettled, setInitialLoadSettled] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [loadErrorKey, setLoadErrorKey] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ export function useProfile(enabled: boolean) {
       setErrorKey(result.error.messageKey);
       setLoadErrorKey(result.error.messageKey);
     }
+    setInitialLoadSettled(true);
     setLoading(false);
   }, [enabled]);
 
@@ -56,19 +58,32 @@ export function useProfile(enabled: boolean) {
     return false;
   }, []);
 
-  const update = useCallback(async (patch: ProfilePatch) => {
-    if (!profile) return false;
-    const result = await updateProfile(profile.id, patch);
-    if (result.ok) {
-      setProfile(result.value);
-      setErrorKey(null);
-      return true;
-    }
-    setErrorKey(result.error.messageKey);
-    return false;
-  }, [profile]);
+  const update = useCallback(
+    async (patch: ProfilePatch) => {
+      if (!profile) return false;
+      const result = await updateProfile(profile.id, patch);
+      if (result.ok) {
+        setProfile(result.value);
+        setErrorKey(null);
+        return true;
+      }
+      setErrorKey(result.error.messageKey);
+      return false;
+    },
+    [profile],
+  );
 
   const dismissError = useCallback(() => setErrorKey(null), []);
 
-  return { profile, loading, errorKey, loadErrorKey, reload, create, update, dismissError };
+  // 認証確定で有効になった最初の描画も、取得前の null を新規利用と判定させない。
+  return {
+    profile,
+    loading: loading || (enabled && !initialLoadSettled),
+    errorKey,
+    loadErrorKey,
+    reload,
+    create,
+    update,
+    dismissError,
+  };
 }

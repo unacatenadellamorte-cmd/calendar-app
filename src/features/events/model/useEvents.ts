@@ -25,6 +25,8 @@ function inputToPatch(input: NewEventInput): EventPatch {
     location: input.location ?? null,
     url: input.url ?? null,
     labelColor: input.labelColor ?? null,
+    ...(input.stampId !== undefined ? { stampId: input.stampId } : {}),
+    ...(input.stampOnly !== undefined ? { stampOnly: input.stampOnly } : {}),
     isSecret: input.isSecret ?? false,
   };
   return input.allDay

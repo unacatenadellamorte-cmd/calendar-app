@@ -1,4 +1,5 @@
 import { normalizeTemplateTimes } from '@/lib/template-time';
+import { isEventStampId, type EventStampId } from '@/lib/event-stamps';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { selectActive } from './soft-delete';
@@ -8,6 +9,7 @@ export interface EventTag {
   allDay: boolean;
   id: string;
   name: string;
+  stampId?: EventStampId | null;
   color: string;
   startLocal: string;
   endLocal: string;
@@ -18,6 +20,7 @@ export interface EventTag {
 export interface NewEventTagInput {
   allDay?: boolean;
   name: string;
+  stampId?: EventStampId | null;
   color: string;
   startLocal: string;
   endLocal: string;
@@ -30,6 +33,7 @@ interface EventTagRow {
   id: string;
   user_id?: string;
   name: string;
+  stamp_id?: string | null;
   color: string;
   start_local: string;
   end_local: string;
@@ -38,7 +42,7 @@ interface EventTagRow {
 }
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
-const COLUMNS = 'id,all_day,name,color,start_local,end_local,created_at,updated_at';
+const COLUMNS = 'id,all_day,name,stamp_id,color,start_local,end_local,created_at,updated_at';
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 
@@ -51,6 +55,7 @@ function toEventTag(row: EventTagRow): EventTag {
     id: row.id,
     allDay: row.all_day ?? false,
     name: row.name,
+    stampId: isEventStampId(row.stamp_id) ? row.stamp_id : null,
     color: row.color,
     startLocal: row.start_local,
     endLocal: row.end_local,
@@ -68,9 +73,11 @@ function minutesOf(value: string): number | null {
 function validateFields(input: NewEventTagInput): AppError | null {
   input = normalizeInput(input);
   const name = input.name.trim();
-  if (name.length < 1 || name.length > 200) {
+  if ((name.length < 1 && !input.stampId) || name.length > 200) {
     return appError('event-tag/invalid-name', 'event-tag/invalid-name');
   }
+  if (input.stampId != null && !isEventStampId(input.stampId))
+    return appError('event-tag/invalid-stamp', 'event-tag/invalid-stamp');
   if (!HEX6.test(input.color)) {
     return appError('event-tag/invalid-color', 'event-tag/invalid-color');
   }
@@ -93,6 +100,7 @@ export function validateEventTagPatch(
   return validateFields({
     allDay: patch.allDay ?? current.allDay,
     name: patch.name ?? current.name,
+    stampId: patch.stampId === undefined ? current.stampId : patch.stampId,
     color: patch.color ?? current.color,
     startLocal: patch.startLocal ?? current.startLocal,
     endLocal: patch.endLocal ?? current.endLocal,
@@ -111,6 +119,7 @@ function rowFromInput(input: NewEventTagInput): Record<string, unknown> {
   return {
     all_day: input.allDay ?? false,
     name: input.name.trim(),
+    stamp_id: input.stampId ?? null,
     color: input.color,
     start_local: input.startLocal,
     end_local: input.endLocal,
@@ -161,6 +170,7 @@ export async function updateEventTag(
   const row: Record<string, unknown> = {};
   if (patch.allDay !== undefined) row.all_day = patch.allDay;
   if (patch.name !== undefined) row.name = patch.name.trim();
+  if (patch.stampId !== undefined) row.stamp_id = patch.stampId;
   if (patch.color !== undefined) row.color = patch.color;
   if (patch.startLocal !== undefined) row.start_local = patch.startLocal;
   if (patch.endLocal !== undefined) row.end_local = patch.endLocal;

@@ -49,6 +49,8 @@ export async function offlineCreateEvent(
     location: input.location?.trim() || null,
     url: input.url?.trim() || null,
     labelColor: input.labelColor ?? null,
+    stampId: input.stampId ?? null,
+    stampOnly: input.stampOnly ?? false,
     source: 'local',
     breakMinutes: input.shift?.breakMinutes ?? null,
     hourlyWage: input.shift?.hourlyWage ?? null,
@@ -127,7 +129,12 @@ export async function offlineReorderCalendars(
     .sort((a, b) => a.priority - b.priority);
   for (const c of reordered) await cachePut('calendars', c);
   await dropOutboxFor('calendar', 'reorder', 'reorder');
-  await enqueue({ entity: 'calendar', op: 'reorder', targetId: 'reorder', payload: { orderedIds } });
+  await enqueue({
+    entity: 'calendar',
+    op: 'reorder',
+    targetId: 'reorder',
+    payload: { orderedIds },
+  });
   return ok(reordered);
 }
 

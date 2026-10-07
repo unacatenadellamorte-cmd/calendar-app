@@ -74,6 +74,19 @@ describe('event-tags data', () => {
     if (!value.ok) expect(value.error.messageKey).toBe(key);
   });
 
+  it('固定スタンプがあれば名称なしを保存し、不正IDは拒否する', async () => {
+    const { createEventTag } = await import('./event-tags');
+    result = { data: row({ name: '', stamp_id: 'work' }), error: null };
+    const created = await createEventTag(input({ name: '', stampId: 'work' }));
+    expect(created.ok && created.value).toMatchObject({ name: '', stampId: 'work' });
+    expect(calls.find((call) => call.method === 'insert')?.args[0]).toMatchObject({
+      name: '',
+      stamp_id: 'work',
+    });
+    const invalid = await createEventTag(input({ stampId: 'arbitrary-svg' }));
+    expect(invalid.ok).toBe(false);
+  });
+
   it('削除は deleted_at を更新する', async () => {
     const { deleteEventTag } = await import('./event-tags');
     expect((await deleteEventTag('tag-1')).ok).toBe(true);

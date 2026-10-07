@@ -13,6 +13,8 @@ import { BottomSheet } from '@/ui/BottomSheet';
 import { ShiftTemplateFormSheet } from '@/features/shifts/ui/ShiftTemplateFormSheet';
 import type { NewShiftTemplateInput } from '@/data/shift-templates';
 import { useShiftAutoAdvance } from '@/features/settings/model/useShiftAutoAdvance';
+import { EventStamp } from '@/ui/EventStamp';
+import { isEventStampId } from '@/lib/event-stamps';
 
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_MOVE_PX = 8;
@@ -352,7 +354,10 @@ export function MonthShiftTiles({
               onClick={() => void remove(event)}
               className="flex min-h-11 items-center justify-between gap-3 rounded-sm border border-border-hairline px-3 py-2 text-left disabled:opacity-40"
             >
-              <span className="break-words text-body">{event.title}</span>
+              <span className="inline-flex items-center gap-1 break-words text-body">
+                {isEventStampId(event.stampId) && <EventStamp id={event.stampId} />}
+                {!(event.stampOnly && isEventStampId(event.stampId)) && event.title}
+              </span>
               <span className="shrink-0 text-meta text-ink-secondary">
                 {event.startsAt
                   ? new Date(event.startsAt).toLocaleTimeString(getLocale(), {

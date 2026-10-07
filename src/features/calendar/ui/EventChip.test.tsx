@@ -89,13 +89,55 @@ describe('EventChip（月表示の件名計測）', () => {
     await waitFor(() => expect(viewport).not.toHaveClass('is-marquee'));
     vi.unstubAllGlobals();
   });
+  it('スタンプのみは用途名を読み上げ、未知IDなら件名と横流れを保つ', () => {
+    const { container, rerender } = render(
+      <EventChip
+        event={{ ...event, stampId: 'work', stampOnly: true }}
+        calendar={calendar}
+        onTap={vi.fn()}
+        month
+        showTime={false}
+      />,
+    );
+    expect(container.querySelector('button')).toHaveAttribute('aria-label', '終日 仕事 仕事');
+    expect(container.querySelector('.month-event-title')).toBeNull();
+    rerender(
+      <EventChip
+        event={{ ...event, stampId: 'future-id' as never, stampOnly: true }}
+        calendar={calendar}
+        onTap={vi.fn()}
+        month
+        showTime={false}
+      />,
+    );
+    expect(container.querySelector('button')).toHaveAttribute(
+      'aria-label',
+      '終日 とても長い予定の件名 仕事',
+    );
+    expect(container.querySelector('.month-event-title')).toBeInTheDocument();
+  });
 });
 
-
 it('自作予定は指定色で塗り、外部予定は元の色バー表示を保つ', () => {
-  const { container, rerender } = render(<EventChip event={{ ...event, labelColor: '#FFCC00' }} calendar={calendar} onTap={vi.fn()} />);
-  expect(container.querySelector('button')).toHaveStyle({ backgroundColor: '#FFCC00', color: '#111827', borderLeftWidth: '0' });
-  rerender(<EventChip event={{ ...event, source: 'google', labelColor: '#FFCC00' }} calendar={calendar} onTap={vi.fn()} />);
+  const { container, rerender } = render(
+    <EventChip
+      event={{ ...event, labelColor: '#FFCC00' }}
+      calendar={calendar}
+      onTap={vi.fn()}
+    />,
+  );
+  expect(container.querySelector('button')).toHaveStyle({
+    backgroundColor: '#FFCC00',
+    color: '#111827',
+    borderLeftWidth: '0',
+  });
+  rerender(
+    <EventChip
+      event={{ ...event, source: 'google', labelColor: '#FFCC00' }}
+      calendar={calendar}
+      onTap={vi.fn()}
+    />,
+  );
   expect(container.querySelector('button')!.style.backgroundColor).toBe('');
   expect(container.querySelector('button')).toHaveStyle({ borderColor: calendar.color });
   rerender(<EventChip event={event} calendar={calendar} onTap={vi.fn()} />);

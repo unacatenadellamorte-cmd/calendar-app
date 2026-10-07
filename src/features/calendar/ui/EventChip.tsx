@@ -4,6 +4,8 @@ import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { eventLabelColor, labelTextColor } from '@/lib/event-label';
 import { formatClock } from '@/lib/datetime';
+import { EventStamp } from '@/ui/EventStamp';
+import { eventStampName, isEventStampId } from '@/lib/event-stamps';
 interface EventChipProps {
   event: EventItem;
   calendar: Calendar | undefined;
@@ -36,8 +38,18 @@ export function EventChip({
   const [marqueeDistance, setMarqueeDistance] = useState(0);
   const time = event.allDay ? t('終日') : event.startsAt ? formatClock(event.startsAt) : '';
   const filled = event.source === 'local';
-  const color = filled ? eventLabelColor(event, calendar) : calendar?.color ?? 'var(--color-ink-disabled)';
-  const label = [time, event.title, calendar?.name].filter(Boolean).join(' ');
+  const color = filled
+    ? eventLabelColor(event, calendar)
+    : (calendar?.color ?? 'var(--color-ink-disabled)');
+  const knownStampId = isEventStampId(event.stampId) ? event.stampId : null;
+  const stampOnly = Boolean(event.stampOnly && knownStampId);
+  const label = [
+    time,
+    stampOnly && knownStampId ? t(eventStampName(knownStampId)) : event.title,
+    calendar?.name,
+  ]
+    .filter(Boolean)
+    .join(' ');
   const marqueeDuration = Math.max(4, Math.min(14, 4 + marqueeDistance * 0.055));
   useEffect(() => {
     if (!month) return;
@@ -49,7 +61,8 @@ export function EventChip({
       setMarqueeDistance(distance);
     };
     measure();
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     observer?.observe(viewport);
     observer?.observe(text);
     window.addEventListener('resize', measure);
@@ -57,7 +70,17 @@ export function EventChip({
       observer?.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, [event.title, month]);
+  }, [event.title, event.stampOnly, month]);
+  const stampSize = month ? '1.4em' : '1.25em';
+  const visibleTitle =
+    stampOnly && knownStampId ? (
+      <EventStamp id={knownStampId} size={stampSize} />
+    ) : (
+      <>
+        {knownStampId && <EventStamp id={knownStampId} size={stampSize} />}
+        <span>{event.title}</span>
+      </>
+    );
   return (
     <button
       type="button"
@@ -65,9 +88,26 @@ export function EventChip({
         e.stopPropagation();
         onTap(event);
       }}
-      style={{ ...style, borderColor: color, ...(filled ? { backgroundColor: color, color: labelTextColor(color), borderLeftWidth: 0, paddingInline: 2 } : {}) }}
+      style={{
+        ...style,
+        borderColor: color,
+        ...(filled
+          ? {
+              backgroundColor: color,
+              color: labelTextColor(color),
+              borderLeftWidth: 0,
+              paddingInline: 2,
+            }
+          : {}),
+      }}
       aria-label={label}
-      title={calendar ? `${event.title} ・ ${calendar.name}` : event.title}
+      title={
+        calendar
+          ? `${stampOnly && knownStampId ? t(eventStampName(knownStampId)) : event.title} ・ ${calendar.name}`
+          : stampOnly && knownStampId
+            ? t(eventStampName(knownStampId))
+            : event.title
+      }
       className={[
         'flex w-full items-baseline gap-1 overflow-hidden rounded-sm border-l-[3px]',
         month
@@ -76,9 +116,15 @@ export function EventChip({
       ].join(' ')}
     >
       {showTime && time && (
-        <span className={filled ? "flex-none tabular" : "flex-none tabular text-ink-secondary"}>{time}</span>
+        <span
+          className={filled ? 'flex-none tabular' : 'flex-none tabular text-ink-secondary'}
+        >
+          {time}
+        </span>
       )}
-      {month ? (
+      {month && stampOnly ? (
+        <span className="flex-none">{visibleTitle}</span>
+      ) : month ? (
         <span
           ref={titleViewportRef}
           className={['month-event-title', marqueeDistance > 0 ? 'is-marquee' : ''].join(' ')}
@@ -89,10 +135,16 @@ export function EventChip({
             } as CSSProperties
           }
         >
-          <span ref={titleTextRef}>{event.title}</span>
+          <span ref={titleTextRef}>{visibleTitle}</span>
         </span>
       ) : (
-        <span className={wrap ? 'min-w-0' : 'truncate'}>{event.title}</span>
+        <span
+          className={['inline-flex min-w-0 items-center gap-1', wrap ? '' : 'truncate'].join(
+            ' ',
+          )}
+        >
+          {visibleTitle}
+        </span>
       )}
     </button>
   );

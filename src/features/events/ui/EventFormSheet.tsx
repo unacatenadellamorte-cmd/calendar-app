@@ -20,6 +20,9 @@ import { ReminderPicker } from './ReminderPicker';
 import { isAllowedExternalUrl, openExternalUrl, openMap } from '@/platform/externalLinks';
 import { LabelColorPresets } from '@/ui/LabelColorPresets';
 import { GooglePushStatus } from '@/features/google-push/ui/GooglePushStatus';
+import { EventStamp } from '@/ui/EventStamp';
+import { StampPicker } from '@/ui/StampPicker';
+import { eventStampName, isEventStampId, type EventStampId } from '@/lib/event-stamps';
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
   /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
@@ -52,6 +55,8 @@ interface FormState {
   url: string;
   isSecret: boolean;
   labelColor: string | null;
+  stampId: EventStampId | null;
+  stampOnly: boolean;
 }
 function initialState(
   editing: EventItem | null,
@@ -79,6 +84,8 @@ function initialState(
       url: '',
       isSecret: false,
       labelColor: null,
+      stampId: null,
+      stampOnly: false,
     };
   }
   // 以前の不具合で外部カレンダーに保存された local 予定は、編集時に
@@ -106,6 +113,8 @@ function initialState(
     url: editing.url ?? '',
     isSecret: editing.isSecret,
     labelColor: editing.labelColor ?? null,
+    stampId: editing.stampId ?? null,
+    stampOnly: editing.stampOnly ?? false,
   };
 }
 function toInput(form: FormState): NewEventInput {
@@ -117,6 +126,8 @@ function toInput(form: FormState): NewEventInput {
     url: form.url.trim() || null,
     isSecret: form.isSecret,
     labelColor: form.labelColor,
+    stampId: form.stampId,
+    stampOnly: form.stampOnly,
   };
   return form.allDay
     ? { ...common, allDay: true, eventDate: form.dateLocal }
@@ -307,7 +318,12 @@ export function EventFormSheet({
                 return;
               }
               setSelectedTag(tag.id);
-              setForm((current) => ({ ...current, ...applied }));
+              setForm((current) => ({
+                ...current,
+                ...applied,
+                stampId: tag.stampId ?? null,
+                stampOnly: Boolean(tag.stampId && !tag.name.trim()),
+              }));
               setErrorKey(null);
             }}
           >
@@ -316,7 +332,11 @@ export function EventFormSheet({
             </option>
             {tags.map((tag) => (
               <option key={tag.id} value={tag.id}>
-                {tag.name} ({tag.allDay ? t('終日') : `${tag.startLocal}–${tag.endLocal}`})
+                {tag.name ||
+                  (isEventStampId(tag.stampId)
+                    ? t(eventStampName(tag.stampId))
+                    : t('予定タグ'))}{' '}
+                ({tag.allDay ? t('終日') : `${tag.startLocal}–${tag.endLocal}`})
               </option>
             ))}
           </select>
@@ -338,12 +358,27 @@ export function EventFormSheet({
           <span className="text-meta text-ink-secondary">{t('タイトル')}</span>
           <input
             value={form.title}
-            onChange={(e) => set('title', e.target.value)}
+            onChange={(e) =>
+              setForm((current) => ({ ...current, title: e.target.value, stampOnly: false }))
+            }
             required
             maxLength={200}
             className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
         </label>
+
+        <StampPicker
+          value={form.stampId}
+          color={previewColor}
+          onChange={(stampId) =>
+            setForm((current) => ({
+              ...current,
+              stampId,
+              stampOnly: Boolean(stampId && current.stampOnly),
+            }))
+          }
+          disabled={submitting}
+        />
 
         <label className="flex items-center gap-2">
           <input
@@ -430,7 +465,10 @@ export function EventFormSheet({
               color: labelTextColor(previewColor),
             }}
           >
-            {form.title || t('予定のプレビュー')}
+            {form.stampId && (
+              <EventStamp id={form.stampId} color={labelTextColor(previewColor)} />
+            )}{' '}
+            {form.stampOnly ? '' : form.title || t('予定のプレビュー')}
           </span>
           <button
             type="button"
@@ -557,7 +595,9 @@ export function EventFormSheet({
           </button>
         )}
       </form>
-      {open && editing?.source === 'local' && <GooglePushStatus key={editing.id} eventId={editing.id} />}
+      {open && editing?.source === 'local' && (
+        <GooglePushStatus key={editing.id} eventId={editing.id} />
+      )}
     </BottomSheet>
   );
 }

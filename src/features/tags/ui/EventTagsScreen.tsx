@@ -6,12 +6,14 @@ import type { EventTag, NewEventTagInput } from '@/data/event-tags';
 import { useEventTags } from '../model/useEventTags';
 import { EventTagFormSheet } from './EventTagFormSheet';
 import { labelTextColor } from '@/lib/event-label';
+import { EventStamp } from '@/ui/EventStamp';
 
 function errorText(key: string): string {
   const messages: Record<string, string> = {
-    'event-tag/invalid-name': '予定名称を1〜200文字で入力してください',
+    'event-tag/invalid-name': '予定名称またはスタンプを設定してください（名称は200文字まで）',
     'event-tag/invalid-color': 'ラベル色は6桁のカラーコードで入力してください',
     'event-tag/invalid-time': '開始・終了時刻を入力し、異なる時刻にしてください',
+    'event-tag/invalid-stamp': 'スタンプを選び直してください',
     'data/unavailable': 'Supabase を設定すると、予定タグを登録できます。',
     'data/query': '読み込みに失敗しました。もう一度お試しください',
   };
@@ -92,7 +94,12 @@ function EventTagsScreenContent({ state }: { state: ReturnType<typeof useAuth>['
                 className="flex min-h-14 w-full min-w-0 items-center justify-between gap-3 rounded-md border border-border-hairline px-4 text-left"
                 style={{ backgroundColor: tag.color, color: labelTextColor(tag.color) }}
               >
-                <span className="min-w-0 flex-1 truncate">{tag.name}</span>
+                <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+                  {tag.stampId && (
+                    <EventStamp id={tag.stampId} color={labelTextColor(tag.color)} />
+                  )}
+                  <span className="truncate">{tag.name}</span>
+                </span>
                 <span className="shrink-0 text-meta">
                   {tag.allDay ? t('終日') : `${tag.startLocal}–${tag.endLocal}`}
                 </span>

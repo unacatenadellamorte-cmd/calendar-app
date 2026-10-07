@@ -4,6 +4,55 @@ import userEvent from '@testing-library/user-event';
 import { EventTagFormSheet } from './EventTagFormSheet';
 
 describe('EventTagFormSheet', () => {
+  it('名称なしで仕事スタンプを選んだ値を送信する', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    render(
+      <EventTagFormSheet
+        open
+        editing={null}
+        errorKey={null}
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: '仕事' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: '保存' }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '', stampId: 'work' }),
+    );
+  });
+
+  it('編集時に仕事スタンプを復元し、保存値にも保持する', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    render(
+      <EventTagFormSheet
+        open
+        editing={
+          {
+            id: 'tag1',
+            name: '',
+            stampId: 'work',
+            color: '#2563EB',
+            allDay: false,
+            startLocal: '09:00',
+            endLocal: '18:00',
+          } as never
+        }
+        errorKey={null}
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '仕事' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: '保存' }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '', stampId: 'work' }),
+    );
+  });
+
   it('24色目のプリセットを選んで保存値へ渡す', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(true);
