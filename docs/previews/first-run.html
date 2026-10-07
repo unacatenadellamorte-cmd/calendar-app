@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi calendar 初回設定の確認</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      // 架空データ専用の設定で起動した場合だけ、確認画面を読み込む。
+      if (import.meta.env.FIRST_RUN_PREVIEW === true) {
+        import('./first-run.tsx');
+      } else {
+        document.getElementById('root').textContent =
+          'この確認画面は first-run.vite.config.ts を指定して起動してな。';
+      }
+    </script>
+  </body>
+</html>

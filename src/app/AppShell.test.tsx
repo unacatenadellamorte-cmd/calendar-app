@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { TUTORIAL_COMPLETED_KEY } from '@/features/tutorial/model/tutorial-state';
+import {
+  saveFirstRunStage,
+  readFirstRunStage,
+} from '@/features/onboarding/model/first-run-state';
 
 /**
  * オンボーディング(profiles 行なし)分岐・取得エラー分岐・通常表示 + 上部アバター分岐を検証する。
@@ -23,8 +27,15 @@ import { TUTORIAL_COMPLETED_KEY } from '@/features/tutorial/model/tutorial-state
  */
 
 let authState: 'loading' | 'guest' | 'authenticated' | 'unavailable' = 'guest';
+const config = vi.hoisted(() => ({ hasSupabase: false, hasGoogleOauth: false }));
+vi.mock('@/data/env', () => ({ env: config }));
 vi.mock('@/app/auth-context', () => ({
-  useAuth: () => ({ state: authState, session: null, email: null, signOut: vi.fn() }),
+  useAuth: () => ({
+    state: authState,
+    session: { user: { id: 'u1' } },
+    email: null,
+    signOut: vi.fn(),
+  }),
 }));
 
 const reload = vi.fn();
@@ -80,8 +91,8 @@ vi.mock('./secret-mode-context', async (importOriginal) => {
 
 const { AppShell } = await import('./AppShell');
 
-function renderShell() {
-  return render(
+function ShellRoutes() {
+  return (
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<AppShell />}>
@@ -95,14 +106,18 @@ function renderShell() {
           />
         </Route>
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+function renderShell() {
+  return render(<ShellRoutes />);
 }
 
 beforeEach(() => {
   // 既存のプロフィール分岐試験は案内完了後の状態で行う。
   localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
   authState = 'guest';
+  config.hasSupabase = false;
   profileState = { profile: null, loading: false, errorKey: null, loadErrorKey: null };
   reload.mockReset();
   navigateMock.mockReset();
@@ -124,21 +139,17 @@ afterEach(() => {
 });
 
 describe('AppShell', () => {
-  it('新規利用で案内を表示し、スキップ後は名前設定へ進み再表示しない', async () => {
+  it('新規ゲストは登録を最初に表示し、ログインへ切替可だがGoogle・名前・案内へは進めない', async () => {
     localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
-    const view = renderShell();
-    expect(
-      screen.getByRole('heading', { name: '予定をカレンダーに登録' }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'ようこそ' })).not.toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'スキップ' }));
-    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
-    expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBe('1');
-    view.unmount();
     renderShell();
-    expect(
-      screen.queryByRole('heading', { name: '予定をカレンダーに登録' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'アカウントを作成' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'ようこそ' })).not.toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'アカウントを持っている場合はログイン' }));
+    expect(screen.getByRole('heading', { name: 'ログイン' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Google を接続' })).not.toBeInTheDocument();
   });
 
   it('初回フラグがない既存利用者には案内を表示しない', () => {
@@ -154,14 +165,18 @@ describe('AppShell', () => {
 
   it('全ページ完了後の再起動でも案内を表示しない', async () => {
     localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    authState = 'authenticated';
+    profileState.profile = { id: 'u1', displayName: '花子', avatarDataUrl: null };
+    saveFirstRunStage('u1', 'tutorial');
     const view = renderShell();
     const user = userEvent.setup();
     for (let i = 0; i < 4; i++) await user.click(screen.getByRole('button', { name: '次へ' }));
     await user.click(screen.getByRole('button', { name: '使いはじめる' }));
-    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    expect(readFirstRunStage('u1')).toBe('done');
+    expect(navigateMock).toHaveBeenCalledWith('/calendar', { replace: true });
     view.unmount();
     renderShell();
-    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
   });
 
@@ -175,15 +190,18 @@ describe('AppShell', () => {
     expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBeNull();
   });
 
-  it('案内完了を保存できなくても名前設定へ進める', async () => {
+  it('案内完了を保存できなくても通常利用へ進める', async () => {
     localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    authState = 'authenticated';
+    profileState.profile = { id: 'u1', displayName: '花子', avatarDataUrl: null };
+    saveFirstRunStage('u1', 'tutorial');
     const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('保存不可');
     });
     try {
       renderShell();
       await userEvent.setup().click(screen.getByRole('button', { name: 'スキップ' }));
-      expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
     } finally {
       storage.mockRestore();
     }
@@ -200,9 +218,9 @@ describe('AppShell', () => {
     expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBeNull();
   });
 
-  it('profiles 行が無ければオンボーディングを表示し、下タブ・Outlet は出さない', () => {
+  it('profiles 行が無ければ登録画面を表示し、下タブ・Outlet は出さない', () => {
     renderShell();
-    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'アカウントを作成' })).toBeInTheDocument();
     expect(screen.queryByText('ホーム画面')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('navigation', { name: 'メインナビゲーション' }),
@@ -230,6 +248,32 @@ describe('AppShell', () => {
     renderShell();
     expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'プロフィール' })).not.toBeInTheDocument();
+  });
+
+  it('本番設定済みの認証失敗は通常利用へ通さず、再試行を案内する', () => {
+    config.hasSupabase = true;
+    authState = 'unavailable';
+    renderShell();
+    expect(screen.getByRole('alert')).toHaveTextContent('認証を確認できません');
+    expect(screen.queryByText('ホーム画面')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'もう一度試す' })).toBeInTheDocument();
+  });
+
+  it('認証後だけGoogle段階へ進み、スキップした名前設定を再起動後も保つ', async () => {
+    authState = 'authenticated';
+    const view = renderShell();
+    expect(
+      screen.getByRole('heading', { name: 'Googleアカウントを接続（任意）' }),
+    ).toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'スキップしてユーザー名を設定' }));
+    expect(screen.getByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
+    expect(readFirstRunStage('u1')).toBe('profile');
+    view.unmount();
+    renderShell();
+    expect(screen.getByRole('button', { name: 'チュートリアルへ進む' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
   });
 
   it('認証未確定(state===loading)の間は待機表示のまま、通常画面は一瞬も出さない', () => {

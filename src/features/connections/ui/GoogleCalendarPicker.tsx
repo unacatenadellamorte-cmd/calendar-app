@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { t, useLanguage } from '@/i18n';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
@@ -73,19 +74,32 @@ interface GoogleAccountCalendarsProps {
   connectionId: string;
   /** 見出しに出すアカウント名(メール)。 */
   email: string;
+  /** 初回設定の親へ、選択保存中だけ次段階を待たせるための通知。 */
+  onSelectionPendingChange?: (connectionId: string, pending: boolean) => void;
 }
 
 /** 1つの Google アカウント分のカレンダー候補(見出し・更新・オン/オフ)。 */
-export function GoogleAccountCalendars({ connectionId, email }: GoogleAccountCalendarsProps) {
+export function GoogleAccountCalendars({
+  connectionId,
+  email,
+  onSelectionPendingChange,
+}: GoogleAccountCalendarsProps) {
   useLanguage();
-  const { choices, loading, refreshing, errorKey, refresh, toggle } =
+  const { choices, loading, refreshing, pendingSelections, errorKey, refresh, toggle } =
     useGoogleCalendars(connectionId);
+  const saving = pendingSelections > 0;
+  useEffect(() => {
+    onSelectionPendingChange?.(connectionId, saving);
+  }, [connectionId, saving, onSelectionPendingChange]);
   const selectedCount = choices.filter((c) => c.selected).length;
   const headingId = `google-account-${connectionId}`;
   return (
     <section aria-labelledby={headingId} className="mt-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} className="min-w-0 truncate text-body font-semibold text-ink-primary">
+        <h2
+          id={headingId}
+          className="min-w-0 truncate text-body font-semibold text-ink-primary"
+        >
           {email}
         </h2>
         <button
@@ -99,6 +113,11 @@ export function GoogleAccountCalendars({ connectionId, email }: GoogleAccountCal
         </button>
       </div>
       <p className="text-meta text-ink-secondary">{t('{0} 件選択中。', [selectedCount])}</p>
+      {saving && (
+        <p role="status" className="text-meta text-ink-secondary">
+          {t('保存中…')}
+        </p>
+      )}
 
       {errorKey && (
         <p role="alert" className="mt-2 text-meta text-danger">

@@ -10,14 +10,21 @@ import { ConnectivityBar } from './ConnectivityBar';
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAuth } from './auth-context';
 import { resolveMessage } from '@/data/messages';
+import { env } from '@/data/env';
 import { useProfile } from '@/features/profile/model/useProfile';
 import { AvatarIcon } from '@/features/profile/ui/AvatarIcon';
 import { OnboardingScreen } from '@/features/profile/ui/OnboardingScreen';
 import { FirstRunTutorial } from '@/features/tutorial/ui/FirstRunTutorial';
+import { completeTutorial } from '@/features/tutorial/model/tutorial-state';
+import { AuthScreen } from '@/features/auth/ui/AuthScreen';
+import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
+import { GOOGLE_CALLBACK_PATH } from '@/data/connections';
+import { GoogleSetupScreen } from '@/features/onboarding/ui/GoogleSetupScreen';
 import {
-  completeTutorial,
-  hasCompletedTutorial,
-} from '@/features/tutorial/model/tutorial-state';
+  readFirstRunStage,
+  saveFirstRunStage,
+  type FirstRunStage,
+} from '@/features/onboarding/model/first-run-state';
 import type { Profile } from '@/data/profiles';
 import type { ProfileOutletContext } from './profile-outlet-context';
 import { ProfileHeaderProvider } from '@/ui/profile-header-context';
@@ -34,13 +41,22 @@ import { ProfileHeaderProvider } from '@/ui/profile-header-context';
  *  1. 認証未確定(`state==='loading'`)、または profiles 取得中 → 待機表示のみ
  *  2. profiles 取得(reload)自体が失敗 → エラー表示 + 再試行(オンボーディングには倒さない。
  *     既存ユーザーが通信エラーに遭遇するたびオンボーディングへ閉じ込められるのを防ぐ)
- *  3. guest/authenticated が確定 かつ profiles 行が無い → オンボーディング(下タブ含め他は見せない)
+ *  3. profiles行なし → 登録・ログイン → 任意Google接続 → 名前 → 案内
  *  4. それ以外 → 従来どおり Outlet + 下タブ。profiles 行があれば最上部にアバター
  *     (シングルタップ→ /profile、ダブルタップ→シークレットモードON/OFF、`AvatarNav`)
  */
 export function AppShell() {
+  const { state, session } = useAuth();
+  // アカウントが変わった瞬間にプロフィール・フォーム・進捗を一緒に破棄する。
+  // 同じIDへの匿名昇格ではデータと入力を保持する。
+  const userId = session?.user.id ?? null;
+  return <AppShellContent key={userId ?? state} userId={userId} />;
+}
+
+function AppShellContent({ userId }: { userId: string | null }) {
   useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   useEffect(() => {
     // 保存済み画像(data-background)とは分けて、写真を見せる画面だけを指定する。
     const root = document.documentElement;
@@ -59,18 +75,49 @@ export function AppShell() {
   const showWaiting = authResolving || (enabled && loading);
   const showProfileError = !showWaiting && enabled && Boolean(loadErrorKey);
   const needsOnboarding = !showWaiting && !showProfileError && enabled && profile === null;
-  const [tutorialDone, setTutorialDone] = useState(hasCompletedTutorial);
+  const [stage, setStage] = useState(() => readFirstRunStage(userId));
+  const changeStage = (next: FirstRunStage) => {
+    saveFirstRunStage(userId, next);
+    setStage(next);
+  };
+  const showTutorial =
+    !showWaiting &&
+    !showProfileError &&
+    state === 'authenticated' &&
+    Boolean(profile) &&
+    (stage === 'profile' || stage === 'tutorial');
+  const googleCallback =
+    state === 'authenticated' && location.pathname === GOOGLE_CALLBACK_PATH;
+  const authUnavailable = state === 'unavailable' && env.hasSupabase;
   useEffect(() => {
-    // 既存プロフィールは更新後の初回案内対象にしない。取得失敗とは区別する。
-    if (!showWaiting && !showProfileError && enabled && profile && !tutorialDone) {
-      completeTutorial();
-      setTutorialDone(true);
+    if (showWaiting || showProfileError || !enabled) return;
+    if (profile) {
+      // 名前保存の直後と既存利用者は、利用者別の途中記録で区別する。
+      if (stage === 'profile') {
+        saveFirstRunStage(userId, 'tutorial');
+        setStage('tutorial');
+      } else if (stage !== 'tutorial' && stage !== 'done') {
+        saveFirstRunStage(userId, 'done');
+        setStage('done');
+        completeTutorial();
+      }
+    } else if (state === 'authenticated' && (stage === null || stage === 'done')) {
+      saveFirstRunStage(userId, 'google');
+      setStage('google');
     }
-  }, [showWaiting, showProfileError, enabled, profile, tutorialDone]);
+  }, [showWaiting, showProfileError, enabled, profile, stage, state, userId]);
   const finishTutorial = () => {
     completeTutorial();
-    setTutorialDone(true);
+    changeStage('done');
+    navigate('/calendar', { replace: true });
   };
+  const needsAccount = needsOnboarding && state !== 'authenticated';
+  const needsGoogle =
+    needsOnboarding &&
+    state === 'authenticated' &&
+    stage !== 'profile' &&
+    stage !== 'tutorial';
+  const step = needsAccount ? 1 : needsGoogle || googleCallback ? 2 : showTutorial ? 4 : 3;
   const outletContext: ProfileOutletContext = { profile, loading, errorKey, update, reload };
   return (
     <OnlineProvider>
@@ -84,7 +131,28 @@ export function AppShell() {
         >
           <div className="app-status-bar" aria-hidden="true" />
           <ConnectivityBar />
-          {showWaiting ? (
+          {(needsOnboarding || showTutorial || (googleCallback && stage === 'google')) && (
+            <p className="px-4 pt-4 text-meta text-ink-secondary">
+              {t('初回設定 {0}/4', [step])} ·{' '}
+              {t(['アプリアカウント', 'Google接続', 'ユーザー名', '使い方ガイド'][step - 1]!)}
+            </p>
+          )}
+          {googleCallback ? (
+            <GoogleCallbackScreen returnTo={stage === 'google' ? '/' : '/settings'} />
+          ) : authUnavailable ? (
+            <div className="flex flex-col gap-3 px-4 py-8">
+              <p role="alert" className="text-meta text-danger">
+                {t('認証を確認できません。通信を確認して再試行してください。')}
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="min-h-11 rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
+              >
+                {t('もう一度試す')}
+              </button>
+            </div>
+          ) : showWaiting ? (
             <p className="px-4 py-8 text-center text-meta text-ink-secondary">
               {t('読み込み中…')}
             </p>
@@ -101,10 +169,14 @@ export function AppShell() {
                 {t('もう一度試す')}
               </button>
             </div>
-          ) : needsOnboarding && !tutorialDone ? (
+          ) : needsAccount ? (
+            <AuthScreen initialMode="signup" onSuccess={() => void reload()} />
+          ) : needsGoogle ? (
+            <GoogleSetupScreen onContinue={() => changeStage('profile')} />
+          ) : showTutorial ? (
             <FirstRunTutorial onFinish={finishTutorial} />
           ) : needsOnboarding ? (
-            <OnboardingScreen create={create} errorKey={errorKey} />
+            <OnboardingScreen create={create} errorKey={errorKey} continueToTutorial />
           ) : (
             <>
               <ProfileHeaderProvider value={profile ? <AvatarNav profile={profile} /> : null}>

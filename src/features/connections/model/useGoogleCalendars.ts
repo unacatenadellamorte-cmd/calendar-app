@@ -12,6 +12,8 @@ interface State {
   loading: boolean;
   /** Google から取り直し中。 */
   refreshing: boolean;
+  /** カレンダー選択を保存している件数。読取更新とは分けて扱う。 */
+  pendingSelections: number;
   errorKey: string | null;
 }
 
@@ -28,6 +30,7 @@ export function useGoogleCalendars(connectionId: string | null) {
     choices: [],
     loading: enabled,
     refreshing: false,
+    pendingSelections: 0,
     errorKey: null,
   });
   const pending = useRef(new Set<string>());
@@ -54,7 +57,13 @@ export function useGoogleCalendars(connectionId: string | null) {
 
   useEffect(() => {
     if (!enabled) {
-      setState({ choices: [], loading: false, refreshing: false, errorKey: null });
+      setState({
+        choices: [],
+        loading: false,
+        refreshing: false,
+        pendingSelections: 0,
+        errorKey: null,
+      });
       return;
     }
     let cancelled = false;
@@ -69,29 +78,44 @@ export function useGoogleCalendars(connectionId: string | null) {
     };
   }, [enabled, reloadCatalog, refresh]);
 
-  const toggle = useCallback(async (externalCalendarId: string, selected: boolean) => {
-    if (connectionId === null) return;
-    if (pending.current.has(externalCalendarId)) return;
-    pending.current.add(externalCalendarId);
-    setState((s) => ({
-      ...s,
-      errorKey: null,
-      choices: s.choices.map((c) =>
-        c.externalCalendarId === externalCalendarId ? { ...c, selected } : c,
-      ),
-    }));
-    const result = await setGoogleCalendarSelected(connectionId, externalCalendarId, selected);
-    pending.current.delete(externalCalendarId);
-    if (!result.ok) {
+  const toggle = useCallback(
+    async (externalCalendarId: string, selected: boolean) => {
+      if (connectionId === null) return;
+      if (pending.current.has(externalCalendarId)) return;
+      pending.current.add(externalCalendarId);
       setState((s) => ({
         ...s,
-        errorKey: result.error.messageKey,
+        errorKey: null,
+        pendingSelections: pending.current.size,
         choices: s.choices.map((c) =>
-          c.externalCalendarId === externalCalendarId ? { ...c, selected: !selected } : c,
+          c.externalCalendarId === externalCalendarId ? { ...c, selected } : c,
         ),
       }));
-    }
-  }, [connectionId]);
+      const rollback = (errorKey: string) => {
+        setState((s) => ({
+          ...s,
+          errorKey,
+          choices: s.choices.map((c) =>
+            c.externalCalendarId === externalCalendarId ? { ...c, selected: !selected } : c,
+          ),
+        }));
+      };
+      try {
+        const result = await setGoogleCalendarSelected(
+          connectionId,
+          externalCalendarId,
+          selected,
+        );
+        if (!result.ok) rollback(result.error.messageKey);
+      } catch {
+        rollback('connection/calendars-failed');
+      } finally {
+        pending.current.delete(externalCalendarId);
+        setState((s) => ({ ...s, pendingSelections: pending.current.size }));
+      }
+    },
+    [connectionId],
+  );
 
   return { ...state, refresh, toggle };
 }

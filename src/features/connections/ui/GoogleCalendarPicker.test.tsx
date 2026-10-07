@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ok, err, appError } from '@/data/result';
 
@@ -10,8 +10,21 @@ const setGoogleCalendarSelected = vi.fn();
 let searchParams = new URLSearchParams();
 let authState = { state: 'authenticated' };
 let envValue = { hasSupabase: true, hasGoogleOauth: true };
-let connectionsValue: { connections: unknown[]; loading: boolean; errorKey: string | null; refresh: () => void } = {
-  connections: [{ id: 'c1', provider: 'google', googleEmail: 'me@gmail.com', createdAt: 'x', status: 'active' }],
+let connectionsValue: {
+  connections: unknown[];
+  loading: boolean;
+  errorKey: string | null;
+  refresh: () => void;
+} = {
+  connections: [
+    {
+      id: 'c1',
+      provider: 'google',
+      googleEmail: 'me@gmail.com',
+      createdAt: 'x',
+      status: 'active',
+    },
+  ],
   loading: false,
   errorKey: null,
   refresh: vi.fn(),
@@ -51,13 +64,23 @@ const choice = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   searchParams = new URLSearchParams();
   navigate.mockReset();
-  listConnectionCalendars.mockReset().mockResolvedValue(ok([choice(), choice({ externalCalendarId: 'b@g', summary: '部活' })]));
+  listConnectionCalendars
+    .mockReset()
+    .mockResolvedValue(ok([choice(), choice({ externalCalendarId: 'b@g', summary: '部活' })]));
   refreshGoogleCalendars.mockReset().mockResolvedValue(ok({ count: 2 }));
   setGoogleCalendarSelected.mockReset().mockResolvedValue(ok(undefined));
   authState = { state: 'authenticated' };
   envValue = { hasSupabase: true, hasGoogleOauth: true };
   connectionsValue = {
-    connections: [{ id: 'c1', provider: 'google', googleEmail: 'me@gmail.com', createdAt: 'x', status: 'active' }],
+    connections: [
+      {
+        id: 'c1',
+        provider: 'google',
+        googleEmail: 'me@gmail.com',
+        createdAt: 'x',
+        status: 'active',
+      },
+    ],
     loading: false,
     errorKey: null,
     refresh: vi.fn(),
@@ -65,6 +88,21 @@ beforeEach(() => {
 });
 
 describe('GoogleCalendarPicker', () => {
+  it('選択の保存が例外になっても保存中を解除し、チェックを戻してエラーを出す', async () => {
+    let fail!: (reason: Error) => void;
+    setGoogleCalendarSelected.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      }),
+    );
+    render(<GoogleCalendarPicker />);
+    await userEvent.setup().click(await screen.findByRole('checkbox', { name: /個人/ }));
+    expect(screen.getByText('保存中…')).toBeInTheDocument();
+    await act(async () => fail(new Error('保存通信失敗')));
+    expect(screen.getByRole('alert')).toHaveTextContent('取得できませんでした');
+    expect(screen.queryByText('保存中…')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /個人/ })).not.toBeChecked();
+  });
   it('未接続なら設定へ戻す案内を出し、関数を呼ばない', () => {
     connectionsValue = { connections: [], loading: false, errorKey: null, refresh: vi.fn() };
     render(<GoogleCalendarPicker />);
@@ -102,15 +140,27 @@ describe('GoogleCalendarPicker', () => {
     await screen.findByText('個人');
     const cb = screen.getAllByRole('checkbox')[0]!;
     await user.click(cb);
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('取得できませんでした'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('取得できませんでした'),
+    );
     expect((cb as HTMLInputElement).checked).toBe(false);
   });
 
   it('選択済みカレンダー: 最終取り込み時刻 / 失敗を行ごとに出す', async () => {
     listConnectionCalendars.mockResolvedValue(
       ok([
-        choice({ externalCalendarId: 'a@g', summary: '個人', selected: true, lastSyncedAt: '2026-09-11T05:30:00Z' }),
-        choice({ externalCalendarId: 'b@g', summary: '部活', selected: true, lastError: 'sync-failed' }),
+        choice({
+          externalCalendarId: 'a@g',
+          summary: '個人',
+          selected: true,
+          lastSyncedAt: '2026-09-11T05:30:00Z',
+        }),
+        choice({
+          externalCalendarId: 'b@g',
+          summary: '部活',
+          selected: true,
+          lastError: 'sync-failed',
+        }),
         choice({ externalCalendarId: 'c@g', summary: '未選択', selected: false }),
       ]),
     );
@@ -137,9 +187,27 @@ describe('GoogleCalendarPicker', () => {
   describe('複数アカウント', () => {
     const two = () => ({
       connections: [
-        { id: 'c1', provider: 'google', googleEmail: 'me@gmail.com', createdAt: 'x', status: 'active' },
-        { id: 'c2', provider: 'google', googleEmail: 'work@gmail.com', createdAt: 'y', status: 'active' },
-        { id: 'c3', provider: 'google', googleEmail: 'old@gmail.com', createdAt: 'z', status: 'suspended' },
+        {
+          id: 'c1',
+          provider: 'google',
+          googleEmail: 'me@gmail.com',
+          createdAt: 'x',
+          status: 'active',
+        },
+        {
+          id: 'c2',
+          provider: 'google',
+          googleEmail: 'work@gmail.com',
+          createdAt: 'y',
+          status: 'active',
+        },
+        {
+          id: 'c3',
+          provider: 'google',
+          googleEmail: 'old@gmail.com',
+          createdAt: 'z',
+          status: 'suspended',
+        },
       ],
       loading: false,
       errorKey: null,
@@ -184,7 +252,9 @@ describe('GoogleCalendarPicker', () => {
       render(<GoogleCalendarPicker />);
       await waitFor(() => expect(refreshGoogleCalendars).toHaveBeenCalledTimes(2));
       refreshGoogleCalendars.mockClear();
-      await user.click(screen.getByRole('button', { name: 'work@gmail.com のカレンダーを更新' }));
+      await user.click(
+        screen.getByRole('button', { name: 'work@gmail.com のカレンダーを更新' }),
+      );
       await waitFor(() => expect(refreshGoogleCalendars).toHaveBeenCalledTimes(1));
       expect(refreshGoogleCalendars).toHaveBeenCalledWith('c2');
     });
@@ -192,7 +262,9 @@ describe('GoogleCalendarPicker', () => {
     it('?connection= 指定時はそのアカウントだけを出す', async () => {
       searchParams = new URLSearchParams({ connection: 'c2' });
       render(<GoogleCalendarPicker />);
-      expect(await screen.findByRole('region', { name: 'work@gmail.com' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('region', { name: 'work@gmail.com' }),
+      ).toBeInTheDocument();
       expect(screen.queryByRole('region', { name: 'me@gmail.com' })).not.toBeInTheDocument();
       expect(listConnectionCalendars).not.toHaveBeenCalledWith('c1');
     });
@@ -201,7 +273,13 @@ describe('GoogleCalendarPicker', () => {
       connectionsValue = {
         ...two(),
         connections: [
-          { id: 'c3', provider: 'google', googleEmail: 'old@gmail.com', createdAt: 'z', status: 'suspended' },
+          {
+            id: 'c3',
+            provider: 'google',
+            googleEmail: 'old@gmail.com',
+            createdAt: 'z',
+            status: 'suspended',
+          },
         ],
       };
       render(<GoogleCalendarPicker />);

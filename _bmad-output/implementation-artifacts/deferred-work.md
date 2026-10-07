@@ -178,3 +178,10 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-device-calendar-permission-20261001.md`
   summary: 端末の一覧読み取り中にカレンダー権限が失効する場合の競合を検証する（中程度・未検証）。
   evidence: 権限確認後、一覧APIが未許可を空一覧として返しプロセスが存続すると差分削除に進む可能性がある。実機でその順序とAPI結果を確認する必要がある。今回の未許可からの開始は読み取り前ガードで対処。
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-first-run-account-google-profile-tutorial.md`
+  summary: 登録確認メール待ち・ログインへの切替を再起動後も復元できるようにする（medium、既存課題）。
+  evidence: 84fd921以前からuseAuthFormのpendingEmail・modeはメモリのみ。通常/authにも同じ欠点があり、パスワードを保存せず確認段階だけを利用者別に再開する設計が必要。現在は登録画面のログイン切替を使って復帰できる。
+- source_spec: `_bmad-output/implementation-artifacts/spec-first-run-account-google-profile-tutorial.md`
+  summary: プロフィール未作成の初回設定に、アプリアカウントを変更する導線を検討する（low、既存課題）。
+  evidence: 84fd921のプロフィール未作成ゲートもOutlet・設定を隠し、初回内部にログアウトを置いていない。現状は名前登録と案内スキップ後、通常の設定から切替できる。

@@ -11,12 +11,13 @@ describe('初回使い方ガイド', () => {
     '$name の全5ページと操作文言に日本語の取り残しがない',
     async ({ code }) => {
       applyLanguage(code);
-      const { container } = render(<FirstRunTutorial onFinish={vi.fn()} />);
+      const { container, unmount } = render(<FirstRunTutorial onFinish={vi.fn()} />);
       const user = userEvent.setup();
       for (let page = 0; page < 5; page++) {
         expect(container.textContent).not.toMatch(/[ぁ-んァ-ヶ]/);
         if (page < 4) await user.click(container.querySelector('footer button:last-child')!);
       }
+      unmount();
     },
   );
   it('5ページを進み、戻ることもでき、最後でだけ完了する', async () => {
@@ -47,8 +48,11 @@ describe('初回使い方ガイド', () => {
     const user = userEvent.setup();
     for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: '次へ' }));
     expect(
-      screen.getByText(/Googleカレンダーを接続するには、アプリのアカウント登録/),
+      screen.getByText(/アプリの登録・ログインとGoogle接続は別の設定/),
     ).toBeInTheDocument();
     expect(screen.getByText(/プロフィールの名前は、アカウント登録とは別/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Google接続をスキップした場合は、後から「設定」/),
+    ).toBeInTheDocument();
   });
 });

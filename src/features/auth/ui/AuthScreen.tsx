@@ -1,21 +1,36 @@
 import { t, useLanguage } from '@/i18n';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useAuth } from '@/app/auth-context';
 import { resolveMessage } from '@/data/messages';
-import { useAuthForm } from '@/features/auth/model/useAuthForm';
+import { useAuthForm, type AuthMode } from '@/features/auth/model/useAuthForm';
 /**
  * ログイン / アカウント作成画面(タブ外、設定から遷移)。
  * 匿名セッション中はサインアップが「登録(昇格)」になる。
  */
-export function AuthScreen() {
+export function AuthScreen({
+  initialMode,
+  onSuccess,
+}: {
+  initialMode?: AuthMode;
+  onSuccess?: () => void;
+} = {}) {
   useLanguage();
   const { state } = useAuth();
   const navigate = useNavigate();
+  useEffect(() => {
+    // 認証通知でシェルが再マウントされても、通常ログインの戻り先を失わない。
+    // 初回の成功先は親シェルが認証状態から決める。
+    if (state === 'authenticated' && onSuccess === undefined) {
+      navigate('/settings', { replace: true });
+    }
+  }, [state, onSuccess, navigate]);
   const isGuest = state === 'guest';
   const { form, setMode, setEmail, setPassword, changeEmail, submit } = useAuthForm({
     isGuest,
-    onSuccess: () => navigate('/settings'),
+    initialMode,
+    onSuccess: onSuccess ?? (() => navigate('/settings')),
   });
   if (state === 'unavailable') {
     return (
@@ -31,7 +46,11 @@ export function AuthScreen() {
     return (
       <Screen title={t('確認メールを送信しました')}>
         <div role="status" className="mt-1 flex flex-col gap-3 text-body text-ink-primary">
-          <p>{t('{0} に確認メールを送信しました。登録はまだ完了していません。', [form.pendingEmail])}</p>
+          <p>
+            {t('{0} に確認メールを送信しました。登録はまだ完了していません。', [
+              form.pendingEmail,
+            ])}
+          </p>
           <p>
             {t(
               '届いたメールのリンクを開いて確認してください。複数届いている場合は最新のメールを使ってください。',
@@ -50,7 +69,11 @@ export function AuthScreen() {
         >
           {t('ログインへ進む')}
         </button>
-        <button type="button" onClick={changeEmail} className="mt-4 min-h-11 text-meta text-accent">
+        <button
+          type="button"
+          onClick={changeEmail}
+          className="mt-4 min-h-11 text-meta text-accent"
+        >
           {t('別のメールアドレスで登録する')}
         </button>
       </Screen>

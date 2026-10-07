@@ -9,6 +9,7 @@ import {
 export type AuthMode = 'signin' | 'signup';
 
 interface UseAuthFormOptions {
+  initialMode?: AuthMode;
   /** 匿名セッション中か。true のとき signup は「昇格」(updateUser)になる。 */
   isGuest: boolean;
   /** 成功時に呼ばれる(画面遷移など)。確認メール待ちでは呼ばない。 */
@@ -30,9 +31,13 @@ const PASSWORD_MIN = 6;
 /** 同じ宛先へ確認メールを出し直せるまでの間隔(Supabase の既定の送信間隔に合わせる)。 */
 const RESEND_COOLDOWN_MS = 60_000;
 
-export function useAuthForm({ isGuest, onSuccess }: UseAuthFormOptions) {
+export function useAuthForm({
+  isGuest,
+  onSuccess,
+  initialMode = 'signin',
+}: UseAuthFormOptions) {
   const [form, setForm] = useState<AuthFormState>({
-    mode: 'signin',
+    mode: initialMode,
     email: '',
     password: '',
     submitting: false,
@@ -107,7 +112,8 @@ export function useAuthForm({ isGuest, onSuccess }: UseAuthFormOptions) {
           ? await upgradeToPassword(email, password)
           : await signUpWithPassword(email, password);
         if (!result.ok) errorKey = result.error.messageKey;
-        else if (result.value.status === 'confirmation-pending') pendingEmail = result.value.email;
+        else if (result.value.status === 'confirmation-pending')
+          pendingEmail = result.value.email;
       } else {
         const result = await signInWithPassword(email, password);
         if (!result.ok) errorKey = result.error.messageKey;

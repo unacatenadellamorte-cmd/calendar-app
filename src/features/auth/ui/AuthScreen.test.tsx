@@ -5,6 +5,23 @@ import { appError, err, ok } from '@/data/result';
 import { applyLanguage } from '@/i18n';
 import { AuthScreen } from './AuthScreen';
 
+it('初回は登録モードを指定でき、確認待ちで成功先へは進まない', async () => {
+  api.upgradeToPassword.mockResolvedValue(
+    ok({ status: 'confirmation-pending', email: 'a@b.com' }),
+  );
+  const success = vi.fn();
+  render(
+    <MemoryRouter>
+      <AuthScreen initialMode="signup" onSuccess={success} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('heading', { name: 'アカウントを作成' })).toBeInTheDocument();
+  fill('a@b.com', 'secret1');
+  fireEvent.click(screen.getByRole('button', { name: '登録する' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('登録はまだ完了していません');
+  expect(success).not.toHaveBeenCalled();
+});
+
 const api = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   signUpWithPassword: vi.fn(),
@@ -35,20 +52,28 @@ function renderScreen() {
 
 function fill(email: string, password: string) {
   fireEvent.change(screen.getByLabelText('メールアドレス'), { target: { value: email } });
-  fireEvent.change(screen.getByLabelText('パスワード(6文字以上)'), { target: { value: password } });
+  fireEvent.change(screen.getByLabelText('パスワード(6文字以上)'), {
+    target: { value: password },
+  });
 }
 
 it('確認待ちは設定へ戻らず、送信先・最新メール・確認後のログインを案内する', async () => {
-  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
+  api.upgradeToPassword.mockResolvedValue(
+    ok({ status: 'confirmation-pending', email: 'a@b.com' }),
+  );
   renderScreen();
   fireEvent.click(screen.getByRole('button', { name: 'アカウントを作成する' }));
   fill('a@b.com', 'secret1');
   fireEvent.click(screen.getByRole('button', { name: '登録する' }));
 
   const guide = await screen.findByRole('status');
-  expect(guide).toHaveTextContent('a@b.com に確認メールを送信しました。登録はまだ完了していません。');
+  expect(guide).toHaveTextContent(
+    'a@b.com に確認メールを送信しました。登録はまだ完了していません。',
+  );
   expect(guide).toHaveTextContent('最新のメール');
-  expect(guide).toHaveTextContent('このアプリに戻り、同じメールアドレスとパスワードでログインしてください。');
+  expect(guide).toHaveTextContent(
+    'このアプリに戻り、同じメールアドレスとパスワードでログインしてください。',
+  );
   expect(screen.queryByText('設定画面')).not.toBeInTheDocument();
   // パスワード欄も値も画面に残さない。再送の操作も置かない。
   expect(document.body.innerHTML).not.toContain('secret1');
@@ -57,7 +82,9 @@ it('確認待ちは設定へ戻らず、送信先・最新メール・確認後�
 });
 
 it('確認待ちからログインへ進み、成功したら従来どおり設定へ戻る', async () => {
-  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
+  api.upgradeToPassword.mockResolvedValue(
+    ok({ status: 'confirmation-pending', email: 'a@b.com' }),
+  );
   api.signInWithPassword.mockResolvedValue(ok({ user: { id: 'u1' } }));
   renderScreen();
   fireEvent.click(screen.getByRole('button', { name: 'アカウントを作成する' }));
@@ -74,7 +101,9 @@ it('確認待ちからログインへ進み、成功したら従来どおり設�
 });
 
 it('確認待ちから別のメールアドレスでの登録に戻れる', async () => {
-  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
+  api.upgradeToPassword.mockResolvedValue(
+    ok({ status: 'confirmation-pending', email: 'a@b.com' }),
+  );
   renderScreen();
   fireEvent.click(screen.getByRole('button', { name: 'アカウントを作成する' }));
   fill('a@b.com', 'secret1');
@@ -95,8 +124,14 @@ it('即時完了の登録は従来どおり設定へ戻る', async () => {
 });
 
 it.each([
-  ['auth/email-rate-limited', '確認メールの送信回数が上限に達しました。届いている最新のメールを確認するか、時間をおいてください'],
-  ['auth/email-not-confirmed', 'メールアドレスの確認が完了していません。確認メールのリンクを開いてからログインしてください'],
+  [
+    'auth/email-rate-limited',
+    '確認メールの送信回数が上限に達しました。届いている最新のメールを確認するか、時間をおいてください',
+  ],
+  [
+    'auth/email-not-confirmed',
+    'メールアドレスの確認が完了していません。確認メールのリンクを開いてからログインしてください',
+  ],
 ])('%s はその場で個別の文言を出す', async (key, message) => {
   api.signInWithPassword.mockResolvedValue(err(appError(key, key)));
   renderScreen();
@@ -108,7 +143,11 @@ it.each([
 
 it('送信中は連打とモード変更を受け付けない', async () => {
   let finish!: (value: unknown) => void;
-  api.upgradeToPassword.mockReturnValue(new Promise((done) => { finish = done; }));
+  api.upgradeToPassword.mockReturnValue(
+    new Promise((done) => {
+      finish = done;
+    }),
+  );
   renderScreen();
   fireEvent.click(screen.getByRole('button', { name: 'アカウントを作成する' }));
   fill('a@b.com', 'secret1');
@@ -117,7 +156,9 @@ it('送信中は連打とモード変更を受け付けない', async () => {
   fireEvent.submit(form);
 
   expect(await screen.findByRole('button', { name: '処理中…' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'アカウントを持っている場合はログイン' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'アカウントを持っている場合はログイン' }),
+  ).toBeDisabled();
   expect(api.upgradeToPassword).toHaveBeenCalledTimes(1);
   finish(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
   await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
@@ -125,11 +166,15 @@ it('送信中は連打とモード変更を受け付けない', async () => {
 
 it('確認待ちの案内は選択中の言語で出す', async () => {
   applyLanguage('en');
-  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
+  api.upgradeToPassword.mockResolvedValue(
+    ok({ status: 'confirmation-pending', email: 'a@b.com' }),
+  );
   renderScreen();
   fireEvent.click(screen.getByRole('button', { name: 'Create an account' }));
   fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'a@b.com' } });
-  fireEvent.change(screen.getByLabelText('Password (6+ characters)'), { target: { value: 'secret1' } });
+  fireEvent.change(screen.getByLabelText('Password (6+ characters)'), {
+    target: { value: 'secret1' },
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Register' }));
   expect(await screen.findByRole('status')).toHaveTextContent(
     'We sent a confirmation email to a@b.com. Registration is not complete yet.',

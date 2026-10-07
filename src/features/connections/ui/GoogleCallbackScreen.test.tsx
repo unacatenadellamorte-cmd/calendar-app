@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import userEvent from '@testing-library/user-event';
 import { appError, err, ok } from '@/data/result';
 
@@ -25,6 +26,43 @@ beforeEach(() => {
 });
 
 describe('GoogleCallbackScreen', () => {
+  it('初回の成功は設定ではなく初回フローへ戻り、StrictModeでも交換は一度', async () => {
+    completeGoogleConnect.mockResolvedValue(ok({ googleEmail: null }));
+    render(
+      <StrictMode>
+        <GoogleCallbackScreen returnTo="/" />
+      </StrictMode>,
+    );
+    await screen.findByText('接続しました');
+    expect(completeGoogleConnect).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/', { replace: true }));
+  });
+
+  it('初回の拒否はエラーと初回へ戻る導線を出す', async () => {
+    completeGoogleConnect.mockResolvedValue(
+      err(appError('connection/cancelled', 'connection/cancelled')),
+    );
+    render(<GoogleCallbackScreen returnTo="/" />);
+    await screen.findByRole('alert');
+    await userEvent.setup().click(screen.getByRole('button', { name: '初回設定へ戻る' }));
+    expect(navigate).toHaveBeenCalledWith('/', { replace: true });
+  });
+
+  it('交換結果が画面を離れた後に届いても遷移しない', async () => {
+    vi.useFakeTimers();
+    let finish!: (value: unknown) => void;
+    completeGoogleConnect.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const view = render(<GoogleCallbackScreen returnTo="/" />);
+    view.unmount();
+    await act(async () => finish(ok({ googleEmail: null })));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(navigate).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
   it('成功: 受け取ったパラメータで completeGoogleConnect を呼び、設定へ戻る', async () => {
     completeGoogleConnect.mockResolvedValue(ok({ googleEmail: 'me@gmail.com' }));
     render(<GoogleCallbackScreen />);

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   getSession,
@@ -8,8 +16,15 @@ import {
   signOut as signOutRequest,
   deleteMyAccount,
 } from '@/data/auth';
-import { deletionSnapshot, readDeletion, subscribeDeletion, isAccountDataBlocked, startAfterDeletion } from '@/data/account-deletion-state';
+import {
+  deletionSnapshot,
+  readDeletion,
+  subscribeDeletion,
+  isAccountDataBlocked,
+  startAfterDeletion,
+} from '@/data/account-deletion-state';
 import { t, useLanguage } from '@/i18n';
+import { firstRunKey } from '@/features/onboarding/model/first-run-state';
 import { AuthContext, type AuthContextValue, type AuthState } from './auth-context';
 
 function deriveState(session: Session | null): AuthState {
@@ -95,16 +110,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await deleteMyAccount(resumeOnly);
       setDeletionFailed(!result.ok);
-      if (result.ok) setSession(null);
+      if (result.ok) {
+        const userId = readDeletion()?.userId;
+        if (userId) {
+          try {
+            localStorage.removeItem(firstRunKey(userId));
+          } catch {
+            // 進捗だけの保存が禁止されても、完了した本人削除を失敗扱いにはしない。
+          }
+        }
+        setSession(null);
+      }
       return result;
-    } finally { setDeletionBusy(false); }
+    } finally {
+      setDeletionBusy(false);
+    }
   }, []);
 
   const deleteAccount = useCallback(() => runDeletion(false), [runDeletion]);
   const resumeDeletion = useCallback(async () => {
     const record = readDeletion();
-    if (!record) { window.location.reload(); return; }
-    if (!record.userId) { setDeletionFailed(true); return; }
+    if (!record) {
+      window.location.reload();
+      return;
+    }
+    if (!record.userId) {
+      setDeletionFailed(true);
+      return;
+    }
     if (record.phase !== 'done') await runDeletion(true);
   }, [runDeletion]);
 
@@ -115,30 +148,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const storageError = deletion !== null && !readDeletion()?.userId;
 
-  const effectiveState: AuthState = deletion !== null ? (readDeletion()?.phase === 'done' ? 'deleted' : 'deleting') : state;
+  const effectiveState: AuthState =
+    deletion !== null ? (readDeletion()?.phase === 'done' ? 'deleted' : 'deleting') : state;
 
   const value = useMemo<AuthContextValue>(
     () => ({
       state: effectiveState,
       session: deletion !== null ? null : session,
-      email: deletion !== null ? null : session?.user.email ?? null,
+      email: deletion !== null ? null : (session?.user.email ?? null),
       signOut,
       deleteAccount,
     }),
     [effectiveState, deletion, session, signOut, deleteAccount],
   );
 
-  return <AuthContext value={value}>{deletion !== null ? (
-    <main className="mx-auto max-w-lg p-6" aria-live="polite">
-      <h1 className="text-body font-semibold">{t(storageError ? '保存状態を確認できません' : effectiveState === 'deleted' ? 'アカウントを削除しました' : 'アカウントの削除中です')}</h1>
-      {effectiveState === 'deleted' ? (
-        <button className="mt-4 min-h-11" onClick={startAfterDeletion}>{t('新しく使い始める')}</button>
-      ) : <>
-        <p role={storageError ? 'alert' : undefined}>{t(storageError ? '端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。' : '削除が完了するまで、この端末の同期と予定表示を停止しています。')}</p>
-        {deletionFailed && !storageError && <p role="alert">{t('削除は完了していません。通信を確認して再試行してください。')}</p>}
-        <button className="mt-4 min-h-11" disabled={deletionBusy} onClick={() => void resumeDeletion()}>{t(storageError ? '保存状態を再確認' : '削除を再試行')}</button>
-        <p><a href="mailto:una.catena.della.morte@gmail.com">{t('再試行できない場合はサポートへ連絡')}</a></p>
-      </>}
-    </main>
-  ) : children}</AuthContext>;
+  return (
+    <AuthContext value={value}>
+      {deletion !== null ? (
+        <main className="mx-auto max-w-lg p-6" aria-live="polite">
+          <h1 className="text-body font-semibold">
+            {t(
+              storageError
+                ? '保存状態を確認できません'
+                : effectiveState === 'deleted'
+                  ? 'アカウントを削除しました'
+                  : 'アカウントの削除中です',
+            )}
+          </h1>
+          {effectiveState === 'deleted' ? (
+            <button className="mt-4 min-h-11" onClick={startAfterDeletion}>
+              {t('新しく使い始める')}
+            </button>
+          ) : (
+            <>
+              <p role={storageError ? 'alert' : undefined}>
+                {t(
+                  storageError
+                    ? '端末の保存状態を読み取れないため、同期と予定表示を停止しています。削除は開始しません。'
+                    : '削除が完了するまで、この端末の同期と予定表示を停止しています。',
+                )}
+              </p>
+              {deletionFailed && !storageError && (
+                <p role="alert">
+                  {t('削除は完了していません。通信を確認して再試行してください。')}
+                </p>
+              )}
+              <button
+                className="mt-4 min-h-11"
+                disabled={deletionBusy}
+                onClick={() => void resumeDeletion()}
+              >
+                {t(storageError ? '保存状態を再確認' : '削除を再試行')}
+              </button>
+              <p>
+                <a href="mailto:una.catena.della.morte@gmail.com">
+                  {t('再試行できない場合はサポートへ連絡')}
+                </a>
+              </p>
+            </>
+          )}
+        </main>
+      ) : (
+        children
+      )}
+    </AuthContext>
+  );
 }

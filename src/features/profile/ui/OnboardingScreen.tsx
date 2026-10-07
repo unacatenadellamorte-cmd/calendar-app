@@ -3,6 +3,7 @@ import { resolveMessage } from '@/data/messages';
 import type { NewProfileInput } from '@/data/profiles';
 import { ProfileForm } from './ProfileForm';
 interface OnboardingScreenProps {
+  continueToTutorial?: boolean;
   /** `AppShell` の唯一の `useProfile()` インスタンスから渡される(自前で呼ばない)。 */
   create: (input: NewProfileInput) => Promise<boolean>;
   errorKey: string | null;
@@ -11,7 +12,11 @@ interface OnboardingScreenProps {
  * 初回起動時、profiles 行がまだ無いユーザーに表示するオンボーディング。
  * `AppShell` が `<Outlet/>` の代わりに描画する(他の画面・下タブへは進めない)。
  */
-export function OnboardingScreen({ create, errorKey }: OnboardingScreenProps) {
+export function OnboardingScreen({
+  create,
+  errorKey,
+  continueToTutorial = false,
+}: OnboardingScreenProps) {
   useLanguage();
   return (
     <div className="flex min-h-[100dvh] flex-col justify-center bg-surface-sunken px-4 py-8">
@@ -26,7 +31,10 @@ export function OnboardingScreen({ create, errorKey }: OnboardingScreenProps) {
         </p>
       )}
 
-      <ProfileForm submitLabel={t('はじめる')} onSubmit={create} />
+      <ProfileForm
+        submitLabel={continueToTutorial ? t('チュートリアルへ進む') : t('はじめる')}
+        onSubmit={create}
+      />
     </div>
   );
 }

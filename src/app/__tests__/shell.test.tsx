@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+
+// この試験は認証未設定の開発用シェル。端末の.envには依存させない。
+vi.mock('@/data/env', () => ({ env: { hasSupabase: false, hasGoogleOauth: false } }));
 import { AppRoutes } from '@/app/routes';
 import { AuthProvider } from '@/app/AuthProvider';
 

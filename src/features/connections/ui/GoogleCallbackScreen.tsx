@@ -21,27 +21,34 @@ type Phase =
  * Google から戻ってきた認可コードを oauth-exchange に渡す。
  * 成功したら設定へ戻る。失敗はメッセージと戻る導線を出す。
  */
-export function GoogleCallbackScreen() {
+export function GoogleCallbackScreen({
+  returnTo = '/settings',
+}: { returnTo?: '/' | '/settings' } = {}) {
   useLanguage();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: 'working' });
-  const ran = useRef(false);
+  const request = useRef<ReturnType<typeof completeGoogleConnect> | null>(null);
   useEffect(() => {
-    if (ran.current) return;
-    ran.current = true;
+    let cancelled = false;
     let timer: number | undefined;
-    void completeGoogleConnect(params).then((result) => {
+    // StrictModeの再購読でも、消費済みの認可コードを交換し直さない。
+    request.current ??= completeGoogleConnect(params);
+    void request.current.then((result) => {
+      if (cancelled) return;
       if (result.ok) {
         setPhase({ kind: 'done', email: result.value.googleEmail });
         // 少し見せてから設定へ。
-        timer = window.setTimeout(() => navigate('/settings', { replace: true }), 900);
+        timer = window.setTimeout(() => navigate(returnTo, { replace: true }), 900);
       } else {
         setPhase({ kind: 'error', messageKey: result.error.messageKey });
       }
     });
-    return () => window.clearTimeout(timer);
-  }, [params, navigate]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [params, navigate, returnTo]);
   return (
     <Screen title={t('Google を接続')}>
       <div className="mt-4 rounded-md border border-border-hairline bg-surface-raised p-4">
@@ -67,10 +74,10 @@ export function GoogleCallbackScreen() {
             </p>
             <button
               type="button"
-              onClick={() => navigate('/settings', { replace: true })}
+              onClick={() => navigate(returnTo, { replace: true })}
               className="mt-3 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
             >
-              {t('設定へ戻る')}
+              {returnTo === '/' ? t('初回設定へ戻る') : t('設定へ戻る')}
             </button>
           </>
         )}
