@@ -542,12 +542,12 @@ index 77c814a..0e74443 100644
 +  readFirstRunStage,
 +} from '@/features/onboarding/model/first-run-state';
 +import { GoogleCallbackScreen } from '@/features/connections/ui/GoogleCallbackScreen';
- 
+
  /**
   * 回帰テスト(コードレビュー指摘): `AppShell` / `OnboardingScreen` / `ProfileScreen` が
 @@ -19,9 +24,40 @@ import { TUTORIAL_COMPLETED_KEY } from '@/features/tutorial/model/tutorial-state
   */
- 
+
  let authState: 'guest' | 'authenticated' | 'unavailable' = 'guest';
 +let userId = 'u1';
  vi.mock('@/app/auth-context', () => ({
@@ -584,13 +584,13 @@ index 77c814a..0e74443 100644
 +}));
 +vi.mock('@/data/google-calendars', () => calendarApi);
 +vi.mock('@/data/env', () => ({ env: { hasSupabase: true, hasGoogleOauth: true } }));
- 
+
  const getProfile = vi.fn();
  const createProfile = vi.fn();
 @@ -35,8 +71,8 @@ vi.mock('@/data/profiles', () => ({
  const { AppShell } = await import('./AppShell');
  const { ProfileScreen } = await import('@/features/profile/ui/ProfileScreen');
- 
+
 -function renderShell(initialPath = '/') {
 -  return render(
 +function ShellRoutes({ initialPath = '/' }: { initialPath?: string }) {
@@ -620,7 +620,7 @@ index 77c814a..0e74443 100644
 +function renderShell(initialPath = '/') {
 +  return render(<ShellRoutes initialPath={initialPath} />);
 +}
- 
+
  beforeEach(() => {
    localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
    authState = 'guest';
@@ -636,7 +636,7 @@ index 77c814a..0e74443 100644
 +  calendarApi.refreshGoogleCalendars.mockResolvedValue(ok([]));
 +  calendarApi.setGoogleCalendarSelected.mockResolvedValue(ok(undefined));
  });
- 
+
  describe('AppShell × OnboardingScreen(実フック、data層のみモック)', () => {
    it('オンボーディングで送信成功すると、AppShell 自身が profile を認識して通常画面へ切り替わる', async () => {
 +    authState = 'authenticated';
@@ -646,7 +646,7 @@ index 77c814a..0e74443 100644
 @@ -77,15 +134,22 @@ describe('AppShell × OnboardingScreen(実フック、data層のみモック)',
      const user = userEvent.setup();
      renderShell();
- 
+
 +    await user.click(
 +      await screen.findByRole('button', { name: 'スキップしてユーザー名を設定' }),
 +    );
@@ -654,14 +654,14 @@ index 77c814a..0e74443 100644
      // 最初はオンボーディング(下タブ・ホーム画面は出ない)
      expect(await screen.findByRole('heading', { name: 'ようこそ' })).toBeInTheDocument();
      expect(screen.queryByText('ホーム画面')).not.toBeInTheDocument();
- 
+
      await user.type(screen.getByLabelText('名前'), '花子');
 -    await user.click(screen.getByRole('button', { name: 'はじめる' }));
 +    await user.click(screen.getByRole('button', { name: 'チュートリアルへ進む' }));
 +
 +    expect(await screen.findByRole('region', { name: '使い方ガイド' })).toBeInTheDocument();
 +    await user.click(screen.getByRole('button', { name: 'スキップ' }));
- 
+
      // 別インスタンス問題が直っていれば、AppShell が同じ profile を認識して通常画面に切り替わる
 -    expect(await screen.findByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
 +    expect(await screen.findByRole('heading', { name: 'カレンダー画面' })).toBeInTheDocument();
@@ -883,12 +883,12 @@ index f20d260..5eb0190 100644
 +  saveFirstRunStage,
 +  readFirstRunStage,
 +} from '@/features/onboarding/model/first-run-state';
- 
+
  /**
   * オンボーディング(profiles 行なし)分岐・取得エラー分岐・通常表示 + 上部アバター分岐を検証する。
 @@ -23,8 +27,15 @@ import { TUTORIAL_COMPLETED_KEY } from '@/features/tutorial/model/tutorial-state
   */
- 
+
  let authState: 'loading' | 'guest' | 'authenticated' | 'unavailable' = 'guest';
 +const config = vi.hoisted(() => ({ hasSupabase: false, hasGoogleOauth: false }));
 +vi.mock('@/data/env', () => ({ env: config }));
@@ -901,12 +901,12 @@ index f20d260..5eb0190 100644
 +    signOut: vi.fn(),
 +  }),
  }));
- 
+
  const reload = vi.fn();
 @@ -80,8 +91,8 @@ vi.mock('./secret-mode-context', async (importOriginal) => {
- 
+
  const { AppShell } = await import('./AppShell');
- 
+
 -function renderShell() {
 -  return render(
 +function ShellRoutes() {
@@ -925,7 +925,7 @@ index f20d260..5eb0190 100644
 +function renderShell() {
 +  return render(<ShellRoutes />);
 +}
- 
+
  beforeEach(() => {
    // 既存のプロフィール分岐試験は案内完了後の状態で行う。
    localStorage.setItem(TUTORIAL_COMPLETED_KEY, '1');
@@ -936,7 +936,7 @@ index f20d260..5eb0190 100644
    navigateMock.mockReset();
 @@ -124,21 +139,17 @@ afterEach(() => {
  });
- 
+
  describe('AppShell', () => {
 -  it('新規利用で案内を表示し、スキップ後は名前設定へ進み再表示しない', async () => {
 +  it('新規ゲストは登録を最初に表示し、ログインへ切替可だがGoogle・名前・案内へは進めない', async () => {
@@ -963,10 +963,10 @@ index f20d260..5eb0190 100644
 +    expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
 +    expect(screen.queryByRole('button', { name: 'Google を接続' })).not.toBeInTheDocument();
    });
- 
+
    it('初回フラグがない既存利用者には案内を表示しない', () => {
 @@ -154,14 +165,18 @@ describe('AppShell', () => {
- 
+
    it('全ページ完了後の再起動でも案内を表示しない', async () => {
      localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
 +    authState = 'authenticated';
@@ -985,11 +985,11 @@ index f20d260..5eb0190 100644
 +    expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
      expect(screen.queryByRole('region', { name: '使い方ガイド' })).not.toBeInTheDocument();
    });
- 
+
 @@ -175,15 +190,18 @@ describe('AppShell', () => {
      expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBeNull();
    });
- 
+
 -  it('案内完了を保存できなくても名前設定へ進める', async () => {
 +  it('案内完了を保存できなくても通常利用へ進める', async () => {
      localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
@@ -1010,7 +1010,7 @@ index f20d260..5eb0190 100644
 @@ -200,9 +218,9 @@ describe('AppShell', () => {
      expect(localStorage.getItem(TUTORIAL_COMPLETED_KEY)).toBeNull();
    });
- 
+
 -  it('profiles 行が無ければオンボーディングを表示し、下タブ・Outlet は出さない', () => {
 +  it('profiles 行が無ければ登録画面を表示し、下タブ・Outlet は出さない', () => {
      renderShell();
@@ -1022,7 +1022,7 @@ index f20d260..5eb0190 100644
 @@ -232,6 +250,32 @@ describe('AppShell', () => {
      expect(screen.queryByRole('link', { name: 'プロフィール' })).not.toBeInTheDocument();
    });
- 
+
 +  it('本番設定済みの認証失敗は通常利用へ通さず、再試行を案内する', () => {
 +    config.hasSupabase = true;
 +    authState = 'unavailable';
@@ -1222,14 +1222,14 @@ index f49e0c4..fd2cb8e 100644
 +vi.mock('@/data/env', () => ({ env: { hasSupabase: false, hasGoogleOauth: false } }));
  import { AppRoutes } from '@/app/routes';
  import { AuthProvider } from '@/app/AuthProvider';
- 
+
 diff --git a/src/features/auth/model/useAuthForm.ts b/src/features/auth/model/useAuthForm.ts
 index 998c787..8fb0d86 100644
 --- a/src/features/auth/model/useAuthForm.ts
 +++ b/src/features/auth/model/useAuthForm.ts
 @@ -9,6 +9,7 @@ import {
  export type AuthMode = 'signin' | 'signup';
- 
+
  interface UseAuthFormOptions {
 +  initialMode?: AuthMode;
    /** 匿名セッション中か。true のとき signup は「昇格」(updateUser)になる。 */
@@ -1238,7 +1238,7 @@ index 998c787..8fb0d86 100644
 @@ -30,9 +31,13 @@ const PASSWORD_MIN = 6;
  /** 同じ宛先へ確認メールを出し直せるまでの間隔(Supabase の既定の送信間隔に合わせる)。 */
  const RESEND_COOLDOWN_MS = 60_000;
- 
+
 -export function useAuthForm({ isGuest, onSuccess }: UseAuthFormOptions) {
 +export function useAuthForm({
 +  isGuest,
@@ -1268,7 +1268,7 @@ index 7ff3518..386e314 100644
 @@ -5,6 +5,23 @@ import { appError, err, ok } from '@/data/result';
  import { applyLanguage } from '@/i18n';
  import { AuthScreen } from './AuthScreen';
- 
+
 +it('初回は登録モードを指定でき、確認待ちで成功先へは進まない', async () => {
 +  api.upgradeToPassword.mockResolvedValue(
 +    ok({ status: 'confirmation-pending', email: 'a@b.com' }),
@@ -1290,7 +1290,7 @@ index 7ff3518..386e314 100644
    signInWithPassword: vi.fn(),
    signUpWithPassword: vi.fn(),
 @@ -35,20 +52,28 @@ function renderScreen() {
- 
+
  function fill(email: string, password: string) {
    fireEvent.change(screen.getByLabelText('メールアドレス'), { target: { value: email } });
 -  fireEvent.change(screen.getByLabelText('パスワード(6文字以上)'), { target: { value: password } });
@@ -1298,7 +1298,7 @@ index 7ff3518..386e314 100644
 +    target: { value: password },
 +  });
  }
- 
+
  it('確認待ちは設定へ戻らず、送信先・最新メール・確認後のログインを案内する', async () => {
 -  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
 +  api.upgradeToPassword.mockResolvedValue(
@@ -1308,7 +1308,7 @@ index 7ff3518..386e314 100644
    fireEvent.click(screen.getByRole('button', { name: 'アカウントを作成する' }));
    fill('a@b.com', 'secret1');
    fireEvent.click(screen.getByRole('button', { name: '登録する' }));
- 
+
    const guide = await screen.findByRole('status');
 -  expect(guide).toHaveTextContent('a@b.com に確認メールを送信しました。登録はまだ完了していません。');
 +  expect(guide).toHaveTextContent(
@@ -1324,7 +1324,7 @@ index 7ff3518..386e314 100644
    expect(document.body.innerHTML).not.toContain('secret1');
 @@ -57,7 +82,9 @@ it('確認待ちは設定へ戻らず、送信先・最新メール・確認後
  });
- 
+
  it('確認待ちからログインへ進み、成功したら従来どおり設定へ戻る', async () => {
 -  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
 +  api.upgradeToPassword.mockResolvedValue(
@@ -1335,7 +1335,7 @@ index 7ff3518..386e314 100644
    fireEvent.click(screen.getByRole('button', { name: 'アカウントを作成する' }));
 @@ -74,7 +101,9 @@ it('確認待ちからログインへ進み、成功したら従来どおり設
  });
- 
+
  it('確認待ちから別のメールアドレスでの登録に戻れる', async () => {
 -  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
 +  api.upgradeToPassword.mockResolvedValue(
@@ -1346,7 +1346,7 @@ index 7ff3518..386e314 100644
    fill('a@b.com', 'secret1');
 @@ -95,8 +124,14 @@ it('即時完了の登録は従来どおり設定へ戻る', async () => {
  });
- 
+
  it.each([
 -  ['auth/email-rate-limited', '確認メールの送信回数が上限に達しました。届いている最新のメールを確認するか、時間をおいてください'],
 -  ['auth/email-not-confirmed', 'メールアドレスの確認が完了していません。確認メールのリンクを開いてからログインしてください'],
@@ -1362,7 +1362,7 @@ index 7ff3518..386e314 100644
    api.signInWithPassword.mockResolvedValue(err(appError(key, key)));
    renderScreen();
 @@ -108,7 +143,11 @@ it.each([
- 
+
  it('送信中は連打とモード変更を受け付けない', async () => {
    let finish!: (value: unknown) => void;
 -  api.upgradeToPassword.mockReturnValue(new Promise((done) => { finish = done; }));
@@ -1376,7 +1376,7 @@ index 7ff3518..386e314 100644
    fill('a@b.com', 'secret1');
 @@ -117,7 +156,9 @@ it('送信中は連打とモード変更を受け付けない', async () => {
    fireEvent.submit(form);
- 
+
    expect(await screen.findByRole('button', { name: '処理中…' })).toBeDisabled();
 -  expect(screen.getByRole('button', { name: 'アカウントを持っている場合はログイン' })).toBeDisabled();
 +  expect(
@@ -1386,7 +1386,7 @@ index 7ff3518..386e314 100644
    finish(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
 @@ -125,11 +166,15 @@ it('送信中は連打とモード変更を受け付けない', async () => {
- 
+
  it('確認待ちの案内は選択中の言語で出す', async () => {
    applyLanguage('en');
 -  api.upgradeToPassword.mockResolvedValue(ok({ status: 'confirmation-pending', email: 'a@b.com' }));
@@ -1474,10 +1474,10 @@ index d7d114a..a5b7fc4 100644
 +import { StrictMode } from 'react';
  import userEvent from '@testing-library/user-event';
  import { appError, err, ok } from '@/data/result';
- 
+
 @@ -25,6 +26,43 @@ beforeEach(() => {
  });
- 
+
  describe('GoogleCallbackScreen', () => {
 +  it('初回の成功は設定ではなく初回フローへ戻り、StrictModeでも交換は一度', async () => {
 +    completeGoogleConnect.mockResolvedValue(ok({ googleEmail: null }));
@@ -1947,7 +1947,7 @@ index 61f066a..d45ddc2 100644
 @@ -26,7 +31,10 @@ export function OnboardingScreen({ create, errorKey }: OnboardingScreenProps) {
          </p>
        )}
- 
+
 -      <ProfileForm submitLabel={t('はじめる')} onSubmit={create} />
 +      <ProfileForm
 +        submitLabel={continueToTutorial ? t('チュートリアルへ進む') : t('はじめる')}
