@@ -25,6 +25,16 @@ import {
 } from '@/data/account-deletion-state';
 import { t, useLanguage } from '@/i18n';
 import { firstRunKey } from '@/features/onboarding/model/first-run-state';
+import {
+  adoptAccountOwner,
+  beginAccountTransition,
+  localAccountOwner,
+  reloadAccountPage,
+  requireAccountOwner,
+} from '@/data/account-scope';
+import { clearPreviousAccountSession } from '@/data/account-session';
+import { legacyOutboxCount } from '@/data/local-db';
+import { appError, err, ok } from '@/data/result';
 import { AuthContext, type AuthContextValue, type AuthState } from './auth-context';
 
 function deriveState(session: Session | null): AuthState {
@@ -41,13 +51,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   /** 匿名サインインの多重発行を防ぐ(解決したら false に戻す)。 */
   const anonInFlight = useRef(false);
+  const [switching, setSwitching] = useState(false);
+  const [switchFailed, setSwitchFailed] = useState(false);
+  const [switchBusy, setSwitchBusy] = useState(false);
+  const [legacyPending, setLegacyPending] = useState(false);
+  const switchMode = useRef<'logout' | 'reload'>('reload');
+  const switchInFlight = useRef(false);
+
+  const completeAccountSwitch = useCallback(async () => {
+    if (switchInFlight.current) return err(appError('auth/unknown', 'auth/unknown'));
+    switchInFlight.current = true;
+    beginAccountTransition();
+    setSwitching(true);
+    setSwitchBusy(true);
+    setSwitchFailed(false);
+    try {
+      await clearPreviousAccountSession();
+      if (switchMode.current === 'logout') {
+        const result = await signOutRequest();
+        if (!result.ok) {
+          setSwitchFailed(true);
+          return result;
+        }
+      }
+      reloadAccountPage();
+      return ok(undefined);
+    } catch (cause) {
+      setSwitchFailed(true);
+      return err(appError('auth/unknown', 'auth/unknown', cause));
+    } finally {
+      switchInFlight.current = false;
+      setSwitchBusy(false);
+    }
+  }, []);
 
   useEffect(() => {
+    requireAccountOwner();
     if (!isAuthAvailable()) return;
     let cancelled = false;
 
     const applySession = (next: Session | null) => {
       if (cancelled || isAccountDataBlocked()) return;
+      const owner = localAccountOwner();
+      if (owner !== null && next?.user.id !== owner) {
+        switchMode.current = 'reload';
+        void completeAccountSwitch();
+        return;
+      }
+      if (next) {
+        adoptAccountOwner(next.user.id);
+        void legacyOutboxCount()
+          .then((count) => {
+            if (!cancelled) setLegacyPending(count > 0);
+          })
+          .catch(() => undefined);
+      }
       setSession(next);
       setState(deriveState(next));
     };
@@ -87,9 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next) {
         applySession(next);
       } else {
-        // サインアウト等でセッションが消えたら、お試しモードに戻す。
+        // 既存の利用者が居た場合は、旧処理を止めてから再起動する。
         applySession(null);
-        void ensureGuest();
+        if (!isAccountDataBlocked()) void ensureGuest();
       }
     });
 
@@ -97,12 +155,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.unsubscribe();
     };
-  }, []);
+  }, [completeAccountSwitch]);
 
   const signOut = useCallback(async () => {
-    // onAuthStateChange ハンドラが state を更新し、匿名セッションを張り直す。
-    return signOutRequest();
-  }, []);
+    switchMode.current = 'logout';
+    return completeAccountSwitch();
+  }, [completeAccountSwitch]);
 
   const runDeletion = useCallback(async (resumeOnly: boolean) => {
     setDeletionBusy(true);
@@ -208,8 +266,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             </>
           )}
         </main>
+      ) : switching ? (
+        <main className="mx-auto max-w-lg p-6" aria-live="polite">
+          <p>
+            {t('アカウントを切り替えています。未送信の変更は元のアカウント用に保管します。')}
+          </p>
+          {switchFailed && (
+            <p role="alert">{t('切替の後始末が完了していません。再試行してください。')}</p>
+          )}
+          <button disabled={switchBusy} onClick={() => void completeAccountSwitch()}>
+            {t('もう一度試す')}
+          </button>
+        </main>
+      ) : state === 'loading' ? (
+        <p role="status">{t('読み込み中…')}</p>
       ) : (
-        children
+        <>
+          {legacyPending && (
+            <p role="status">
+              {t(
+                '旧版の未送信データは所有者を確認できないため隔離して保管しています。別アカウントには送信しません。',
+              )}
+            </p>
+          )}
+          {children}
+        </>
       )}
     </AuthContext>
   );

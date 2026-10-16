@@ -16,7 +16,11 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 // 純ロジックの一次ソースは packages/core/src/revenuecat-webhook.ts。
 // この _shared/revenuecat-webhook.ts は scripts/sync-edge-shared.mjs が生成する(手で編集しない)。
-import { constantTimeEqual, planRevenueCatEvent } from '../_shared/revenuecat-webhook.ts';
+import {
+  changesFromSubscriber,
+  constantTimeEqual,
+  planRevenueCatEvent,
+} from '../_shared/revenuecat-webhook.ts';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -49,6 +53,26 @@ async function handle(req: Request): Promise<Response> {
   }
 
   const plan = planRevenueCatEvent(body);
+  if (plan.reconciliation) {
+    // 公開SDKキーやWebhook認証文字列を流用しない。未設定時は再送可能な失敗にする。
+    const apiKey = Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? '';
+    if (!apiKey) return json({ error: 'reconciliation-unconfigured' }, 503);
+    const response = await fetch(
+      `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(plan.reconciliation.userId)}`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (!response.ok) return json({ error: 'reconciliation-unavailable' }, 503);
+    const changes = changesFromSubscriber(
+      await response.json(),
+      plan.reconciliation.userId,
+      plan.reconciliation.eventAtMs,
+    );
+    if (!changes) return json({ error: 'reconciliation-invalid' }, 503);
+    plan.changes = changes;
+  }
   if (plan.changes.length === 0 && plan.transfers.length === 0) {
     return json({ ok: true, ignored: plan.reason });
   }

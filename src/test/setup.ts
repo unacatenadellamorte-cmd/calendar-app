@@ -6,9 +6,11 @@ import { afterEach, beforeEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { resetLocalDbForTests } from '@/data/local-db';
 import { resetDeletionStateForTests } from '@/data/account-deletion-state';
+import { resetAccountScopeForTests } from '@/data/account-scope';
 
 beforeEach(() => {
   resetDeletionStateForTests();
+  resetAccountScopeForTests();
   if (typeof document !== 'undefined') applyLanguage('ja');
   // 各テストで IndexedDB をまっさらにする。
   globalThis.indexedDB = new IDBFactory();

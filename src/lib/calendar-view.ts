@@ -165,7 +165,11 @@ export function layoutDayEvents(
     .map((e) => {
       const startMin = minutesIntoLocalDay(e.startsAt as string);
       let endMin = e.endsAt ? minutesIntoLocalDay(e.endsAt) : startMin + MIN_EVENT_MINUTES;
-      if (endMin <= startMin) endMin = 1440; // 日跨ぎ or 同時刻
+      if (
+        endMin <= startMin ||
+        (e.endsAt && localDateOf(e.endsAt) !== localDateOf(e.startsAt as string))
+      )
+        endMin = 1440;
       return { event: e, startMin, endMin: Math.max(endMin, startMin + MIN_EVENT_MINUTES) };
     })
     .sort(

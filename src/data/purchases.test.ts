@@ -39,6 +39,11 @@ const { PURCHASES_ERROR_CODE } = await import('@revenuecat/purchases-capacitor')
 
 const pkg = (identifier: string, priceString: string) => ({
   identifier: `$rc_${identifier}`,
+  presentedOfferingContext: {
+    offeringIdentifier: 'default',
+    placementIdentifier: null,
+    targetingContext: null,
+  },
   product: { identifier, priceString },
 });
 const offerings = {
@@ -85,7 +90,10 @@ describe('利用可否', () => {
   it('プラットフォームごとのキーを使う', async () => {
     platform = 'ios';
     await purchases.configurePurchases('u1');
-    expect(plugin.configure).toHaveBeenCalledWith({ apiKey: 'appl_public_key', appUserID: 'u1' });
+    expect(plugin.configure).toHaveBeenCalledWith({
+      apiKey: 'appl_public_key',
+      appUserID: 'u1',
+    });
   });
   it('configure 前は価格・購入・復元・管理が利用不可エラー', async () => {
     for (const r of [
@@ -104,7 +112,10 @@ describe('configure / logIn / logOut', () => {
     await purchases.configurePurchases('u1');
     await purchases.configurePurchases('u1');
     expect(plugin.configure).toHaveBeenCalledTimes(1);
-    expect(plugin.configure).toHaveBeenCalledWith({ apiKey: 'goog_public_key', appUserID: 'u1' });
+    expect(plugin.configure).toHaveBeenCalledWith({
+      apiKey: 'goog_public_key',
+      appUserID: 'u1',
+    });
     expect(plugin.logIn).not.toHaveBeenCalled();
     expect(purchases.getPurchasesSnapshot().userId).toBe('u1');
   });
@@ -130,14 +141,77 @@ describe('configure / logIn / logOut', () => {
     const r = await purchases.configurePurchases('u1');
     expect(r).toMatchObject({ ok: false, error: { messageKey: 'purchase/configure-failed' } });
     expect(purchases.getPurchasesSnapshot().userId).toBeNull();
+    expect(purchases.getPurchasesSnapshot().status).toBe('error');
+    await purchases.configurePurchases('u1');
+    expect(purchases.getPurchasesSnapshot()).toMatchObject({ userId: 'u1', status: 'ready' });
+  });
+  it('設定中にログアウトしたら古い完了を公開しない', async () => {
+    let complete!: () => void;
+    plugin.configure.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const configuring = purchases.configurePurchases('u1');
+    await Promise.resolve();
+    const logout = purchases.configurePurchases(null);
+    expect(purchases.getPurchasesSnapshot().userId).toBeNull();
+    complete();
+    expect((await configuring).ok).toBe(false);
+    await logout;
+    expect(plugin.logOut).toHaveBeenCalledTimes(1);
+    expect(purchases.getPurchasesSnapshot()).toMatchObject({ userId: null, status: 'idle' });
+  });
+  it('ログイン切替に失敗しても旧ユーザーで購入しない', async () => {
+    await purchases.configurePurchases('u1');
+    plugin.logIn.mockRejectedValueOnce({ code: PURCHASES_ERROR_CODE.NETWORK_ERROR });
+    await purchases.configurePurchases('u2');
+    expect(purchases.getPurchasesSnapshot()).toMatchObject({
+      userId: null,
+      status: 'error',
+      messageKey: 'purchase/offline',
+    });
+    expect((await purchases.purchasePlan('calendar_write')).ok).toBe(false);
+    expect(plugin.purchasePackage).not.toHaveBeenCalled();
+    await purchases.configurePurchases('u2');
+    expect(purchases.getPurchasesSnapshot().userId).toBe('u2');
+  });
+  it('ログイン切替失敗の後に旧利用者へ戻る場合もSDKを紐付け直す', async () => {
+    await purchases.configurePurchases('u1');
+    plugin.logIn.mockRejectedValueOnce(new Error('切替失敗'));
+    await purchases.configurePurchases('u2');
+    await purchases.configurePurchases('u1');
+    expect(plugin.logIn).toHaveBeenLastCalledWith({ appUserID: 'u1' });
+    expect(purchases.getPurchasesSnapshot().userId).toBe('u1');
   });
 });
 
 describe('価格', () => {
+  it('商品取得の途中で利用者が切り替わったら価格を捨てる', async () => {
+    await purchases.configurePurchases('u1');
+    let complete!: (value: typeof offerings) => void;
+    plugin.getOfferings.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const prices = purchases.getPlanPrices();
+    await Promise.resolve();
+    const change = purchases.configurePurchases('u2');
+    complete(offerings);
+    expect((await prices).ok).toBe(false);
+    await change;
+    expect(purchases.getPurchasesSnapshot().userId).toBe('u2');
+  });
   it('商品IDに対応するパッケージのストア価格文字列を返す(Android の base plan 付き ID も対応)', async () => {
     await purchases.configurePurchases('u1');
     const r = await purchases.getPlanPrices();
-    expect(r).toEqual({ ok: true, value: { calendar_write: '¥300', multi_account: '¥1,000' } });
+    expect(r).toEqual({
+      ok: true,
+      value: { calendar_write: '¥300', multi_account: '¥1,000' },
+    });
   });
   it('見つからない商品は含めない(仮表示のまま)', async () => {
     plugin.getOfferings.mockResolvedValue({
@@ -159,6 +233,59 @@ describe('価格', () => {
 });
 
 describe('購入', () => {
+  it('取得済みパッケージとoffering contextをそのまま購入へ渡す', async () => {
+    platform = 'ios';
+    await purchases.configurePurchases('u1');
+    await purchases.getPlanPrices();
+    plugin.getOfferings.mockClear();
+    await purchases.purchasePlan('calendar_write', 'u1');
+    expect(plugin.getOfferings).not.toHaveBeenCalled();
+    expect(plugin.purchasePackage.mock.calls[0]![0].aPackage).toBe(
+      offerings.current.availablePackages[0],
+    );
+    expect(plugin.purchasePackage.mock.calls[0]![0].aPackage.presentedOfferingContext).toEqual(
+      { offeringIdentifier: 'default', placementIdentifier: null, targetingContext: null },
+    );
+  });
+  it('旧利用者を指定した購入と、購入前の旧契約取得中の切替を拒否する', async () => {
+    await purchases.configurePurchases('u1');
+    expect((await purchases.purchasePlan('calendar_write', 'u2')).ok).toBe(false);
+    let complete!: (value: unknown) => void;
+    plugin.getCustomerInfo.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const purchase = purchases.purchasePlan('multi_account', 'u1');
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    const change = purchases.configurePurchases('u2');
+    complete({ customerInfo: { activeSubscriptions: [] } });
+    expect((await purchase).ok).toBe(false);
+    await change;
+    expect(plugin.purchasePackage).not.toHaveBeenCalled();
+  });
+  it('診断ログに例外本文や個人情報を出さない', async () => {
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await purchases.configurePurchases('u1');
+      plugin.purchasePackage.mockRejectedValue({
+        code: '秘密のコード',
+        message: '秘密の本文',
+        receipt: '秘密のレシート',
+      });
+      await purchases.purchasePlan('calendar_write');
+      expect(log).toHaveBeenLastCalledWith('課金処理', {
+        stage: 'store-purchase',
+        code: 'unknown',
+      });
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/秘密|u1/);
+    } finally {
+      log.mockRestore();
+    }
+  });
   it('成功すると purchased。購入するのは該当商品のパッケージ', async () => {
     await purchases.configurePurchases('u1');
     const r = await purchases.purchasePlan('calendar_write');
@@ -173,10 +300,15 @@ describe('購入', () => {
       userCancelled: true,
     });
     await purchases.configurePurchases('u1');
-    expect(await purchases.purchasePlan('calendar_write')).toEqual({ ok: true, value: 'cancelled' });
+    expect(await purchases.purchasePlan('calendar_write')).toEqual({
+      ok: true,
+      value: 'cancelled',
+    });
   });
   it('それ以外のエラーは messageKey 化する', async () => {
-    plugin.purchasePackage.mockRejectedValue({ code: PURCHASES_ERROR_CODE.STORE_PROBLEM_ERROR });
+    plugin.purchasePackage.mockRejectedValue({
+      code: PURCHASES_ERROR_CODE.STORE_PROBLEM_ERROR,
+    });
     await purchases.configurePurchases('u1');
     expect(await purchases.purchasePlan('calendar_write')).toMatchObject({
       ok: false,
@@ -206,7 +338,10 @@ describe('購入', () => {
   });
   it('Android で予定反映の契約中に複数アカウントを買うと、旧商品IDを商品変更として渡す', async () => {
     plugin.getCustomerInfo.mockResolvedValue({
-      customerInfo: { activeSubscriptions: ['calendar_write_monthly:base'], managementURL: null },
+      customerInfo: {
+        activeSubscriptions: ['calendar_write_monthly:base'],
+        managementURL: null,
+      },
     });
     await purchases.configurePurchases('u1');
     await purchases.purchasePlan('multi_account');
@@ -228,11 +363,27 @@ describe('購入', () => {
     });
     await purchases.configurePurchases('u1');
     await purchases.purchasePlan('multi_account');
-    expect(plugin.purchasePackage.mock.calls[0]![0]).not.toHaveProperty('storeProductChangeInfo');
+    expect(plugin.purchasePackage.mock.calls[0]![0]).not.toHaveProperty(
+      'storeProductChangeInfo',
+    );
   });
 });
 
 describe('復元・管理', () => {
+  it('iOSでは別ストアの購読URLが返ってもApp Storeを開く', async () => {
+    platform = 'ios';
+    plugin.getCustomerInfo.mockResolvedValue({
+      customerInfo: {
+        activeSubscriptions: ['multi_account_monthly'],
+        managementURL: 'https://play.google.com/store/account/subscriptions',
+      },
+    });
+    await purchases.configurePurchases('u1');
+    expect(await purchases.getManagementUrl()).toEqual({
+      ok: true,
+      value: 'https://apps.apple.com/account/subscriptions',
+    });
+  });
   it('復元: 有効な購読があるかを返す', async () => {
     await purchases.configurePurchases('u1');
     expect(await purchases.restorePurchases()).toEqual({

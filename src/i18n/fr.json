@@ -554,5 +554,13 @@
   "ユーザー名": "Nom d’utilisateur",
   "認証を確認できません。通信を確認して再試行してください。": "Impossible de vérifier votre compte. Vérifiez votre connexion et réessayez.",
   "アプリの登録・ログインとGoogle接続は別の設定です。Google接続をスキップしても、予定やシフトを使えます。": "L’inscription ou la connexion à l’application et la connexion Google sont deux réglages distincts. Vous pouvez utiliser les événements et les shifts sans connecter Google.",
-  "プロフィールの名前は、アカウント登録とは別の表示名です。": "Le nom du profil est un nom d’affichage, distinct de l’inscription du compte."
+  "プロフィールの名前は、アカウント登録とは別の表示名です。": "Le nom du profil est un nom d’affichage, distinct de l’inscription du compte.",
+  "Googleアカウント": "Compte Google",
+  "選択してください": "Sélectionnez une option",
+  "Supabase を設定すると、予定タグを登録できます。": "Configurez Supabase pour enregistrer des étiquettes d’événement.",
+  "保存に失敗しました。もう一度お試しください": "Échec de l’enregistrement. Réessayez.",
+  "マイカレンダー": "Mon agenda",
+  "アカウントを切り替えています。未送信の変更は元のアカウント用に保管します。": "Changement de compte. Les modifications non envoyées restent associées au compte d’origine.",
+  "切替の後始末が完了していません。再試行してください。": "Le nettoyage du compte n’est pas terminé. Réessayez.",
+  "旧版の未送信データは所有者を確認できないため隔離して保管しています。別アカウントには送信しません。": "Les données non envoyées de l’ancienne version sont conservées séparément, car leur propriétaire n’a pas pu être vérifié. Elles ne seront pas envoyées depuis un autre compte."
 }

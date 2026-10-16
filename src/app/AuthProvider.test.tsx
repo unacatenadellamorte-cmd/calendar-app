@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ok } from '@/data/result';
-import { ACCOUNT_DELETION_KEY, writeDeletion } from '@/data/account-deletion-state';
+import { appError, err, ok } from '@/data/result';
+import {
+  ACCOUNT_DELETION_KEY,
+  readDeletion,
+  writeDeletion,
+} from '@/data/account-deletion-state';
 import { firstRunKey } from '@/features/onboarding/model/first-run-state';
 
 const isAuthAvailable = vi.fn();
@@ -9,6 +13,15 @@ const getSession = vi.fn();
 const signInAnonymously = vi.fn();
 const signOut = vi.fn();
 const deleteMyAccount = vi.fn();
+const reloadAccountPage = vi.fn();
+const clearPreviousAccountSession = vi.fn();
+vi.mock('@/data/account-scope', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/data/account-scope')>()),
+  reloadAccountPage: () => reloadAccountPage(),
+}));
+vi.mock('@/data/account-session', () => ({
+  clearPreviousAccountSession: () => clearPreviousAccountSession(),
+}));
 let authStateHandler: ((s: unknown) => void) | undefined;
 const unsubscribe = vi.fn();
 
@@ -46,6 +59,8 @@ beforeEach(() => {
   signInAnonymously.mockReset();
   signOut.mockReset();
   deleteMyAccount.mockReset();
+  reloadAccountPage.mockReset();
+  clearPreviousAccountSession.mockReset().mockResolvedValue(undefined);
   deleteMyAccount.mockResolvedValue(ok(undefined));
   unsubscribe.mockReset();
   authStateHandler = undefined;
@@ -56,6 +71,72 @@ afterEach(() => {
 });
 
 describe('AuthProvider', () => {
+  it('削除失敗後も旧画面を隠し続け、再試行が成功してから完了を表示する', async () => {
+    isAuthAvailable.mockReturnValue(true);
+    getSession.mockResolvedValue(ok(userSession));
+    deleteMyAccount.mockImplementationOnce(async () => {
+      writeDeletion({ userId: 'anon-1', phase: 'remote' });
+      return err(appError('auth/deletion-failed', 'auth/deletion-failed'));
+    });
+    let complete!: () => void;
+    deleteMyAccount.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = () => {
+            writeDeletion({ userId: 'anon-1', phase: 'done' });
+            resolve(ok(undefined));
+          };
+        }),
+    );
+    function StartDeletion() {
+      const { deleteAccount } = useAuth();
+      return (
+        <button type="button" onClick={() => void deleteAccount()}>
+          本人の削除を開始
+        </button>
+      );
+    }
+    render(
+      <AuthProvider>
+        <Probe />
+        <StartDeletion />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveTextContent('authenticated'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '本人の削除を開始' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '削除は完了していません。通信を確認して再試行してください。',
+    );
+    expect(deleteMyAccount).toHaveBeenNthCalledWith(1, false);
+    expect(readDeletion()).toEqual({ userId: 'anon-1', phase: 'remote' });
+    expect(screen.queryByTestId('probe')).not.toBeInTheDocument();
+    expect(screen.queryByText('アカウントを削除しました')).not.toBeInTheDocument();
+
+    // 削除未完了中に認証通知が届いても、本人の旧画面へ復帰させない。
+    act(() => authStateHandler?.(userSession));
+    expect(screen.queryByTestId('probe')).not.toBeInTheDocument();
+    const retry = screen.getByRole('button', { name: '削除を再試行' });
+    expect(retry).toBeEnabled();
+    fireEvent.click(retry);
+    expect(retry).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('probe')).not.toBeInTheDocument();
+    expect(screen.queryByText('アカウントを削除しました')).not.toBeInTheDocument();
+    fireEvent.click(retry);
+    expect(deleteMyAccount).toHaveBeenCalledTimes(2);
+    expect(deleteMyAccount).toHaveBeenNthCalledWith(2, true);
+
+    await act(async () => complete());
+    expect(screen.getByText('アカウントを削除しました')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '新しく使い始める' })).toBeEnabled();
+    expect(readDeletion()?.phase).toBe('done');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('probe')).not.toBeInTheDocument();
+    expect(signInAnonymously).not.toHaveBeenCalled();
+  });
+
   it('本人削除の成功後は本人の初回進捗だけ消し、別利用者の進捗は保つ', async () => {
     isAuthAvailable.mockReturnValue(true);
     getSession.mockResolvedValue(ok(null));
@@ -283,7 +364,7 @@ describe('AuthProvider', () => {
     );
   });
 
-  it('サインアウトでセッションが消えたら匿名セッションを張り直す', async () => {
+  it('サインアウトでは旧画面を隠し、後始末後に再起動して別利用者と混ぜない', async () => {
     isAuthAvailable.mockReturnValue(true);
     getSession.mockResolvedValue(ok(userSession));
     signInAnonymously.mockResolvedValue(ok(guestSession));
@@ -300,7 +381,31 @@ describe('AuthProvider', () => {
     await act(async () => {
       authStateHandler?.(null);
     });
-    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('guest:-'));
-    expect(signInAnonymously).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(reloadAccountPage).toHaveBeenCalledTimes(1));
+    expect(clearPreviousAccountSession).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('probe')).not.toBeInTheDocument();
+    expect(signInAnonymously).not.toHaveBeenCalled();
+  });
+
+  it('直接の別利用者通知でも旧画面を遮断し、後始末失敗は再試行できる', async () => {
+    isAuthAvailable.mockReturnValue(true);
+    getSession.mockResolvedValue(ok(userSession));
+    clearPreviousAccountSession.mockRejectedValueOnce(new Error('通知消去失敗'));
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveTextContent('authenticated'),
+    );
+    await act(async () => {
+      authStateHandler?.({ user: { id: '別人', email: 'other@example.test' } });
+    });
+    expect(screen.queryByTestId('probe')).not.toBeInTheDocument();
+    expect(reloadAccountPage).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('再試行');
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }));
+    await waitFor(() => expect(reloadAccountPage).toHaveBeenCalledTimes(1));
   });
 });

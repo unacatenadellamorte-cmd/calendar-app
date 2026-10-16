@@ -28,12 +28,16 @@ export function ListView({
   const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   const headerRefs = useRef(new Map<string, HTMLElement>());
+  const lastScrolledDateRef = useRef<string | null>(null);
   useEffect(() => {
+    // 予定の編集・削除で days が変わっただけでは、利用者のスクロール位置を奪わない。
+    if (lastScrolledDateRef.current === scrollTo) return;
     const target = days.find((d) => d >= scrollTo) ?? days.at(-1);
     if (!target) return;
     const region = scrollRegionRef.current;
     const section = headerRefs.current.get(target);
     if (!region || !section) return;
+    lastScrolledDateRef.current = scrollTo;
     // ページ全体の祖先を動かさず、リスト専用領域だけを移動する。
     const regionTop = region.getBoundingClientRect().top;
     const headerTop = section.getBoundingClientRect().top;
@@ -56,33 +60,33 @@ export function ListView({
     >
       <div className="flex flex-col gap-3">
         {days.map((date) => (
-        <section
-          key={date}
-          ref={(el) => {
-            if (el) headerRefs.current.set(date, el);
-            else headerRefs.current.delete(date);
-          }}
-        >
-          <h3
-            className={[
-              'sticky top-0 bg-surface-sunken py-1 text-meta font-semibold',
-              date === today ? 'text-accent' : 'text-ink-secondary',
-            ].join(' ')}
+          <section
+            key={date}
+            ref={(el) => {
+              if (el) headerRefs.current.set(date, el);
+              else headerRefs.current.delete(date);
+            }}
           >
-            {formatDayTitle(date)}
-          </h3>
-          <ul className="rounded-md border border-border-hairline bg-surface-raised px-3">
-            {(byDay.get(date) ?? []).map((event) => (
-              <EventListItem
-                key={event.id}
-                event={event}
-                calendar={calendarById.get(event.calendarId)}
-                onEdit={onEventTap}
-                compact
-              />
-            ))}
-          </ul>
-        </section>
+            <h3
+              className={[
+                'sticky top-0 bg-surface-sunken py-1 text-meta font-semibold',
+                date === today ? 'text-accent' : 'text-ink-secondary',
+              ].join(' ')}
+            >
+              {formatDayTitle(date)}
+            </h3>
+            <ul className="rounded-md border border-border-hairline bg-surface-raised px-3">
+              {(byDay.get(date) ?? []).map((event) => (
+                <EventListItem
+                  key={event.id}
+                  event={event}
+                  calendar={calendarById.get(event.calendarId)}
+                  onEdit={onEventTap}
+                  compact
+                />
+              ))}
+            </ul>
+          </section>
         ))}
       </div>
     </div>

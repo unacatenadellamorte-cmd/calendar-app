@@ -45,6 +45,32 @@ const calendarById = new Map<string, Calendar>([
 ]);
 
 describe('CompactCard', () => {
+  it('別日の時刻付き・終日予定は日付を併記する', () => {
+    render(
+      <CompactCard
+        featured={[
+          ev({
+            id: 'future',
+            startsAt: '2026-10-20T06:00:00Z',
+            endsAt: '2026-10-20T07:00:00Z',
+            calendarId: 'high',
+          }),
+          ev({
+            id: 'day',
+            allDay: true,
+            startsAt: null,
+            endsAt: null,
+            eventDate: '2026-10-21',
+            calendarId: 'high',
+          }),
+        ]}
+        calendarById={calendarById}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByRole('button')[0]).toHaveTextContent('10/20 15:00');
+    expect(screen.getAllByRole('button')[1]).toHaveTextContent('10/21 終日');
+  });
   it('ホームのスタンプのみ予定も内部件名を隠し、絵を読み上げる', () => {
     render(
       <CompactCard

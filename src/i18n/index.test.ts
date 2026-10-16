@@ -11,6 +11,8 @@ import {
 } from './index';
 import { catalog } from './catalog';
 import sourceKeys from './source-keys.json';
+import zh from './zh.json';
+import ko from './ko.json';
 import { formatDayTitle, formatMonthTitle } from '@/lib/datetime';
 
 afterEach(() => {
@@ -68,6 +70,30 @@ describe('表示言語', () => {
         expect(translation.trim(), key).not.toBe('');
         expect(slots(translation), key).toEqual(slots(key));
       }
+    }
+  });
+  it('中国語・韓国語の訳に日本語のかなを混在させない', () => {
+    for (const [language, dictionary] of Object.entries({ zh, ko })) {
+      for (const [key, translation] of Object.entries(dictionary)) {
+        expect(translation, `${language}:${key}`).not.toMatch(/[ぁ-んァ-ン]/);
+      }
+    }
+  });
+  it('tリテラルと動的フォールバックの追加キーを5言語へ揃える', () => {
+    const requiredKeys = [
+      'Googleアカウント',
+      '選択してください',
+      'Supabase を設定すると、予定タグを登録できます。',
+      '保存に失敗しました。もう一度お試しください',
+      'マイカレンダー',
+    ];
+    for (const key of requiredKeys) {
+      expect(sourceKeys, key).toContain(key);
+      expect(catalog[key], key).toHaveLength(5);
+      expect(
+        catalog[key]?.every((translation) => translation.trim() !== ''),
+        key,
+      ).toBe(true);
     }
   });
 });

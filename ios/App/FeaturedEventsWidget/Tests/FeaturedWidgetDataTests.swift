@@ -41,10 +41,13 @@ final class FeaturedWidgetDataTests: XCTestCase {
 
     func testTimeFormatsAndFallback() throws {
         let zone = try XCTUnwrap(TimeZone(identifier: "Asia/Tokyo"))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-17T00:00:00Z"))
         for iso in ["2026-09-17T01:02:00Z", "2026-09-17T01:02:00.000Z", "2026-09-17T10:02:00+09:00"] {
-            XCTAssertEqual(FeaturedWidgetData.startLabel(event(iso: iso), timeZone: zone), "10:02")
+            XCTAssertEqual(FeaturedWidgetData.startLabel(event(iso: iso), timeZone: zone, now: now), "10:02")
         }
-        XCTAssertEqual(FeaturedWidgetData.startLabel(event(allDay: true)), "終日")
+        XCTAssertEqual(FeaturedWidgetData.startLabel(event(allDay: true), timeZone: zone, now: now), "終日")
+        XCTAssertEqual(FeaturedWidgetData.startLabel(event(iso: "2026-09-18T01:02:00Z"), timeZone: zone, now: now), "9/18 10:02")
+        XCTAssertEqual(FeaturedWidgetData.startLabel(event(iso: "2026-09-17T15:00:00Z", allDay: true), timeZone: zone, now: now), "9/18 終日")
         XCTAssertEqual(FeaturedWidgetData.startLabel(event(iso: "不正")), "終日")
     }
 

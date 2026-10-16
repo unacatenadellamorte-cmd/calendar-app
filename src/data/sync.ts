@@ -36,10 +36,14 @@ async function replay(
   targetId: string,
   idMap: Map<string, string>,
 ): Promise<Result<unknown>> {
+  const options = { noOfflineFallback: true };
   if (item.entity === 'event') {
     switch (item.op) {
       case 'create': {
-        const r = await createEvent(item.payload as NewEventInput);
+        const r = await createEvent(
+          { ...(item.payload as NewEventInput), id: targetId },
+          options,
+        );
         if (r.ok) {
           idMap.set(item.targetId, r.value.id);
           await cacheRekey('events', item.targetId, r.value);
@@ -47,12 +51,16 @@ async function replay(
         return r;
       }
       case 'update': {
-        const r = await updateEvent({ id: targetId, source: 'local' }, item.payload as EventPatch);
+        const r = await updateEvent(
+          { id: targetId, source: 'local' },
+          item.payload as EventPatch,
+          options,
+        );
         if (r.ok) await cachePut('events', r.value);
         return r;
       }
       case 'delete':
-        return deleteEvent({ id: targetId, source: 'local' });
+        return deleteEvent({ id: targetId, source: 'local' }, options);
       default:
         return { ok: true, value: undefined };
     }
@@ -60,7 +68,10 @@ async function replay(
 
   switch (item.op) {
     case 'create': {
-      const r = await createCalendar(item.payload as NewCalendarInput);
+      const r = await createCalendar(
+        { ...(item.payload as NewCalendarInput), id: targetId },
+        options,
+      );
       if (r.ok) {
         idMap.set(item.targetId, r.value.id);
         await cacheRekey('calendars', item.targetId, r.value);
@@ -68,12 +79,20 @@ async function replay(
       return r;
     }
     case 'rename': {
-      const r = await renameCalendar(targetId, (item.payload as { name: string }).name);
+      const r = await renameCalendar(
+        targetId,
+        (item.payload as { name: string }).name,
+        options,
+      );
       if (r.ok) await cachePut('calendars', r.value);
       return r;
     }
     case 'recolor': {
-      const r = await recolorCalendar(targetId, (item.payload as { color: string }).color);
+      const r = await recolorCalendar(
+        targetId,
+        (item.payload as { color: string }).color,
+        options,
+      );
       if (r.ok) await cachePut('calendars', r.value);
       return r;
     }
@@ -81,6 +100,7 @@ async function replay(
       const r = await setCalendarVisible(
         targetId,
         (item.payload as { isVisible: boolean }).isVisible,
+        options,
       );
       if (r.ok) await cachePut('calendars', r.value);
       return r;
@@ -89,12 +109,12 @@ async function replay(
       const orderedIds = (item.payload as { orderedIds: string[] }).orderedIds.map(
         (id) => idMap.get(id) ?? id,
       );
-      const r = await reorderCalendars(orderedIds);
+      const r = await reorderCalendars(orderedIds, options);
       if (r.ok) for (const c of r.value) await cachePut('calendars', c);
       return r;
     }
     case 'delete':
-      return deleteCalendar({ id: targetId, isShift: false });
+      return deleteCalendar({ id: targetId, isShift: false }, options);
     default:
       return { ok: true, value: undefined };
   }

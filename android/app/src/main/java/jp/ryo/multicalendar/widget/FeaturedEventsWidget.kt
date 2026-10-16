@@ -116,8 +116,10 @@ internal fun parseIsoUtc(iso: String): Date? {
  * 終日は「終日」。時刻付きは UTC ISO をデバイスのローカル時刻の "H:mm" にする(AD-7)。
  * `internal` にしてJUnitテストから検証する。
  */
-internal fun formatStartLabel(event: FeaturedWidgetEvent): String {
-    if (event.allDay) return "終日"
+internal fun formatStartLabel(event: FeaturedWidgetEvent, now: Date = Date()): String {
     val parsed = parseIsoUtc(event.startsAtIso) ?: return "終日"
-    return SimpleDateFormat("H:mm", Locale.getDefault()).format(parsed)
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    val sameDay = dateFormat.format(parsed) == dateFormat.format(now)
+    if (event.allDay) return if (sameDay) "終日" else SimpleDateFormat("M/d", Locale.getDefault()).format(parsed) + " 終日"
+    return SimpleDateFormat(if (sameDay) "H:mm" else "M/d H:mm", Locale.getDefault()).format(parsed)
 }

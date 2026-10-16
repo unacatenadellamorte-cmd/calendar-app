@@ -45,7 +45,7 @@ export function HomeScreen() {
   };
   return (
     <Screen
-      title={t('今日')}
+      title={t('この後の予定')}
       showProfileHeader
       action={
         <Link to="/calendars" className="text-meta text-accent">

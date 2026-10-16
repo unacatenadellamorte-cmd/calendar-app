@@ -2,6 +2,11 @@
  * ネットワーク到達性の判定。data-access レイヤがオフライン分岐に使う。
  */
 
+/** キュー再送では通信失敗を新規操作として積み直さない。 */
+export interface WriteOptions {
+  noOfflineFallback?: boolean;
+}
+
 export function isOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
 }

@@ -71,13 +71,16 @@ async function load() {
   return import('./device-sync');
 }
 
+const deviceStart = Date.now();
+const occurrenceKey = (id = 'e1', start = deviceStart) =>
+  JSON.stringify(['cal-a', id, new Date(start).toISOString()]);
 const rawEvent = (over: Record<string, unknown> = {}) => ({
   id: 'e1',
   title: '会議',
   description: null,
   isAllDay: false,
-  startDate: Date.now(),
-  endDate: Date.now() + 3_600_000,
+  startDate: deviceStart,
+  endDate: deviceStart + 3_600_000,
   calendarId: 'cal-a',
   ...over,
 });
@@ -98,6 +101,92 @@ beforeEach(() => {
 });
 
 describe('syncDeviceCalendarsNow', () => {
+  it('旧キーの同じ回は元の行IDを保ち、リマインダーを上書きしない', async () => {
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
+    responseQueue = [
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
+      {
+        data: [
+          {
+            id: 'old-row',
+            external_id: 'e1',
+            calendar_id: 'cal-a-id',
+            starts_at: new Date(deviceStart).toISOString(),
+            event_date: null,
+          },
+        ],
+        error: null,
+      },
+      { error: null },
+      { data: [], error: null },
+    ];
+    listDeviceEventsInRange.mockResolvedValue([rawEvent()]);
+    const { syncDeviceCalendarsNow } = await load();
+    expect(await syncDeviceCalendarsNow()).toMatchObject({ ok: true, value: { errors: [] } });
+    expect(calls.some((call) => call.method === 'insert')).toBe(false);
+    expect(calls.find((call) => call.method === 'update')?.args[0]).toMatchObject({
+      external_id: occurrenceKey(),
+    });
+    expect(calls.find((call) => call.method === 'update')?.args[0]).not.toHaveProperty(
+      'reminder_minutes',
+    );
+    expect(
+      calls.some(
+        (call) => call.method === 'eq' && call.args[0] === 'id' && call.args[1] === 'old-row',
+      ),
+    ).toBe(true);
+  });
+  it('同一IDの繰り返し4回を欠落させず、旧キーだけを削除する', async () => {
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
+    responseQueue = [
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
+      { data: [], error: null },
+      { error: null },
+      {
+        data: [
+          {
+            external_id: 'e1',
+            starts_at: new Date(deviceStart).toISOString(),
+            event_date: null,
+          },
+        ],
+        error: null,
+      },
+      { error: null },
+    ];
+    listDeviceEventsInRange.mockResolvedValue(
+      Array.from({ length: 4 }, (_, index) =>
+        rawEvent({
+          startDate: deviceStart + index * 86400000,
+          endDate: deviceStart + index * 86400000 + 3600000,
+        }),
+      ),
+    );
+    const { syncDeviceCalendarsNow } = await load();
+    expect(await syncDeviceCalendarsNow()).toMatchObject({
+      ok: true,
+      value: { synced: [{ upserted: 4, deleted: 1 }], errors: [] },
+    });
+    const rows = calls.find((call) => call.method === 'insert')?.args[0] as {
+      external_id: string;
+    }[];
+    expect(new Set(rows.map((row) => row.external_id)).size).toBe(4);
+    expect(rows.map((row) => row.external_id)).toEqual(
+      Array.from({ length: 4 }, (_, index) =>
+        occurrenceKey('e1', deviceStart + index * 86400000),
+      ),
+    );
+  });
   it('端末カレンダー未接続なら何もせず {synced:[],errors:[]}', async () => {
     getDeviceConnection.mockResolvedValue(ok(null));
     const { syncDeviceCalendarsNow } = await load();
@@ -168,7 +257,7 @@ describe('syncDeviceCalendarsNow', () => {
     const rows = insertCall?.args[0] as Array<Record<string, unknown>>;
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      external_id: 'e1',
+      external_id: occurrenceKey(),
       calendar_id: 'cal-a-id',
       connection_id: 'conn1',
       source: 'device',
@@ -184,7 +273,7 @@ describe('syncDeviceCalendarsNow', () => {
         data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
         error: null,
       },
-      { data: [{ id: 'ev1', external_id: 'e1' }], error: null }, // 既存あり(論理削除済みでも一意インデックス上は存在)
+      { data: [{ id: 'ev1', external_id: occurrenceKey() }], error: null }, // 既存あり(論理削除済みでも一意インデックス上は存在)
       { error: null }, // update
       { data: [], error: null }, // 削除差分用の既存 external_id
     ];
@@ -196,7 +285,10 @@ describe('syncDeviceCalendarsNow', () => {
 
     expect(calls.some((c) => c.method === 'insert')).toBe(false);
     const updateCall = calls.find((c) => c.table === 'events' && c.method === 'update');
-    expect(updateCall?.args[0]).toMatchObject({ external_id: 'e1', deleted_at: null });
+    expect(updateCall?.args[0]).toMatchObject({
+      external_id: occurrenceKey(),
+      deleted_at: null,
+    });
     const updateEq = calls.find(
       (c) => c.table === 'events' && c.method === 'eq' && c.args[0] === 'id',
     );
@@ -213,11 +305,11 @@ describe('syncDeviceCalendarsNow', () => {
         data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
         error: null,
       },
-      { data: [{ id: 'ev1', external_id: 'e1' }], error: null }, // 既存 external_id 検索(e1 既存)
+      { data: [{ id: 'ev1', external_id: occurrenceKey() }], error: null }, // 既存 external_id 検索(e1 既存)
       { error: null }, // update(e1)
       {
         data: [
-          { external_id: 'e1', starts_at: nowIso, event_date: null }, // 今回も応答にある
+          { external_id: occurrenceKey(), starts_at: nowIso, event_date: null }, // 今回も応答にある
           { external_id: 'gone', starts_at: nowIso, event_date: null }, // 応答に無い→削除対象
         ],
         error: null,

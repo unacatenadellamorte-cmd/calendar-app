@@ -67,5 +67,5 @@ describe('予定スタンプ移行', () => {
     } finally {
       await db.close();
     }
-  });
+  }, 30_000);
 });

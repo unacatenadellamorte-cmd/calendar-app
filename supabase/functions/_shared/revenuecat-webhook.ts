@@ -50,6 +50,7 @@ export interface EntitlementTransfer {
 export interface WebhookPlan {
   changes: EntitlementChange[];
   transfers: EntitlementTransfer[];
+  reconciliation?: { userId: string; eventAtMs: number };
   /** ログ用の分類(ユーザーID等の個人情報は含めない)。 */
   reason: string;
 }
@@ -146,15 +147,46 @@ export function planRevenueCatEvent(body: unknown): WebhookPlan {
 
   const eventAtMs = finiteNumber(event.event_timestamp_ms);
 
+  if (type === 'CANCELLATION') {
+    if (eventAtMs === null) return ignore('no-event-time');
+    if (!isUuid(event.app_user_id)) return ignore('non-uuid-user');
+    const userId = event.app_user_id.toLowerCase();
+    // 請求失敗の取消では猶予期間を潰さず、BILLING_ISSUE / EXPIRATIONに委ねる。
+    if (event.cancel_reason === 'BILLING_ERROR') return ignore('noop:CANCELLATION');
+    const expiry = finiteNumber(event.expiration_at_ms);
+    if (expiry !== null && expiry <= eventAtMs) {
+      const changes = buildChanges(event, userId, expiry, eventAtMs);
+      return changes.length
+        ? { changes, transfers: [], reason: 'cancel-expired' }
+        : ignore('no-entitlement');
+    }
+    // 返金理由だけで剥奪せず、サーバーが現在の契約状態を照合する。
+    if (event.cancel_reason === 'CUSTOMER_SUPPORT') {
+      return {
+        changes: [],
+        transfers: [],
+        reconciliation: { userId, eventAtMs },
+        reason: 'refund-reconcile',
+      };
+    }
+    return ignore('noop:CANCELLATION');
+  }
+
   if (type === 'TRANSFER') {
     if (eventAtMs === null) return ignore('no-event-time');
-    const from = Array.isArray(event.transferred_from) ? event.transferred_from.filter(isUuid) : [];
+    const from = Array.isArray(event.transferred_from)
+      ? event.transferred_from.filter(isUuid)
+      : [];
     const to = Array.isArray(event.transferred_to) ? event.transferred_to.filter(isUuid) : [];
     const transfers: EntitlementTransfer[] = [];
     for (const f of from) {
       for (const t of to) {
         if (f.toLowerCase() !== t.toLowerCase()) {
-          transfers.push({ fromUserId: f.toLowerCase(), toUserId: t.toLowerCase(), eventAtMs });
+          transfers.push({
+            fromUserId: f.toLowerCase(),
+            toUserId: t.toLowerCase(),
+            eventAtMs,
+          });
         }
       }
     }
@@ -177,21 +209,27 @@ export function planRevenueCatEvent(body: unknown): WebhookPlan {
     const exp = finiteNumber(event.expiration_at_ms);
     if (exp === null) return ignore('grant-no-expiration');
     const changes = buildChanges(event, userId, exp, eventAtMs);
-    return changes.length > 0 ? { changes, transfers: [], reason: 'grant' } : ignore('no-entitlement');
+    return changes.length > 0
+      ? { changes, transfers: [], reason: 'grant' }
+      : ignore('no-entitlement');
   }
 
   if (type === 'EXPIRATION') {
     const exp = finiteNumber(event.expiration_at_ms);
     const expiredAt = exp !== null && exp <= eventAtMs ? exp : eventAtMs;
     const changes = buildChanges(event, userId, expiredAt, eventAtMs);
-    return changes.length > 0 ? { changes, transfers: [], reason: 'expire' } : ignore('no-entitlement');
+    return changes.length > 0
+      ? { changes, transfers: [], reason: 'expire' }
+      : ignore('no-entitlement');
   }
 
   // BILLING_ISSUE
   const grace = finiteNumber(event.grace_period_expiration_at_ms);
   if (grace === null || grace <= eventAtMs) return ignore('billing-issue-no-grace');
   const changes = buildChanges(event, userId, grace, eventAtMs);
-  return changes.length > 0 ? { changes, transfers: [], reason: 'grace' } : ignore('no-entitlement');
+  return changes.length > 0
+    ? { changes, transfers: [], reason: 'grace' }
+    : ignore('no-entitlement');
 }
 
 /**
@@ -209,4 +247,58 @@ export async function constantTimeEqual(a: string, b: string): Promise<boolean> 
   let diff = 0;
   for (let i = 0; i < va.length; i++) diff |= (va[i] ?? 0) ^ (vb[i] ?? 0);
   return diff === 0;
+}
+
+/** 認証済みRevenueCat API応答のみを解釈する。欠損・不正値を無期限や返金と誤認しない。 */
+export function changesFromSubscriber(
+  body: unknown,
+  userId: string,
+  eventAtMs: number,
+): EntitlementChange[] | null {
+  if (
+    !isUuid(userId) ||
+    !Number.isFinite(eventAtMs) ||
+    !isRecord(body) ||
+    !isRecord(body.subscriber) ||
+    !isRecord(body.subscriber.entitlements)
+  )
+    return null;
+  const entitlements = body.subscriber.entitlements;
+  const changes: EntitlementChange[] = [];
+  for (const entitlement of KNOWN_ENTITLEMENTS) {
+    const entry = entitlements[entitlement];
+    let expiry = eventAtMs;
+    let productId: string | null = null;
+    if (entry !== undefined) {
+      if (
+        !isRecord(entry) ||
+        typeof entry.expires_date !== 'string' ||
+        typeof entry.product_identifier !== 'string'
+      )
+        return null;
+      expiry = Date.parse(entry.expires_date);
+      // 本アプリは月額商品のみ。欠損・nullを無期限に昇格させない。
+      if (!Number.isFinite(expiry)) return null;
+      if (
+        entry.grace_period_expires_date !== undefined &&
+        entry.grace_period_expires_date !== null
+      ) {
+        if (typeof entry.grace_period_expires_date !== 'string') return null;
+        const grace = Date.parse(entry.grace_period_expires_date);
+        if (!Number.isFinite(grace)) return null;
+        expiry = Math.max(expiry, grace);
+      }
+      productId = entry.product_identifier;
+    }
+    changes.push({
+      userId,
+      entitlement,
+      expiresAt: new Date(expiry).toISOString(),
+      active: expiry > eventAtMs,
+      productId,
+      store: null,
+      eventAtMs,
+    });
+  }
+  return changes;
 }

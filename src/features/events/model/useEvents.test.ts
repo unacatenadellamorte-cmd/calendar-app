@@ -87,6 +87,35 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('useEvents', () => {
+  it('初期読込中の作成後は再取得し、既存3件と新規1件を保つ', async () => {
+    const existing = ['e1', 'e2', 'e3'].map((id) => ev({ id }));
+    const added = ev({ id: 'e4' });
+    let resolveInitial!: (value: ReturnType<typeof ok<EventItem[]>>) => void;
+    listEvents.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInitial = resolve;
+        }),
+    );
+    listEvents.mockResolvedValue(ok([...existing, added]));
+    createEvent.mockResolvedValue(ok(added));
+    const { result } = renderHook(() => useEvents(true));
+    await act(async () => {
+      await result.current.create(timedInput);
+    });
+    await act(async () => {
+      resolveInitial(ok(existing));
+    });
+    await waitFor(() =>
+      expect(result.current.events.map((event) => event.id).sort()).toEqual([
+        'e1',
+        'e2',
+        'e3',
+        'e4',
+      ]),
+    );
+    expect(listEvents).toHaveBeenCalledTimes(2);
+  });
   it('初期化でリストを読み込む(全期間・range 引数なし)', async () => {
     const { result } = renderHook(() => useEvents(true));
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -525,17 +554,23 @@ describe('useEvents', () => {
   });
 });
 
-
 it('既存予定のラベル色の変更と解除が保存・再取得まで届く', async () => {
   let saved = ev();
   listEvents.mockImplementation(async () => ok([saved]));
-  updateEvent.mockImplementation(async (_current, patch) => { saved = { ...saved, ...patch }; return ok(saved); });
+  updateEvent.mockImplementation(async (_current, patch) => {
+    saved = { ...saved, ...patch };
+    return ok(saved);
+  });
   const { result } = renderHook(() => useEvents(true));
   await waitFor(() => expect(result.current.loading).toBe(false));
   for (const labelColor of ['#FFCC00', null]) {
-    await act(async () => { await result.current.update(saved, { ...timedInput, labelColor }); });
+    await act(async () => {
+      await result.current.update(saved, { ...timedInput, labelColor });
+    });
     expect(saved.labelColor).toBe(labelColor);
-    await act(async () => { await result.current.reload(); });
+    await act(async () => {
+      await result.current.reload();
+    });
     expect(result.current.events[0]?.labelColor).toBe(labelColor);
   }
 });

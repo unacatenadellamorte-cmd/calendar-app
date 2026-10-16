@@ -1,15 +1,22 @@
-import { expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ok } from '@/data/result';
 import type { Session } from '@supabase/supabase-js';
 import { readFirstRunStage } from '@/features/onboarding/model/first-run-state';
+import { resetAccountScopeForTests } from '@/data/account-scope';
 
 const api = vi.hoisted(() => ({
   getProfile: vi.fn(),
   createProfile: vi.fn(),
   signin: vi.fn(),
+  currentSession: null as Session | null,
+  reload: vi.fn(),
+}));
+vi.mock('@/data/account-scope', async (original) => ({
+  ...(await original<typeof import('@/data/account-scope')>()),
+  reloadAccountPage: () => api.reload(),
 }));
 let publish: (session: Session | null) => void;
 const guest = { user: { id: 'u1', is_anonymous: true } } as Session;
@@ -24,7 +31,7 @@ const account = {
 
 vi.mock('@/data/auth', () => ({
   isAuthAvailable: () => true,
-  getSession: async () => ok(guest),
+  getSession: async () => ok(api.currentSession),
   signInAnonymously: async () => ok(guest),
   onAuthStateChange: (listener: typeof publish) => {
     publish = listener;
@@ -47,6 +54,10 @@ vi.mock('@/data/env', () => ({ env: { hasSupabase: true, hasGoogleOauth: false }
 const { AuthProvider } = await import('./AuthProvider');
 const { AppShell } = await import('./AppShell');
 const { AuthScreen } = await import('@/features/auth/ui/AuthScreen');
+beforeEach(() => {
+  api.currentSession = guest;
+  api.reload.mockClear();
+});
 
 it('通常ログインで別IDの認証通知が応答より先でも、再マウント後は設定へ戻る', async () => {
   const nextAccount = { ...account, user: { ...account.user, id: 'u2' } } as Session;
@@ -63,18 +74,20 @@ it('通常ログインで別IDの認証通知が応答より先でも、再マ�
       finish = resolve;
     }),
   );
-  render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={['/auth']}>
-        <Routes>
-          <Route path="/" element={<AppShell />}>
-            <Route path="auth" element={<AuthScreen />} />
-            <Route path="settings" element={<h1>設定画面</h1>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
-  );
+  const mount = () =>
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/auth']}>
+          <Routes>
+            <Route path="/" element={<AppShell />}>
+              <Route path="auth" element={<AuthScreen />} />
+              <Route path="settings" element={<h1>設定画面</h1>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+  const view = mount();
   await screen.findByRole('heading', { name: 'ログイン' });
   fireEvent.change(screen.getByLabelText('メールアドレス'), {
     target: { value: 'sample@example.invalid' },
@@ -84,8 +97,15 @@ it('通常ログインで別IDの認証通知が応答より先でも、再マ�
   });
   fireEvent.click(screen.getByRole('button', { name: 'ログイン' }));
   await act(async () => publish(nextAccount));
-  expect(await screen.findByRole('heading', { name: '設定画面' })).toBeInTheDocument();
+  await waitFor(() => expect(api.reload).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole('heading', { name: 'ログイン' })).not.toBeInTheDocument();
   await act(async () => finish(ok(nextAccount)));
+  view.unmount();
+  // 新しい画面実行だけにBのセッションを渡し、旧非同期処理を持ち越さない。
+  resetAccountScopeForTests();
+  api.currentSession = nextAccount;
+  mount();
+  expect(await screen.findByRole('heading', { name: '設定画面' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'ログイン' })).not.toBeInTheDocument();
 });
 

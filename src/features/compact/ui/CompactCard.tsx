@@ -2,6 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { EventListItem } from '@/features/events/ui/EventListItem';
+import { localDateOf, todayLocalDate } from '@/lib/datetime';
 interface CompactCardProps {
   /** `selectFeaturedEvents` の結果。既に優先度順・件数打ち切り済み。 */
   featured: EventItem[];
@@ -34,6 +35,11 @@ export function CompactCard({ featured, calendarById, onSelect }: CompactCardPro
           calendar={calendarById.get(event.calendarId)}
           onEdit={onSelect}
           compact
+          showDate={
+            (event.allDay
+              ? event.eventDate
+              : event.startsAt && localDateOf(event.startsAt)) !== todayLocalDate()
+          }
         />
       ))}
     </ul>

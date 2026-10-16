@@ -2,6 +2,7 @@
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import { resolveAdsConfig } from './scripts/admob-config';
+import { nativeStoreContractPlugin } from './scripts/native-store-contract.mjs';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -14,6 +15,7 @@ export default defineConfig(({ mode }) => {
   return ({
   define: { __ADMOB_CONFIG__: JSON.stringify(ads) },
   plugins: [
+    nativeStoreContractPlugin(nativeTarget),
     {
       name: 'native-admob-config',
       generateBundle() {

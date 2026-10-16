@@ -554,5 +554,13 @@
   "ユーザー名": "Username",
   "認証を確認できません。通信を確認して再試行してください。": "Couldn’t verify your account. Check your connection and try again.",
   "アプリの登録・ログインとGoogle接続は別の設定です。Google接続をスキップしても、予定やシフトを使えます。": "App registration or sign-in and Google connection are separate settings. You can use events and shifts even if you skip Google connection.",
-  "プロフィールの名前は、アカウント登録とは別の表示名です。": "Your profile name is a display name, separate from app account registration."
+  "プロフィールの名前は、アカウント登録とは別の表示名です。": "Your profile name is a display name, separate from app account registration.",
+  "Googleアカウント": "Google account",
+  "選択してください": "Select an option",
+  "Supabase を設定すると、予定タグを登録できます。": "Configure Supabase to register event tags.",
+  "保存に失敗しました。もう一度お試しください": "Couldn’t save. Try again.",
+  "マイカレンダー": "My calendar",
+  "アカウントを切り替えています。未送信の変更は元のアカウント用に保管します。": "Switching accounts. Unsent changes will be kept for the original account.",
+  "切替の後始末が完了していません。再試行してください。": "Account cleanup is not complete. Please try again.",
+  "旧版の未送信データは所有者を確認できないため隔離して保管しています。別アカウントには送信しません。": "Unsent data from the old version is kept separately because its owner could not be verified. It will not be sent from another account."
 }

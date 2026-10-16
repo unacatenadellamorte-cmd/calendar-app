@@ -94,7 +94,7 @@ class FeaturedEventsWidgetTest {
 
     @Test
     fun `ミリ秒付きISO(JSブリッジの標準形)をパースする`() {
-        val result = formatStartLabel(event(startsAtIso = "2026-09-15T01:30:00.000Z"))
+        val result = formatStartLabel(event(startsAtIso = "2026-09-15T01:30:00.000Z"), parseIsoUtc("2026-09-15T00:00:00Z")!!)
         assertEquals("1:30", result)
     }
 
@@ -102,13 +102,22 @@ class FeaturedEventsWidgetTest {
     fun `ミリ秒無しISO(Supabase PostgREST の標準形)もパースする`() {
         // src/data/events.ts の toEvent() は starts_at をそのまま渡すため、
         // 実データはこの形('...T01:00:00Z')が標準(レビュー指摘、HIGH)。
-        val result = formatStartLabel(event(startsAtIso = "2026-09-15T01:30:00Z"))
+        val result = formatStartLabel(event(startsAtIso = "2026-09-15T01:30:00Z"), parseIsoUtc("2026-09-15T00:00:00Z")!!)
         assertEquals("1:30", result)
     }
 
     @Test
     fun `パース不能な文字列は「終日」にフォールバックする`() {
         assertEquals("終日", formatStartLabel(event(startsAtIso = "壊れた日付")))
+    }
+
+    @Test
+    fun `別日の予定には日付を付け終日も区別する`() {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
+        val now = parseIsoUtc("2026-09-14T23:00:00Z")!!
+        assertEquals("9/16 10:30", formatStartLabel(event(startsAtIso = "2026-09-16T01:30:00Z"), now))
+        assertEquals("9/16 終日", formatStartLabel(event(startsAtIso = "2026-09-15T15:00:00Z", allDay = true), now))
+        assertEquals("終日", formatStartLabel(event(startsAtIso = "2026-09-14T15:00:00Z", allDay = true), now))
     }
 
     @Test

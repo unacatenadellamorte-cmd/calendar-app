@@ -30,11 +30,13 @@ export function selectFeaturedEvents<E extends FeaturableEvent>(
   priorityOf: PriorityLookup,
   now: string,
   limit: number,
+  /** 終日予定の判定に使う端末ローカル日付。省略時は後方互換のため now の日付。 */
+  today = now.slice(0, 10),
 ): E[] {
   if (limit <= 0) return [];
 
   const nowMs = Date.parse(now);
-  const nowDate = now.slice(0, 10); // "YYYY-MM-DD"
+  const nowDate = today; // "YYYY-MM-DD"。UTC日付を暗黙に使わない
 
   const inScope = events.filter((event) => {
     if (event.allDay) {
@@ -47,7 +49,5 @@ export function selectFeaturedEvents<E extends FeaturableEvent>(
       : Date.parse(event.startsAt) >= nowMs;
   });
 
-  return [...inScope]
-    .sort((a, b) => compareEventsForList(a, b, priorityOf))
-    .slice(0, limit);
+  return [...inScope].sort((a, b) => compareEventsForList(a, b, priorityOf)).slice(0, limit);
 }

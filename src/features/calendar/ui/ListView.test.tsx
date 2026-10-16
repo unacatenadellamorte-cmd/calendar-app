@@ -54,12 +54,38 @@ function setup(events: EventItem[]) {
 }
 
 describe('ListView', () => {
+  it('初回データ到着と日付変更だけスクロールし編集では動かさない', () => {
+    const scroll = vi.fn();
+    const original = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = scroll;
+    const props = {
+      calendarById,
+      today: '2026-09-08',
+      scrollTo: '2026-09-08',
+      onEventTap: vi.fn(),
+    };
+    try {
+      const view = render(<ListView {...props} events={[]} />);
+      expect(scroll).not.toHaveBeenCalled();
+      view.rerender(<ListView {...props} events={[ev()]} />);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      view.rerender(<ListView {...props} events={[ev({ title: '編集後' })]} />);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      view.rerender(<ListView {...props} scrollTo="2026-09-09" events={[ev()]} />);
+      expect(scroll).toHaveBeenCalledTimes(2);
+    } finally {
+      HTMLElement.prototype.scrollTo = original;
+    }
+  });
   it('未来の予定がない場合も最古ではなく最も新しい日へスクロールする', () => {
     const original = HTMLElement.prototype.scrollTo;
     const originalRect = HTMLElement.prototype.getBoundingClientRect;
     const scrolled: { target: HTMLElement; top: number }[] = [];
     HTMLElement.prototype.scrollTo = function (options) {
-      scrolled.push({ target: this, top: typeof options === 'number' ? options : options?.top ?? 0 });
+      scrolled.push({
+        target: this,
+        top: typeof options === 'number' ? options : (options?.top ?? 0),
+      });
     };
     HTMLElement.prototype.getBoundingClientRect = function () {
       return {
@@ -69,7 +95,13 @@ describe('ListView', () => {
             : this.textContent?.includes('9月7日')
               ? 250
               : 500,
-        bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0,
         toJSON: () => ({}),
       };
     };

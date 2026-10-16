@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Calendar } from './calendars';
 import type { EventItem } from './events';
+import { accountOwnerMissing, localAccountOwner } from './account-scope';
 
 /**
  * IndexedDB の開設を1か所に集約する(AD-1: 表示専用の複製 + 書き込みキュー)。
@@ -40,11 +41,18 @@ export type LocalDb = IDBPDatabase<CalendarAppDB>;
 const DB_NAME = 'calendar-app';
 const DB_VERSION = 1;
 
-let dbPromise: Promise<LocalDb> | null = null;
+const databases = new Map<string, Promise<LocalDb>>();
 
 export function getLocalDb(): Promise<LocalDb> {
+  if (accountOwnerMissing()) return Promise.reject(new Error('利用者の確認前です'));
+  const owner = localAccountOwner();
+  return openLocalDb(owner ? `${DB_NAME}.user.${encodeURIComponent(owner)}` : DB_NAME);
+}
+
+function openLocalDb(name: string): Promise<LocalDb> {
+  let dbPromise = databases.get(name);
   if (!dbPromise) {
-    dbPromise = openDB<CalendarAppDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<CalendarAppDB>(name, DB_VERSION, {
       upgrade(db) {
         db.createObjectStore('calendars', { keyPath: 'id' });
         db.createObjectStore('events', { keyPath: 'id' });
@@ -52,13 +60,28 @@ export function getLocalDb(): Promise<LocalDb> {
         db.createObjectStore('meta', { keyPath: 'key' });
       },
     });
+    databases.set(name, dbPromise);
   }
   return dbPromise;
 }
 
 /** テスト用: シングルトンの参照を捨てる(DB 自体は消さない)。 */
 export function resetLocalDbForTests(): void {
-  dbPromise = null;
+  databases.clear();
+}
+
+/** 旧版の所有者不明キューは移送も削除もせず隔離し、画面へ存在だけを知らせる。 */
+export async function legacyOutboxCount(): Promise<number> {
+  return (await openLocalDb(DB_NAME)).count('outbox');
+}
+
+/** ログアウトでは未送信操作を消さず、表示用の複製だけを消す。 */
+export async function clearLocalCachedData(): Promise<void> {
+  const db = await getLocalDb();
+  const stores = ['calendars', 'events', 'meta'] as const;
+  const tx = db.transaction([...stores], 'readwrite');
+  await Promise.all(stores.map((store) => tx.objectStore(store).clear()));
+  await tx.done;
 }
 
 /** 表示キャッシュと未送信操作を一つのトランザクションで消す。 */

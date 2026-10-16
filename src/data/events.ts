@@ -4,7 +4,7 @@ import { isLabelColor } from '@/lib/event-label';
 import { isEventStampId, type EventStampId } from '@/lib/event-stamps';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
-import { isNetworkError, isOffline } from './net';
+import { isNetworkError, isOffline, type WriteOptions } from './net';
 import { cacheDelete, cacheGetAll, cachePut, cacheReplace } from './cache';
 import {
   newLocalId,
@@ -344,10 +344,15 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
   }
 }
 
-export async function createEvent(input: NewEventInput): Promise<Result<EventItem>> {
+export async function createEvent(
+  input: NewEventInput,
+  options: WriteOptions = {},
+): Promise<Result<EventItem>> {
   if (!supabase) return err(UNAVAILABLE);
   const invalid = validateEventInput(input);
   if (invalid) return err(invalid);
+  if (options.noOfflineFallback && isOffline())
+    return err(appError('data/offline', 'data/offline'));
   const calendarError = await validateWritableCalendar(input.calendarId);
   if (calendarError) return err(calendarError);
   if (isOffline()) return offlineCreateEvent(input.id ?? newLocalId(), input);
@@ -359,14 +364,37 @@ export async function createEvent(input: NewEventInput): Promise<Result<EventIte
       .select(COLUMNS)
       .single();
     if (error) {
-      if (isNetworkError(error)) return offlineCreateEvent(input.id ?? newLocalId(), input);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlineCreateEvent(input.id ?? newLocalId(), input);
+      if (options.noOfflineFallback && input.id && error.code === '23505') {
+        // RLS内の同じクライアントIDだけを照合し、別の一意制約違反を握り潰さない。
+        const existing = await supabase
+          .from('events')
+          .select(COLUMNS)
+          .eq('id', input.id)
+          .eq('source', 'local')
+          .eq('calendar_id', input.calendarId)
+          .maybeSingle();
+        if (existing.error)
+          return err(
+            isNetworkError(existing.error)
+              ? appError('data/offline', 'data/offline', existing.error)
+              : fromPostgrest(existing.error),
+          );
+        if (existing.data) return ok(toEvent(existing.data as EventRow));
+      }
       return err(fromPostgrest(error));
     }
     const row = toEvent(data as EventRow);
     await cachePut('events', row);
     return ok(row);
   } catch (e) {
-    if (isNetworkError(e)) return offlineCreateEvent(input.id ?? newLocalId(), input);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlineCreateEvent(input.id ?? newLocalId(), input);
     return err(appError('data/query', 'data/query', e));
   }
 }
@@ -420,6 +448,7 @@ export function validateEventPatch(patch: EventPatch): AppError | null {
 export async function updateEvent(
   current: Pick<EventItem, 'id' | 'source'>,
   patch: EventPatch,
+  options: WriteOptions = {},
 ): Promise<Result<EventItem>> {
   if (!supabase) return err(UNAVAILABLE);
   if (current.source !== 'local') {
@@ -431,7 +460,10 @@ export async function updateEvent(
     const calendarError = await validateWritableCalendar(patch.calendarId);
     if (calendarError) return err(calendarError);
   }
-  if (isOffline()) return offlineUpdateEvent(current.id, patch);
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : offlineUpdateEvent(current.id, patch);
 
   const row: Record<string, unknown> = {};
   if (patch.calendarId !== undefined) row.calendar_id = patch.calendarId;
@@ -456,14 +488,20 @@ export async function updateEvent(
       .select(COLUMNS)
       .single();
     if (error) {
-      if (isNetworkError(error)) return offlineUpdateEvent(current.id, patch);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlineUpdateEvent(current.id, patch);
       return err(fromPostgrest(error));
     }
     const updated = toEvent(data as EventRow);
     await cachePut('events', updated);
     return ok(updated);
   } catch (e) {
-    if (isNetworkError(e)) return offlineUpdateEvent(current.id, patch);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlineUpdateEvent(current.id, patch);
     return err(appError('data/query', 'data/query', e));
   }
 }
@@ -524,12 +562,16 @@ export async function setEventReminder(
 
 export async function deleteEvent(
   current: Pick<EventItem, 'id' | 'source'>,
+  options: WriteOptions = {},
 ): Promise<Result<void>> {
   if (!supabase) return err(UNAVAILABLE);
   if (current.source !== 'local') {
     return err(appError('event/not-editable', 'event/not-editable'));
   }
-  if (isOffline()) return offlineDeleteEvent(current.id);
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : offlineDeleteEvent(current.id);
 
   try {
     const { error } = await supabase
@@ -537,13 +579,19 @@ export async function deleteEvent(
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', current.id);
     if (error) {
-      if (isNetworkError(error)) return offlineDeleteEvent(current.id);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlineDeleteEvent(current.id);
       return err(fromPostgrest(error));
     }
     await cacheDelete('events', current.id);
     return ok(undefined);
   } catch (e) {
-    if (isNetworkError(e)) return offlineDeleteEvent(current.id);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlineDeleteEvent(current.id);
     return err(appError('data/query', 'data/query', e));
   }
 }

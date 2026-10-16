@@ -3,6 +3,7 @@ import { useAuth } from '@/app/auth-context';
 import type { EntitlementName } from '@/data/entitlements';
 import {
   getManagementUrl,
+  configurePurchases,
   getPlanPrices,
   getPurchasesSnapshot,
   purchasePlan,
@@ -51,8 +52,10 @@ export interface PurchaseApi {
   available: boolean;
   /** SDK は有効だがゲストで購入できない。 */
   loginRequired: boolean;
-  /** ストアのローカライズ済み価格。無いプランは仮表示のまま。 */
+  /** ストアのローカライズ済み価格。未取得のプランは購入不可。 */
   prices: PlanPriceStrings;
+  preparation: { kind: 'loading' | 'ready' | 'error'; messageKey?: string };
+  retry: () => Promise<void>;
   status: PurchaseStatus;
   /** 購入・復元・反映待ちの最中。 */
   busy: boolean;
@@ -73,7 +76,11 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 export function usePurchase(): PurchaseApi {
   const { state, session } = useAuth();
   const { refresh } = useEntitlements();
-  const snap = useSyncExternalStore(subscribePurchases, getPurchasesSnapshot, getPurchasesSnapshot);
+  const snap = useSyncExternalStore(
+    subscribePurchases,
+    getPurchasesSnapshot,
+    getPurchasesSnapshot,
+  );
   const supported = purchasesSupported();
   const userId = session?.user.id ?? null;
   const authenticated = state === 'authenticated';
@@ -81,11 +88,33 @@ export function usePurchase(): PurchaseApi {
   const loginRequired = supported && state === 'guest';
 
   const [prices, setPrices] = useState<PlanPriceStrings>({});
+  const [priceUserId, setPriceUserId] = useState<string | null>(null);
+  const [priceState, setPriceState] = useState<{
+    kind: 'loading' | 'ready' | 'error';
+    messageKey?: string;
+  }>({ kind: 'loading' });
+  const [nonce, setNonce] = useState(0);
   const [status, setStatus] = useState<PurchaseStatus>({ kind: 'idle' });
   const mounted = useRef(true);
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   const busyRef = useRef(false);
+  const identity = authenticated ? userId : null;
+  const identityRef = useRef(identity);
+  const identityGeneration = useRef(0);
+  if (identityRef.current !== identity) {
+    identityRef.current = identity;
+    identityGeneration.current += 1;
+  }
+  const generation = identityGeneration.current;
+  const current = useCallback(
+    () =>
+      mounted.current &&
+      identity !== null &&
+      identityRef.current === identity &&
+      identityGeneration.current === generation,
+    [identity, generation],
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -95,30 +124,60 @@ export function usePurchase(): PurchaseApi {
   }, []);
 
   useEffect(() => {
+    setStatus({ kind: 'idle' });
+  }, [identity]);
+
+  useEffect(() => {
+    setPrices({});
+    setPriceUserId(null);
+    setPriceState({ kind: 'loading' });
     if (!available) {
-      setPrices({});
       return;
     }
     let cancelled = false;
     void getPlanPrices().then((result) => {
-      if (!cancelled) setPrices(result.ok ? result.value : {});
+      if (!cancelled && current()) {
+        setPrices(result.ok ? result.value : {});
+        setPriceUserId(userId);
+        setPriceState(
+          result.ok
+            ? { kind: 'ready' }
+            : { kind: 'error', messageKey: result.error.messageKey },
+        );
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [available, userId]);
+  }, [available, userId, nonce, current]);
 
-  const update = useCallback((next: PurchaseStatus) => {
-    if (mounted.current) setStatus(next);
-  }, []);
+  const retry = useCallback(async () => {
+    if (!supported || !current() || busyRef.current) return;
+    setPrices({});
+    setPriceUserId(null);
+    setPriceState({ kind: 'loading' });
+    if (!available) await configurePurchases(userId);
+    if (current()) setNonce((n) => n + 1);
+  }, [supported, current, available, userId]);
+
+  const update = useCallback(
+    (next: PurchaseStatus) => {
+      if (current()) setStatus(next);
+    },
+    [current],
+  );
 
   /** 目的の権利が DB に現れるまで待つ。閉じた後も続け、他の画面の表示も更新する。 */
   const waitForEntitlement = useCallback(
-    async (isDone: (e: Pick<EntitlementsState, 'hasMultiAccount' | 'canWrite'>) => boolean) => {
+    async (
+      isDone: (e: Pick<EntitlementsState, 'hasMultiAccount' | 'canWrite'>) => boolean,
+    ) => {
       update({ kind: 'syncing' });
       for (let i = 0; i < ENTITLEMENT_POLL_MAX_ATTEMPTS; i += 1) {
         await sleep(ENTITLEMENT_POLL_INTERVAL_MS);
+        if (!current()) return 'cancelled' as const;
         const latest = await refreshRef.current();
+        if (!current()) return 'cancelled' as const;
         if (latest && isDone(latest)) {
           update({ kind: 'settled' });
           return 'settled' as const;
@@ -127,7 +186,7 @@ export function usePurchase(): PurchaseApi {
       update({ kind: 'timeout' });
       return 'timeout' as const;
     },
-    [update],
+    [update, current],
   );
 
   const guard = useCallback((): PurchaseResult | null => {
@@ -136,22 +195,27 @@ export function usePurchase(): PurchaseApi {
       update({ kind: 'error', messageKey: 'purchase/login-required' });
       return { ok: false, reason: 'login-required' };
     }
-    if (!available) {
+    if (!available || !current()) {
       update({ kind: 'error', messageKey: 'purchase/unavailable' });
       return { ok: false, reason: 'not-ready' };
     }
     return null;
-  }, [supported, authenticated, available, update]);
+  }, [supported, authenticated, available, update, current]);
 
   const purchase = useCallback(
     async (plan: EntitlementName): Promise<PurchaseResult> => {
       const blocked = guard();
       if (blocked) return blocked;
+      if (priceUserId !== userId || !prices[plan] || priceState.kind !== 'ready') {
+        update({ kind: 'error', messageKey: 'purchase/product-missing' });
+        return { ok: false, reason: 'not-ready' };
+      }
       if (busyRef.current) return { ok: false, reason: 'not-ready' };
       busyRef.current = true;
       try {
         update({ kind: 'working', action: 'purchase' });
-        const result = await purchasePlan(plan);
+        const result = await purchasePlan(plan, userId);
+        if (!current()) return { ok: false, reason: 'not-ready' };
         if (!result.ok) {
           update({ kind: 'error', messageKey: result.error.messageKey });
           return { ok: false, reason: 'error' };
@@ -169,7 +233,7 @@ export function usePurchase(): PurchaseApi {
         busyRef.current = false;
       }
     },
-    [guard, update, waitForEntitlement],
+    [guard, update, waitForEntitlement, prices, priceUserId, priceState.kind, userId, current],
   );
 
   const restore = useCallback(async (): Promise<PurchaseResult> => {
@@ -180,6 +244,7 @@ export function usePurchase(): PurchaseApi {
     try {
       update({ kind: 'working', action: 'restore' });
       const result = await restorePurchases();
+      if (!current()) return { ok: false, reason: 'not-ready' };
       if (!result.ok) {
         update({ kind: 'error', messageKey: result.error.messageKey });
         return { ok: false, reason: 'error' };
@@ -193,24 +258,53 @@ export function usePurchase(): PurchaseApi {
     } finally {
       busyRef.current = false;
     }
-  }, [guard, update, waitForEntitlement]);
+  }, [guard, update, waitForEntitlement, current]);
 
   const openManagement = useCallback(async () => {
-    if (!available) return;
-    update({ kind: 'working', action: 'manage' });
-    const result = await getManagementUrl();
-    if (!result.ok) {
-      update({ kind: 'error', messageKey: result.error.messageKey });
-      return;
+    if (guard() || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      update({ kind: 'working', action: 'manage' });
+      const result = await getManagementUrl();
+      if (!current()) return;
+      if (!result.ok) {
+        update({ kind: 'error', messageKey: result.error.messageKey });
+        return;
+      }
+      if (!result.value) {
+        update({ kind: 'no-management-url' });
+        return;
+      }
+      const opened = await openExternalUrl(result.value);
+      update(
+        opened
+          ? { kind: 'idle' }
+          : { kind: 'error', messageKey: 'purchase/management-failed' },
+      );
+    } finally {
+      busyRef.current = false;
     }
-    if (!result.value) {
-      update({ kind: 'no-management-url' });
-      return;
-    }
-    const opened = await openExternalUrl(result.value);
-    update(opened ? { kind: 'idle' } : { kind: 'error', messageKey: 'purchase/management-failed' });
-  }, [available, update]);
+  }, [guard, update, current]);
 
   const busy = status.kind === 'working' || status.kind === 'syncing';
-  return { supported, available, loginRequired, prices, status, busy, purchase, restore, openManagement };
+  const preparation = !available
+    ? snap.status === 'error'
+      ? { kind: 'error' as const, messageKey: snap.messageKey }
+      : { kind: 'loading' as const }
+    : priceUserId !== userId
+      ? { kind: 'loading' as const }
+      : priceState;
+  return {
+    supported,
+    available,
+    loginRequired,
+    prices: priceUserId === userId ? prices : {},
+    preparation,
+    retry,
+    status,
+    busy,
+    purchase,
+    restore,
+    openManagement,
+  };
 }

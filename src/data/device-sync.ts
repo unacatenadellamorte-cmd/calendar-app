@@ -81,10 +81,21 @@ async function syncOneCalendar(
   windowMax: number,
 ): Promise<{ calendar: string; upserted: number; deleted: number }> {
   const byExternalId = new Map<string, EventRow>();
+  const originalIds = new Map<string, string>();
   for (const raw of rawEvents) {
     if (raw.calendarId !== target.external_calendar_id) continue;
     const n = normalizeDeviceEvent(raw);
-    if (n) byExternalId.set(n.externalId, toDeviceEventRow(n));
+    if (n) {
+      // 繰り返し各回と別カレンダーの同一IDを、取得窓に左右されないキーで分ける。
+      const row = toDeviceEventRow(n);
+      const occurrenceId = JSON.stringify([
+        target.external_calendar_id,
+        n.externalId,
+        row.starts_at ?? row.event_date,
+      ]);
+      byExternalId.set(occurrenceId, { ...row, external_id: occurrenceId });
+      originalIds.set(occurrenceId, n.externalId);
+    }
   }
 
   if (byExternalId.size > 0) {
@@ -97,15 +108,43 @@ async function syncOneCalendar(
     // (`selectActive` は使わない)。
     const { data: existing, error: existingError } = await supabase!
       .from('events')
-      .select('id,external_id')
+      .select('id,external_id,calendar_id,starts_at,event_date')
       .eq('connection_id', connectionId)
-      .in('external_id', externalIds)
-      .returns<{ id: string; external_id: string }[]>();
+      .in('external_id', [...new Set([...externalIds, ...originalIds.values()])])
+      .returns<
+        {
+          id: string;
+          external_id: string;
+          calendar_id: string;
+          starts_at: string | null;
+          event_date: string | null;
+        }[]
+      >();
     if (existingError) throw new Error(existingError.message);
 
     const existingIdByExternalId = new Map(
       (existing ?? []).map((r) => [r.external_id, r.id] as const),
     );
+    // 旧形式の同じ回は行IDを保つ。設定済みリマインダーまで新規行に置き換えない。
+    for (const old of existing ?? []) {
+      if (old.calendar_id !== target.calendar_id || byExternalId.has(old.external_id))
+        continue;
+      for (const [key, row] of byExternalId) {
+        const sameOccurrence =
+          row.starts_at && old.starts_at
+            ? Date.parse(row.starts_at) === Date.parse(old.starts_at)
+            : row.starts_at === null &&
+              old.starts_at === null &&
+              row.event_date === old.event_date;
+        if (
+          originalIds.get(key) === old.external_id &&
+          sameOccurrence &&
+          !existingIdByExternalId.has(key)
+        ) {
+          existingIdByExternalId.set(key, old.id);
+        }
+      }
+    }
 
     const toInsert: Array<
       EventRow & { calendar_id: string; connection_id: string; source: 'device' }

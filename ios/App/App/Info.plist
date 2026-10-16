@@ -58,6 +58,10 @@
 		NSCalendarsWriteOnlyAccessUsageDescription・reminders 系キーは追加しない
 		(書き込み・リマインダーは対象外)。
 	-->
+	<key>NSCameraUsageDescription</key>
+	<string>プロフィール写真やカレンダーの背景画像に使う写真を撮影します。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>プロフィール写真やカレンダーの背景画像に使う写真を選びます。</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>予定を取り込むために端末のカレンダーを読み取ります。このアプリ自身は読み取りにしか使いません(iOS 13-16)。</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>

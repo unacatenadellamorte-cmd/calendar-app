@@ -94,10 +94,12 @@ describe('flushOutbox', () => {
     expect((await flushOutbox()).flushed).toBe(2);
     expect(createEvent).toHaveBeenCalledWith(
       expect.objectContaining({ stampId: 'work', stampOnly: true }),
+      { noOfflineFallback: true },
     );
     expect(updateEvent).toHaveBeenCalledWith(
       { id: 'real', source: 'local' },
       { title: '勤務', stampOnly: false },
+      { noOfflineFallback: true },
     );
     expect(await cacheGetAll('events')).toEqual([renamed]);
     expect(await listOutbox()).toHaveLength(0);
@@ -181,7 +183,7 @@ describe('flushOutbox', () => {
     });
     reorderCalendars.mockResolvedValue(ok([]));
     const result = await flushOutbox();
-    expect(reorderCalendars).toHaveBeenCalledWith(['c2', 'c1']);
+    expect(reorderCalendars).toHaveBeenCalledWith(['c2', 'c1'], { noOfflineFallback: true });
     expect(result.flushed).toBe(1);
   });
 

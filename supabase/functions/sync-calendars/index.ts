@@ -15,7 +15,12 @@ import { corsHeadersFor, handlePreflight, jsonResponse } from '../_shared/cors.t
 import { fetchGoogleEvents, refreshAccessToken } from '../_shared/google.ts';
 // 正規化の純ロジックは packages/core/src/google-events.ts が一次ソース。
 // この _shared/google-events.ts は scripts/sync-edge-shared.mjs が生成する(手で編集しない)。
-import { normalizeGoogleEvent, toEventRow, type EventRow } from '../_shared/google-events.ts';
+import {
+  isOwnGoogleCopy,
+  normalizeGoogleEvent,
+  toEventRow,
+  type EventRow,
+} from '../_shared/google-events.ts';
 
 interface Target {
   user_id: string;
@@ -77,7 +82,8 @@ async function handle(req: Request): Promise<Response> {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data: userData, error: userError } = await userClient.auth.getUser();
-    if (userError || !userData?.user) return jsonResponse(req, { error: 'not-authenticated' }, 401);
+    if (userError || !userData?.user)
+      return jsonResponse(req, { error: 'not-authenticated' }, 401);
     scopeUserId = userData.user.id;
 
     // 複数接続対応: active な接続が1件以上あるかを確認。
@@ -88,7 +94,8 @@ async function handle(req: Request): Promise<Response> {
       .eq('provider', 'google')
       .eq('status', 'active')
       .is('deleted_at', null);
-    if (!conns || conns.length === 0) return jsonResponse(req, { error: 'not-connected' }, 409);
+    if (!conns || conns.length === 0)
+      return jsonResponse(req, { error: 'not-connected' }, 409);
   }
 
   // 取り込み対象。
@@ -120,10 +127,13 @@ async function handle(req: Request): Promise<Response> {
   for (const [connectionId, list] of byConnection) {
     const userId = list[0].user_id;
 
-    const { data: refreshToken, error: rtError } = await admin.rpc('get_google_connection_token', {
-      p_user_id: userId,
-      p_connection_id: connectionId,
-    });
+    const { data: refreshToken, error: rtError } = await admin.rpc(
+      'get_google_connection_token',
+      {
+        p_user_id: userId,
+        p_connection_id: connectionId,
+      },
+    );
     if (rtError || typeof refreshToken !== 'string' || !refreshToken) {
       for (const t of list) {
         await admin.rpc('record_calendar_sync_error', {
@@ -174,16 +184,41 @@ async function handle(req: Request): Promise<Response> {
         // 別接続経由で同じGoogleカレンダーを読む場合も、自分が反映したコピーを除外する。
         const pushedIds = new Set<string>();
         // APIの件数上限を超えても除外漏れが起きないよう、取得した予定IDを小分けに照合する。
-        const rawIds = [...new Set(raw.flatMap(item => item.id ? [item.id] : []))];
+        const rawIds = [...new Set(raw.flatMap((item) => (item.id ? [item.id] : [])))];
         for (let offset = 0; offset < rawIds.length; offset += 200) {
-          const { data: links, error: linkError } = await admin.from('event_google_links')
-            .select('google_event_id').eq('user_id', userId).eq('google_calendar_id', t.external_calendar_id)
+          const { data: links, error: linkError } = await admin
+            .from('event_google_links')
+            .select('google_event_id')
+            .eq('user_id', userId)
+            .eq('google_calendar_id', t.external_calendar_id)
             .in('google_event_id', rawIds.slice(offset, offset + 200));
           if (linkError) throw new Error('push-links-unavailable');
           for (const link of links ?? []) pushedIds.add(link.google_event_id);
         }
+        const markerIds = [
+          ...new Set(
+            raw.flatMap((item) => {
+              const id = item.extendedProperties?.private?.multiCalendarEventId;
+              return typeof id === 'string' &&
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+                ? [id]
+                : [];
+            }),
+          ),
+        ];
+        const ownedLocalIds = new Set<string>();
+        for (let offset = 0; offset < markerIds.length; offset += 200) {
+          const { data: localEvents, error: localError } = await admin
+            .from('events')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('source', 'local')
+            .in('id', markerIds.slice(offset, offset + 200));
+          if (localError) throw new Error('push-markers-unavailable');
+          for (const event of localEvents ?? []) ownedLocalIds.add(event.id);
+        }
         for (const item of raw) {
-          if (pushedIds.has(item.id ?? '')) continue;
+          if (pushedIds.has(item.id ?? '') || isOwnGoogleCopy(item, ownedLocalIds)) continue;
           const n = normalizeGoogleEvent(item);
           if (n) byExternalId.set(n.externalId, toEventRow(n));
         }

@@ -109,6 +109,8 @@ class SigningTest(unittest.TestCase):
                 info = {"CFBundleIdentifier": bundle, "CFBundleShortVersionString": "1.0.20", "CFBundleVersion": "21"}
                 if bundle == release.APP:
                     info.update({"GIDClientID": fixture_env["GOOGLE_IOS_CLIENT_ID"], "GIDServerClientID": fixture_env["GOOGLE_SERVER_CLIENT_ID"],
+                                 "NSCameraUsageDescription": "プロフィールと背景の写真を撮影します。",
+                                 "NSPhotoLibraryUsageDescription": "プロフィールと背景の写真を選びます。",
                                  "GADApplicationIdentifier": fixture_env["ADMOB_IOS_APP_ID"],
                                  "CFBundleURLTypes": [{"CFBundleURLSchemes": ["calendar-app", fixture_env["GOOGLE_IOS_REVERSED_CLIENT_ID"]]}]})
                 (directory / "Info.plist").write_bytes(plistlib.dumps(info))
@@ -120,6 +122,8 @@ class SigningTest(unittest.TestCase):
                     embedded["UUID"] = "87654321-1234-1234-1234-123456789abc"
                 settings["profiles"][bundle] = embedded["UUID"]
                 (directory / "embedded.mobileprovision").write_bytes(plistlib.dumps(embedded))
+            (app / "public/assets").mkdir(parents=True)
+            (app / "public/assets/app.js").write_text('App Store; Google Calendar', encoding="utf-8")
 
             def command(args, **kwargs):
                 path = Path(args[-1])
@@ -203,6 +207,33 @@ class SigningTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         for target in ["App", "FeaturedEventsWidget"]:
             release.validate_manifest(root / "ios/App" / target / "PrivacyInfo.xcprivacy")
+
+    def test_review_contract_rejects_missing_descriptions_and_other_store(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app = Path(temporary)
+            web = app / "public"
+            web.mkdir()
+            script = web / "app.js"
+            script.write_text("App Store; Google Calendar", encoding="utf-8")
+            valid = {"NSCameraUsageDescription": "写真を撮影します。", "NSPhotoLibraryUsageDescription": "写真を選びます。"}
+            for key in valid:
+                for value in (None, "", " ", "$(UNRESOLVED)"):
+                    (app / "Info.plist").write_bytes(plistlib.dumps({**valid, key: value} if value is not None else {k: v for k, v in valid.items() if k != key}))
+                    with self.assertRaisesRegex(ValueError, "用途説明"):
+                        release.validate_review_contract(app)
+            (app / "Info.plist").write_bytes(plistlib.dumps(valid))
+            release.validate_review_contract(app)
+            for value in ("Google Play", "https://play.google.com/store/account/subscriptions"):
+                script.write_text(value, encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "他ストア"):
+                    release.validate_review_contract(app)
+
+    def test_source_has_photo_usage_descriptions(self):
+        source = Path(__file__).resolve().parents[2] / "ios/App/App/Info.plist"
+        info = plistlib.loads(source.read_bytes())
+        for key in ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription"):
+            self.assertIn("プロフィール", info[key])
+            self.assertIn("背景", info[key])
 
 
 if __name__ == "__main__":

@@ -50,14 +50,20 @@ export function purchasesSupported(): boolean {
 export interface PurchasesSnapshot {
   /** configure 済みで、いま RevenueCat 側に紐づいているユーザーID。ログアウト状態は null。 */
   userId: string | null;
+  status: 'idle' | 'configuring' | 'ready' | 'error';
+  messageKey?: string;
 }
 
-let snapshot: PurchasesSnapshot = { userId: null };
+let snapshot: PurchasesSnapshot = { userId: null, status: 'idle' };
 let isConfigured = false;
+let sdkUserId: string | null | undefined = null;
+let requestedUserId: string | null = null;
+let generation = 0;
+let loadedPackages: PurchasesPackage[] | null = null;
 const listeners = new Set<() => void>();
 
-function setUserId(userId: string | null): void {
-  snapshot = { userId };
+function publish(next: PurchasesSnapshot): void {
+  snapshot = next;
   listeners.forEach((listener) => listener());
 }
 
@@ -75,19 +81,29 @@ export function getPurchasesSnapshot(): PurchasesSnapshot {
 /** テスト用: モジュール内の状態を初期化する。 */
 export function resetPurchasesForTest(): void {
   isConfigured = false;
+  sdkUserId = requestedUserId = null;
+  generation += 1;
+  loadedPackages = null;
   queue = Promise.resolve();
-  setUserId(null);
+  publish({ userId: null, status: 'idle' });
 }
 
 // ---- エラー変換 ----
 
 function isCancelled(error: unknown): boolean {
   const e = error as { code?: unknown; userCancelled?: unknown } | null;
-  return e?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR || e?.userCancelled === true;
+  return (
+    e?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR || e?.userCancelled === true
+  );
 }
 
-function failure(kind: string, messageKey: string, cause: unknown) {
+function failure(kind: string, messageKey: string, cause: unknown, stage = kind) {
   const code = (cause as { code?: unknown } | null)?.code;
+  // 例外本文・ユーザーID・キー・レシートはログへ出さない。
+  const safeCode = Object.values(PURCHASES_ERROR_CODE).includes(code as PURCHASES_ERROR_CODE)
+    ? code
+    : 'unknown';
+  console.warn('課金処理', { stage, code: safeCode });
   if (code === PURCHASES_ERROR_CODE.NETWORK_ERROR) {
     return err(appError('purchase/offline', 'purchase/offline', cause));
   }
@@ -116,30 +132,54 @@ function serialize<T>(task: () => Promise<T>): Promise<T> {
  * 同じ userId で何度呼んでも何もしない。
  */
 export function configurePurchases(userId: string | null): Promise<Result<void>> {
+  if (snapshot.status === 'ready' && snapshot.userId === userId)
+    return Promise.resolve(ok(undefined));
+  requestedUserId = userId;
+  const request = ++generation;
+  loadedPackages = null;
+  publish({ userId: null, status: userId ? 'configuring' : 'idle' });
   return serialize(async () => {
+    if (request !== generation) return unavailable();
     const apiKey = sdkKey();
     if (!apiKey) return unavailable();
+    let stage = 'configure';
     try {
       if (userId === null) {
-        if (isConfigured && snapshot.userId !== null) {
+        stage = 'logout';
+        if (isConfigured && sdkUserId !== null) {
           await Purchases.logOut();
-          setUserId(null);
+          sdkUserId = null;
         }
         return ok(undefined);
       }
       if (!isConfigured) {
         await Purchases.configure({ apiKey, appUserID: userId });
         isConfigured = true;
-        setUserId(userId);
+        sdkUserId = userId;
+        if (request !== generation) return unavailable();
+        publish({ userId, status: 'ready' });
         return ok(undefined);
       }
-      if (snapshot.userId !== userId) {
+      if (sdkUserId !== userId) {
+        stage = 'login';
         await Purchases.logIn({ appUserID: userId });
-        setUserId(userId);
+        sdkUserId = userId;
       }
+      if (request !== generation) return unavailable();
+      publish({ userId, status: 'ready' });
       return ok(undefined);
     } catch (e) {
-      return err(appError('purchase/configure-failed', 'purchase/configure-failed', e));
+      // SDK側で部分的に切り替わった可能性があるため、次回は必ず紐付け直す。
+      if (isConfigured) sdkUserId = undefined;
+      const result = failure(
+        'purchase/configure-failed',
+        'purchase/configure-failed',
+        e,
+        stage,
+      );
+      if (request === generation && !result.ok)
+        publish({ userId: null, status: 'error', messageKey: result.error.messageKey });
+      return result;
     }
   });
 }
@@ -164,26 +204,36 @@ function matchesProduct(pkg: PurchasesPackage, productId: string): boolean {
   return id === productId || id.startsWith(`${productId}:`);
 }
 
-function findPackage(packages: PurchasesPackage[], plan: EntitlementName): PurchasesPackage | null {
+function findPackage(
+  packages: PurchasesPackage[],
+  plan: EntitlementName,
+): PurchasesPackage | null {
   return packages.find((p) => matchesProduct(p, PRODUCT_IDS[plan])) ?? null;
 }
 
 export type PlanPriceStrings = Partial<Record<EntitlementName, string>>;
 
-/** ストアのローカライズ済み価格文字列。商品が見つからないプランは含めない(仮表示のまま)。 */
+/** ストアのローカライズ済み価格文字列。商品が見つからないプランは購入不可。 */
 export async function getPlanPrices(): Promise<Result<PlanPriceStrings>> {
-  if (!purchasesSupported() || snapshot.userId === null) return unavailable();
-  try {
-    const packages = collectPackages(await Purchases.getOfferings());
-    const prices: PlanPriceStrings = {};
-    for (const plan of Object.keys(PRODUCT_IDS) as EntitlementName[]) {
-      const pkg = findPackage(packages, plan);
-      if (pkg) prices[plan] = pkg.product.priceString;
+  const request = generation;
+  return serialize(async () => {
+    if (!purchasesSupported() || snapshot.userId === null || request !== generation)
+      return unavailable();
+    loadedPackages = null;
+    try {
+      const packages = collectPackages(await Purchases.getOfferings());
+      if (request !== generation) return unavailable();
+      loadedPackages = packages;
+      const prices: PlanPriceStrings = {};
+      for (const plan of Object.keys(PRODUCT_IDS) as EntitlementName[]) {
+        const pkg = findPackage(packages, plan);
+        if (pkg?.product.priceString) prices[plan] = pkg.product.priceString;
+      }
+      return ok(prices);
+    } catch (e) {
+      return failure('purchase/offerings-failed', 'purchase/offerings-failed', e);
     }
-    return ok(prices);
-  } catch (e) {
-    return failure('purchase/offerings-failed', 'purchase/offerings-failed', e);
-  }
+  });
 }
 
 // ---- 購入 ----
@@ -202,30 +252,49 @@ async function findOldProductId(plan: EntitlementName): Promise<string | null> {
     const { customerInfo } = await Purchases.getCustomerInfo();
     const old = PRODUCT_IDS.calendar_write;
     return (
-      customerInfo.activeSubscriptions.find((id) => id === old || id.startsWith(`${old}:`)) ?? null
+      customerInfo.activeSubscriptions.find((id) => id === old || id.startsWith(`${old}:`)) ??
+      null
     );
   }
 }
 
 /** プランを購入する。ユーザーのキャンセルはエラーにせず `cancelled` を返す。 */
-export async function purchasePlan(plan: EntitlementName): Promise<Result<PurchaseOutcome>> {
-  if (!purchasesSupported() || snapshot.userId === null) return unavailable();
-  try {
-    const packages = collectPackages(await Purchases.getOfferings());
-    const aPackage = findPackage(packages, plan);
-    if (!aPackage) {
-      return err(appError('purchase/product-missing', 'purchase/product-missing'));
+export async function purchasePlan(
+  plan: EntitlementName,
+  expectedUserId = snapshot.userId,
+): Promise<Result<PurchaseOutcome>> {
+  const request = generation;
+  return serialize(async () => {
+    const valid = () =>
+      purchasesSupported() &&
+      expectedUserId !== null &&
+      snapshot.userId === expectedUserId &&
+      requestedUserId === expectedUserId &&
+      request === generation;
+    if (!valid()) return unavailable();
+    let stage = 'offerings';
+    try {
+      const packages = loadedPackages ?? collectPackages(await Purchases.getOfferings());
+      if (!valid()) return unavailable();
+      const aPackage = findPackage(packages, plan);
+      if (!aPackage) {
+        return err(appError('purchase/product-missing', 'purchase/product-missing'));
+      }
+      stage = 'previous-subscription';
+      const oldProductIdentifier = await findOldProductId(plan);
+      if (!valid()) return unavailable();
+      stage = 'store-purchase';
+      await Purchases.purchasePackage({
+        aPackage,
+        ...(oldProductIdentifier ? { storeProductChangeInfo: { oldProductIdentifier } } : {}),
+      });
+      if (!valid()) return unavailable();
+      return ok('purchased');
+    } catch (e) {
+      if (isCancelled(e)) return ok('cancelled');
+      return failure('purchase/failed', 'purchase/failed', e, stage);
     }
-    const oldProductIdentifier = await findOldProductId(plan);
-    await Purchases.purchasePackage({
-      aPackage,
-      ...(oldProductIdentifier ? { storeProductChangeInfo: { oldProductIdentifier } } : {}),
-    });
-    return ok('purchased');
-  } catch (e) {
-    if (isCancelled(e)) return ok('cancelled');
-    return failure('purchase/failed', 'purchase/failed', e);
-  }
+  });
 }
 
 // ---- 復元・管理 ----
@@ -236,22 +305,36 @@ export interface RestoreOutcome {
 }
 
 export async function restorePurchases(): Promise<Result<RestoreOutcome>> {
-  if (!purchasesSupported() || snapshot.userId === null) return unavailable();
-  try {
-    const { customerInfo } = await Purchases.restorePurchases();
-    return ok({ hasActiveSubscription: customerInfo.activeSubscriptions.length > 0 });
-  } catch (e) {
-    return failure('purchase/restore-failed', 'purchase/restore-failed', e);
-  }
+  const request = generation;
+  return serialize(async () => {
+    if (!purchasesSupported() || snapshot.userId === null || request !== generation)
+      return unavailable();
+    try {
+      const { customerInfo } = await Purchases.restorePurchases();
+      if (request !== generation) return unavailable();
+      return ok({ hasActiveSubscription: customerInfo.activeSubscriptions.length > 0 });
+    } catch (e) {
+      return failure('purchase/restore-failed', 'purchase/restore-failed', e);
+    }
+  });
 }
 
 /** ストアの購読管理ページ。有効な購読が無いと null(型定義の仕様)。 */
 export async function getManagementUrl(): Promise<Result<string | null>> {
-  if (!purchasesSupported() || snapshot.userId === null) return unavailable();
-  try {
-    const { customerInfo } = await Purchases.getCustomerInfo();
-    return ok(customerInfo.managementURL);
-  } catch (e) {
-    return failure('purchase/management-failed', 'purchase/management-failed', e);
-  }
+  const request = generation;
+  return serialize(async () => {
+    if (!purchasesSupported() || snapshot.userId === null || request !== generation)
+      return unavailable();
+    try {
+      const { customerInfo } = await Purchases.getCustomerInfo();
+      if (request !== generation) return unavailable();
+      // 別OSで開始した購読でも、iOSから他ストアへ誘導しない。
+      if (currentPlatform() === 'ios' && customerInfo.managementURL) {
+        return ok('https://apps.apple.com/account/subscriptions');
+      }
+      return ok(customerInfo.managementURL);
+    } catch (e) {
+      return failure('purchase/management-failed', 'purchase/management-failed', e);
+    }
+  });
 }

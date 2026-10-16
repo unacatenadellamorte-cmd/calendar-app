@@ -109,26 +109,32 @@ export function buildFeaturedWidgetPayload(
     makePriorityOf(calendarById),
     now,
     WIDGET_LIMIT,
+    localDateOf(now),
   );
 
   return featured.flatMap((event) => {
     if (!dateRangeForEvent(event)) return [];
     const calendar = calendarById.get(event.calendarId);
-    return [{
-      id: event.id,
-      calendarName: calendar?.name ?? '不明なカレンダー',
-      colorHex: event.source === 'local' ? eventLabelColor(event, calendar) : calendar?.color ?? EXTERNAL_DEFAULT_COLOR,
-      startsAtIso:
-        event.allDay && event.eventDate
-          ? localMidnightIso(event.eventDate)
-          : // Supabase(PostgREST)の `starts_at` はミリ秒無し('...T01:00:00Z')が標準形。
-            // ネイティブ側(FeaturedEventsWidget.kt)のパーサはミリ秒付きの固定書式を要求するため、
-            // `Date` を経由してミリ秒付きの形へ正規化する(素通しすると時刻付き予定が「終日」に
-            // 誤フォールバックする実害があった)。
-            new Date(event.startsAt ?? now).toISOString(),
-      allDay: event.allDay,
-      schemaVersion: 1,
-    }];
+    return [
+      {
+        id: event.id,
+        calendarName: calendar?.name ?? '不明なカレンダー',
+        colorHex:
+          event.source === 'local'
+            ? eventLabelColor(event, calendar)
+            : (calendar?.color ?? EXTERNAL_DEFAULT_COLOR),
+        startsAtIso:
+          event.allDay && event.eventDate
+            ? localMidnightIso(event.eventDate)
+            : // Supabase(PostgREST)の `starts_at` はミリ秒無し('...T01:00:00Z')が標準形。
+              // ネイティブ側(FeaturedEventsWidget.kt)のパーサはミリ秒付きの固定書式を要求するため、
+              // `Date` を経由してミリ秒付きの形へ正規化する(素通しすると時刻付き予定が「終日」に
+              // 誤フォールバックする実害があった)。
+              new Date(event.startsAt ?? now).toISOString(),
+        allDay: event.allDay,
+        schemaVersion: 1,
+      },
+    ];
   });
 }
 
@@ -151,7 +157,12 @@ function dateRangeForEvent(event: EventItem): {
 } | null {
   if (event.allDay) {
     if (!event.eventDate || !isLocalDate(event.eventDate)) return null;
-    return { startDate: event.eventDate, endDate: event.eventDate, startsAtIso: null, endsAtIso: null };
+    return {
+      startDate: event.eventDate,
+      endDate: event.eventDate,
+      startsAtIso: null,
+      endsAtIso: null,
+    };
   }
   if (!event.startsAt) return null;
   const startMs = Date.parse(event.startsAt);
@@ -164,8 +175,12 @@ function dateRangeForEvent(event: EventItem): {
     // 終了はexclusive。深夜0時終了なら前日までにする。
     endDate = localDateString(new Date(Math.max(startMs, endMs - 1)));
   }
-  return { startDate, endDate, startsAtIso: new Date(startMs).toISOString(),
-    endsAtIso: event.endsAt ? new Date(event.endsAt).toISOString() : null };
+  return {
+    startDate,
+    endDate,
+    startsAtIso: new Date(startMs).toISOString(),
+    endsAtIso: event.endsAt ? new Date(event.endsAt).toISOString() : null,
+  };
 }
 
 export function buildCalendarOverviewPayload(
@@ -175,11 +190,18 @@ export function buildCalendarOverviewPayload(
   language: Language = getLanguage(),
 ): CalendarOverviewPayload {
   const calendarById = new Map(calendars.map((calendar) => [calendar.id, calendar]));
-  const visibleIds = new Set(calendars.filter((calendar) => calendar.isVisible).map((calendar) => calendar.id));
+  const visibleIds = new Set(
+    calendars.filter((calendar) => calendar.isVisible).map((calendar) => calendar.id),
+  );
   const priorityOf = makePriorityOf(calendarById);
   const overviewEvents = events
     // 不正な時刻を比較関数へ渡すとNaNが混ざるため、並べ替え前に除外する。
-    .filter((event) => visibleIds.has(event.calendarId) && !event.isSecret && dateRangeForEvent(event) !== null)
+    .filter(
+      (event) =>
+        visibleIds.has(event.calendarId) &&
+        !event.isSecret &&
+        dateRangeForEvent(event) !== null,
+    )
     .sort((a, b) => compareEventsForList(a, b, priorityOf))
     .map((event) => {
       const range = dateRangeForEvent(event);
@@ -190,13 +212,19 @@ export function buildCalendarOverviewPayload(
         id: event.id,
         title: event.title,
         calendarName: calendar.name,
-        colorHex: event.source === 'local' ? eventLabelColor(event, calendar) : calendar.color || EXTERNAL_DEFAULT_COLOR,
+        colorHex:
+          event.source === 'local'
+            ? eventLabelColor(event, calendar)
+            : calendar.color || EXTERNAL_DEFAULT_COLOR,
         filledLabel: event.source === 'local',
         ...range,
         allDay: event.allDay,
       };
     })
-    .filter((event): event is CalendarOverviewEventPayload & { calendarId: string } => event !== null)
+    .filter(
+      (event): event is CalendarOverviewEventPayload & { calendarId: string } =>
+        event !== null,
+    )
     .map(({ calendarId: _calendarId, ...event }) => event);
   return { schemaVersion: 1, updatedAtIso, language, events: overviewEvents };
 }
@@ -232,7 +260,8 @@ async function runRefreshFeaturedWidget(): Promise<void> {
       group: WIDGET_GROUP,
       value: JSON.stringify(payload),
     });
-    if (featuredResult?.results === false) throw new Error('ウィジェットの書込みに失敗しました');
+    if (featuredResult?.results === false)
+      throw new Error('ウィジェットの書込みに失敗しました');
     // Android/iOSの月グリッドが同じ保存済みスナップショットを読む。
     // Android固有なのは登録先の設定だけで、共有データの書込みは両方で行う。
     const overview = buildCalendarOverviewPayload(
@@ -245,7 +274,8 @@ async function runRefreshFeaturedWidget(): Promise<void> {
       group: WIDGET_GROUP,
       value: JSON.stringify(overview),
     });
-    if (overviewResult?.results === false) throw new Error('ウィジェットの書込みに失敗しました');
+    if (overviewResult?.results === false)
+      throw new Error('ウィジェットの書込みに失敗しました');
     await WidgetBridgePlugin.reloadAllTimelines();
   } catch (e) {
     console.warn('widget: refreshFeaturedWidget failed', (e as Error)?.message);
@@ -292,10 +322,22 @@ export async function clearAccountWidgets(): Promise<void> {
   if (Capacitor.getPlatform() === 'android') {
     await WidgetBridgePlugin.setRegisteredWidgets({ widgets: WIDGET_RECEIVER_FQCNS });
   }
-  const featured = await WidgetBridgePlugin.setItem({ key: WIDGET_ITEM_KEY, group: WIDGET_GROUP, value: '[]' });
+  const featured = await WidgetBridgePlugin.setItem({
+    key: WIDGET_ITEM_KEY,
+    group: WIDGET_GROUP,
+    value: '[]',
+  });
   if (featured?.results === false) throw new Error('ウィジェットの消去に失敗しました');
-  const overview = await WidgetBridgePlugin.setItem({ key: CALENDAR_OVERVIEW_ITEM_KEY, group: WIDGET_GROUP,
-    value: JSON.stringify({ schemaVersion: 1, updatedAtIso: new Date().toISOString(), language: getLanguage(), events: [] }) });
+  const overview = await WidgetBridgePlugin.setItem({
+    key: CALENDAR_OVERVIEW_ITEM_KEY,
+    group: WIDGET_GROUP,
+    value: JSON.stringify({
+      schemaVersion: 1,
+      updatedAtIso: new Date().toISOString(),
+      language: getLanguage(),
+      events: [],
+    }),
+  });
   if (overview?.results === false) throw new Error('ウィジェットの消去に失敗しました');
   await WidgetBridgePlugin.reloadAllTimelines();
 }

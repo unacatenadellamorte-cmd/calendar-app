@@ -17,39 +17,25 @@ const baseEvent = {
 
 describe('googlePushBody', () => {
   it('source が local でなければ null', () => {
-    expect(
-      googlePushBody({ ...baseEvent, source: 'google' }),
-    ).toBeNull();
+    expect(googlePushBody({ ...baseEvent, source: 'google' })).toBeNull();
   });
 
   it('is_secret が true なら null', () => {
-    expect(
-      googlePushBody({ ...baseEvent, is_secret: true }),
-    ).toBeNull();
+    expect(googlePushBody({ ...baseEvent, is_secret: true })).toBeNull();
   });
 
   it('deleted_at が null でなければ null', () => {
-    expect(
-      googlePushBody({ ...baseEvent, deleted_at: '2026-09-15T00:00:00Z' }),
-    ).toBeNull();
+    expect(googlePushBody({ ...baseEvent, deleted_at: '2026-09-15T00:00:00Z' })).toBeNull();
   });
 
   it('id が空なら null', () => {
-    expect(
-      googlePushBody({ ...baseEvent, id: '' }),
-    ).toBeNull();
-    expect(
-      googlePushBody({ ...baseEvent, id: '   ' }),
-    ).toBeNull();
+    expect(googlePushBody({ ...baseEvent, id: '' })).toBeNull();
+    expect(googlePushBody({ ...baseEvent, id: '   ' })).toBeNull();
   });
 
   it('title が空なら null', () => {
-    expect(
-      googlePushBody({ ...baseEvent, title: '' }),
-    ).toBeNull();
-    expect(
-      googlePushBody({ ...baseEvent, title: '   ' }),
-    ).toBeNull();
+    expect(googlePushBody({ ...baseEvent, title: '' })).toBeNull();
+    expect(googlePushBody({ ...baseEvent, title: '   ' })).toBeNull();
   });
 
   describe('終日', () => {
@@ -133,6 +119,16 @@ describe('googlePushBody', () => {
           ends_at: '2026-09-15T10:00:00Z',
         }),
       ).toBeNull();
+    });
+
+    it('時刻付き: 同時刻は24時間後を終了にする', () => {
+      expect(
+        googlePushBody({
+          ...baseEvent,
+          starts_at: '2026-09-15T10:00:00Z',
+          ends_at: '2026-09-15T10:00:00Z',
+        })?.end.dateTime,
+      ).toBe('2026-09-16T10:00:00.000Z');
     });
 
     it('時刻付き: starts_at が不正なら null', () => {
@@ -224,7 +220,14 @@ describe('googlePushBody', () => {
     it('余計なフィールドは入らない(summary/description/location/start/end/extendedProperties だけ)', () => {
       const body = googlePushBody(baseEvent)!;
       const keys = Object.keys(body).sort();
-      expect(keys).toEqual(['description', 'end', 'extendedProperties', 'location', 'start', 'summary']);
+      expect(keys).toEqual([
+        'description',
+        'end',
+        'extendedProperties',
+        'location',
+        'start',
+        'summary',
+      ]);
     });
   });
 

@@ -63,7 +63,10 @@ function initialState(
   calendars: Calendar[],
   seed?: EventSeed,
 ): FormState {
-  const firstCalendar = calendars[0]?.id ?? '';
+  const firstCalendar =
+    calendars.find((calendar) => calendar.source === 'local' && !calendar.isShift)?.id ??
+    calendars.find((calendar) => calendar.source === 'local')?.id ??
+    '';
   if (!editing) {
     const seededStart =
       seed?.startLocal ?? (seed?.date ? `${seed.date}T09:00` : nowLocalInput());
@@ -203,7 +206,10 @@ export function EventFormSheet({
       launchRequest.current += 1;
     };
   }, [open, editing?.id, seed?.date, seed?.startLocal]);
-  const firstEditableCalendarId = editableCalendars[0]?.id ?? '';
+  const firstEditableCalendarId =
+    editableCalendars.find((calendar) => !calendar.isShift)?.id ??
+    editableCalendars[0]?.id ??
+    '';
   useEffect(() => {
     // カレンダー取得前にフォームを開いた場合だけ、一覧到着後に所属先を補完する。
     // 入力値全体は触らず、ユーザーが選択・入力した値も保持する。

@@ -77,13 +77,52 @@ beforeEach(() => {
 });
 
 describe('calendars.ts', () => {
+  it('ensureShiftCalendarの同時呼出は1回の作成を共有する', async () => {
+    let count = 0;
+    from.mockImplementation(() => {
+      const current = ++count;
+      const chain = makeChain();
+      chain.then = (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(
+          current === 1
+            ? { data: null, error: null }
+            : { data: row({ is_shift: true }), error: null },
+        ).then(resolve);
+      return chain;
+    });
+    const { ensureShiftCalendar } = await importCalendars();
+    const [a, b] = await Promise.all([ensureShiftCalendar(), ensureShiftCalendar()]);
+    expect(a.ok && b.ok).toBe(true);
+    expect(calls.filter((call) => call.method === 'insert')).toHaveLength(1);
+  });
+  it('別処理が先にシフトを作った23505だけは再取得して成功する', async () => {
+    const responses = [
+      { data: null, error: null },
+      { data: null, error: { code: '23505' } },
+      { data: row({ id: 'winner', is_shift: true }), error: null },
+    ];
+    from.mockImplementation(() => {
+      const response = responses.shift();
+      const chain = makeChain();
+      chain.then = (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(response).then(resolve);
+      return chain;
+    });
+    const { ensureShiftCalendar } = await importCalendars();
+    expect(await ensureShiftCalendar()).toMatchObject({ ok: true, value: { id: 'winner' } });
+  });
   it('listCalendars: 行を camelCase に変換して返す', async () => {
     queryResult = { data: [row(), row({ id: 'c2', is_shift: true })], error: null };
     const { listCalendars } = await importCalendars();
     const r = await listCalendars();
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value[0]).toMatchObject({ id: 'c1', isShift: false, isVisible: true, priority: 0 });
+      expect(r.value[0]).toMatchObject({
+        id: 'c1',
+        isShift: false,
+        isVisible: true,
+        priority: 0,
+      });
       expect(r.value[1]).toMatchObject({ id: 'c2', isShift: true });
     }
     expect(calls.map((c) => c.method)).toContain('is'); // deleted_at is null で絞る
@@ -245,8 +284,15 @@ describe('calendars.ts — オフライン(Story 1.6)', () => {
   it('listCalendars はオフラインでキャッシュを返す(supabase に触れない)', async () => {
     const { cachePut } = await import('./cache');
     await cachePut('calendars', {
-      id: 'c1', name: 'キャッシュ', color: '#2563EB', source: 'local',
-      isShift: false, isVisible: true, priority: 0, createdAt: '', updatedAt: '',
+      id: 'c1',
+      name: 'キャッシュ',
+      color: '#2563EB',
+      source: 'local',
+      isShift: false,
+      isVisible: true,
+      priority: 0,
+      createdAt: '',
+      updatedAt: '',
     });
     const { listCalendars } = await importCalendars();
     const r = await listCalendars();
@@ -266,8 +312,15 @@ describe('calendars.ts — オフライン(Story 1.6)', () => {
   it('renameCalendar はオフラインで outbox に rename を積む', async () => {
     const { cachePut } = await import('./cache');
     await cachePut('calendars', {
-      id: 'c1', name: '旧', color: '#2563EB', source: 'local',
-      isShift: false, isVisible: true, priority: 0, createdAt: '', updatedAt: '',
+      id: 'c1',
+      name: '旧',
+      color: '#2563EB',
+      source: 'local',
+      isShift: false,
+      isVisible: true,
+      priority: 0,
+      createdAt: '',
+      updatedAt: '',
     });
     const { renameCalendar } = await importCalendars();
     const { listOutbox } = await import('./outbox');

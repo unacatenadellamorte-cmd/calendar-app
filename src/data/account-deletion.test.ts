@@ -2,18 +2,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteMyAccount } from './auth';
 import { readDeletion, writeDeletion } from './account-deletion-state';
 import { getLocalDb } from './local-db';
+import { adoptAccountOwner } from './account-scope';
 import { cachePut, cacheReplace } from './cache';
 import { enqueue } from './outbox';
 import { readBackground, storeBackground } from '@/features/settings/model/backgroundImage';
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), setHeader: vi.fn(), session: vi.fn(), signOut: vi.fn(), notifications: vi.fn(), widgets: vi.fn() }));
-vi.mock('./supabase', () => ({ supabase: { rpc: mocks.rpc, auth: { getSession: mocks.session, signOut: mocks.signOut } } }));
+const mocks = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  setHeader: vi.fn(),
+  session: vi.fn(),
+  signOut: vi.fn(),
+  notifications: vi.fn(),
+  widgets: vi.fn(),
+}));
+vi.mock('./supabase', () => ({
+  supabase: { rpc: mocks.rpc, auth: { getSession: mocks.session, signOut: mocks.signOut } },
+}));
 vi.mock('@/platform/reminders', () => ({ clearAccountNotifications: mocks.notifications }));
 vi.mock('@/platform/widget', () => ({ clearAccountWidgets: mocks.widgets }));
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.session.mockResolvedValue({ data: { session: { access_token: '本人のJWT', user: { id: '本人' } } }, error: null });
+  mocks.session.mockResolvedValue({
+    data: { session: { access_token: '本人のJWT', user: { id: '本人' } } },
+    error: null,
+  });
   mocks.rpc.mockReturnValue({ setHeader: mocks.setHeader });
   mocks.setHeader.mockResolvedValue({ error: null });
   mocks.signOut.mockResolvedValue({ error: null });
@@ -23,6 +36,7 @@ beforeEach(() => {
 
 describe('アカウント削除', () => {
   it('本人IDをRPCへ渡さず全ストアを空にして完了を永続化する', async () => {
+    adoptAccountOwner('本人');
     await storeBackground(new Blob(['本人の画像'], { type: 'image/jpeg' }));
     const db = await getLocalDb();
     await db.put('events', { id: '旧予定' } as never);
@@ -45,7 +59,10 @@ describe('アカウント削除', () => {
 
   it('確認後に別タブでセッションが切り替わっても本人JWTを固定する', async () => {
     mocks.rpc.mockImplementation(() => {
-      mocks.session.mockResolvedValue({ data: { session: { user: { id: '別人' }, access_token: '別人のJWT' } }, error: null });
+      mocks.session.mockResolvedValue({
+        data: { session: { user: { id: '別人' }, access_token: '別人のJWT' } },
+        error: null,
+      });
       return { setHeader: mocks.setHeader };
     });
     expect((await deleteMyAccount()).ok).toBe(true);
@@ -90,7 +107,10 @@ describe('アカウント削除', () => {
     expect((await deleteMyAccount()).ok).toBe(false);
     expect(readDeletion()).toBeNull();
     writeDeletion({ userId: '別人', phase: 'remote' });
-    mocks.session.mockResolvedValue({ data: { session: { access_token: '本人のJWT', user: { id: '本人' } } }, error: null });
+    mocks.session.mockResolvedValue({
+      data: { session: { access_token: '本人のJWT', user: { id: '本人' } } },
+      error: null,
+    });
     expect((await deleteMyAccount()).ok).toBe(false);
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
@@ -99,7 +119,9 @@ describe('アカウント削除', () => {
     await deleteMyAccount();
     await expect(cachePut('events', { id: '旧予定' } as never)).rejects.toThrow();
     await expect(cacheReplace('calendars', [{ id: '旧予定' } as never])).rejects.toThrow();
-    await expect(enqueue({ entity: 'event', op: 'create', targetId: '旧予定' })).rejects.toThrow();
+    await expect(
+      enqueue({ entity: 'event', op: 'create', targetId: '旧予定' }),
+    ).rejects.toThrow();
     expect(await (await getLocalDb()).count('events')).toBe(0);
   });
 });

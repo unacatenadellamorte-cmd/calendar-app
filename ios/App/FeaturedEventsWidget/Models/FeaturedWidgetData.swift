@@ -27,8 +27,7 @@ enum FeaturedWidgetData {
         decode(defaults?.string(forKey: key))
     }
 
-    static func startLabel(_ event: FeaturedWidgetEvent, timeZone: TimeZone = .current) -> String {
-        guard !event.allDay else { return "終日" }
+    static func startLabel(_ event: FeaturedWidgetEvent, timeZone: TimeZone = .current, now: Date = Date()) -> String {
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var date = parser.date(from: event.startsAtIso)
@@ -41,8 +40,11 @@ enum FeaturedWidgetData {
         formatter.locale = Locale(identifier: "ja_JP")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = timeZone
-        formatter.dateFormat = "H:mm"
-        return formatter.string(from: date)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let sameDay = calendar.isDate(date, inSameDayAs: now)
+        formatter.dateFormat = event.allDay ? "M/d" : (sameDay ? "H:mm" : "M/d H:mm")
+        return event.allDay ? (sameDay ? "終日" : formatter.string(from: date) + " 終日") : formatter.string(from: date)
     }
 
     static func colorRGB(_ hex: String) -> UInt32 {

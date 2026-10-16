@@ -4,7 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { resetFeaturedCountForTests, setFeaturedCount } from '@/features/compact/model/featuredCount';
+import {
+  resetFeaturedCountForTests,
+  setFeaturedCount,
+} from '@/features/compact/model/featuredCount';
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -80,9 +83,11 @@ beforeEach(() => {
 });
 
 describe('HomeScreen', () => {
-  it('見出しは「今日」、右にカレンダーの並び順リンク', () => {
+  it('見出しは「この後の予定」、右にカレンダーの並び順リンク', () => {
     renderHome();
-    expect(screen.getByRole('heading', { level: 1, name: '今日' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'この後の予定' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /カレンダーの並び順/ })).toBeInTheDocument();
   });
 
@@ -94,7 +99,11 @@ describe('HomeScreen', () => {
 
   it('この後に予定が無いと静かな1行', () => {
     evState.events = [
-      futureEvent({ id: 'p', startsAt: '2020-01-01T00:00:00Z', endsAt: '2020-01-01T01:00:00Z' }),
+      futureEvent({
+        id: 'p',
+        startsAt: '2020-01-01T00:00:00Z',
+        endsAt: '2020-01-01T01:00:00Z',
+      }),
     ];
     renderHome();
     expect(screen.getByText('この後の予定はありません')).toBeInTheDocument();
@@ -107,7 +116,14 @@ describe('HomeScreen', () => {
 
   it('代表予定をタップするとその予定の日付でカレンダーへ遷移', async () => {
     const user = userEvent.setup();
-    evState.events = [futureEvent({ id: 'a', title: '役員会議', startsAt: '2026-12-25T01:00:00Z', endsAt: '2026-12-25T02:00:00Z' })];
+    evState.events = [
+      futureEvent({
+        id: 'a',
+        title: '役員会議',
+        startsAt: '2026-12-25T01:00:00Z',
+        endsAt: '2026-12-25T02:00:00Z',
+      }),
+    ];
     renderHome();
     await user.click(screen.getByRole('button', { name: /役員会議/ }));
     // 01:00Z = JST 10:00、暦日は 2026-12-25。
@@ -153,7 +169,10 @@ describe('HomeScreen', () => {
     });
 
     it('ロック中はシークレットのシフトを給料見込み(PayCard/usePayEstimate)の計算から除外する', () => {
-      calState.calendars = [cal({ id: 'c1' }), cal({ id: 'shift1', name: 'バイト', isShift: true })];
+      calState.calendars = [
+        cal({ id: 'c1' }),
+        cal({ id: 'shift1', name: 'バイト', isShift: true }),
+      ];
       evState.events = [
         futureEvent({
           id: 'shift-e',
@@ -172,7 +191,10 @@ describe('HomeScreen', () => {
 
     it('解除中はシークレットのシフトも給料見込みの計算に含める', () => {
       secretState = { unlocked: true };
-      calState.calendars = [cal({ id: 'c1' }), cal({ id: 'shift1', name: 'バイト', isShift: true })];
+      calState.calendars = [
+        cal({ id: 'c1' }),
+        cal({ id: 'shift1', name: 'バイト', isShift: true }),
+      ];
       evState.events = [
         futureEvent({
           id: 'shift-e',

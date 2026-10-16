@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import { appError, err, ok, type Result } from './result';
 import { normalizeAuthError } from './auth.errors';
 import { readDeletion, writeDeletion, isAccountDataBlocked } from './account-deletion-state';
+import { adoptAccountOwner, localAccountOwner } from './account-scope';
 
 /**
  * 認証は Supabase Auth に委ねる。この層は supabase.auth を薄くラップし、
@@ -33,7 +34,8 @@ export async function getSession(): Promise<Result<Session | null>> {
 }
 
 export async function signInAnonymously(): Promise<Result<Session | null>> {
-  if (isAccountDataBlocked()) return err(appError('auth/deletion-pending', 'auth/deletion-pending'));
+  if (isAccountDataBlocked())
+    return err(appError('auth/deletion-pending', 'auth/deletion-pending'));
   if (!supabase) return err(UNAVAILABLE);
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) return err(normalizeAuthError(error));
@@ -45,7 +47,9 @@ let deletionInFlight: Promise<Result<void>> | null = null;
 /** 本人の削除と中断後の再試行。任意ユーザーIDは受け取らない。 */
 export function deleteMyAccount(resumeOnly = false): Promise<Result<void>> {
   if (deletionInFlight) return deletionInFlight;
-  const run = runAccountDeletion(resumeOnly).finally(() => { deletionInFlight = null; });
+  const run = runAccountDeletion(resumeOnly).finally(() => {
+    deletionInFlight = null;
+  });
   deletionInFlight = run;
   return run;
 }
@@ -54,7 +58,8 @@ async function runAccountDeletion(resumeOnly: boolean): Promise<Result<void>> {
   if (!supabase) return err(UNAVAILABLE);
   try {
     let record = readDeletion();
-    if (resumeOnly && (!record || !record.userId)) return err(appError('auth/deletion-pending', 'auth/deletion-pending'));
+    if (resumeOnly && (!record || !record.userId))
+      return err(appError('auth/deletion-pending', 'auth/deletion-pending'));
     if (record?.phase === 'done') return ok(undefined);
     if (!record || record.phase === 'remote') {
       const current = await getSession();
@@ -64,19 +69,29 @@ async function runAccountDeletion(resumeOnly: boolean): Promise<Result<void>> {
       }
       record = { userId: current.value.user.id, phase: 'remote' };
       writeDeletion(record);
-      const { error } = await supabase.rpc('delete_my_account')
+      const { error } = await supabase
+        .rpc('delete_my_account')
         .setHeader('Authorization', `Bearer ${current.value.access_token}`);
       if (error) return err(appError('auth/deletion-failed', 'auth/deletion-failed', error));
       record = { ...record, phase: 'local' };
       writeDeletion(record);
     }
+    // 再起動後の削除再試行でも、対象利用者の名前空間だけを消す。
+    if (!localAccountOwner()) adoptAccountOwner(record.userId);
+    if (localAccountOwner() !== record.userId)
+      return err(appError('auth/deletion-pending', 'auth/deletion-pending'));
     const [{ clearLocalAccountData }, { clearAccountNotifications }, { clearAccountWidgets }] =
-      await Promise.all([import('./local-db'), import('@/platform/reminders'), import('@/platform/widget')]);
+      await Promise.all([
+        import('./local-db'),
+        import('@/platform/reminders'),
+        import('@/platform/widget'),
+      ]);
     // 各工程は冪等。どれか失敗したら local の記録を残す。
     await clearLocalAccountData();
     await clearAccountNotifications();
     await clearAccountWidgets();
-    const { storeBackground, applyBackground } = await import('@/features/settings/model/backgroundImage');
+    const { storeBackground, applyBackground } =
+      await import('@/features/settings/model/backgroundImage');
     await storeBackground(null);
     applyBackground(null);
     const { error } = await supabase.auth.signOut({ scope: 'local' });
@@ -98,8 +113,7 @@ export const AUTH_CONFIRMATION_URL =
 
 /** 登録要求の結果。確認メール待ちは、登録完了と区別して返す。 */
 export type SignUpOutcome =
-  | { status: 'complete' }
-  | { status: 'confirmation-pending'; email: string };
+  { status: 'complete' } | { status: 'confirmation-pending'; email: string };
 
 export async function signUpWithPassword(
   email: string,
@@ -154,7 +168,9 @@ export async function upgradeToPassword(
     !user.is_anonymous &&
     Boolean(user.email_confirmed_at) &&
     user.email?.toLowerCase() === address.toLowerCase();
-  return ok(confirmed ? { status: 'complete' } : { status: 'confirmation-pending', email: address });
+  return ok(
+    confirmed ? { status: 'complete' } : { status: 'confirmation-pending', email: address },
+  );
 }
 
 export async function signOut(): Promise<Result<void>> {

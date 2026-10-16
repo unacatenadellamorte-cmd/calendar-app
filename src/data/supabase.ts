@@ -1,4 +1,5 @@
 import { isAccountDataBlocked } from './account-deletion-state';
+import { accountScopeGeneration } from './account-scope';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env, type AppEnv } from './env';
 
@@ -45,11 +46,19 @@ export function requireSupabase(): SupabaseClient {
 }
 
 /** 削除中の新規同期と、削除前に出発した応答の再利用を遮断する。 */
-export async function accountAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
-  const recovery = url.pathname === '/rest/v1/rpc/delete_my_account' || url.pathname.startsWith('/auth/v1/');
+export async function accountAwareFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const url = new URL(
+    typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+  );
+  const recovery =
+    url.pathname === '/rest/v1/rpc/delete_my_account' || url.pathname.startsWith('/auth/v1/');
+  const generation = accountScopeGeneration();
   if (!recovery && isAccountDataBlocked()) throw new Error('アカウントの削除中です');
   const response = await fetch(input, init);
-  if (!recovery && isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  if (!recovery && (isAccountDataBlocked() || generation !== accountScopeGeneration()))
+    throw new Error('アカウントの削除中です');
   return response;
 }

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build, loadEnv } from 'vite';
 import { assertSelfDestroyingServiceWorker } from '../native-service-worker-contract.mjs';
+import { assertIosStoreContract } from '../native-store-contract.mjs';
 import { validateDeviceEnv } from './build-device-web.mjs';
 
 class ReleaseConfigError extends Error {}
@@ -87,6 +88,7 @@ export async function buildReleaseWeb() {
   assertSelfDestroyingServiceWorker(await readFile('dist/sw.js', 'utf8'));
   const names = await readdir('dist/assets');
   const scripts = (await Promise.all(names.filter((name) => name.endsWith('.js')).map((name) => readFile(`dist/assets/${name}`, 'utf8')))).join('');
+  assertIosStoreContract(scripts);
   if (![url, key, env.VITE_GOOGLE_OAUTH_CLIENT_ID, env.VITE_REVENUECAT_IOS_KEY].every((value) => scripts.includes(value))) {
     throw new ReleaseConfigError('公開接続設定が成果物へ組み込まれていません。');
   }

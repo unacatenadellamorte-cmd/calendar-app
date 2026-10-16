@@ -11,12 +11,15 @@ interface EventListItemProps {
   onEdit: (event: EventItem) => void;
   /** true なら日付を省き時刻のみ表示(日付見出しのあるリストビュー用)。 */
   compact?: boolean;
+  /** コンパクトカードのように複数日をまたいで表示するときは日付も出す。 */
+  showDate?: boolean;
 }
 export function EventListItem({
   event,
   calendar,
   onEdit,
   compact = false,
+  showDate = false,
 }: EventListItemProps) {
   useLanguage();
   const filled = event.source === 'local';
@@ -25,9 +28,10 @@ export function EventListItem({
   const stampOnly = Boolean(event.stampOnly && knownStampId);
   let when = '';
   if (event.allDay && event.eventDate) {
-    when = compact ? t('終日') : formatEventDate(event.eventDate);
+    when = compact && !showDate ? t('終日') : formatEventDate(event.eventDate);
   } else if (event.startsAt) {
-    when = compact ? formatClock(event.startsAt) : formatEventTime(event.startsAt);
+    when =
+      compact && !showDate ? formatClock(event.startsAt) : formatEventTime(event.startsAt);
   }
   return (
     <li className="border-b border-border-hairline last:border-b-0">

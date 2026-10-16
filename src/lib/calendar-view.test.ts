@@ -145,10 +145,22 @@ describe('eventOccursOnDate', () => {
 
 describe('groupEventsByDay', () => {
   it('出現日ごとにまとめ、時刻付き→終日・開始時刻順に並べる', () => {
-    const early = ev({ id: 'a', startsAt: '2026-09-08T00:00:00Z', endsAt: '2026-09-08T01:00:00Z' }); // JST 09:00
-    const late = ev({ id: 'b', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }); // JST 14:00
+    const early = ev({
+      id: 'a',
+      startsAt: '2026-09-08T00:00:00Z',
+      endsAt: '2026-09-08T01:00:00Z',
+    }); // JST 09:00
+    const late = ev({
+      id: 'b',
+      startsAt: '2026-09-08T05:00:00Z',
+      endsAt: '2026-09-08T06:00:00Z',
+    }); // JST 14:00
     const holiday = allDay('2026-09-08', { id: 'c' });
-    const other = ev({ id: 'd', startsAt: '2026-09-09T01:00:00Z', endsAt: '2026-09-09T02:00:00Z' });
+    const other = ev({
+      id: 'd',
+      startsAt: '2026-09-09T01:00:00Z',
+      endsAt: '2026-09-09T02:00:00Z',
+    });
 
     const map = groupEventsByDay([late, holiday, early, other]);
     expect([...map.keys()].sort()).toEqual(['2026-09-08', '2026-09-09']);
@@ -158,8 +170,18 @@ describe('groupEventsByDay', () => {
 
   it('priorityOf を渡すと所属カレンダーの優先度が第一キーになる', () => {
     // 優先度1のカレンダーの早い予定より、優先度0のカレンダーの遅い予定が先。
-    const highLate = ev({ id: 'x', calendarId: 'high', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' });
-    const lowEarly = ev({ id: 'y', calendarId: 'low', startsAt: '2026-09-08T02:00:00Z', endsAt: '2026-09-08T03:00:00Z' });
+    const highLate = ev({
+      id: 'x',
+      calendarId: 'high',
+      startsAt: '2026-09-08T09:00:00Z',
+      endsAt: '2026-09-08T10:00:00Z',
+    });
+    const lowEarly = ev({
+      id: 'y',
+      calendarId: 'low',
+      startsAt: '2026-09-08T02:00:00Z',
+      endsAt: '2026-09-08T03:00:00Z',
+    });
     const priorityOf = (id: string) => (id === 'low' ? 0 : 1);
     const map = groupEventsByDay([lowEarly, highLate], priorityOf);
     expect(map.get('2026-09-08')?.map((e) => e.id)).toEqual(['y', 'x']);
@@ -167,20 +189,53 @@ describe('groupEventsByDay', () => {
 });
 
 describe('layoutDayEvents', () => {
+  it('複数日にまたがる予定は開始日の24時まで表示する', () => {
+    const event = ev({ startsAt: '2026-10-15T13:00:00Z', endsAt: '2026-10-16T14:00:00Z' });
+    expect(layoutDayEvents([event])[0]).toMatchObject({ startMin: 1320, endMin: 1440 });
+  });
   it('重なる時刻付き予定を列に分割する(開始時刻順で左詰め)', () => {
-    const a = ev({ id: 'a', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' }); // 10:00-11:00
-    const b = ev({ id: 'b', startsAt: '2026-09-08T01:30:00Z', endsAt: '2026-09-08T02:30:00Z' }); // 10:30-11:30
+    const a = ev({
+      id: 'a',
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    }); // 10:00-11:00
+    const b = ev({
+      id: 'b',
+      startsAt: '2026-09-08T01:30:00Z',
+      endsAt: '2026-09-08T02:30:00Z',
+    }); // 10:30-11:30
     const positioned = layoutDayEvents([b, a]);
     const byId = new Map(positioned.map((p) => [p.event.id, p]));
-    expect(byId.get('a')).toMatchObject({ column: 0, columnCount: 2, startMin: 600, endMin: 660 });
-    expect(byId.get('b')).toMatchObject({ column: 1, columnCount: 2, startMin: 630, endMin: 690 });
+    expect(byId.get('a')).toMatchObject({
+      column: 0,
+      columnCount: 2,
+      startMin: 600,
+      endMin: 660,
+    });
+    expect(byId.get('b')).toMatchObject({
+      column: 1,
+      columnCount: 2,
+      startMin: 630,
+      endMin: 690,
+    });
   });
 
   it('重ならない予定は独立グループ(columnCount=1)', () => {
-    const a = ev({ id: 'a', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' });
-    const c = ev({ id: 'c', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' });
+    const a = ev({
+      id: 'a',
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    const c = ev({
+      id: 'c',
+      startsAt: '2026-09-08T05:00:00Z',
+      endsAt: '2026-09-08T06:00:00Z',
+    });
     const positioned = layoutDayEvents([a, c]);
-    expect(positioned.find((p) => p.event.id === 'c')).toMatchObject({ column: 0, columnCount: 1 });
+    expect(positioned.find((p) => p.event.id === 'c')).toMatchObject({
+      column: 0,
+      columnCount: 1,
+    });
   });
 
   it('終日予定は無視する', () => {
@@ -202,9 +257,7 @@ describe('layoutDayEvents', () => {
       endsAt: '2026-09-08T05:00:00Z',
     });
     const priorityOf = (id: string) => (id === 'high' ? 0 : 1);
-    const byId = new Map(
-      layoutDayEvents([low, high], priorityOf).map((p) => [p.event.id, p]),
-    );
+    const byId = new Map(layoutDayEvents([low, high], priorityOf).map((p) => [p.event.id, p]));
     expect(byId.get('high')).toMatchObject({ column: 0, columnCount: 2 });
     expect(byId.get('low')).toMatchObject({ column: 1, columnCount: 2 });
   });
@@ -228,8 +281,16 @@ describe('layoutDayEvents', () => {
   });
 
   it('priorityOf 省略時は開始時刻順の列割り当て(Story 1.5 の回帰なし)', () => {
-    const a = ev({ id: 'a', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' });
-    const b = ev({ id: 'b', startsAt: '2026-09-08T01:30:00Z', endsAt: '2026-09-08T02:30:00Z' });
+    const a = ev({
+      id: 'a',
+      startsAt: '2026-09-08T01:00:00Z',
+      endsAt: '2026-09-08T02:00:00Z',
+    });
+    const b = ev({
+      id: 'b',
+      startsAt: '2026-09-08T01:30:00Z',
+      endsAt: '2026-09-08T02:30:00Z',
+    });
     const byId = new Map(layoutDayEvents([b, a]).map((p) => [p.event.id, p]));
     expect(byId.get('a')).toMatchObject({ column: 0, columnCount: 2 });
     expect(byId.get('b')).toMatchObject({ column: 1, columnCount: 2 });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import { registerLayerBack } from './layerBack';
 
@@ -16,6 +16,12 @@ vi.mock('@capacitor/app', () => ({
     }),
   },
 }));
+
+beforeEach(() => {
+  mocks.platform = 'android';
+  mocks.callbacks.length = 0;
+  mocks.remove.mockReset();
+});
 
 describe('Androidレイヤー戻る', () => {
   it('最前面だけを閉じ、解除後や非同期解除の待機中には呼ばない', async () => {

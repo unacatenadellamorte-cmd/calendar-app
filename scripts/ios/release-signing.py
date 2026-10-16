@@ -85,6 +85,20 @@ def validate_manifest(path):
     require("1C8F.1" in reasons, "App Groupのプライバシー宣言が同梱されていません。")
 
 
+def validate_review_contract(app):
+    info = plistlib.loads((app / "Info.plist").read_bytes())
+    for key in ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription"):
+        value = info.get(key)
+        require(isinstance(value, str) and bool(value.strip()) and "$(" not in value,
+                "撮影・写真選択の用途説明が不足しています: " + key)
+    web = app / "public"
+    require(web.is_dir() and any(web.rglob("*.js")), "iOSのWeb成果物がありません。")
+    for path in web.rglob("*"):
+        if path.is_file() and path.suffix in (".js", ".json", ".html"):
+            require(not re.search(r"Google\s*Play|play\.google\.com", path.read_text(encoding="utf-8"), re.I),
+                    "iOS成果物に他ストアの文言またはURLが含まれています。")
+
+
 def workdir():
     parent = Path(os.environ["RUNNER_TEMP"]).resolve()
     path = (parent / "calendar-ios-release-signing").resolve()
@@ -135,6 +149,7 @@ def cleanup():
 
 
 def verify_app(app, settings):
+    validate_review_contract(app)
     for directory, bundle in [(app, APP), (app / "PlugIns/FeaturedEventsWidget.appex", WIDGET)]:
         require(directory.is_dir(), "アプリまたはウィジェットがありません。")
         run(["codesign", "--verify", "--deep", "--strict", str(directory)])

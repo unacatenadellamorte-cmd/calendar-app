@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProfileForm } from './ProfileForm';
 
@@ -67,6 +67,18 @@ describe('ProfileForm', () => {
       displayName: '花子',
       avatarDataUrl: 'data:image/jpeg;base64,resized',
     });
+  });
+
+  it('撮影・写真選択からファイルが返らないときも名前だけで登録できる', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    render(<ProfileForm submitLabel="はじめる" onSubmit={onSubmit} />);
+    // 取消・拒否でWebKitからファイルが渡らない場合のフォーム側を検証する。
+    fireEvent.change(screen.getByLabelText('写真を選ぶ(任意)'), { target: { files: [] } });
+    expect(resizeImageToDataUrl).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText('名前'), '花子');
+    await user.click(screen.getByRole('button', { name: 'はじめる' }));
+    expect(onSubmit).toHaveBeenCalledWith({ displayName: '花子', avatarDataUrl: null });
   });
 
   it('10MBを超える写真は拒否し、リサイズを呼ばずにメッセージを表示する', async () => {

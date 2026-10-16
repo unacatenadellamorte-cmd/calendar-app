@@ -49,7 +49,25 @@ describe('selectFeaturedEvents / 規則1: 対象は now 以降 / 進行中のみ
     const today = allday('c1', '2026-09-08');
     const yesterday = allday('c1', '2026-09-07');
     const tomorrow = allday('c1', '2026-09-09');
-    expect(selectFeaturedEvents([yesterday, today, tomorrow], p, NOW, 5)).toEqual([today, tomorrow]);
+    expect(selectFeaturedEvents([yesterday, today, tomorrow], p, NOW, 5)).toEqual([
+      today,
+      tomorrow,
+    ]);
+  });
+
+  it('JST朝はUTCの前日ではなく渡された端末日付を使う', () => {
+    const yesterday = allday('c1', '2026-10-14');
+    const today = allday('c1', '2026-10-15');
+    expect(
+      selectFeaturedEvents([yesterday, today], p, '2026-10-14T23:00:00Z', 3, '2026-10-15'),
+    ).toEqual([today]);
+  });
+
+  it('UTC負側の夕方も端末の今日を除外しない', () => {
+    const today = allday('c1', '2026-10-14');
+    expect(selectFeaturedEvents([today], p, '2026-10-15T02:00:00Z', 3, '2026-10-14')).toEqual([
+      today,
+    ]);
   });
 });
 

@@ -36,7 +36,11 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 function isValidDate(dateStr: string): boolean {
   if (!DATE_ONLY.test(dateStr)) return false;
   const d = new Date(`${dateStr}T00:00:00Z`);
-  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === dateStr && dateStr < '9999-12-31';
+  return (
+    Number.isFinite(d.getTime()) &&
+    d.toISOString().slice(0, 10) === dateStr &&
+    dateStr < '9999-12-31'
+  );
 }
 
 /**
@@ -92,16 +96,18 @@ export function googlePushBody(event: GooglePushEvent): GooglePushBody | null {
     return null;
   }
 
-  if (endMs <= startMs) {
-    return null;
-  }
+  if (endMs < startMs) return null;
+  // 本人選択2Bにより、同一瞬間だけは24時間勤務として扱う。
+  // フォームでは同時刻を24時間勤務として許可しているため、Google反映でも
+  // 同一瞬間を無効値として捨てず、24時間後の終了へ変換する。
+  const safeEndMs = endMs === startMs ? endMs + 24 * 60 * 60 * 1000 : endMs;
 
   return {
     summary: title,
     description: note,
     location,
     start: { dateTime: new Date(startMs).toISOString(), date: null },
-    end: { dateTime: new Date(endMs).toISOString(), date: null },
+    end: { dateTime: new Date(safeEndMs).toISOString(), date: null },
     extendedProperties: { private: { multiCalendarEventId: id } },
   };
 }

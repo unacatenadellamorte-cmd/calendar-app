@@ -53,6 +53,12 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
 }
 
 describe('EventFormSheet', () => {
+  it('新規予定は先頭のシフトではなく通常カレンダーを既定にする', async () => {
+    const shift = { ...calendars[0]!, id: 'shift', name: 'シフト', isShift: true };
+    setup({ calendars: [shift, ...calendars] });
+    expect(screen.getByLabelText('カレンダー')).toHaveValue('c1');
+    await waitFor(() => expect(tagsMock.list).toHaveBeenCalled());
+  });
   it('24色目のプリセットを選んで保存値へ渡す', async () => {
     const user = userEvent.setup();
     const { onCreate } = setup();

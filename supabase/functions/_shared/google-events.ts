@@ -22,6 +22,16 @@ export interface GoogleEventRaw {
   description?: string;
   start?: { date?: string; dateTime?: string };
   end?: { date?: string; dateTime?: string };
+  extendedProperties?: { private?: { multiCalendarEventId?: unknown } };
+}
+
+/** マーカーだけでは信用せず、呼出元が確認した本人のlocal予定と照合する。 */
+export function isOwnGoogleCopy(
+  raw: GoogleEventRaw,
+  ownedLocalIds: ReadonlySet<string>,
+): boolean {
+  const marker = raw.extendedProperties?.private?.multiCalendarEventId;
+  return typeof marker === 'string' && ownedLocalIds.has(marker);
 }
 
 /** 正規化後の予定。events テーブルの列に対応する。 */
@@ -52,7 +62,8 @@ export function normalizeGoogleEvent(raw: GoogleEventRaw): NormalizedGoogleEvent
   const externalId = typeof raw.id === 'string' ? raw.id : '';
   if (!externalId) return null;
 
-  const title = (typeof raw.summary === 'string' ? raw.summary.trim() : '') || '(タイトルなし)';
+  const title =
+    (typeof raw.summary === 'string' ? raw.summary.trim() : '') || '(タイトルなし)';
   const noteRaw = typeof raw.description === 'string' ? raw.description.trim() : '';
   const note = noteRaw ? noteRaw.slice(0, NOTE_MAX) : null;
 

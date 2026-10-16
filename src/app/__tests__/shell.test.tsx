@@ -36,7 +36,9 @@ describe('AppShell', () => {
       expect.stringContaining('カレンダー'),
       expect.stringContaining('設定'),
     ]);
-    expect(screen.getByRole('heading', { level: 1, name: '今日' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'この後の予定' }),
+    ).toBeInTheDocument();
   });
 
   it('タブをクリックするとルートが変わる', async () => {

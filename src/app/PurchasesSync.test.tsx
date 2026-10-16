@@ -53,4 +53,19 @@ describe('PurchasesSync', () => {
     render(<PurchasesSync />);
     expect(configurePurchases).not.toHaveBeenCalled();
   });
+  it('初期化失敗はdata層に保持され、ユーザー切替と削除開始では紐付けを更新する', async () => {
+    configurePurchases.mockResolvedValueOnce({
+      ok: false,
+      error: { messageKey: 'purchase/configure-failed' },
+    });
+    auth = { state: 'authenticated', session: { user: { id: 'u1' } } };
+    const { rerender } = render(<PurchasesSync />);
+    await Promise.resolve();
+    auth = { state: 'authenticated', session: { user: { id: 'u2' } } };
+    rerender(<PurchasesSync />);
+    expect(configurePurchases).toHaveBeenLastCalledWith('u2');
+    auth = { state: 'deleting', session: { user: { id: 'u2' } } };
+    rerender(<PurchasesSync />);
+    expect(configurePurchases).toHaveBeenLastCalledWith(null);
+  });
 });

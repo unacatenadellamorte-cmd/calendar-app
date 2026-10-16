@@ -3,6 +3,7 @@ import { selectFeaturedEvents } from '@core';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { makePriorityOf } from '@/lib/calendar-view';
+import { todayLocalDate } from '@/lib/datetime';
 
 /**
  * ホームのコンパクトビューに出す代表予定。
@@ -19,6 +20,12 @@ export function useFeaturedEvents(
     const visibleIds = new Set(calendars.filter((c) => c.isVisible).map((c) => c.id));
     const visible = events.filter((e) => visibleIds.has(e.calendarId));
     const now = new Date().toISOString();
-    return selectFeaturedEvents(visible, makePriorityOf(calendarById), now, count);
+    return selectFeaturedEvents(
+      visible,
+      makePriorityOf(calendarById),
+      now,
+      count,
+      todayLocalDate(),
+    );
   }, [events, calendars, count]);
 }

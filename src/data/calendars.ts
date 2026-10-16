@@ -1,10 +1,11 @@
 import type { PostgrestError } from '@supabase/supabase-js';
 import { byPriorityValue } from '@core';
 import { supabase } from './supabase';
+import { localAccountOwner } from './account-scope';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isPresetColor, SHIFT_CALENDAR_COLOR } from './calendar-colors';
-import { isNetworkError, isOffline } from './net';
+import { isNetworkError, isOffline, type WriteOptions } from './net';
 import { cacheDelete, cacheGetAll, cachePut, cacheReplace } from './cache';
 import {
   newLocalId,
@@ -107,33 +108,46 @@ function validateColor(color: string): AppError | null {
     : appError('calendar/invalid-color', 'calendar/invalid-color');
 }
 
-export async function listCalendars(): Promise<Result<Calendar[]>> {
+export async function listCalendars(options: WriteOptions = {}): Promise<Result<Calendar[]>> {
   if (!supabase) return err(UNAVAILABLE);
-  if (isOffline()) return ok(sortCalendars(await cacheGetAll('calendars')));
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : ok(sortCalendars(await cacheGetAll('calendars')));
   try {
     const { data, error } = await selectActive('calendars', COLUMNS)
       .order('priority', { ascending: true })
       .order('created_at', { ascending: true });
     if (error) {
-      if (isNetworkError(error)) return ok(sortCalendars(await cacheGetAll('calendars')));
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : ok(sortCalendars(await cacheGetAll('calendars')));
       return err(fromPostgrest(error));
     }
     const mapped = (data as unknown as CalendarRow[]).map(toCalendar);
     await cacheReplace('calendars', mapped);
     return ok(mapped);
   } catch (e) {
-    if (isNetworkError(e)) return ok(sortCalendars(await cacheGetAll('calendars')));
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : ok(sortCalendars(await cacheGetAll('calendars')));
     return err(appError('data/query', 'data/query', e));
   }
 }
 
-export async function createCalendar(input: NewCalendarInput): Promise<Result<Calendar>> {
+export async function createCalendar(
+  input: NewCalendarInput,
+  options: WriteOptions = {},
+): Promise<Result<Calendar>> {
   if (!supabase) return err(UNAVAILABLE);
   const nameError = validateName(input.name);
   if (nameError) return err(nameError);
   const colorError = validateColor(input.color);
   if (colorError) return err(colorError);
   if (isOffline()) {
+    if (options.noOfflineFallback) return err(appError('data/offline', 'data/offline'));
     return offlineCreateCalendar(input.id ?? newLocalId(), input);
   }
 
@@ -150,14 +164,36 @@ export async function createCalendar(input: NewCalendarInput): Promise<Result<Ca
       .select(COLUMNS)
       .single();
     if (error) {
-      if (isNetworkError(error)) return offlineCreateCalendar(input.id ?? newLocalId(), input);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlineCreateCalendar(input.id ?? newLocalId(), input);
+      if (options.noOfflineFallback && input.id && error.code === '23505') {
+        const existing = await supabase
+          .from('calendars')
+          .select(COLUMNS)
+          .eq('id', input.id)
+          .eq('source', 'local')
+          .eq('is_shift', false)
+          .maybeSingle();
+        if (existing.error)
+          return err(
+            isNetworkError(existing.error)
+              ? appError('data/offline', 'data/offline', existing.error)
+              : fromPostgrest(existing.error),
+          );
+        if (existing.data) return ok(toCalendar(existing.data as CalendarRow));
+      }
       return err(fromPostgrest(error));
     }
     const created = toCalendar(data as CalendarRow);
     await cachePut('calendars', created);
     return ok(created);
   } catch (e) {
-    if (isNetworkError(e)) return offlineCreateCalendar(input.id ?? newLocalId(), input);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlineCreateCalendar(input.id ?? newLocalId(), input);
     return err(appError('data/query', 'data/query', e));
   }
 }
@@ -168,9 +204,13 @@ async function patchCalendar(
   dbPatch: Record<string, unknown>,
   localPatch: Partial<Calendar>,
   payload: unknown,
+  options: WriteOptions = {},
 ): Promise<Result<Calendar>> {
   if (!supabase) return err(UNAVAILABLE);
-  if (isOffline()) return offlinePatchCalendar(id, op, localPatch, payload);
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : offlinePatchCalendar(id, op, localPatch, payload);
   try {
     const { data, error } = await supabase
       .from('calendars')
@@ -179,33 +219,55 @@ async function patchCalendar(
       .select(COLUMNS)
       .single();
     if (error) {
-      if (isNetworkError(error)) return offlinePatchCalendar(id, op, localPatch, payload);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlinePatchCalendar(id, op, localPatch, payload);
       return err(fromPostgrest(error));
     }
     const updated = toCalendar(data as CalendarRow);
     await cachePut('calendars', updated);
     return ok(updated);
   } catch (e) {
-    if (isNetworkError(e)) return offlinePatchCalendar(id, op, localPatch, payload);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlinePatchCalendar(id, op, localPatch, payload);
     return err(appError('data/query', 'data/query', e));
   }
 }
 
-export async function renameCalendar(id: string, name: string): Promise<Result<Calendar>> {
+export async function renameCalendar(
+  id: string,
+  name: string,
+  options: WriteOptions = {},
+): Promise<Result<Calendar>> {
   const nameError = validateName(name);
   if (nameError) return err(nameError);
-  return patchCalendar(id, 'rename', { name: name.trim() }, { name: name.trim() }, { name: name.trim() });
+  return patchCalendar(
+    id,
+    'rename',
+    { name: name.trim() },
+    { name: name.trim() },
+    { name: name.trim() },
+    options,
+  );
 }
 
-export async function recolorCalendar(id: string, color: string): Promise<Result<Calendar>> {
+export async function recolorCalendar(
+  id: string,
+  color: string,
+  options: WriteOptions = {},
+): Promise<Result<Calendar>> {
   const colorError = validateColor(color);
   if (colorError) return err(colorError);
-  return patchCalendar(id, 'recolor', { color }, { color }, { color });
+  return patchCalendar(id, 'recolor', { color }, { color }, { color }, options);
 }
 
 export async function setCalendarVisible(
   id: string,
   isVisible: boolean,
+  options: WriteOptions = {},
 ): Promise<Result<Calendar>> {
   return patchCalendar(
     id,
@@ -213,18 +275,23 @@ export async function setCalendarVisible(
     { is_visible: isVisible },
     { isVisible },
     { isVisible },
+    options,
   );
 }
 
 /** 論理削除。シフト用カレンダーは拒否する。 */
 export async function deleteCalendar(
   calendar: Pick<Calendar, 'id' | 'isShift'>,
+  options: WriteOptions = {},
 ): Promise<Result<void>> {
   if (!supabase) return err(UNAVAILABLE);
   if (calendar.isShift) {
     return err(appError('calendar/shift-undeletable', 'calendar/shift-undeletable'));
   }
-  if (isOffline()) return offlineDeleteCalendar(calendar.id);
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : offlineDeleteCalendar(calendar.id);
 
   try {
     const { error } = await supabase
@@ -232,13 +299,19 @@ export async function deleteCalendar(
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', calendar.id);
     if (error) {
-      if (isNetworkError(error)) return offlineDeleteCalendar(calendar.id);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlineDeleteCalendar(calendar.id);
       return err(fromPostgrest(error));
     }
     await cacheDelete('calendars', calendar.id);
     return ok(undefined);
   } catch (e) {
-    if (isNetworkError(e)) return offlineDeleteCalendar(calendar.id);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlineDeleteCalendar(calendar.id);
     return err(appError('data/query', 'data/query', e));
   }
 }
@@ -269,25 +342,49 @@ export async function restoreCalendar(calendar: Calendar): Promise<Result<void>>
  * `orderedIds` の順に priority を採番し直す(Story 2.1、AD-5)。
  * 一意制約は RPC `reorder_calendars` 側で保証する。成功時は最新のカレンダー一覧を返す。
  */
-export async function reorderCalendars(orderedIds: string[]): Promise<Result<Calendar[]>> {
+export async function reorderCalendars(
+  orderedIds: string[],
+  options: WriteOptions = {},
+): Promise<Result<Calendar[]>> {
   if (!supabase) return err(UNAVAILABLE);
-  if (isOffline()) return offlineReorderCalendars(orderedIds);
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : offlineReorderCalendars(orderedIds);
 
   try {
     const { error } = await supabase.rpc('reorder_calendars', { ordered_ids: orderedIds });
     if (error) {
-      if (isNetworkError(error)) return offlineReorderCalendars(orderedIds);
+      if (isNetworkError(error))
+        return options.noOfflineFallback
+          ? err(appError('data/offline', 'data/offline', error))
+          : offlineReorderCalendars(orderedIds);
       return err(fromPostgrest(error));
     }
-    return listCalendars();
+    return listCalendars(options);
   } catch (e) {
-    if (isNetworkError(e)) return offlineReorderCalendars(orderedIds);
+    if (isNetworkError(e))
+      return options.noOfflineFallback
+        ? err(appError('data/offline', 'data/offline', e))
+        : offlineReorderCalendars(orderedIds);
     return err(appError('data/query', 'data/query', e));
   }
 }
 
 /** その user にシフト用カレンダーが無ければ作る。既にあればそれを返す。 */
-export async function ensureShiftCalendar(): Promise<Result<Calendar>> {
+const shiftInFlight = new Map<string, Promise<Result<Calendar>>>();
+export function ensureShiftCalendar(): Promise<Result<Calendar>> {
+  const owner = localAccountOwner() ?? '未初期化';
+  const pending = shiftInFlight.get(owner);
+  if (pending) return pending;
+  const run = runEnsureShiftCalendar().finally(() => {
+    if (shiftInFlight.get(owner) === run) shiftInFlight.delete(owner);
+  });
+  shiftInFlight.set(owner, run);
+  return run;
+}
+
+async function runEnsureShiftCalendar(): Promise<Result<Calendar>> {
   if (!supabase) return err(UNAVAILABLE);
   if (isOffline()) {
     const cached = (await cacheGetAll('calendars')).find((c) => c.isShift);
@@ -317,7 +414,20 @@ export async function ensureShiftCalendar(): Promise<Result<Calendar>> {
       .insert({ name: 'シフト', color: SHIFT_CALENDAR_COLOR, source: 'local', is_shift: true })
       .select(COLUMNS)
       .single();
-    if (error) return err(fromPostgrest(error));
+    if (error) {
+      if (error.code === '23505') {
+        const retry = await selectActive('calendars', COLUMNS)
+          .eq('is_shift', true)
+          .limit(1)
+          .maybeSingle();
+        if (!retry.error && retry.data) {
+          const existingCalendar = toCalendar(retry.data as unknown as CalendarRow);
+          await cachePut('calendars', existingCalendar);
+          return ok(existingCalendar);
+        }
+      }
+      return err(fromPostgrest(error));
+    }
     const created = toCalendar(data as CalendarRow);
     await cachePut('calendars', created);
     return ok(created);
