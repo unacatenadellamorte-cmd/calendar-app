@@ -16,6 +16,15 @@ const baseEvent = {
 };
 
 describe('googlePushBody', () => {
+  it('同時刻24時間補正がDate上限を超える場合は例外にせず無効値を返す', () => {
+    expect(
+      googlePushBody({
+        ...baseEvent,
+        starts_at: '+275760-09-13T00:00:00.000Z',
+        ends_at: '+275760-09-13T00:00:00.000Z',
+      }),
+    ).toBeNull();
+  });
   it('source が local でなければ null', () => {
     expect(googlePushBody({ ...baseEvent, source: 'google' })).toBeNull();
   });

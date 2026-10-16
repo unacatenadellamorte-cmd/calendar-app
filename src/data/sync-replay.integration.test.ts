@@ -7,6 +7,9 @@ const server = vi.hoisted(() => ({
   calendars: new Map<string, Record<string, unknown>>(),
   fail: '' as string,
   deliveredThenLost: '' as string,
+  offlineAfterValidation: false,
+  listGate: null as Promise<void> | null,
+  listStarted: null as (() => void) | null,
   writes: [] as string[],
 }));
 vi.mock('@/platform/widget', () => ({
@@ -21,6 +24,7 @@ vi.mock('./supabase', () => ({
       const filters: [string, unknown][] = [];
       const chain = {
         select: () => chain,
+        order: () => chain,
         insert: (value: Record<string, unknown>) => {
           operation = 'insert';
           payload = value;
@@ -49,7 +53,7 @@ vi.mock('./supabase', () => ({
         },
         then(resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) {
           return Promise.resolve()
-            .then(() => {
+            .then(async () => {
               const name = `${table}:${operation}`;
               if (server.fail === name) {
                 server.fail = '';
@@ -61,7 +65,8 @@ vi.mock('./supabase', () => ({
               );
               let data: unknown;
               if (operation === 'insert') {
-                if (rows.has(String(payload.id)))
+                const id = String(payload.id ?? crypto.randomUUID());
+                if (rows.has(id))
                   return { data: null, error: { code: '23505', message: 'duplicate' } };
                 const row = {
                   created_at: '',
@@ -71,8 +76,9 @@ vi.mock('./supabase', () => ({
                     ? { is_shift: false, is_visible: true, priority: 0 }
                     : {}),
                   ...payload,
+                  id,
                 };
-                rows.set(String(payload.id), row);
+                rows.set(id, row);
                 server.writes.push(`${table}:create`);
                 data = row;
               } else if (operation === 'update') {
@@ -82,9 +88,19 @@ vi.mock('./supabase', () => ({
                 );
                 data = matching[0] ?? null;
               } else data = single ? (matching[0] ?? null) : matching;
+              if (name === 'events:select' && !single && server.listGate) {
+                const gate = server.listGate;
+                server.listGate = null;
+                server.listStarted?.();
+                await gate;
+              }
               if (server.deliveredThenLost === name) {
                 server.deliveredThenLost = '';
                 return { data: null, error: new TypeError('Failed to fetch') };
+              }
+              if (name === 'calendars:select' && server.offlineAfterValidation) {
+                server.offlineAfterValidation = false;
+                vi.stubGlobal('navigator', { onLine: false });
               }
               return { data, error: null };
             })
@@ -97,12 +113,16 @@ vi.mock('./supabase', () => ({
 }));
 const { flushOutbox } = await import('./sync');
 const { createCalendar } = await import('./calendars');
+const { createEvent, listEvents, deleteEvent, updateEvent } = await import('./events');
 beforeEach(() => {
   server.events.clear();
   server.calendars.clear();
   server.writes.length = 0;
   server.fail = '';
   server.deliveredThenLost = '';
+  server.offlineAfterValidation = false;
+  server.listGate = null;
+  server.listStarted = null;
   server.calendars.set('c1', {
     id: 'c1',
     source: 'local',
@@ -113,6 +133,134 @@ beforeEach(() => {
   vi.stubGlobal('navigator', { onLine: true });
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it.each(['create', 'update', 'delete'] as const)(
+  '一覧取得前から未送信の%sも古いサーバー一覧で消さない',
+  async (operation) => {
+    await createCalendar({ id: 'cached-cal', name: '通常', color: '#0072B2' });
+    const initial = await createEvent({
+      id: 'original',
+      calendarId: 'cached-cal',
+      title: '保存済み',
+      allDay: true,
+      eventDate: '2026-10-15',
+    });
+    expect(initial.ok).toBe(true);
+    if (!initial.ok) return;
+    vi.stubGlobal('navigator', { onLine: false });
+    if (operation === 'create')
+      await createEvent({
+        id: 'pending',
+        calendarId: 'cached-cal',
+        title: '未送信',
+        allDay: true,
+        eventDate: '2026-10-15',
+      });
+    if (operation === 'update') await updateEvent(initial.value, { title: '未送信の編集' });
+    if (operation === 'delete') await deleteEvent(initial.value);
+    vi.stubGlobal('navigator', { onLine: true });
+    const result = await listEvents();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.map((event) => event.id).sort()).toEqual(
+      operation === 'delete'
+        ? []
+        : operation === 'create'
+          ? ['original', 'pending']
+          : ['original'],
+    );
+    if (operation === 'update') expect(result.value[0]?.title).toBe('未送信の編集');
+    vi.stubGlobal('navigator', { onLine: false });
+    expect(await listEvents()).toEqual(result);
+  },
+);
+
+it('初期一覧の古い応答後に切断しても、既存3件と保存した1件を読み出せる', async () => {
+  for (const id of ['a', 'b', 'c'])
+    server.events.set(id, {
+      id,
+      calendar_id: 'c1',
+      source: 'local',
+      title: id,
+      all_day: true,
+      event_date: '2026-10-15',
+      created_at: '',
+      updated_at: '',
+    });
+  let release!: () => void;
+  server.listGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    server.listStarted = resolve;
+  });
+  const pending = listEvents();
+  await started;
+  const added = await createEvent({
+    id: 'added',
+    calendarId: 'c1',
+    title: '新規',
+    allDay: true,
+    eventDate: '2026-10-15',
+  });
+  expect(added.ok).toBe(true);
+  release();
+  await pending;
+  vi.stubGlobal('navigator', { onLine: false });
+  const result = await listEvents();
+  expect(result.ok && result.value.map((event) => event.id).sort()).toEqual([
+    'a',
+    'added',
+    'b',
+    'c',
+  ]);
+});
+
+it('初回作成の保存応答を失ってもカレンダーIDを変えず1件だけになる', async () => {
+  server.deliveredThenLost = 'calendars:insert';
+  const result = await createCalendar({ name: '応答喪失', color: '#0072B2' });
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  const ids = () => [...server.calendars.keys()].filter((id) => id !== 'c1');
+  expect(ids()).toEqual([result.value.id]);
+  await flushOutbox();
+  expect(ids()).toEqual([result.value.id]);
+  expect(await listOutbox()).toEqual([]);
+});
+
+it('初回作成の保存応答を失っても予定IDを変えず、再送後も1件だけになる', async () => {
+  server.deliveredThenLost = 'events:insert';
+  const result = await createEvent({
+    calendarId: 'c1',
+    title: '応答喪失',
+    allDay: true,
+    eventDate: '2026-10-15',
+  });
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect([...server.events.keys()]).toEqual([result.value.id]);
+  await flushOutbox();
+  expect([...server.events.keys()]).toEqual([result.value.id]);
+  expect(await listOutbox()).toEqual([]);
+});
+
+it('再送のカレンダー検証中に切断しても作成を末尾へ積み直さない', async () => {
+  await enqueue({
+    entity: 'event',
+    op: 'create',
+    targetId: 'new',
+    payload: { calendarId: 'c1', title: '新規', allDay: true, eventDate: '2026-10-15' },
+  });
+  await enqueue({ entity: 'event', op: 'delete', targetId: 'new' });
+  const before = await listOutbox();
+  server.offlineAfterValidation = true;
+  expect(await flushOutbox()).toEqual({ flushed: 0, dropped: 0, interrupted: true });
+  expect(await listOutbox()).toEqual(before);
+  vi.stubGlobal('navigator', { onLine: true });
+  await flushOutbox();
+  expect(server.events.get('new')?.deleted_at).toBeTruthy();
+  expect(await listOutbox()).toEqual([]);
+});
 
 it('実データ層でも瞬断時はA→Bを積み直さず先頭に保持する', async () => {
   server.events.set('e1', {

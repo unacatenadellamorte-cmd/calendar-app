@@ -304,7 +304,8 @@ describe('AppShell × OnboardingScreen(実フック、data層のみモック)', 
     expect(screen.queryByDisplayValue('前の利用者')).not.toBeInTheDocument();
     expect(screen.getByText('読み込み中…')).toBeInTheDocument();
     await screen.findByRole('heading', { name: 'Googleアカウントを接続（任意）' });
-    expect(readFirstRunStage('u2')).toBe('google');
+    // 画面描画後の副作用による保存完了を待つ。旧利用者の即時非表示の検査は上で維持する。
+    await waitFor(() => expect(readFirstRunStage('u2')).toBe('google'));
     expect(readFirstRunStage('u1')).toBe('profile');
   });
 

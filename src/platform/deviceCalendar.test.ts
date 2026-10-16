@@ -103,6 +103,26 @@ describe('listDeviceCalendars', () => {
 });
 
 describe('listDeviceEventsInRange', () => {
+  it.each([true, false])(
+    '系列情報isPartOfSeries=%sを同期側へ落とさず渡す',
+    async (isPartOfSeries) => {
+      listEventsInRange.mockResolvedValue({
+        result: [
+          {
+            id: 'e1',
+            title: '予定',
+            description: null,
+            isAllDay: false,
+            startDate: 1000,
+            endDate: 2000,
+            calendarId: 'cal-a',
+            isPartOfSeries,
+          },
+        ],
+      });
+      expect((await listDeviceEventsInRange(0, 3000))[0]).toMatchObject({ isPartOfSeries });
+    },
+  );
   it('from/to を渡し、id/title/description/isAllDay/startDate/endDate/calendarId だけを取り出す', async () => {
     listEventsInRange.mockResolvedValue({
       result: [

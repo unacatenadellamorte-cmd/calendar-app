@@ -3,6 +3,21 @@ import { changesFromSubscriber, planRevenueCatEvent } from './revenuecat-webhook
 
 const userId = '10000000-0000-4000-8000-000000000001';
 const now = Date.parse('2026-10-15T00:00:00Z');
+it('過去商品の返金でも現在状態を照合し、過去期限だけで権利を剥奪しない', () => {
+  const plan = planRevenueCatEvent({
+    event: {
+      type: 'CANCELLATION',
+      app_user_id: userId,
+      cancel_reason: 'CUSTOMER_SUPPORT',
+      event_timestamp_ms: now,
+      entitlement_ids: ['calendar_write'],
+      expiration_at_ms: now - 86400000,
+      product_id: 'old-monthly',
+    },
+  });
+  expect(plan.reconciliation).toEqual({ userId, eventAtMs: now });
+  expect(plan.changes).toEqual([]);
+});
 it('期限内の通常解約を維持し、期限切れ取消だけを失効する', () => {
   const event = {
     type: 'CANCELLATION',

@@ -5,7 +5,7 @@ import { isEventStampId, type EventStampId } from '@/lib/event-stamps';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isNetworkError, isOffline, type WriteOptions } from './net';
-import { cacheDelete, cacheGetAll, cachePut, cacheReplace } from './cache';
+import { cacheDelete, cacheGetAll, cachePut, cacheMergeSnapshot } from './cache';
 import {
   newLocalId,
   offlineCreateEvent,
@@ -73,7 +73,7 @@ export interface ShiftAttributes {
 }
 
 export type NewEventInput = {
-  /** 省略時は DB 発番。オフライン作成・フラッシュ時はクライアント発番の id を渡す。 */
+  /** 省略時も最初の送信前にクライアント発番し、応答喪失後の再送まで保持する。 */
   id?: string;
   calendarId: string;
   title: string;
@@ -328,14 +328,15 @@ export async function listEvents(range: EventRange = {}): Promise<Result<EventIt
   if (range.limit) query = query.limit(range.limit);
 
   try {
+    const baseline = !range.fromIso && !range.limit ? await cacheGetAll('events') : null;
     const { data, error } = await query;
     if (error) {
       if (isNetworkError(error))
         return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
       return err(fromPostgrest(error));
     }
-    const mapped = (data as unknown as EventRow[]).map(toEvent);
-    if (!range.fromIso && !range.limit) await cacheReplace('events', mapped);
+    let mapped = (data as unknown as EventRow[]).map(toEvent);
+    if (baseline) mapped = await cacheMergeSnapshot('events', mapped, baseline);
     else for (const row of mapped) await cachePut('events', row);
     return ok(mapped);
   } catch (e) {
@@ -351,11 +352,15 @@ export async function createEvent(
   if (!supabase) return err(UNAVAILABLE);
   const invalid = validateEventInput(input);
   if (invalid) return err(invalid);
+  input = { ...input, id: input.id ?? newLocalId() };
   if (options.noOfflineFallback && isOffline())
     return err(appError('data/offline', 'data/offline'));
   const calendarError = await validateWritableCalendar(input.calendarId);
   if (calendarError) return err(calendarError);
-  if (isOffline()) return offlineCreateEvent(input.id ?? newLocalId(), input);
+  if (isOffline())
+    return options.noOfflineFallback
+      ? err(appError('data/offline', 'data/offline'))
+      : offlineCreateEvent(input.id ?? newLocalId(), input);
 
   try {
     const { data, error } = await supabase

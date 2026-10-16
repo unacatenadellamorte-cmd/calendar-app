@@ -101,6 +101,7 @@ export function googlePushBody(event: GooglePushEvent): GooglePushBody | null {
   // フォームでは同時刻を24時間勤務として許可しているため、Google反映でも
   // 同一瞬間を無効値として捨てず、24時間後の終了へ変換する。
   const safeEndMs = endMs === startMs ? endMs + 24 * 60 * 60 * 1000 : endMs;
+  if (!Number.isFinite(new Date(safeEndMs).getTime())) return null;
 
   return {
     summary: title,

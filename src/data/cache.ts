@@ -10,6 +10,40 @@ import type { EventItem } from './events';
 
 type CacheRow = { calendars: Calendar; events: EventItem };
 
+/** 取得開始後の保存・削除を、遅れて届く一覧で消さずに反映する。 */
+export async function cacheMergeSnapshot<S extends CacheStore>(
+  store: S,
+  rows: CacheRow[S][],
+  baseline: CacheRow[S][],
+): Promise<CacheRow[S][]> {
+  const db = await getLocalDb();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  const tx = db.transaction([store, 'outbox'], 'readwrite');
+  const cacheStore = tx.objectStore(store);
+  const current = (await cacheStore.getAll()) as CacheRow[S][];
+  const pending = await tx.objectStore('outbox').getAll();
+  const before = new Map(baseline.map((row) => [row.id, row]));
+  const currentIds = new Set(current.map((row) => row.id));
+  const merged = new Map(rows.map((row) => [row.id, row]));
+  for (const row of current) {
+    if (JSON.stringify(before.get(row.id)) !== JSON.stringify(row)) merged.set(row.id, row);
+  }
+  for (const row of baseline) {
+    if (!currentIds.has(row.id)) merged.delete(row.id);
+  }
+  const currentById = new Map(current.map((row) => [row.id, row]));
+  for (const item of pending) {
+    if (item.entity !== (store === 'events' ? 'event' : 'calendar')) continue;
+    const row = currentById.get(item.targetId);
+    if (row) merged.set(row.id, row);
+    else merged.delete(item.targetId);
+  }
+  await cacheStore.clear();
+  for (const row of merged.values()) await cacheStore.put(row);
+  await tx.done;
+  return [...merged.values()];
+}
+
 /** そのストアを rows だけに置き換える(サーバー取得成功時のスナップショット反映)。 */
 export async function cacheReplace<S extends CacheStore>(
   store: S,

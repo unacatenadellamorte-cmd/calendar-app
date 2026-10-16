@@ -47,21 +47,56 @@ const ev = (over: Partial<EventItem>): EventItem => ({
 });
 
 describe('useFeaturedEvents', () => {
+  it('JST朝はUTCで前日でも、前日の終日予定を除外して当日だけ返す', () => {
+    vi.setSystemTime(new Date('2026-09-07T23:00:00Z'));
+    try {
+      const events = ['2026-09-07', '2026-09-08'].map((eventDate) =>
+        ev({ id: eventDate, allDay: true, startsAt: null, endsAt: null, eventDate }),
+      );
+      const { result } = renderHook(() => useFeaturedEvents(events, [cal({})], 3));
+      expect(result.current.map((event) => event.id)).toEqual(['2026-09-08']);
+    } finally {
+      vi.setSystemTime(NOW);
+    }
+  });
   it('この後の予定を優先度順で count 件返す', () => {
     const calendars = [cal({ id: 'high', priority: 0 }), cal({ id: 'low', priority: 1 })];
     const events = [
-      ev({ id: 'a', calendarId: 'low', startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' }),
-      ev({ id: 'b', calendarId: 'high', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' }),
+      ev({
+        id: 'a',
+        calendarId: 'low',
+        startsAt: '2026-09-08T05:00:00Z',
+        endsAt: '2026-09-08T06:00:00Z',
+      }),
+      ev({
+        id: 'b',
+        calendarId: 'high',
+        startsAt: '2026-09-08T09:00:00Z',
+        endsAt: '2026-09-08T10:00:00Z',
+      }),
     ];
     const { result } = renderHook(() => useFeaturedEvents(events, calendars, 3));
     expect(result.current.map((e) => e.id)).toEqual(['b', 'a']);
   });
 
   it('表示オフのカレンダーの予定は除外する', () => {
-    const calendars = [cal({ id: 'shown', priority: 1, isVisible: true }), cal({ id: 'hidden', priority: 0, isVisible: false })];
+    const calendars = [
+      cal({ id: 'shown', priority: 1, isVisible: true }),
+      cal({ id: 'hidden', priority: 0, isVisible: false }),
+    ];
     const events = [
-      ev({ id: 'v', calendarId: 'shown', startsAt: '2026-09-08T09:00:00Z', endsAt: '2026-09-08T10:00:00Z' }),
-      ev({ id: 'h', calendarId: 'hidden', startsAt: '2026-09-08T08:00:00Z', endsAt: '2026-09-08T09:00:00Z' }),
+      ev({
+        id: 'v',
+        calendarId: 'shown',
+        startsAt: '2026-09-08T09:00:00Z',
+        endsAt: '2026-09-08T10:00:00Z',
+      }),
+      ev({
+        id: 'h',
+        calendarId: 'hidden',
+        startsAt: '2026-09-08T08:00:00Z',
+        endsAt: '2026-09-08T09:00:00Z',
+      }),
     ];
     const { result } = renderHook(() => useFeaturedEvents(events, calendars, 3));
     expect(result.current.map((e) => e.id)).toEqual(['v']);
@@ -70,7 +105,11 @@ describe('useFeaturedEvents', () => {
   it('count で打ち切る', () => {
     const calendars = [cal({ id: 'c1' })];
     const events = [10, 11, 12].map((h) =>
-      ev({ id: `e${h}`, startsAt: `2026-09-08T${h}:00:00Z`, endsAt: `2026-09-08T${h + 1}:00:00Z` }),
+      ev({
+        id: `e${h}`,
+        startsAt: `2026-09-08T${h}:00:00Z`,
+        endsAt: `2026-09-08T${h + 1}:00:00Z`,
+      }),
     );
     const { result } = renderHook(() => useFeaturedEvents(events, calendars, 2));
     expect(result.current.map((e) => e.id)).toEqual(['e10', 'e11']);
@@ -78,7 +117,9 @@ describe('useFeaturedEvents', () => {
 
   it('この後に予定が無ければ空', () => {
     const calendars = [cal({ id: 'c1' })];
-    const past = [ev({ id: 'p', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' })];
+    const past = [
+      ev({ id: 'p', startsAt: '2026-09-08T01:00:00Z', endsAt: '2026-09-08T02:00:00Z' }),
+    ];
     const { result } = renderHook(() => useFeaturedEvents(past, calendars, 3));
     expect(result.current).toEqual([]);
   });

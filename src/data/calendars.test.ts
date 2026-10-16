@@ -140,7 +140,12 @@ describe('calendars.ts', () => {
     expect(r.ok).toBe(true);
     const insert = calls.find((c) => c.method === 'insert');
     // user_id は DB の default auth.uid() が入れるので insert には含めない
-    expect(insert?.args[0]).toEqual({ name: '仕事', color: '#0072B2', source: 'local' });
+    expect(insert?.args[0]).toEqual({
+      name: '仕事',
+      color: '#0072B2',
+      source: 'local',
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
   });
 
   it('renameCalendar: trim して update する', async () => {

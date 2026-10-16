@@ -153,14 +153,7 @@ export function planRevenueCatEvent(body: unknown): WebhookPlan {
     const userId = event.app_user_id.toLowerCase();
     // 請求失敗の取消では猶予期間を潰さず、BILLING_ISSUE / EXPIRATIONに委ねる。
     if (event.cancel_reason === 'BILLING_ERROR') return ignore('noop:CANCELLATION');
-    const expiry = finiteNumber(event.expiration_at_ms);
-    if (expiry !== null && expiry <= eventAtMs) {
-      const changes = buildChanges(event, userId, expiry, eventAtMs);
-      return changes.length
-        ? { changes, transfers: [], reason: 'cancel-expired' }
-        : ignore('no-entitlement');
-    }
-    // 返金理由だけで剥奪せず、サーバーが現在の契約状態を照合する。
+    // 古い商品の過去期限を、現在の別商品による権利へ上書きしない。
     if (event.cancel_reason === 'CUSTOMER_SUPPORT') {
       return {
         changes: [],
@@ -168,6 +161,13 @@ export function planRevenueCatEvent(body: unknown): WebhookPlan {
         reconciliation: { userId, eventAtMs },
         reason: 'refund-reconcile',
       };
+    }
+    const expiry = finiteNumber(event.expiration_at_ms);
+    if (expiry !== null && expiry <= eventAtMs) {
+      const changes = buildChanges(event, userId, expiry, eventAtMs);
+      return changes.length
+        ? { changes, transfers: [], reason: 'cancel-expired' }
+        : ignore('no-entitlement');
     }
     return ignore('noop:CANCELLATION');
   }

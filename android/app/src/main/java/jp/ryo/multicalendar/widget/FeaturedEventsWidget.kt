@@ -60,6 +60,7 @@ internal data class FeaturedWidgetEvent(
     val colorHex: String,
     val startsAtIso: String,
     val allDay: Boolean,
+    val eventDate: String? = null,
 )
 
 /** SharedPreferences の JSON 配列を読む。壊れている/存在しない場合は空リスト(静かな表示)。 */
@@ -78,6 +79,7 @@ internal fun readFeaturedEvents(context: Context): List<FeaturedWidgetEvent> {
                         colorHex = obj.optString("colorHex", DEFAULT_COLOR_HEX),
                         startsAtIso = obj.optString("startsAtIso", ""),
                         allDay = obj.optBoolean("allDay", false),
+                        eventDate = obj.optString("eventDate", "").takeIf { it.isNotEmpty() },
                     ),
                 )
             }
@@ -117,9 +119,22 @@ internal fun parseIsoUtc(iso: String): Date? {
  * `internal` にしてJUnitテストから検証する。
  */
 internal fun formatStartLabel(event: FeaturedWidgetEvent, now: Date = Date()): String {
+    if (event.allDay) {
+        // 旧データの瞬間から暦日を推測しない。新しい保存値だけで日付を表示する。
+        val key = event.eventDate ?: return "終日"
+        val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+            isLenient = false
+        }
+        val date = runCatching { parser.parse(key) }.getOrNull() ?: return "終日"
+        if (parser.format(date) != key) return "終日"
+        if (key == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now)) return "終日"
+        return SimpleDateFormat("M/d", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.format(date) + " 終日"
+    }
     val parsed = parseIsoUtc(event.startsAtIso) ?: return "終日"
     val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     val sameDay = dateFormat.format(parsed) == dateFormat.format(now)
-    if (event.allDay) return if (sameDay) "終日" else SimpleDateFormat("M/d", Locale.getDefault()).format(parsed) + " 終日"
     return SimpleDateFormat(if (sameDay) "H:mm" else "M/d H:mm", Locale.getDefault()).format(parsed)
 }

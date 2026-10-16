@@ -53,6 +53,8 @@ export interface FeaturedWidgetEventPayload {
   colorHex: string;
   /** 時刻付きはその瞬間、終日はその日のローカル00:00の UTC ISO。 */
   startsAtIso: string;
+  /** 終日の暦日。旧保存データは未設定のまま受理する。 */
+  eventDate?: string;
   allDay: boolean;
   schemaVersion: 1;
 }
@@ -132,6 +134,7 @@ export function buildFeaturedWidgetPayload(
               // 誤フォールバックする実害があった)。
               new Date(event.startsAt ?? now).toISOString(),
         allDay: event.allDay,
+        ...(event.allDay && event.eventDate ? { eventDate: event.eventDate } : {}),
         schemaVersion: 1,
       },
     ];

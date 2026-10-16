@@ -204,6 +204,240 @@ it('移転先行は再送可能な失敗にし、後着購入後に移転して�
   ).toBe(300);
 });
 
+const grant = (user: string, entitlement: string, expires: string, eventMs: number) =>
+  scalar("select apply_revenuecat_entitlement($1,$2,$3,'monthly','app_store',$4)", [
+    user,
+    entitlement,
+    expires,
+    eventMs,
+  ]);
+const active = async (user: string, entitlement: string) =>
+  scalar(
+    'select coalesce(bool_or(expires_at is null or expires_at>now()),false) from entitlements where user_id=$1 and entitlement=$2',
+    [user, entitlement],
+  );
+
+it('削除した移転元の履歴を残さず、古い購入通知も移転先へ付与しない', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await grant(a, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  await db.query('delete from auth.users where id=$1', [a]);
+  expect(
+    await scalar('select count(*)::int from revenuecat_transfers where from_user=$1', [a]),
+  ).toBe(0);
+  expect(await grant(a, 'multi_account', '2030-01-01', 150)).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(false);
+});
+
+it('移転先削除で識別子を消し、後着購入を移転元へ戻さない', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await grant(a, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  await db.query('delete from auth.users where id=$1', [b]);
+  expect(
+    await scalar('select to_user from revenuecat_transfers where from_user=$1', [a]),
+  ).toBeNull();
+  expect(await grant(a, 'multi_account', '2030-01-01', 150)).toBe(false);
+  expect(await active(a, 'multi_account')).toBe(false);
+});
+
+it('同時刻の循環移転は途中の人に付与せず再送可能な失敗にする', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await db.query(
+    'insert into revenuecat_transfers(from_user,to_user,event_ms) values($1,$2,200),($2,$1,200)',
+    [a, b],
+  );
+  await expect(grant(a, 'multi_account', '2030-01-01', 100)).rejects.toThrow('transfer route');
+  expect(await active(a, 'multi_account')).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(false);
+});
+
+it('同時刻に移転先が複数あればUUID順に選ばず失敗にする', async () => {
+  const a = await newUser(),
+    b = await newUser(),
+    c = await newUser();
+  await db.query(
+    'insert into revenuecat_transfers(from_user,to_user,event_ms) values($1,$2,200),($1,$3,200)',
+    [a, b, c],
+  );
+  await expect(grant(a, 'multi_account', '2030-01-01', 100)).rejects.toThrow('transfer route');
+  for (const user of [a, b, c]) expect(await active(user, 'multi_account')).toBe(false);
+});
+
+it('移転追跡の上限を超えても途中の利用者へ付与しない', async () => {
+  const users: string[] = [];
+  for (let i = 0; i < 34; i++) users.push(await newUser());
+  for (let i = 0; i < 33; i++)
+    await db.query(
+      'insert into revenuecat_transfers(from_user,to_user,event_ms) values($1,$2,$3)',
+      [users[i], users[i + 1], 200 + i],
+    );
+  await expect(grant(users[0]!, 'multi_account', '2030-01-01', 100)).rejects.toThrow(
+    'transfer route',
+  );
+  expect(
+    await scalar(
+      "select count(*)::int from entitlements where user_id=any($1::uuid[]) and entitlement='multi_account'",
+      [users],
+    ),
+  ).toBe(0);
+});
+
+it('BからCへの移転が先着しても後着のAからBへの移転を最終Cへ渡す', async () => {
+  const a = await newUser(),
+    b = await newUser(),
+    c = await newUser();
+  await grant(b, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,300)', [b, c]);
+  await grant(a, 'multi_account', '2030-01-01', 100);
+  expect(await scalar('select apply_revenuecat_transfer($1,$2,200)', [a, b])).toBe(true);
+  expect(await active(a, 'multi_account')).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(false);
+  expect(await active(c, 'multi_account')).toBe(true);
+});
+
+it('移転前に発生した同じ権利の後着更新を移転先に反映し、新しい失効は守る', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await grant(a, 'calendar_write', '2028-01-01', 50);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  expect(await grant(a, 'calendar_write', '2030-01-01', 150)).toBe(true);
+  expect(
+    await scalar(
+      "select expires_at='2030-01-01'::timestamptz from entitlements where user_id=$1 and entitlement='calendar_write'",
+      [b],
+    ),
+  ).toBe(true);
+  await grant(b, 'calendar_write', '2020-01-01', 400);
+  expect(await grant(a, 'calendar_write', '2030-01-01', 150)).toBe(false);
+  expect(await active(b, 'calendar_write')).toBe(false);
+});
+
+it('時刻順にAへ戻った移転では古い移転再送で最終所有者Aを失効しない', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await grant(a, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  await db.query('select apply_revenuecat_transfer($1,$2,300)', [b, a]);
+  expect(await active(a, 'calendar_write')).toBe(true);
+  await grant(a, 'multi_account', '2030-01-01', 150);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  expect(await active(a, 'multi_account')).toBe(true);
+  expect(await active(b, 'multi_account')).toBe(false);
+});
+
+it('逆順移転でも最終移転先の長い期限を短縮しない', async () => {
+  const a = await newUser(),
+    b = await newUser(),
+    c = await newUser();
+  await grant(b, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,300)', [b, c]);
+  await grant(c, 'multi_account', '2035-01-01', 400);
+  await grant(a, 'multi_account', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  expect(
+    await scalar(
+      "select expires_at='2035-01-01'::timestamptz and last_event_ms=400 from entitlements where user_id=$1 and entitlement='multi_account'",
+      [c],
+    ),
+  ).toBe(true);
+  expect(await active(b, 'multi_account')).toBe(false);
+});
+
+it('期限切れ行だけの移転元へ先着した移転後、後着の古い購入は移転先へ付与する', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await grant(a, 'calendar_write', '2020-01-01', 50);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  expect(await grant(a, 'multi_account', '2030-01-01', 100)).toBe(true);
+  expect(await active(a, 'multi_account')).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(true);
+  // 同じ通知の再送でも元利用者へ復活させない。
+  await grant(a, 'multi_account', '2030-01-01', 100);
+  expect(await active(a, 'multi_account')).toBe(false);
+});
+
+it('有効な権利の移転後に後着した古い購入は移転先へ付与し、移転先の新しい状態は上書きしない', async () => {
+  const a = await newUser(),
+    b = await newUser();
+  await grant(a, 'calendar_write', '2030-01-01', 100);
+  expect(await scalar('select apply_revenuecat_transfer($1,$2,200)', [a, b])).toBe(true);
+  await grant(a, 'multi_account', '2030-01-01', 150);
+  expect(await active(a, 'multi_account')).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(true);
+  expect(await active(a, 'calendar_write')).toBe(false);
+  // Bの新しい失効を、古いA宛て通知の再送で戻さない。
+  await grant(b, 'multi_account', '2020-01-01', 400);
+  expect(await grant(a, 'multi_account', '2030-01-01', 150)).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(false);
+  expect(await active(a, 'multi_account')).toBe(false);
+  // 移転より新しいA自身の購入はAへ付与する。
+  await grant(a, 'multi_account', '2030-01-01', 500);
+  expect(await active(a, 'multi_account')).toBe(true);
+});
+
+it('A→B→Cの連続移転では最終移転先へ、移転順が逆なら途中で止めて付与する', async () => {
+  const a = await newUser(),
+    b = await newUser(),
+    c = await newUser();
+  await grant(a, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [a, b]);
+  await db.query('select apply_revenuecat_transfer($1,$2,300)', [b, c]);
+  await grant(a, 'multi_account', '2030-01-01', 150);
+  expect(await active(a, 'multi_account')).toBe(false);
+  expect(await active(b, 'multi_account')).toBe(false);
+  expect(await active(c, 'multi_account')).toBe(true);
+
+  const d = await newUser(),
+    e = await newUser(),
+    f = await newUser();
+  await grant(e, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,150)', [e, f]);
+  await grant(d, 'calendar_write', '2030-01-01', 100);
+  await db.query('select apply_revenuecat_transfer($1,$2,200)', [d, e]);
+  // D宛ての通知はEへ移った時点(200)より前のE→F移転(150)を辿らない。
+  await grant(d, 'multi_account', '2030-01-01', 120);
+  expect(await active(e, 'multi_account')).toBe(true);
+  expect(await active(f, 'multi_account')).toBe(false);
+});
+
+it('移転記録はクライアントから読めず、移転・付与RPCはservice_role専用のまま', async () => {
+  expect(
+    await scalar(
+      "select relrowsecurity from pg_class where oid='public.revenuecat_transfers'::regclass",
+    ),
+  ).toBe(true);
+  for (const role of ['anon', 'authenticated']) {
+    expect(
+      await scalar("select has_table_privilege($1,'public.revenuecat_transfers','select')", [
+        role,
+      ]),
+    ).toBe(false);
+    for (const fn of [
+      'public.apply_revenuecat_transfer(uuid,uuid,bigint)',
+      'public.revenuecat_transfer_target(uuid,bigint)',
+      'public.apply_revenuecat_entitlement(uuid,text,timestamptz,text,text,bigint)',
+    ]) {
+      expect(
+        await scalar('select has_function_privilege($1,$2,$3)', [role, fn, 'execute']),
+      ).toBe(false);
+    }
+  }
+  expect(
+    await scalar(
+      "select has_function_privilege('service_role','public.revenuecat_transfer_target(uuid,bigint)','execute')",
+    ),
+  ).toBe(false);
+  expect(
+    await scalar(
+      "select has_function_privilege('service_role','public.apply_revenuecat_entitlement(uuid,text,timestamptz,text,text,bigint)','execute')",
+    ),
+  ).toBe(true);
+});
+
 it('初回シフト作成時だけマイカレンダーを1件作り、既存・削除済み通常カレンダーを重複作成しない', async () => {
   const user = await newUser();
   const shift = await scalar(

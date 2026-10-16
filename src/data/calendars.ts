@@ -47,7 +47,7 @@ export interface Calendar {
 export interface NewCalendarInput {
   name: string;
   color: string;
-  /** 省略時は DB 発番。オフライン作成・フラッシュ時はクライアント発番の id。 */
+  /** 省略時も最初の送信前にクライアント発番し、再送まで保持する。 */
   id?: string;
 }
 
@@ -146,6 +146,7 @@ export async function createCalendar(
   if (nameError) return err(nameError);
   const colorError = validateColor(input.color);
   if (colorError) return err(colorError);
+  input = { ...input, id: input.id ?? newLocalId() };
   if (isOffline()) {
     if (options.noOfflineFallback) return err(appError('data/offline', 'data/offline'));
     return offlineCreateCalendar(input.id ?? newLocalId(), input);

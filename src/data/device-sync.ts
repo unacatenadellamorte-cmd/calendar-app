@@ -31,8 +31,8 @@ export interface SyncRunResult {
 }
 
 const UNAVAILABLE = appError('connection/unavailable', 'connection/unavailable');
-/** 削除差分 SELECT の安全マージン(暴走的な行数増加からの防御。通常はこれよりずっと少ない)。 */
-const EXISTING_EVENTS_LIMIT = 2000;
+/** APIの行数上限より小さいページに分け、長いin条件も使わない。 */
+const EVENT_PAGE_SIZE = 500;
 
 interface SelectedCalendarRow {
   calendar_id: string | null;
@@ -44,6 +44,36 @@ interface ExistingEventRow {
   external_id: string | null;
   starts_at: string | null;
   event_date: string | null;
+}
+
+interface StoredDeviceEvent extends ExistingEventRow {
+  id: string;
+  external_id: string;
+  calendar_id: string;
+  deleted_at?: string | null;
+}
+
+async function readDeviceRows<T>(
+  columns: string,
+  connectionId: string,
+  calendarId: string,
+  activeOnly = false,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += EVENT_PAGE_SIZE) {
+    const query = activeOnly
+      ? selectActive('events', columns)
+      : supabase!.from('events').select(columns);
+    const { data, error } = await query
+      .eq('connection_id', connectionId)
+      .eq('calendar_id', calendarId)
+      .order('id')
+      .range(offset, offset + EVENT_PAGE_SIZE - 1)
+      .returns<T[]>();
+    if (error) throw new Error(error.message);
+    rows.push(...(data ?? []));
+    if (!data || data.length < EVENT_PAGE_SIZE) return rows;
+  }
 }
 
 /** 今 - 60日 〜 今 + 400日(`supabase/functions/sync-calendars` と同じ時間窓)。 */
@@ -82,68 +112,74 @@ async function syncOneCalendar(
 ): Promise<{ calendar: string; upserted: number; deleted: number }> {
   const byExternalId = new Map<string, EventRow>();
   const originalIds = new Map<string, string>();
+  const singleKeys = new Set<string>();
   for (const raw of rawEvents) {
     if (raw.calendarId !== target.external_calendar_id) continue;
     const n = normalizeDeviceEvent(raw);
     if (n) {
       // 繰り返し各回と別カレンダーの同一IDを、取得窓に左右されないキーで分ける。
       const row = toDeviceEventRow(n);
-      const occurrenceId = JSON.stringify([
-        target.external_calendar_id,
-        n.externalId,
-        row.starts_at ?? row.event_date,
-      ]);
+      const occurrenceId = JSON.stringify(
+        raw.isPartOfSeries === false
+          ? [target.external_calendar_id, n.externalId]
+          : [target.external_calendar_id, n.externalId, row.starts_at ?? row.event_date],
+      );
+      if (raw.isPartOfSeries === false) singleKeys.add(occurrenceId);
       byExternalId.set(occurrenceId, { ...row, external_id: occurrenceId });
       originalIds.set(occurrenceId, n.externalId);
     }
   }
 
   if (byExternalId.size > 0) {
-    const externalIds = [...byExternalId.keys()];
     // `events_external_uniq` は `(connection_id, external_id) where connection_id is not null`
     // という部分ユニークインデックスで、supabase-js の `upsert({onConflict})` は列名しか渡せず
     // 部分インデックスの述語を表現できないため 42P10 で拒否される。手動で
     // SELECT → 既存なら UPDATE(deleted_at 復活含む)/ 無ければ INSERT に分ける。
     // 論理削除済みの行もこの一意インデックスの対象になるため、deleted_at を問わず検索する
     // (`selectActive` は使わない)。
-    const { data: existing, error: existingError } = await supabase!
-      .from('events')
-      .select('id,external_id,calendar_id,starts_at,event_date')
-      .eq('connection_id', connectionId)
-      .in('external_id', [...new Set([...externalIds, ...originalIds.values()])])
-      .returns<
-        {
-          id: string;
-          external_id: string;
-          calendar_id: string;
-          starts_at: string | null;
-          event_date: string | null;
-        }[]
-      >();
-    if (existingError) throw new Error(existingError.message);
+    const existing = await readDeviceRows<StoredDeviceEvent>(
+      'id,external_id,calendar_id,starts_at,event_date,deleted_at',
+      connectionId,
+      target.calendar_id,
+    );
 
     const existingIdByExternalId = new Map(
       (existing ?? []).map((r) => [r.external_id, r.id] as const),
     );
-    // 旧形式の同じ回は行IDを保つ。設定済みリマインダーまで新規行に置き換えない。
-    for (const old of existing ?? []) {
-      if (old.calendar_id !== target.calendar_id || byExternalId.has(old.external_id))
-        continue;
-      for (const [key, row] of byExternalId) {
-        const sameOccurrence =
-          row.starts_at && old.starts_at
-            ? Date.parse(row.starts_at) === Date.parse(old.starts_at)
-            : row.starts_at === null &&
-              old.starts_at === null &&
-              row.event_date === old.event_date;
-        if (
-          originalIds.get(key) === old.external_id &&
-          sameOccurrence &&
-          !existingIdByExternalId.has(key)
-        ) {
-          existingIdByExternalId.set(key, old.id);
+    // 単発は時刻を識別子にしない。旧キーの行も一意に照合できるときだけ引き継ぐ。
+    for (const [key, row] of byExternalId) {
+      if (existingIdByExternalId.has(key)) continue;
+      const candidates = (existing ?? []).filter((old) => {
+        if (old.calendar_id !== target.calendar_id) return false;
+        let originalId = old.external_id;
+        try {
+          const parsed = JSON.parse(old.external_id) as unknown;
+          if (
+            Array.isArray(parsed) &&
+            parsed[0] === target.external_calendar_id &&
+            typeof parsed[1] === 'string'
+          )
+            originalId = parsed[1];
+        } catch {
+          /* 旧版の生IDはそのまま照合する。 */
         }
-      }
+        return originalId === originalIds.get(key);
+      });
+      const sameTime = candidates.filter((old) =>
+        row.starts_at && old.starts_at
+          ? Date.parse(row.starts_at) === Date.parse(old.starts_at)
+          : row.starts_at === null &&
+            old.starts_at === null &&
+            row.event_date === old.event_date,
+      );
+      const matching = sameTime.length
+        ? sameTime
+        : singleKeys.has(key)
+          ? candidates.filter((old) => old.deleted_at == null)
+          : [];
+      if (matching.length === 1) existingIdByExternalId.set(key, matching[0]!.id);
+      else if (singleKeys.has(key) && matching.length > 1)
+        throw new Error('端末予定の識別が曖昧です');
     }
 
     const toInsert: Array<
@@ -172,15 +208,12 @@ async function syncOneCalendar(
     }
   }
 
-  const { data: existingRows, error: selectError } = await selectActive(
-    'events',
+  const existingRows = await readDeviceRows<ExistingEventRow>(
     'external_id,starts_at,event_date',
-  )
-    .eq('connection_id', connectionId)
-    .eq('calendar_id', target.calendar_id)
-    .limit(EXISTING_EVENTS_LIMIT)
-    .returns<ExistingEventRow[]>();
-  if (selectError) throw new Error(selectError.message);
+    connectionId,
+    target.calendar_id,
+    true,
+  );
 
   const storedIds = (existingRows ?? [])
     .filter((r) => r.external_id !== null && isWithinWindow(r, windowMin, windowMax))
@@ -188,13 +221,24 @@ async function syncOneCalendar(
   const fetchedIds = [...byExternalId.keys()];
   const toDelete = deletedExternalIds(storedIds, fetchedIds);
 
-  if (toDelete.length > 0) {
+  for (let offset = 0; offset < toDelete.length;) {
+    const batch: string[] = [];
+    let encodedSize = 0;
+    while (offset < toDelete.length) {
+      const id = toDelete[offset]!;
+      const size = encodeURIComponent(JSON.stringify(id)).length + 1;
+      if (size > 1800) throw new Error('端末予定の識別子が長すぎます');
+      if (encodedSize + size > 1800) break;
+      batch.push(id);
+      encodedSize += size;
+      offset += 1;
+    }
     const { error: deleteError } = await supabase!
       .from('events')
       .update({ deleted_at: new Date().toISOString() })
       .eq('connection_id', connectionId)
       .eq('calendar_id', target.calendar_id)
-      .in('external_id', toDelete);
+      .in('external_id', batch);
     if (deleteError) throw new Error(deleteError.message);
   }
 

@@ -45,12 +45,14 @@ class FeaturedEventsWidgetTest {
     private fun event(
         startsAtIso: String = "",
         allDay: Boolean = false,
+        eventDate: String? = null,
     ) = FeaturedWidgetEvent(
         id = "e1",
         calendarName = "仕事",
         colorHex = "#0072B2",
         startsAtIso = startsAtIso,
         allDay = allDay,
+        eventDate = eventDate,
     )
 
     // --- maxRowsFor -----------------------------------------------------
@@ -88,6 +90,22 @@ class FeaturedEventsWidgetTest {
     // --- formatStartLabel -------------------------------------------------
 
     @Test
+    fun `暦日を持たない旧終日データから時差で別の日付を捏造しない`() {
+        val stored = event(startsAtIso = "2026-10-15T15:00:00Z", allDay = true)
+        assertEquals("終日", formatStartLabel(stored, parseIsoUtc("2026-10-14T00:00:00Z")!!))
+    }
+
+    @Test
+    fun `終日の暦日は端末を日本からUTCへ変えても維持する`() {
+        val stored = event(startsAtIso = "2026-10-15T15:00:00Z", allDay = true, eventDate = "2026-10-16")
+        val now = parseIsoUtc("2026-10-14T00:00:00Z")!!
+        for (zone in listOf("Asia/Tokyo", "UTC", "America/Los_Angeles")) {
+            TimeZone.setDefault(TimeZone.getTimeZone(zone))
+            assertEquals("10/16 終日", formatStartLabel(stored, now))
+        }
+    }
+
+    @Test
     fun `終日は「終日」を返す(startsAtIso の値によらない)`() {
         assertEquals("終日", formatStartLabel(event(startsAtIso = "", allDay = true)))
     }
@@ -116,8 +134,8 @@ class FeaturedEventsWidgetTest {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
         val now = parseIsoUtc("2026-09-14T23:00:00Z")!!
         assertEquals("9/16 10:30", formatStartLabel(event(startsAtIso = "2026-09-16T01:30:00Z"), now))
-        assertEquals("9/16 終日", formatStartLabel(event(startsAtIso = "2026-09-15T15:00:00Z", allDay = true), now))
-        assertEquals("終日", formatStartLabel(event(startsAtIso = "2026-09-14T15:00:00Z", allDay = true), now))
+        assertEquals("9/16 終日", formatStartLabel(event(startsAtIso = "2026-09-15T15:00:00Z", allDay = true, eventDate = "2026-09-16"), now))
+        assertEquals("終日", formatStartLabel(event(startsAtIso = "2026-09-14T15:00:00Z", allDay = true, eventDate = "2026-09-15"), now))
     }
 
     @Test

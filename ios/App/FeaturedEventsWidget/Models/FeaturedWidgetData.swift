@@ -8,6 +8,7 @@ struct FeaturedWidgetEvent: Decodable, Equatable {
     let startsAtIso: String
     let allDay: Bool
     let schemaVersion: Int
+    var eventDate: String? = nil
 }
 
 enum FeaturedWidgetData {
@@ -28,6 +29,25 @@ enum FeaturedWidgetData {
     }
 
     static func startLabel(_ event: FeaturedWidgetEvent, timeZone: TimeZone = .current, now: Date = Date()) -> String {
+        if event.allDay {
+            // 旧保存データには暦日がないため、瞬間から別の日付を推測しない。
+            guard let key = event.eventDate else { return "終日" }
+            let parser = DateFormatter()
+            parser.locale = Locale(identifier: "en_US_POSIX")
+            parser.calendar = Calendar(identifier: .gregorian)
+            parser.timeZone = TimeZone(secondsFromGMT: 0)
+            parser.dateFormat = "yyyy-MM-dd"
+            parser.isLenient = false
+            guard let date = parser.date(from: key), parser.string(from: date) == key else { return "終日" }
+            let today = DateFormatter()
+            today.locale = Locale(identifier: "en_US_POSIX")
+            today.calendar = Calendar(identifier: .gregorian)
+            today.timeZone = timeZone
+            today.dateFormat = "yyyy-MM-dd"
+            if today.string(from: now) == key { return "終日" }
+            parser.dateFormat = "M/d"
+            return parser.string(from: date) + " 終日"
+        }
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var date = parser.date(from: event.startsAtIso)
@@ -43,8 +63,8 @@ enum FeaturedWidgetData {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let sameDay = calendar.isDate(date, inSameDayAs: now)
-        formatter.dateFormat = event.allDay ? "M/d" : (sameDay ? "H:mm" : "M/d H:mm")
-        return event.allDay ? (sameDay ? "終日" : formatter.string(from: date) + " 終日") : formatter.string(from: date)
+        formatter.dateFormat = sameDay ? "H:mm" : "M/d H:mm"
+        return formatter.string(from: date)
     }
 
     static func colorRGB(_ hex: String) -> UInt32 {

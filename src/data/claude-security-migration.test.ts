@@ -108,6 +108,39 @@ it('参照偽装を拒否し、他人の秘密と予定を保護する', async (
       ],
     );
     expect(await scalar('select user_id from events where connection_id=$1', [conn])).toBe(b);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [b]);
+    await db.exec('set role authenticated');
+    await expect(
+      db.query(
+        "insert into events(user_id,calendar_id,title,all_day,event_date,source) values($1,$2,'不正な所属',true,'2026-10-15','local')",
+        [b, cb],
+      ),
+    ).rejects.toThrow();
+    const ownLocal = await scalar(
+      "insert into calendars(user_id,name,color) values($1,'通常','#112233') returning id",
+      [b],
+    );
+    for (const [column, value] of [
+      ['external_id', 'changed'],
+      ['external_calendar_id', 'other-cal'],
+      ['calendar_id', ownLocal],
+    ]) {
+      await expect(
+        db.query(`update events set ${column}=$1 where connection_id=$2`, [value, conn]),
+      ).rejects.toThrow('protected Google references');
+    }
+    expect(await scalar('select external_id from events where connection_id=$1', [conn])).toBe(
+      'shared-id',
+    );
+    expect(
+      await scalar('select external_calendar_id from events where connection_id=$1', [conn]),
+    ).toBe('b-cal');
+    await db.query('update events set reminder_minutes=10 where connection_id=$1', [conn]);
+    expect(
+      await scalar('select reminder_minutes from events where connection_id=$1', [conn]),
+    ).toBe(10);
+    await db.exec('reset role');
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [a]);
     await db.exec('set role authenticated');
     await db.query('select delete_my_account()');
     await db.exec('reset role');

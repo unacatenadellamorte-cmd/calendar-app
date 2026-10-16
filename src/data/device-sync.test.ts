@@ -18,21 +18,53 @@ interface Call {
 }
 let calls: Call[] = [];
 let responseQueue: unknown[] = [];
+let apiPageLimit = Infinity;
 
 function makeBuilder(table: string) {
   const response = responseQueue.shift() ?? { data: null, error: null };
+  let externalIds: string[] | undefined;
+  let requestedLimit = Infinity;
+  let requestedRange: [number, number] | undefined;
   const chain: Record<string, unknown> = {};
   const record =
     (method: string) =>
     (...args: unknown[]) => {
       calls.push({ table, method, args });
+      if (method === 'in' && args[0] === 'external_id') externalIds = args[1] as string[];
+      if (method === 'limit') requestedLimit = args[0] as number;
+      if (method === 'range') requestedRange = args as [number, number];
       return chain;
     };
-  for (const m of ['select', 'eq', 'is', 'in', 'limit', 'returns', 'update', 'insert']) {
+  for (const m of [
+    'select',
+    'eq',
+    'is',
+    'in',
+    'limit',
+    'range',
+    'order',
+    'returns',
+    'update',
+    'insert',
+  ]) {
     chain[m] = record(m);
   }
   chain.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-    Promise.resolve(response).then(resolve, reject);
+    Promise.resolve(response)
+      .then((value) => {
+        const result = value as { data?: { external_id?: string }[] };
+        if (!Array.isArray(result.data)) return value;
+        let data = externalIds
+          ? result.data.filter(
+              (row) => !row.external_id || externalIds!.includes(row.external_id),
+            )
+          : result.data;
+        data = requestedRange
+          ? data.slice(requestedRange[0], requestedRange[1] + 1)
+          : data.slice(0, requestedLimit);
+        return { ...result, data: data.slice(0, apiPageLimit) };
+      })
+      .then(resolve, reject);
   return chain;
 }
 
@@ -89,6 +121,7 @@ beforeEach(() => {
   vi.resetModules();
   calls = [];
   responseQueue = [];
+  apiPageLimit = Infinity;
   from.mockClear();
   supabaseValue = { from };
   getDeviceConnection.mockReset();
@@ -101,6 +134,128 @@ beforeEach(() => {
 });
 
 describe('syncDeviceCalendarsNow', () => {
+  it('多数の消えた端末予定も長いURLを作らず分割して削除する', async () => {
+    apiPageLimit = 1000;
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
+    const rows = Array.from({ length: 1001 }, (_, i) => ({
+      external_id: occurrenceKey(`deleted-${i}-${'x'.repeat(40)}`),
+      starts_at: new Date(deviceStart).toISOString(),
+      event_date: null,
+    }));
+    responseQueue = [
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
+      { data: rows, error: null },
+      { data: rows, error: null },
+      { data: rows, error: null },
+      ...Array.from({ length: 1001 }, () => ({ error: null })),
+    ];
+    listDeviceEventsInRange.mockResolvedValue([]);
+    const { syncDeviceCalendarsNow } = await load();
+    expect(await syncDeviceCalendarsNow()).toMatchObject({
+      ok: true,
+      value: { synced: [{ deleted: 1001 }], errors: [] },
+    });
+    const batches = calls
+      .filter((call) => call.method === 'in')
+      .map((call) => call.args[1] as string[]);
+    expect(batches.flat().sort()).toEqual(rows.map((row) => row.external_id).sort());
+    expect(
+      batches.every(
+        (batch) =>
+          batch.reduce(
+            (sum, id) => sum + encodeURIComponent(JSON.stringify(id)).length + 1,
+            0,
+          ) <= 2000,
+      ),
+    ).toBe(true);
+  });
+  it('APIの1000件上限を超える端末予定も分割照合して重複INSERTしない', async () => {
+    apiPageLimit = 1000;
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
+    const rows = Array.from({ length: 1001 }, (_, i) => ({
+      id: `kept-${i}`,
+      external_id: occurrenceKey(`e${i}`),
+      calendar_id: 'cal-a-id',
+      starts_at: new Date(deviceStart).toISOString(),
+      event_date: null,
+    }));
+    responseQueue = [
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
+      { data: rows, error: null },
+      { data: rows, error: null },
+      { data: rows, error: null },
+      ...Array.from({ length: 1001 }, () => ({ error: null })),
+      { data: [], error: null },
+    ];
+    listDeviceEventsInRange.mockResolvedValue(
+      Array.from({ length: 1001 }, (_, i) => rawEvent({ id: `e${i}` })),
+    );
+    const { syncDeviceCalendarsNow } = await load();
+    expect(await syncDeviceCalendarsNow()).toMatchObject({
+      ok: true,
+      value: { synced: [{ upserted: 1001 }], errors: [] },
+    });
+    expect(calls.some((call) => call.method === 'insert')).toBe(false);
+    expect(calls.filter((call) => call.method === 'update')).toHaveLength(1001);
+  });
+  it('単発予定の開始変更でも既存行IDと通知設定を保持する', async () => {
+    getDeviceConnection.mockResolvedValue(
+      ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
+    );
+    responseQueue = [
+      {
+        data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }],
+        error: null,
+      },
+      {
+        data: [
+          {
+            id: 'kept',
+            external_id: occurrenceKey(),
+            calendar_id: 'cal-a-id',
+            starts_at: new Date(deviceStart).toISOString(),
+            event_date: null,
+            deleted_at: null,
+          },
+        ],
+        error: null,
+      },
+      { error: null },
+      { data: [], error: null },
+    ];
+    listDeviceEventsInRange.mockResolvedValue([
+      rawEvent({
+        isPartOfSeries: false,
+        startDate: deviceStart + 3600000,
+        endDate: deviceStart + 7200000,
+      }),
+    ]);
+    const { syncDeviceCalendarsNow } = await load();
+    expect(await syncDeviceCalendarsNow()).toMatchObject({ ok: true, value: { errors: [] } });
+    expect(calls.some((call) => call.method === 'insert')).toBe(false);
+    expect(calls.find((call) => call.method === 'update')?.args[0]).toMatchObject({
+      external_id: JSON.stringify(['cal-a', 'e1']),
+      starts_at: new Date(deviceStart + 3600000).toISOString(),
+    });
+    expect(calls.find((call) => call.method === 'update')?.args[0]).not.toHaveProperty(
+      'reminder_minutes',
+    );
+    expect(
+      calls.some(
+        (call) => call.method === 'eq' && call.args[0] === 'id' && call.args[1] === 'kept',
+      ),
+    ).toBe(true);
+  });
   it('旧キーの同じ回は元の行IDを保ち、リマインダーを上書きしない', async () => {
     getDeviceConnection.mockResolvedValue(
       ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
@@ -386,7 +541,7 @@ describe('syncDeviceCalendarsNow', () => {
     expect(calls.some((c) => c.table === 'events' && c.method === 'in')).toBe(false);
   });
 
-  it('削除差分用の既存イベント SELECT に安全マージンの limit を付ける', async () => {
+  it('削除差分の取得も1リクエスト500件の安定順で区切る', async () => {
     getDeviceConnection.mockResolvedValue(
       ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),
     );
@@ -400,8 +555,12 @@ describe('syncDeviceCalendarsNow', () => {
     listDeviceEventsInRange.mockResolvedValue([]);
     const { syncDeviceCalendarsNow } = await load();
     await syncDeviceCalendarsNow();
-    const limitCall = calls.find((c) => c.table === 'events' && c.method === 'limit');
-    expect(limitCall?.args).toEqual([2000]);
+    expect(calls.find((c) => c.table === 'events' && c.method === 'range')?.args).toEqual([
+      0, 499,
+    ]);
+    expect(calls.find((c) => c.table === 'events' && c.method === 'order')?.args).toEqual([
+      'id',
+    ]);
   });
 
   it('1カレンダーの失敗は他を止めない', async () => {

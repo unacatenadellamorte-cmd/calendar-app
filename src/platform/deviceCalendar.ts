@@ -63,6 +63,8 @@ export async function listDeviceCalendars(): Promise<DeviceCalendar[]> {
 /** `listEventsInRange` の生イベントのうち、予定取り込み(Story 5.3)が使う分だけ。 */
 export interface DeviceCalendarEvent {
   id: string;
+  /** 単発はIDだけで追跡し、系列は各回の開始で区別する。旧SDKでは不明。 */
+  isPartOfSeries?: boolean;
   title: string;
   description: string | null;
   isAllDay: boolean;
@@ -82,6 +84,7 @@ export async function listDeviceEventsInRange(
   const { result } = await CapacitorCalendar.listEventsInRange({ from: fromMs, to: toMs });
   return result.map((e) => ({
     id: e.id,
+    ...(typeof e.isPartOfSeries === 'boolean' ? { isPartOfSeries: e.isPartOfSeries } : {}),
     title: e.title,
     description: e.description,
     isAllDay: e.isAllDay,
