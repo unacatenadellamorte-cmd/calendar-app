@@ -61,7 +61,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>プロフィール写真やカレンダーの背景画像に使う写真を撮影します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>プロフィール写真やカレンダーの背景画像に使う写真を選びます。</string>
+	<string>プロフィール写真やカレンダーの背景画像に使う写真を選びます。また、選んだ日に撮影した写真をカレンダーに表示します。この日別一覧用の写真は読み取り専用で、アプリによる複製保存やサーバー送信は行いません。</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
 	<key>NSCalendarsUsageDescription</key>
 	<string>予定を取り込むために端末のカレンダーを読み取ります。このアプリ自身は読み取りにしか使いません(iOS 13-16)。</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>

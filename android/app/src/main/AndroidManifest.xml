@@ -101,4 +101,14 @@
         (誤って書き込み API を呼んでも OS が拒否するようにするため)。
     -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+    <!--
+        端末の写真(選択日に撮影した写真の一覧、読み取り専用)。操作した時だけ権限を求める。
+        Android 14 以上は「選択した写真」だけの一部許可にも対応する。
+        広い写真権限(READ_MEDIA_IMAGES)の Play Console での申告・承認は、配布前の別ゲートで行う
+        (docs/device-photos-by-day-20261020.md 参照)。書き込み・動画・位置情報の権限は追加しない。
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 </manifest>

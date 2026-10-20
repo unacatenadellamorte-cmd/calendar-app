@@ -3,6 +3,23 @@ import { act, render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
+import { DEVICE_PHOTOS_ENABLED_STORAGE_KEY, resetDevicePhotosEnabledForTests } from '@/features/settings/model/useDevicePhotosEnabled';
+
+// 写真の経路は製品の画面・設定・フックを使い、外部OSだけを模擬する。
+const photoPlatform = vi.hoisted(() => ({ native: false }));
+const photoPlugin = vi.hoisted(() => ({
+  checkPermission: vi.fn(async () => ({ status: 'granted' })),
+  listAssets: vi.fn(async () => ({ assets: [{ id: 'qa-photo', createdMs: Date.UTC(2026, 8, 8, 1) }], hasMore: false })),
+  loadImage: vi.fn(async () => ({ dataUrl: 'data:image/jpeg;base64,QQ==' })),
+  cancelLoads: vi.fn(async () => {}),
+  cancelLoad: vi.fn(async () => {}),
+}));
+vi.mock('@capacitor/core', async (original) => ({
+  ...(await original<typeof import('@capacitor/core')>()),
+  Capacitor: { isNativePlatform: () => photoPlatform.native, getPlatform: () => photoPlatform.native ? 'ios' : 'web' },
+  registerPlugin: (name: string) => name === 'DevicePhotos' ? photoPlugin : {},
+}));
+vi.mock('@capacitor/app', () => ({ App: { addListener: vi.fn(async () => ({ remove: async () => {} })) } }));
 
 vi.mock('@/app/AdBanner', () => ({ AdBanner: () => <div data-testid="calendar-ad-slot" /> }));
 
@@ -66,6 +83,8 @@ vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }
 const { CalendarScreen } = await import('./CalendarScreen');
 
 beforeEach(() => {
+  photoPlatform.native = false;
+  resetDevicePhotosEnabledForTests();
   // 日付付きの検証データに合わせ、実行日の月替わりに依存させない。
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-09-08T00:00:00+09:00'));
@@ -95,6 +114,28 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it.each([
+    ['月', 'local', '予定を編集'],
+    ['月', 'google', '予定の詳細'],
+    ['日', 'local', '予定を編集'],
+    ['日', 'google', '予定の詳細'],
+  ] as const)('%s表示で写真の拡大中に%s予定を開くと、写真を閉じて%sだけ表示する', async (view, source, title) => {
+    photoPlatform.native = true;
+    window.localStorage.setItem(DEVICE_PHOTOS_ENABLED_STORAGE_KEY, 'true');
+    resetDevicePhotosEnabledForTests();
+    evState.events = [{ ...sampleEvent, source }];
+    const user = userEvent.setup();
+    const page = render(<CalendarScreen />);
+    if (view === '日') await user.click(screen.getByRole('radio', { name: '日' }));
+    else await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
+    await user.click(await screen.findByRole('button', { name: /の写真を拡大/ }));
+    expect(screen.getByRole('dialog', { name: '写真' })).toBeInTheDocument();
+    page.rerender(<CalendarScreen initialEventId="e1" initialRequestKey="photos-to-event" />);
+    expect(screen.queryByRole('dialog', { name: '写真' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: title })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  });
   it('各ビューで表示切替と年月見出しの間に広告枠を置く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);

@@ -22,6 +22,7 @@
 		C3676566BD61B978FD1C6FC2 /* FeaturedEventsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F35924E8375FAAD126766C /* FeaturedEventsWidget.swift */; };
 		C63395EDA1153BACBCA850D3 /* FeaturedEventsWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5117DB22B3EDE4B0799EFE18 /* FeaturedEventsWidgetBundle.swift */; };
 		21FEF8B3FE2D4A1180E3B3A3 /* GoogleAuthorizationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230682FFDFA548DFA2CB9734 /* GoogleAuthorizationPlugin.swift */; };
+		4A9E1F6D2B7C48D3A5E0F1B2 /* DevicePhotosPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3D2C5A91E84F0AB6C1D2E3 /* DevicePhotosPlugin.swift */; };
 		E81E962D063448C597F8C190 /* CalendarGridData.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB9D35C37108441183516FB3 /* CalendarGridData.swift */; };
 		C4516B22D4024169A2A2DFCB /* CalendarGridWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD83DFB1238645EFA3D49FA1 /* CalendarGridWidget.swift */; };
 		9CDA5E37018A4682B7705DBB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 14594F8C8D38468F88C99EEF /* PrivacyInfo.xcprivacy */; };
@@ -74,6 +75,7 @@
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		230682FFDFA548DFA2CB9734 /* GoogleAuthorizationPlugin.swift */ = {isa = PBXFileReference; name = "GoogleAuthorizationPlugin.swift"; path = "GoogleAuthorizationPlugin.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; includeInIndex = 0; };
+		7B3D2C5A91E84F0AB6C1D2E3 /* DevicePhotosPlugin.swift */ = {isa = PBXFileReference; name = "DevicePhotosPlugin.swift"; path = "DevicePhotosPlugin.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; includeInIndex = 0; };
 		EB9D35C37108441183516FB3 /* CalendarGridData.swift */ = {isa = PBXFileReference; name = "CalendarGridData.swift"; path = "Models/CalendarGridData.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; includeInIndex = 0; };
 		DD83DFB1238645EFA3D49FA1 /* CalendarGridWidget.swift */ = {isa = PBXFileReference; name = "CalendarGridWidget.swift"; path = "CalendarGridWidget.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; includeInIndex = 0; };
 		14594F8C8D38468F88C99EEF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 				5F72B8D7F499CCDCF10A890F /* App.entitlements */,
 				230682FFDFA548DFA2CB9734 /* GoogleAuthorizationPlugin.swift */,
+				7B3D2C5A91E84F0AB6C1D2E3 /* DevicePhotosPlugin.swift */,
 				14594F8C8D38468F88C99EEF /* PrivacyInfo.xcprivacy */,
 			);
 			path = App;
@@ -314,6 +317,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				21FEF8B3FE2D4A1180E3B3A3 /* GoogleAuthorizationPlugin.swift in Sources */,
+				4A9E1F6D2B7C48D3A5E0F1B2 /* DevicePhotosPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

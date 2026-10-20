@@ -21,6 +21,8 @@ import {
   type MonthEventSize,
 } from '@/features/settings/model/monthEventSize';
 import { useShiftAutoAdvance } from '@/features/settings/model/useShiftAutoAdvance';
+import { useDevicePhotosEnabled } from '@/features/settings/model/useDevicePhotosEnabled';
+import { isDevicePhotosSupported } from '@/platform/devicePhotos';
 const THEME_OPTIONS: {
   value: ThemePreference;
   label: string;
@@ -68,6 +70,7 @@ export function SettingsScreen() {
   const featuredCount = useFeaturedCount();
   const { monthEventSize, setMonthEventSize } = useMonthEventSize();
   const { shiftAutoAdvance, setShiftAutoAdvance } = useShiftAutoAdvance();
+  const { devicePhotosEnabled, setDevicePhotosEnabled } = useDevicePhotosEnabled();
   return (
     <Screen title={t('設定')} showProfileHeader>
       <section aria-labelledby="theme-heading" className="mt-2">
@@ -182,6 +185,29 @@ export function SettingsScreen() {
           ))}
         </div>
       </section>
+
+      {isDevicePhotosSupported() && (
+        <section aria-labelledby="device-photos-heading" className="mt-6">
+          <h2 id="device-photos-heading" className="text-body font-semibold text-ink-primary">
+            {t('端末の写真')}
+          </h2>
+          <label className="mt-3 flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary focus-within:ring-2 focus-within:ring-inset focus-within:ring-accent">
+            <span>{t('カレンダーに端末の写真を表示')}</span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={devicePhotosEnabled}
+              onChange={(event) => setDevicePhotosEnabled(event.target.checked)}
+              className="h-5 w-5 accent-accent"
+            />
+          </label>
+          <p className="mt-1 text-meta text-ink-secondary">
+            {t(
+              '選んだ日に撮影した写真を、日付の下に表示します。写真はこの端末の中だけで読み取り、保存や送信はしません。この設定はOSの写真アクセス権限の撤回とは別です。',
+            )}
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="featured-count-heading" className="mt-6">
         <h2 id="featured-count-heading" className="text-body font-semibold text-ink-primary">

@@ -3,6 +3,7 @@ import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { formatDayTitle } from '@/lib/datetime';
 import { EventListItem } from '@/features/events/ui/EventListItem';
+import { DayPhotoSection } from './DayPhotoSection';
 interface DayEventPanelProps {
   /** 選択中の日付 "YYYY-MM-DD"。 */
   date: string;
@@ -12,6 +13,10 @@ interface DayEventPanelProps {
   onEventTap: (event: EventItem) => void;
   /** 「＋ この日に予定を追加」。呼び出し側で `date` をシードした予定フォームを開く想定。 */
   onAddEvent: () => void;
+  /** 予定の入力・詳細シートが開いている間は true。写真の拡大表示を重ねない。 */
+  photosSuspended?: boolean;
+  /** 利用者の識別子(写真の解放用)。 */
+  userId?: string;
 }
 /**
  * 月表示の折りたたみ(Option C)の下に出す、選択中の日付の予定一覧パネル。
@@ -24,6 +29,8 @@ export function DayEventPanel({
   calendarById,
   onEventTap,
   onAddEvent,
+  photosSuspended = false,
+  userId,
 }: DayEventPanelProps) {
   useLanguage();
   const dayEvents = byDay.get(date) ?? [];
@@ -53,6 +60,8 @@ export function DayEventPanel({
       >
         {t('＋ この日に予定を追加')}
       </button>
+
+      <DayPhotoSection date={date} suspended={photosSuspended} userId={userId} />
     </section>
   );
 }

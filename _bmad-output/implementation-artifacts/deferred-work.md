@@ -189,3 +189,7 @@
 - source_spec: none
   summary: カレンダーで選択した日に撮影した端末写真ライブラリの写真を一覧表示する追加機能を、29の審査対応後の別機能版として仕様化する。
   evidence: 2026-10-20本人が対象を端末写真ライブラリ全体と回答し、29の撮影・課金テストを先に、写真一覧を別版とする分割を選択。許可された写真だけを端末内で表示する方向とし、権限・撮影日の解釈・表示先・iCloud写真・動画の扱いと受入条件は追加仕様で確定する。審査用29へ新機能を混ぜない。
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-device-photos-by-day-20261020.md`
+  summary: iOSのPhotoKit実行環境で、写真一覧ではクラウド取得を行わず、個別拡大だけ通信を許すことを配布前に検証する。
+  evidence: 2026-10-20の検証ギャップG3。JS試験はネイティブ境界を模擬し、実OS試験はAndroid専用でSwiftのisNetworkAccessAllowedを実行しない。本人は今回はローカル検証までを指定し、WindowsにはMac・PhotoKit実行環境がない。iCloudのみの架空画像を使ったiOS実行で確認するまで未検証とする。

@@ -75,5 +75,6 @@ public class GoogleAuthorizationPlugin: CAPPlugin, CAPBridgedPlugin {
 class CalendarBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(GoogleAuthorizationPlugin())
+        bridge?.registerPluginInstance(DevicePhotosPlugin())
     }
 }

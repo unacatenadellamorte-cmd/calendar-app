@@ -6,6 +6,7 @@ import { compareEventsForList } from '@core';
 import { eventOccursOnDate, layoutDayEvents, makePriorityOf } from '@/lib/calendar-view';
 import { minutesIntoLocalDay } from '@/lib/datetime';
 import { EventChip } from './EventChip';
+import { DayPhotoSection } from './DayPhotoSection';
 interface WeekViewProps {
   cursor: string;
   events: EventItem[];
@@ -13,6 +14,8 @@ interface WeekViewProps {
   today: string;
   onSlotTap: (startLocal: string) => void;
   onEventTap: (event: EventItem) => void;
+  photosSuspended?: boolean;
+  userId?: string;
 }
 const HOUR_PX = 48;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -28,6 +31,8 @@ export function WeekView({
   today,
   onSlotTap,
   onEventTap,
+  photosSuspended,
+  userId,
 }: WeekViewProps) {
   useLanguage();
   // 重なり順・終日帯の並びは所属カレンダーの優先度順(Story 2.3)。
@@ -140,6 +145,7 @@ export function WeekView({
           </div>
         </div>
       </div>
+      <DayPhotoSection date={cursor} suspended={photosSuspended} userId={userId} />
     </div>
   );
 }

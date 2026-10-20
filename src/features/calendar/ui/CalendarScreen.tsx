@@ -52,7 +52,7 @@ export function CalendarScreen({
   initialRequestKey,
 }: CalendarScreenProps = {}) {
   useLanguage();
-  const { state } = useAuth();
+  const { state, session } = useAuth();
   const enabled = state === 'guest' || state === 'authenticated';
   const cal = useCalendars(enabled);
   const ev = useEvents(enabled);
@@ -305,6 +305,8 @@ export function CalendarScreen({
               calendarById={calendarById}
               onEventTap={openEdit}
               onAddEvent={() => openCreate({ date: selectedDay })}
+              photosSuspended={sheetOpen || detailEvent !== null}
+              userId={session?.user.id}
             />
           )}
           {!selectedDay && (
@@ -327,6 +329,8 @@ export function CalendarScreen({
           today={today}
           onSlotTap={(startLocal) => openCreate({ startLocal })}
           onEventTap={openEdit}
+          photosSuspended={sheetOpen || detailEvent !== null}
+          userId={session?.user.id}
         />
       ) : view === 'year' ? (
         <YearView

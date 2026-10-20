@@ -9,6 +9,8 @@ const config: CapacitorConfig = {
   appName: 'Multi calendar',
   // Vite のビルド出力(vite.config.ts の既定 outDir)とそろえる。
   webDir: 'dist',
+  // 写真ブリッジの識別子・日時・画像を自動デバッグログへ出さない。両OSで適用する。
+  loggingBehavior: 'none',
   ios: {
     // DOMの安全領域をネイティブ側で重ねて加算しない。
     contentInset: 'never',
