@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { appError, err, ok } from '@/data/result';
 import type { Profile } from '@/data/profiles';
 import { Screen } from '@/ui/Screen';
@@ -70,10 +70,33 @@ vi.mock('@/data/profiles', () => ({
 
 const { AppShell } = await import('./AppShell');
 const { ProfileScreen } = await import('@/features/profile/ui/ProfileScreen');
+const { SettingsScreen } = await import('@/features/settings/ui/SettingsScreen');
 
-function ShellRoutes({ initialPath = '/' }: { initialPath?: string }) {
+function HistoryControls() {
+  const location = useLocation();
+  const navigate = useNavigate();
   return (
-    <MemoryRouter initialEntries={[initialPath]}>
+    <>
+      <output aria-label="現在のURL">
+        {location.pathname + location.search + location.hash}
+      </output>
+      <button type="button" onClick={() => navigate(-1)}>
+        履歴で戻る
+      </button>
+    </>
+  );
+}
+
+function ShellRoutes({
+  initialPath = '/',
+  initialEntries,
+}: {
+  initialPath?: string;
+  initialEntries?: string[];
+}) {
+  return (
+    <MemoryRouter initialEntries={initialEntries ?? [initialPath]}>
+      {initialEntries && <HistoryControls />}
       <Routes>
         <Route path="/" element={<AppShell />}>
           <Route
@@ -85,6 +108,7 @@ function ShellRoutes({ initialPath = '/' }: { initialPath?: string }) {
             }
           />
           <Route path="profile" element={<ProfileScreen />} />
+          <Route path="settings" element={<SettingsScreen />} />
           <Route
             path="calendar"
             element={
@@ -120,6 +144,36 @@ beforeEach(() => {
 });
 
 describe('AppShell × OnboardingScreen(実フック、data層のみモック)', () => {
+  it('カレンダーのアバターからプロフィールを開き、戻る操作でカレンダーへ復帰できる', async () => {
+    authState = 'authenticated';
+    getProfile.mockResolvedValue(ok({ id: 'u1', displayName: '花子', avatarDataUrl: null }));
+    render(<ShellRoutes initialEntries={['/', '/calendar?date=2026-10-20#selected']} />);
+    await userEvent.click(await screen.findByRole('link', { name: 'プロフィール' }));
+    await screen.findByRole('heading', { name: 'プロフィール' });
+    await userEvent.click(screen.getByRole('link', { name: '戻る' }));
+    expect(screen.getByRole('heading', { name: 'カレンダー画面' })).toBeInTheDocument();
+    expect(screen.getByLabelText('現在のURL')).toHaveTextContent(
+      '/calendar?date=2026-10-20#selected',
+    );
+    await userEvent.click(screen.getByRole('button', { name: '履歴で戻る' }));
+    expect(screen.getByRole('heading', { name: 'ホーム画面' })).toBeInTheDocument();
+  });
+
+  it('設定一覧からプロフィールへ進んでも、戻る操作が履歴を重複させない', async () => {
+    authState = 'authenticated';
+    getProfile.mockResolvedValue(ok({ id: 'u1', displayName: '花子', avatarDataUrl: null }));
+    render(<ShellRoutes initialEntries={['/calendar', '/settings']} />);
+    await screen.findByRole('heading', { name: '設定' });
+    await userEvent.click(
+      within(screen.getByRole('main')).getByRole('link', { name: /プロフィール/ }),
+    );
+    await screen.findByRole('heading', { name: 'プロフィール' });
+    await userEvent.click(screen.getByRole('link', { name: '戻る' }));
+    expect(screen.getByRole('heading', { name: '設定' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '履歴で戻る' }));
+    expect(screen.getByRole('heading', { name: 'カレンダー画面' })).toBeInTheDocument();
+  });
+
   it('オンボーディングで送信成功すると、AppShell 自身が profile を認識して通常画面へ切り替わる', async () => {
     authState = 'authenticated';
     getProfile.mockResolvedValue(ok(null));

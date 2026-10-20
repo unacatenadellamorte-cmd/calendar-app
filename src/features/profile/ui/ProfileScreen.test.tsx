@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 
 /**
  * `profile`/`update` は `AppShell` から `<Outlet context>` 経由で受け取る(レビュー指摘で
- * 画面ごとに別インスタンスの `useProfile` を呼ぶのをやめたため)。ここでは
- * `react-router-dom` の `useOutletContext` だけを差し替えてテストする。
+ * 画面ごとに別インスタンスの `useProfile` を呼ぶのをやめたため)。実際のルーターと
+ * Outletでプロフィール画面へ状態を渡し、表示と戻る操作の結果を検査する。
  */
 
 const update = vi.fn();
@@ -18,12 +19,20 @@ let outletContext: {
 } = { profile: null, loading: false, errorKey: null, update: (p) => update(p) };
 
 vi.mock('@/app/auth-context', () => ({ useAuth: () => ({ state: authState }) }));
-vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react-router-dom')>();
-  return { ...actual, useOutletContext: () => outletContext };
-});
-
 const { ProfileScreen } = await import('./ProfileScreen');
+
+function renderProfile() {
+  return render(
+    <MemoryRouter initialEntries={['/profile']}>
+      <Routes>
+        <Route element={<Outlet context={outletContext} />}>
+          <Route path="/profile" element={<ProfileScreen />} />
+          <Route path="/settings" element={<h1>設定画面</h1>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 beforeEach(() => {
   update.mockReset();
@@ -32,6 +41,12 @@ beforeEach(() => {
 });
 
 describe('ProfileScreen', () => {
+  it('プロフィールを直接開いた場合も、戻る操作で設定画面に復帰できる', async () => {
+    renderProfile();
+    await userEvent.click(screen.getByRole('link', { name: '戻る' }));
+    expect(screen.getByRole('heading', { name: '設定画面' })).toBeInTheDocument();
+  });
+
   it('既存プロフィールから言語だけを変更でき、名前や写真の更新は呼ばない', async () => {
     outletContext = {
       profile: { id: 'u1', displayName: '花子', avatarDataUrl: null },
@@ -39,22 +54,23 @@ describe('ProfileScreen', () => {
       errorKey: null,
       update: (p) => update(p),
     };
-    render(<ProfileScreen />);
+    renderProfile();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'en');
     expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('花子');
     expect(update).not.toHaveBeenCalled();
     expect(localStorage.getItem('calendar-app.language')).toBe('en');
   });
   it('unavailable なら Supabase 未設定の案内を表示する', () => {
     authState = 'unavailable';
-    render(<ProfileScreen />);
+    renderProfile();
     expect(screen.getByText(/ローカル開発では認証は無効です/)).toBeInTheDocument();
   });
 
   it('読み込み中は読み込み中表示', () => {
     outletContext = { profile: null, loading: true, errorKey: null, update: (p) => update(p) };
-    render(<ProfileScreen />);
+    renderProfile();
     expect(screen.getByText('読み込み中…')).toBeInTheDocument();
   });
 
@@ -65,7 +81,7 @@ describe('ProfileScreen', () => {
       errorKey: null,
       update: (p) => update(p),
     };
-    render(<ProfileScreen />);
+    renderProfile();
     expect(screen.getByLabelText('名前')).toHaveValue('花子');
     expect(screen.getByRole('button', { name: '保存する' })).toBeEnabled();
   });
@@ -79,7 +95,7 @@ describe('ProfileScreen', () => {
     };
     update.mockResolvedValue(true);
     const user = userEvent.setup();
-    render(<ProfileScreen />);
+    renderProfile();
     await user.clear(screen.getByLabelText('名前'));
     await user.type(screen.getByLabelText('名前'), '次郎');
     await user.click(screen.getByRole('button', { name: '保存する' }));
@@ -93,7 +109,7 @@ describe('ProfileScreen', () => {
       errorKey: 'data/query',
       update: (p) => update(p),
     };
-    render(<ProfileScreen />);
+    renderProfile();
     expect(screen.getByRole('alert')).toHaveTextContent(
       '読み込みに失敗しました。もう一度お試しください',
     );

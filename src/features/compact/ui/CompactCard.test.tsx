@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
@@ -45,6 +45,13 @@ const calendarById = new Map<string, Calendar>([
 ]);
 
 describe('CompactCard', () => {
+  beforeEach(() => {
+    // 予定の固定日が実行日と重なっても「別日」の条件を維持する。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-19T03:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it('別日の時刻付き・終日予定は日付を併記する', () => {
     render(
       <CompactCard

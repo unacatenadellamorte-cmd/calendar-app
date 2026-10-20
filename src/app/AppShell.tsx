@@ -220,6 +220,10 @@ const AVATAR_TAP_WINDOW_MS = 300;
  */
 export function AvatarNav({ profile }: { profile: Profile }) {
   useLanguage();
+  const location = useLocation();
+  const profileState = {
+    profileReturnTo: location.pathname + location.search + location.hash,
+  };
   const navigate = useNavigate();
   const { unlocked, hasPasscode, lock } = useSecretMode();
   const [quickUnlockOpen, setQuickUnlockOpen] = useState(false);
@@ -271,7 +275,7 @@ export function AvatarNav({ profile }: { profile: Profile }) {
     }
     tapTimerRef.current = setTimeout(() => {
       tapTimerRef.current = null;
-      navigate('/profile');
+      navigate('/profile', { state: profileState });
     }, AVATAR_TAP_WINDOW_MS);
   };
   return (
@@ -279,6 +283,7 @@ export function AvatarNav({ profile }: { profile: Profile }) {
       <div className="flex shrink-0 items-center">
         <Link
           to="/profile"
+          state={profileState}
           onClick={handleTap}
           aria-label={t('プロフィール')}
           className="touch-manipulation inline-flex min-h-11 min-w-11 items-center justify-center rounded-full"

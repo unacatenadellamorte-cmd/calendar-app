@@ -2,7 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import { BackgroundSection } from './BackgroundSection';
 import { AdsPrivacySection } from './AdsPrivacySection';
 import { themePalettes, type PaletteName } from '../model/themePalettes';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
 import { useTheme, type ThemePreference } from '@/features/settings/model/useTheme';
 import {
@@ -63,6 +63,7 @@ const SHIFT_AUTO_ADVANCE_OPTIONS = [
 ] as const;
 export function SettingsScreen() {
   useLanguage();
+  const location = useLocation();
   const { theme, setTheme } = useTheme();
   const featuredCount = useFeaturedCount();
   const { monthEventSize, setMonthEventSize } = useMonthEventSize();
@@ -228,6 +229,7 @@ export function SettingsScreen() {
       <section className="mt-6 flex flex-col gap-2">
         <Link
           to="/profile"
+          state={{ profileReturnTo: location.pathname + location.search + location.hash }}
           className="flex min-h-11 items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
         >
           {t('プロフィール')}

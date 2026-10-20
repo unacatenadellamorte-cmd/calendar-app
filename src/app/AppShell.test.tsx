@@ -341,7 +341,9 @@ describe('AppShell', () => {
         vi.advanceTimersByTime(300);
       });
       expect(navigateMock).toHaveBeenCalledTimes(1);
-      expect(navigateMock).toHaveBeenCalledWith('/profile');
+      expect(navigateMock).toHaveBeenCalledWith('/profile', {
+        state: { profileReturnTo: '/' },
+      });
     });
 
     it('300ms以内に2回タップ かつ パスコード未設定なら /secret-mode へ遷移し、/profile へは遷移しない', () => {
