@@ -2,7 +2,7 @@
 title: 'Multi Calendar修正版の両ストア更新・再申請'
 type: 'chore'
 created: '2026-10-16'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'cb9c44169caaf135c6c60466732037f1d262be9f'
@@ -43,14 +43,16 @@ context: [docs/ios-app-store-release.md]
 - [x] android/app/build.gradle：ストア照合後、未使用コードで署名AAB作成。
 - [x] .github/workflows/ios.yml：既存releaseで新IPA作成、検証済みrun・ハッシュ・版に送信対象を固定。
 - [x] docs/store-resubmission-20261016.md：成果物・設定・未受入・提出結果を記録。
-- [ ] 両管理画面：掲載情報と審査メモを修正内容へ合わせ、条件が揃った側から再申請。
+- [x] 両管理画面：掲載情報と審査メモを修正内容へ合わせ、条件が揃った側から再申請。
   - [x] Android：既存Alphaの28を審査送信し、事前チェック終了後の「審査中」を確認。
   - [x] Apple：29の処理完了・既存TestFlightグループへの配布と提出候補の差替え、審査メモの準備更新。
-  - [ ] Apple：契約状態・実機受入後に再審査送信し、審査待ちを確認。
+  - [x] Apple：契約状態・実機受入後に再審査送信し、審査待ちを確認。
 
 検証済み成果物があるとき、送信すると、その版だけが選択されること。再申請後、審査待ち／審査中を画面等で確認すること。片側が未完了なら両側完了としない。
 
 ## Implementation Notes
+
+2026-10-20再審査送信完了：本人がApp Store再審査を明示依頼。有料契約・銀行・納税の有効を再確認し、既存1.0.25の候補を30へ変更。審査メモへ29の本人受入と30の静的・署名検証、未実施の実機項目を区別して追記し、ログイン情報・連絡先・旧メモを保持した。既存提出の4項目を維持して再提出し、10:56:41 JSTの送信日時、提出とアプリのWAITING_FOR_REVIEW、選択30・手動公開をAPIでも再取得。画面でも4件の審査待ちを確認した。詳細はdocs/app-store-resubmission-20261020.md。送信仕様として完了するが、承認・一般公開・30の戻る実機受入・購入キャンセル・写真一覧は完了扱いにしない。下記の未送信という停止点は本依頼前の状態。
 
 2026-10-20：本人がプロフィールの戻る修正版をTestFlightへ上げることを明示依頼。修正元28005326fc07ada1de4d273af41d32d14048b01cを既存releaseへ送信し、Appleの最大29を確認して1.0.25（30）のMacビルド39353509325を開始した。今回はTestFlight内部配布だけを進め、既存の提出候補29・手動公開・未送信の再審査は変更しない。写真一覧・Android・本番SQL/Edgeは対象外。詳細はdocs/testflight-profile-back-20261020.mdへ記録する。アップロード前のため配布完了とはしない。
 
