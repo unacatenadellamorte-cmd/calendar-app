@@ -25,7 +25,8 @@ def main():
         executable = temporary / "PluginTests"
         subprocess.run(["xcrun", "swiftc", "-swift-version", "5", "-I", str(temporary), "-L", str(temporary),
                         "-lUIKit", "-lCapacitor", "-lGoogleSignIn", "-Xlinker", "-rpath", "-Xlinker", str(temporary),
-                        str(root / "ios/App/App/GoogleAuthorizationPlugin.swift"), str(fixture / "main.swift"),
+                        str(root / "ios/App/App/GoogleAuthorizationPlugin.swift"),
+                        str(fixture / "DevicePhotosPlugin.swift"), str(fixture / "main.swift"),
                         "-o", str(executable)], check=True)
         for scenario in ["valid", "missing-scheme"]:
             contents = temporary / (scenario + ".app") / "Contents"
@@ -47,6 +48,7 @@ def main():
         subprocess.run(["xcrun", "swiftc", "-swift-version", "5", "-I", str(temporary), "-L", str(temporary),
                         "-lUIKit", "-lCapacitor", "-lGoogleSignIn", "-Xlinker", "-rpath", "-Xlinker", str(temporary),
                         str(root / "ios/App/App/GoogleAuthorizationPlugin.swift"),
+                        str(fixture / "DevicePhotosPlugin.swift"),
                         str(root / "ios/App/App/SceneDelegate.swift"), str(fixture / "scene-main.swift"),
                         "-o", str(scene_executable)], check=True)
         subprocess.run([str(scene_executable)], check=True)
