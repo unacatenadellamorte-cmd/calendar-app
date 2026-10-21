@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import Photos
+import PhotosUI
 import UIKit
 
 /// 端末の写真を撮影日時の範囲で読み取る(PhotoKit)。読み取り専用で、写真・識別子・日時をアプリ外へ出さない。
