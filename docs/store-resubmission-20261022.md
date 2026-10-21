@@ -33,11 +33,20 @@
 - [Mac配布CI39647524337](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/39647524337)は成功。作成元8df2ab0。認可試験・Swift共有データ試験・主AppとWidgetの配布署名・アーカイブ・IPA・一時署名素材の消去を含む。
 - IPAは`C:/Users/Ryo/AppData/Local/calendar-app/store-resubmission-20261022/ios-1.0.25-31-run39647524337/Multi-calendar.ipa`。8,524,235 bytes、SHA-256 `2c5c405936b6a790179b2794641c197328ac298de47a75c08baa9837631392ea`。
 - Windows側でも両ターゲット1.0.25（31）、両プロファイルの存在、主Appのカメラ・写真用途説明、公開Web16ファイルに他ストア言及なしを照合した。署名の暗号検証はMac側で実施済み。送信workflowをこのrun・IPAハッシュ・31へ固定する。
+- Macでは全178ファイル1752件とSwift12件が成功。本番iOS広告、撮影server設定なし、非免除暗号なし、SW自己破棄もIPA実体で照合した。dSYMは17,242,904 bytes、SHA-256 `edb5fa9ca12313f5ee431f4e25df19df86e0fcc85d92d9f230ab0b89779801ba`。
+- [送信CI39648991319](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/39648991319)は成功。2026-10-22 03:03:59 JSTに`UPLOAD SUCCEEDED with no errors`（エラーなし受領）を確認した。Delivery UUIDは`07aa4309-4d5b-45bd-b43b-54e8e52e7f7e`。Apple処理完了・審査申請の成功はこの受領とは別に確認する。
+- Apple公式APIで31・VALID、非免除暗号なし、build ID `07aa4309-4d5b-45bd-b43b-54e8e52e7f7e`を確認。既存内部グループ「実機審査確認」へ31を追加し、旧5ビルドを維持した6件とIN_BETA_TESTING（内部テスト中）、日本語案内の読戻し一致を確認した。テスターの追加・削除はしていない。
+- 旧30の提出をAPIで取下げ、完了を待って31を選択した。審査メモは旧メモを保持したまま31の機能と未実機受入の説明を先頭へ加え、3,766文字の完全一致を読戻した。審査アカウント・パスワード・連絡先を含むnotes以外の全フィールド不変もメモリ内比較で確認し、値は出力・保存していない。日英説明の標準EULAリンクも保持。
+- 旧提出のアプリ・購読グループ版・2商品の版を保存し、[新しい提出c230da88-0b88-4a39-9286-a63d01ab6e5c](https://appstoreconnect.apple.com/apps/6817586147/distribution/reviewsubmissions/details/c230da88-0b88-4a39-9286-a63d01ab6e5c)へ同じ4項目を登録。2026-10-22 03:08:58 JSTに審査へ提出した。別取得で提出とアプリのWAITING_FOR_REVIEW（審査待ち）、選択31、MANUAL（手動公開）を照合した。個別4項目はREADY_FOR_REVIEW表示のままで、集約状態とは区別する。
 
 ## 配布・提出結果
 
 - 配布先DBへ未適用7件を適用済み。更新前の関数定義とEdgeソースを退避。前後の件数は予定166・カレンダー76・接続3で不変。`event_end_date`列・RPCの終了日保存・所有者ガード・Google複合IDが有効であることを再取得した。CLIのDocker未導入によるローカルカタログキャッシュ警告は、DB適用自体の成功と区別する。
 - 終了日に必要な`sync-calendars`と`push-events`を更新。今回の変更と関係しないWebhookは既存の配布版を維持した。ユーザーデータを使う取込・購入・書戻し試験は行っていない。
-- 両OSの署名付き成果物とストア審査提出は作業中。結果・成果物ハッシュ・実行URLと未確認事項を追記する。
+- **最終状況:** iOSは署名版31のアップロード・内部TestFlight・審査申請まで完了。審査承認・一般公開・31の実機受入は未確認。Androidは署名済み31のAABまで完了し、Playの本人ログイン待ちのため未アップロード・未申請。両ストア申請完了とは報告しない。
 - 最初のMac CI39645745531はWeb試験等の後、Google認可単体試験の偽SDKへ新しい写真プラグインの型が未登録だったため停止した。製品の登録処理を削除せず、両方のSwift単体コンパイルへ写真プラグインのテスト代役を追加して再検証する。実際の写真プラグインは後段の配布アプリでコンパイルする。
 - 次のCI39646254159では認可・Swift試験は通過したが、配布アーカイブが写真選択UI用`PhotosUI`のimport不足を検出した。`DevicePhotosPlugin.swift`へimportを追加し、実アーカイブで再検証する。
+
+## 継続事項
+
+T3内蔵の自分のGoogle Play Consoleタブ`tab_7_b74cde26-dabd-4d9f-83d2-9613b4d503aa`を本人のログイン用に残す。未送信入力のない自分の重複タブは閉じ、本人・他AIのタブには触っていない。ログイン後は最新番号を確認してAAB31をAlphaへ追加し、写真権限等の必要な申告を実装に合わせて確認し、審査送信と公開の概要の状態を再取得する。31が使用済みなら番号を上げて署名版を作り直す。ログインが終わる前に申請済みとはしない。完了後、不要になった自分のタブを閉じる。
