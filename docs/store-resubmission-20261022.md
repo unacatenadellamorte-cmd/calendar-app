@@ -28,6 +28,12 @@
 - ログは`C:/Users/Ryo/OneDrive/デスクトップ/AI作業場/.work-temp/store-resubmission-20261022-android-build.log`。
 - Play上の未使用番号、写真アクセスの必要な申告、アップロードと審査送信はログイン後の確認が残る。[Google公式の写真・動画アクセス方針](https://support.google.com/googleplay/android-developer/answer/14115180)に基づき、実装上の用途を正確に説明し、受理や適格性を先に断定しない。
 
+## iOS成果物
+
+- [Mac配布CI39647524337](https://github.com/unacatenadellamorte-cmd/calendar-app/actions/runs/39647524337)は成功。作成元8df2ab0。認可試験・Swift共有データ試験・主AppとWidgetの配布署名・アーカイブ・IPA・一時署名素材の消去を含む。
+- IPAは`C:/Users/Ryo/AppData/Local/calendar-app/store-resubmission-20261022/ios-1.0.25-31-run39647524337/Multi-calendar.ipa`。8,524,235 bytes、SHA-256 `2c5c405936b6a790179b2794641c197328ac298de47a75c08baa9837631392ea`。
+- Windows側でも両ターゲット1.0.25（31）、両プロファイルの存在、主Appのカメラ・写真用途説明、公開Web16ファイルに他ストア言及なしを照合した。署名の暗号検証はMac側で実施済み。送信workflowをこのrun・IPAハッシュ・31へ固定する。
+
 ## 配布・提出結果
 
 - 配布先DBへ未適用7件を適用済み。更新前の関数定義とEdgeソースを退避。前後の件数は予定166・カレンダー76・接続3で不変。`event_end_date`列・RPCの終了日保存・所有者ガード・Google複合IDが有効であることを再取得した。CLIのDocker未導入によるローカルカタログキャッシュ警告は、DB適用自体の成功と区別する。
