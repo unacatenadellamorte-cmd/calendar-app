@@ -4,6 +4,8 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
+import { getMeta, putMeta } from './local-db';
+import { isNetworkError } from './net';
 
 export interface EventTag {
   allDay: boolean;
@@ -45,6 +47,12 @@ const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 const COLUMNS = 'id,all_day,name,stamp_id,color,start_local,end_local,created_at,updated_at';
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
+const CACHE_KEY = 'event-tags';
+
+interface CachedList {
+  fetched: true;
+  value: EventTag[];
+}
 
 function fromPostgrest(error: PostgrestError): AppError {
   return appError('data/query', 'data/query', error);
@@ -132,11 +140,47 @@ export async function listEventTags(): Promise<Result<EventTag[]>> {
     const { data, error } = await selectActive('event_tags', COLUMNS).order('created_at', {
       ascending: true,
     });
-    if (error) return err(fromPostgrest(error));
-    return ok((data as unknown as EventTagRow[]).map(toEventTag));
+    if (error) {
+      if (isNetworkError(error)) {
+        const cached = await readCachedTags();
+        if (cached) return ok(cached);
+        return err(appError('data/offline', 'data/offline', error));
+      }
+      return err(fromPostgrest(error));
+    }
+    const tags = (data as unknown as EventTagRow[]).map(toEventTag);
+    await writeCachedTags(tags);
+    return ok(tags);
   } catch (cause) {
+    if (isNetworkError(cause)) {
+      const cached = await readCachedTags();
+      if (cached) return ok(cached);
+      return err(appError('data/offline', 'data/offline', cause));
+    }
     return err(appError('data/query', 'data/query', cause));
   }
+}
+
+async function readCachedTags(): Promise<EventTag[] | null> {
+  try {
+    const cached = await getMeta<CachedList>(CACHE_KEY);
+    return cached?.fetched === true ? cached.value : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedTags(value: EventTag[]): Promise<void> {
+  try {
+    await putMeta<CachedList>(CACHE_KEY, { fetched: true, value });
+  } catch {
+    // キャッシュ保存失敗はオンライン取得の成功を覆さない。
+  }
+}
+
+async function updateCachedTags(update: (value: EventTag[]) => EventTag[]): Promise<void> {
+  const cached = await readCachedTags();
+  if (cached) await writeCachedTags(update(cached));
 }
 
 export async function createEventTag(input: NewEventTagInput): Promise<Result<EventTag>> {
@@ -150,7 +194,9 @@ export async function createEventTag(input: NewEventTagInput): Promise<Result<Ev
       .select(COLUMNS)
       .single();
     if (error) return err(fromPostgrest(error));
-    return ok(toEventTag(data as EventTagRow));
+    const created = toEventTag(data as EventTagRow);
+    await updateCachedTags((cached) => [...cached, created]);
+    return ok(created);
   } catch (cause) {
     return err(appError('data/query', 'data/query', cause));
   }
@@ -182,7 +228,11 @@ export async function updateEventTag(
       .select(COLUMNS)
       .single();
     if (error) return err(fromPostgrest(error));
-    return ok(toEventTag(data as EventTagRow));
+    const updated = toEventTag(data as EventTagRow);
+    await updateCachedTags((cached) =>
+      cached.map((tag) => (tag.id === updated.id ? updated : tag)),
+    );
+    return ok(updated);
   } catch (cause) {
     return err(appError('data/query', 'data/query', cause));
   }
@@ -196,6 +246,7 @@ export async function deleteEventTag(id: string): Promise<Result<void>> {
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
     if (error) return err(fromPostgrest(error));
+    await updateCachedTags((cached) => cached.filter((tag) => tag.id !== id));
     return ok(undefined);
   } catch (cause) {
     return err(appError('data/query', 'data/query', cause));

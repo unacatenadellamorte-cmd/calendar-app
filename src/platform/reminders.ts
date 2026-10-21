@@ -29,6 +29,7 @@ export interface ScheduleReminderOptions {
   id: number;
   eventId: string;
   title: string;
+  reminderMinutes?: number;
   /** 通知を出す時刻。 */
   at: Date;
 }
@@ -48,7 +49,10 @@ export async function scheduleReminder(opts: ScheduleReminderOptions): Promise<v
       {
         id: opts.id,
         title: opts.title,
-        body: clockLabel(opts.at),
+        body:
+          opts.reminderMinutes == null
+            ? clockLabel(opts.at)
+            : `${clockLabel(opts.at)}（${opts.reminderMinutes}分前）`,
         schedule: { at: opts.at, allowWhileIdle: true },
         extra: { eventId: opts.eventId },
       },
@@ -56,6 +60,12 @@ export async function scheduleReminder(opts: ScheduleReminderOptions): Promise<v
   });
   pendingSchedules.add(task);
   try { await task; } finally { pendingSchedules.delete(task); }
+}
+
+export async function getPendingReminders(): Promise<readonly { id: number; extra?: unknown }[]> {
+  if (!isNotificationSupported()) return [];
+  const { notifications } = await LocalNotifications.getPending();
+  return notifications.map((notification) => ({ id: notification.id, extra: notification.extra }));
 }
 
 /** 通知を1件取り消す(スケジュールされていなくても無害)。 */

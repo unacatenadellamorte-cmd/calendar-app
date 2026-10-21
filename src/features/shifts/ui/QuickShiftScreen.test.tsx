@@ -100,6 +100,7 @@ describe('QuickShiftScreen', () => {
       'shift',
       expect.objectContaining({ id: 't1' }),
       ['2026-12-25', '2026-12-26'],
+      [expect.any(String), expect.any(String)],
     );
     expect(navigateMock).toHaveBeenCalledWith('/calendar');
   });
@@ -141,6 +142,22 @@ describe('QuickShiftScreen', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it('応答喪失後の再試行は同じIDを使い、成功後の再追加は新しいIDを使う', async () => {
+    const user = userEvent.setup();
+    shState.templates = [tpl()];
+    createShifts.mockResolvedValueOnce(err(appError('data/offline', 'data/offline'))).mockResolvedValue(ok([]));
+    render(<QuickShiftScreen />);
+    const button = screen.getByRole('button', { name: /平日/ });
+    await user.click(button);
+    const firstIds = createShifts.mock.calls[0]?.[3];
+    expect(firstIds).toEqual([expect.any(String)]);
+    await user.click(button);
+    expect(createShifts.mock.calls[1]?.[3]).toEqual(firstIds);
+    await user.click(button);
+    expect(createShifts.mock.calls[2]?.[3]).toEqual([expect.any(String)]);
+    expect(createShifts.mock.calls[2]?.[3]).not.toEqual(firstIds);
+  });
+
   it('シフト用カレンダー未取得ならテンプレ選択を無効化する', () => {
     calState.calendars = [calendar]; // isShift なカレンダーが無い
     shState.templates = [tpl()];
@@ -156,6 +173,17 @@ describe('QuickShiftScreen', () => {
     render(<QuickShiftScreen />);
     expect(screen.getByText('読み込み中…')).toBeInTheDocument();
     expect(screen.queryByText(/よく使うシフトを登録すると/)).not.toBeInTheDocument();
+  });
+
+  it('読み込み失敗時はテンプレート未登録の空状態を出さず再試行を出す', async () => {
+    const retryCalendars = vi.fn();
+    calState = { calendars: [], loading: false, errorKey: 'data/query', reload: retryCalendars };
+    shState = { templates: [], loading: false, errorKey: null, reload: vi.fn() };
+    render(<QuickShiftScreen />);
+    expect(screen.getByRole('alert')).toHaveTextContent('読み込みに失敗');
+    expect(screen.queryByText(/よく使うシフトを登録すると/)).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'もう一度試す' }));
+    expect(retryCalendars).toHaveBeenCalledTimes(1);
   });
 
   it('unavailable では設定を促す文言のみ', () => {

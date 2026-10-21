@@ -1,4 +1,6 @@
 {
+  "未送信 {0} 件": "{0} sin enviar",
+  "再送する": "Reintentar envío",
   "戻る": "Volver",
   "予定名称またはスタンプを設定してください（名称は200文字まで）": "Introduce un nombre o elige un sello (máximo 200 caracteres para el nombre)",
   "使い方ガイド": "Guía rápida",
@@ -310,7 +312,6 @@
   "端末カレンダーを接続できます": "Puedes conectar el calendario de tu dispositivo",
   "端末カレンダー接続を解除": "Desconectar la conexión del calendario del dispositivo",
   "終了": "fin",
-  "終了は開始より後にしてください": "Por favor finalice más tarde que comience",
   "終日": "todo el día",
   "翌日に移動": "pasar al día siguiente",
   "翌日に移動する": "Mover al día siguiente",
@@ -580,6 +581,19 @@
   "{0} に撮影した写真": "Foto tomada a las {0}",
   "この写真は端末のOSから取得できませんでした(クラウド上の写真など)。": "El sistema operativo no pudo proporcionar esta foto desde el dispositivo (por ejemplo, una foto solo en la nube).",
   "端末の写真": "Fotos del dispositivo",
+  "外部カレンダーの予定とシークレット予定は書き出しません。復元・インポートには対応していません。": "No se exportan eventos de calendarios externos ni eventos privados. No se admiten restauración ni importación.",
+  "予定を検索": "Buscar eventos",
+  "カレンダーで絞り込み": "Filtrar por calendario",
+  "すべてのカレンダー": "Todos los calendarios",
+  "開始日": "Desde",
+  "終了日": "Hasta",
+  "条件を解除": "Borrar filtros",
+  "条件に一致する予定はありません": "No hay eventos que coincidan con estos filtros",
+  "通知時刻が過ぎているため、予定は保存しましたが通知は予約していません": "El evento se guardó, pero no se programó la notificación porque ya pasó la hora.",
+  "予定は保存しましたが通知を予約できませんでした。もう一度お試しください": "El evento se guardó, pero no se pudo programar la notificación. Inténtalo de nuevo.",
   "カレンダーに端末の写真を表示": "Mostrar fotos del dispositivo en el calendario",
-  "選んだ日に撮影した写真を、日付の下に表示します。写真はこの端末の中だけで読み取り、保存や送信はしません。この設定はOSの写真アクセス権限の撤回とは別です。": "Las fotos tomadas el día seleccionado se muestran debajo de la fecha. Las fotos se leen solo en este dispositivo y nunca se guardan ni se envían. Este ajuste es independiente de revocar el permiso de acceso a fotos del sistema."
+  "選んだ日に撮影した写真を、日付の下に表示します。写真はこの端末の中だけで読み取り、保存や送信はしません。この設定はOSの写真アクセス権限の撤回とは別です。": "Las fotos tomadas el día seleccionado se muestran debajo de la fecha. Las fotos se leen solo en este dispositivo y nunca se guardan ni se envían. Este ajuste es independiente de revocar el permiso de acceso a fotos del sistema.",
+  "開始と終了の時刻を確認してください。24時間は予定編集で翌日を指定してください": "Comprueba las horas de inicio y fin. Para 24 horas, indica el día siguiente en el editor del evento.",
+  "終了は開始より後にしてください。24時間は予定編集で翌日を指定してください": "Establece el final después del inicio. Para 24 horas, indica el día siguiente en el editor del evento.",
+  "最終日": "Último día"
 }

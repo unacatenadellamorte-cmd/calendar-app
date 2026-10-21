@@ -114,6 +114,17 @@ describe('HomeScreen', () => {
     expect(screen.getByRole('region', { name: '9月の給料見込み' })).toBeInTheDocument();
   });
 
+  it('読み込み失敗時は給料0円や空状態を確定表示せず再試行を出す', async () => {
+    const retryCalendars = vi.fn();
+    calState = { calendars: [], loading: false, errorKey: 'data/query', reload: retryCalendars };
+    evState = { events: [], loading: false, errorKey: null, reload: vi.fn() };
+    renderHome();
+    expect(screen.getByRole('alert')).toHaveTextContent('読み込みに失敗');
+    expect(screen.queryByRole('region', { name: /給料見込み/ })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'もう一度試す' }));
+    expect(retryCalendars).toHaveBeenCalledTimes(1);
+  });
+
   it('代表予定をタップするとその予定の日付でカレンダーへ遷移', async () => {
     const user = userEvent.setup();
     evState.events = [

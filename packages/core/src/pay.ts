@@ -19,7 +19,7 @@ export function workedMinutes(
 ): number {
   const start = Date.parse(startsAt);
   let end = Date.parse(endsAt);
-  if (end <= start) end += DAY_MS;
+  if (end < start) end += DAY_MS;
   return Math.round((end - start) / 60000) - breakMinutes;
 }
 

@@ -33,6 +33,7 @@ export function QuickShiftScreen() {
   const [dayCount, setDayCount] = useState(1);
   const [busy, setBusy] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [operation, setOperation] = useState<{ key: string; ids: string[] } | null>(null);
   const shiftCalendar = cal.calendars.find((c) => c.isShift);
   const shiftReady = Boolean(shiftCalendar);
   const dateValid = DATE_RE.test(date);
@@ -51,12 +52,16 @@ export function QuickShiftScreen() {
     if (busy || !canPick || !shiftCalendar) return;
     setBusy(true);
     const dates = Array.from({ length: dayCount }, (_, i) => addDays(date, i));
-    const result = await createShifts(shiftCalendar.id, template, dates);
+    const key = `${shiftCalendar.id}|${template.id}|${dates.join(',')}`;
+    const active = operation?.key === key ? operation : { key, ids: dates.map(() => crypto.randomUUID()) };
+    setOperation(active);
+    const result = await createShifts(shiftCalendar.id, template, dates, active.ids);
     setBusy(false);
     if (!result.ok) {
       setErrorKey(result.error.messageKey);
       return;
     }
+    setOperation(null);
     // 代表予定が変わり得るのでウィジェットも最新化する(useEvents の create/addLocal と同じ契約、Story 5.6)。
     void refreshFeaturedWidget();
     navigate('/calendar');
@@ -72,6 +77,7 @@ export function QuickShiftScreen() {
             onChange={(e) => {
               setDate(e.target.value);
               setErrorKey(null);
+              setOperation(null);
             }}
             className="min-h-11 w-full rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
           />
@@ -85,6 +91,22 @@ export function QuickShiftScreen() {
 
         {cal.loading || sh.loading ? (
           <p className="text-meta text-ink-secondary">{t('読み込み中…')}</p>
+        ) : cal.errorKey || sh.errorKey ? (
+          <div className="flex flex-col gap-2 rounded-md border border-border-hairline bg-surface-raised px-4 py-4">
+            <p role="alert" className="text-meta text-danger">
+              {resolveMessage(cal.errorKey ?? sh.errorKey ?? 'data/query')}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (cal.errorKey) void cal.reload();
+                if (sh.errorKey) void sh.reload();
+              }}
+              className="min-h-11 self-start rounded-sm border border-accent px-3 text-meta text-accent"
+            >
+              {t('もう一度試す')}
+            </button>
+          </div>
         ) : sh.templates.length === 0 ? (
           <>
             <p className="text-body text-ink-secondary">
@@ -107,7 +129,7 @@ export function QuickShiftScreen() {
                   type="button"
                   aria-label={t('日数を減らす')}
                   disabled={dayCount <= 1}
-                  onClick={() => setDayCount((n) => Math.max(1, n - 1))}
+                  onClick={() => { setDayCount((n) => Math.max(1, n - 1)); setOperation(null); }}
                   className="h-11 w-11 rounded-sm border border-border-hairline text-body disabled:opacity-40"
                 >
                   −
@@ -119,7 +141,7 @@ export function QuickShiftScreen() {
                   type="button"
                   aria-label={t('日数を増やす')}
                   disabled={dayCount >= MAX_DAYS}
-                  onClick={() => setDayCount((n) => Math.min(MAX_DAYS, n + 1))}
+                  onClick={() => { setDayCount((n) => Math.min(MAX_DAYS, n + 1)); setOperation(null); }}
                   className="h-11 w-11 rounded-sm border border-border-hairline text-body disabled:opacity-40"
                 >
                   ＋

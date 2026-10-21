@@ -44,6 +44,7 @@ interface ExistingEventRow {
   external_id: string | null;
   starts_at: string | null;
   event_date: string | null;
+  event_end_date?: string | null;
 }
 
 interface StoredDeviceEvent extends ExistingEventRow {
@@ -94,6 +95,11 @@ function localDateStringToMs(dateStr: string): number {
  * 変換したのと対称 ── ここを `Date.parse` で UTC 解釈すると、その対称性が崩れてずれ得る)。
  */
 function isWithinWindow(row: ExistingEventRow, min: number, max: number): boolean {
+  if (!row.starts_at && row.event_date && row.event_end_date) {
+    const start = localDateStringToMs(row.event_date);
+    const end = localDateStringToMs(row.event_end_date);
+    return start <= max && end > min;
+  }
   const ms = row.starts_at
     ? Date.parse(row.starts_at)
     : row.event_date
@@ -138,7 +144,7 @@ async function syncOneCalendar(
     // 論理削除済みの行もこの一意インデックスの対象になるため、deleted_at を問わず検索する
     // (`selectActive` は使わない)。
     const existing = await readDeviceRows<StoredDeviceEvent>(
-      'id,external_id,calendar_id,starts_at,event_date,deleted_at',
+      'id,external_id,calendar_id,starts_at,event_date,event_end_date,deleted_at',
       connectionId,
       target.calendar_id,
     );
@@ -209,7 +215,7 @@ async function syncOneCalendar(
   }
 
   const existingRows = await readDeviceRows<ExistingEventRow>(
-    'external_id,starts_at,event_date',
+    'external_id,starts_at,event_date,event_end_date',
     connectionId,
     target.calendar_id,
     true,

@@ -36,6 +36,16 @@ describe('ConnectivityBar', () => {
     expect(screen.getByRole('status')).toHaveTextContent('送信中');
   });
 
+  it('オンラインの未送信件数に手動再送ボタンを出す', async () => {
+    const retryPending = vi.fn();
+    state = base({ online: true, pendingCount: 2, retryPending });
+    const user = userEvent.setup();
+    render(<ConnectivityBar />);
+    expect(screen.getByRole('status')).toHaveTextContent('未送信 2 件');
+    await user.click(screen.getByRole('button', { name: '再送する' }));
+    expect(retryPending).toHaveBeenCalledTimes(1);
+  });
+
   it('syncNotice は alert で出て、閉じるで dismiss を呼ぶ', async () => {
     const dismiss = vi.fn();
     state = base({ online: true, syncNotice: '一部の変更を送信できませんでした', dismissSyncNotice: dismiss });

@@ -4,7 +4,7 @@ import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useMemo } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { groupEventsByDay, makePriorityOf, monthGridDays, ymd } from '@/lib/calendar-view';
+import { addDays, groupEventsByDay, makePriorityOf, monthGridDays, ymd } from '@/lib/calendar-view';
 import { formatMonthTitle } from '@/lib/datetime';
 import { EventStamp } from '@/ui/EventStamp';
 import { eventStampName, isEventStampId } from '@/lib/event-stamps';
@@ -40,12 +40,15 @@ export function YearView({
   const { year } = ymd(cursor);
   // セル内の1件代表選抜は月ビューと同じ優先度順(Story 2.3 の規則を再利用、年ビュー独自ルールは作らない)。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
-  const byDay = useMemo(() => groupEventsByDay(events, priorityOf), [events, priorityOf]);
   // 12ヶ月ぶんのグリッド計算(最大504セル)はメモ化する(MonthView と同じ流儀)。
   const monthsData = useMemo(
     () => MONTHS.map((month) => ({ month, cells: monthGridDays(year, month, today) })),
     [year, today],
   );
+  const byDay = useMemo(() => groupEventsByDay(events, priorityOf, {
+    from: monthsData[0]?.cells[0]?.date ?? `${year}-01-01`,
+    toExclusive: monthsData.at(-1)?.cells.at(-1) ? addDays(monthsData.at(-1)!.cells.at(-1)!.date, 1) : `${year + 1}-01-01`,
+  }), [events, priorityOf, monthsData, year]);
   return (
     <div>
       <div className="grid grid-cols-7 text-center text-meta text-ink-secondary">

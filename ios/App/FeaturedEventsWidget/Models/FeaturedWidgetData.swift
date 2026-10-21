@@ -9,6 +9,7 @@ struct FeaturedWidgetEvent: Decodable, Equatable {
     let allDay: Bool
     let schemaVersion: Int
     var eventDate: String? = nil
+    var eventEndDate: String? = nil
 }
 
 enum FeaturedWidgetData {
@@ -44,7 +45,8 @@ enum FeaturedWidgetData {
             today.calendar = Calendar(identifier: .gregorian)
             today.timeZone = timeZone
             today.dateFormat = "yyyy-MM-dd"
-            if today.string(from: now) == key { return "終日" }
+            let todayKey = today.string(from: now)
+            if todayKey == key || (event.eventEndDate.map { key <= todayKey && todayKey < $0 } ?? false) { return "終日" }
             parser.dateFormat = "M/d"
             return parser.string(from: date) + " 終日"
         }

@@ -13,8 +13,9 @@ import {
 } from '@/data/events';
 import { deriveNotificationId } from '@core';
 import { cancelReminder } from '@/platform/reminders';
-import { syncReminderForEvent } from '@/data/reminders';
+import { syncReminderForEvent, type ReminderSyncStatus } from '@/data/reminders';
 import { refreshFeaturedWidget } from '@/platform/widget';
+import { subscribeDataRefresh } from '@/app/data-refresh-notification';
 
 /** フォームが返す完全な入力を、更新用の patch に変換する。 */
 function inputToPatch(input: NewEventInput): EventPatch {
@@ -30,13 +31,14 @@ function inputToPatch(input: NewEventInput): EventPatch {
     isSecret: input.isSecret ?? false,
   };
   return input.allDay
-    ? { ...base, allDay: true, eventDate: input.eventDate, startsAt: null, endsAt: null }
+    ? { ...base, allDay: true, eventDate: input.eventDate, eventEndDate: input.eventEndDate ?? null, startsAt: null, endsAt: null }
     : {
         ...base,
         allDay: false,
         startsAt: input.startsAt,
         endsAt: input.endsAt,
         eventDate: null,
+        eventEndDate: null,
       };
 }
 
@@ -72,8 +74,10 @@ export function useEvents(enabled: boolean) {
   }, []);
   /** 削除直後の再取得が遅延した場合に、古い予定を一時的に隠す。 */
   const deletedIdsRef = useRef(new Set<string>());
+  const reloadGenerationRef = useRef(0);
   const reload = useCallback(async () => {
     if (!enabled) return;
+    const generation = ++reloadGenerationRef.current;
     const version = mutationVersionRef.current;
     const pendingAtStart = pendingMutationsRef.current;
     setLoading(true);
@@ -81,6 +85,7 @@ export function useEvents(enabled: boolean) {
     // 月 / 週 / リストのビューは過去〜未来を見るため全期間を読む(Story 1.5)。
     // オフライン時は data-access がキャッシュを返す(Story 1.6)。
     const result = await listEvents();
+    if (generation !== reloadGenerationRef.current) return;
     // 削除・編集の開始後に返った古い一覧は、楽観更新を巻き戻すため適用しない。
     if (
       version === mutationVersionRef.current &&
@@ -111,10 +116,14 @@ export function useEvents(enabled: boolean) {
     void reload();
   }, [reload]);
 
+  useEffect(() => () => { reloadGenerationRef.current += 1; }, [enabled]);
+
   // オンライン復帰でフラッシュされたら、実データを取り直す。
   useEffect(() => {
     if (syncNonce > 0) void reload();
   }, [syncNonce, reload]);
+
+  useEffect(() => subscribeDataRefresh(() => void reload()), [reload]);
 
   useEffect(
     () => () => {
@@ -154,7 +163,11 @@ export function useEvents(enabled: boolean) {
       if (added.length === 0) return;
       mutationVersionRef.current += 1;
       pendingMutationsRef.current += 1;
-      setEvents((es) => sortEvents([...es, ...added]));
+      setEvents((es) => {
+        const merged = new Map(es.map((event) => [event.id, event]));
+        for (const event of added) merged.set(event.id, event);
+        return sortEvents([...merged.values()]);
+      });
       // 呼び出し側は結果を待たない同期関数のため、ウィジェット更新は fire-and-forget(Story 5.6)。
       void refreshFeaturedWidget();
       finishMutation();
@@ -253,10 +266,15 @@ export function useEvents(enabled: boolean) {
       }
       setEvents((es) => sortEvents(es.map((e) => (e.id === event.id ? result.value : e))));
       setErrorKey(null);
-      await syncReminderForEvent(result.value);
+      const reminderStatus: ReminderSyncStatus = await syncReminderForEvent(result.value);
+      if (reminderStatus === 'past') setErrorKey('notification/past');
+      else if (reminderStatus === 'unsupported') setErrorKey('notification/unavailable');
+      else if (reminderStatus === 'schedule-failed') setErrorKey('notification/schedule-failed');
       mutationVersionRef.current += 1;
       finishMutation();
-      return true;
+      return reminderStatus === undefined || reminderStatus === 'ok'
+        ? true
+        : `notification/${reminderStatus}`;
     },
     [finishMutation],
   );

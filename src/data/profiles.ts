@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isNetworkError } from './net';
+import { accountScopeGeneration, localAccountOwner } from './account-scope';
+import { getMeta, putMeta } from './local-db';
 
 /**
  * プロフィール(表示名・アバター)の data-access レイヤ(ARCHITECTURE-SPINE AD-9 / AD-1)。
@@ -38,6 +40,13 @@ interface ProfileRow {
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 const COLUMNS = 'id,display_name,avatar_data_url,secret_passcode_hash';
+const PROFILE_CACHE_KEY = 'profile';
+
+interface ProfileCache {
+  userId: string;
+  fetched: true;
+  profile: Profile | null;
+}
 
 function toProfile(row: ProfileRow): Profile {
   return {
@@ -56,18 +65,61 @@ function validateName(name: string): AppError | null {
   return null;
 }
 
+async function readCachedProfile(): Promise<{ hit: boolean; value: Profile | null }> {
+  const owner = localAccountOwner();
+  if (!owner) return { hit: false, value: null };
+  try {
+    const cached = await getMeta<ProfileCache>(PROFILE_CACHE_KEY);
+    if (cached?.fetched === true && cached.userId === owner) {
+      return { hit: true, value: cached.profile };
+    }
+  } catch {
+    // IndexedDB が使えない環境では、通信結果だけを返す。
+  }
+  return { hit: false, value: null };
+}
+
+async function writeCachedProfile(profile: Profile | null, generation: number): Promise<void> {
+  const owner = localAccountOwner();
+  if (!owner || generation !== accountScopeGeneration()) return;
+  try {
+    await putMeta<ProfileCache>(PROFILE_CACHE_KEY, {
+      userId: owner,
+      fetched: true,
+      profile,
+    });
+  } catch {
+    // キャッシュ保存失敗はプロフィールのサーバー結果を失敗にしない。
+  }
+}
+
 /** 自分のプロフィールを返す。行がまだ無ければエラーではなく null。 */
 export async function getProfile(): Promise<Result<Profile | null>> {
   if (!supabase) return err(UNAVAILABLE);
+  const generation = accountScopeGeneration();
   try {
     const { data, error } = await supabase
       .from('profiles')
       .select(COLUMNS)
       .maybeSingle<ProfileRow>();
-    if (error) return err(appError('data/query', 'data/query', error));
-    return ok(data ? toProfile(data) : null);
+    if (error) {
+      if (isNetworkError(error)) {
+        const cached = await readCachedProfile();
+        if (cached.hit) return ok(cached.value);
+        return err(appError('data/offline', 'data/offline', error));
+      }
+      return err(appError('data/query', 'data/query', error));
+    }
+    if (generation !== accountScopeGeneration()) return err(appError('data/query', 'data/query'));
+    const profile = data ? toProfile(data) : null;
+    await writeCachedProfile(profile, generation);
+    return ok(profile);
   } catch (e) {
-    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
+    if (isNetworkError(e)) {
+      const cached = await readCachedProfile();
+      if (cached.hit) return ok(cached.value);
+      return err(appError('data/offline', 'data/offline', e));
+    }
     return err(appError('data/query', 'data/query', e));
   }
 }
@@ -75,6 +127,7 @@ export async function getProfile(): Promise<Result<Profile | null>> {
 /** オンボーディングでの新規作成。id は DB 側の default auth.uid() が入れる。 */
 export async function createProfile(input: NewProfileInput): Promise<Result<Profile>> {
   if (!supabase) return err(UNAVAILABLE);
+  const generation = accountScopeGeneration();
   const nameError = validateName(input.displayName);
   if (nameError) return err(nameError);
 
@@ -96,7 +149,10 @@ export async function createProfile(input: NewProfileInput): Promise<Result<Prof
       }
       return err(appError('data/query', 'data/query', error));
     }
-    return ok(toProfile(data));
+    if (generation !== accountScopeGeneration()) return err(appError('data/query', 'data/query'));
+    const profile = toProfile(data);
+    await writeCachedProfile(profile, generation);
+    return ok(profile);
   } catch (e) {
     if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
     return err(appError('data/query', 'data/query', e));
@@ -107,6 +163,7 @@ export async function createProfile(input: NewProfileInput): Promise<Result<Prof
 export async function updateProfile(profileId: string, patch: ProfilePatch): Promise<Result<Profile>> {
   if (!supabase) return err(UNAVAILABLE);
   if (!profileId) return err(appError('data/query', 'data/query'));
+  const generation = accountScopeGeneration();
   const dbPatch: Record<string, unknown> = {};
   if (patch.displayName !== undefined) {
     const nameError = validateName(patch.displayName);
@@ -128,7 +185,10 @@ export async function updateProfile(profileId: string, patch: ProfilePatch): Pro
       .select(COLUMNS)
       .single<ProfileRow>();
     if (error) return err(appError('data/query', 'data/query', error));
-    return ok(toProfile(data));
+    if (generation !== accountScopeGeneration()) return err(appError('data/query', 'data/query'));
+    const profile = toProfile(data);
+    await writeCachedProfile(profile, generation);
+    return ok(profile);
   } catch (e) {
     if (isNetworkError(e)) return err(appError('data/offline', 'data/offline', e));
     return err(appError('data/query', 'data/query', e));

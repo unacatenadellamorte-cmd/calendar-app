@@ -1,4 +1,6 @@
 {
+  "未送信 {0} 件": "{0} unsent",
+  "再送する": "Retry sending",
   "戻る": "Back",
   "予定名称またはスタンプを設定してください（名称は200文字まで）": "Enter an event name or choose a stamp (names can have up to 200 characters)",
   "使い方ガイド": "Quick guide",
@@ -310,7 +312,6 @@
   "端末カレンダーを接続できます": "Device calendar can be connected",
   "端末カレンダー接続を解除": "Disconnect device calendar",
   "終了": "End",
-  "終了は開始より後にしてください": "End must be after start",
   "終日": "All day",
   "翌日に移動": "Move to next day",
   "翌日に移動する": "Move to the next day",
@@ -581,5 +582,18 @@
   "この写真は端末のOSから取得できませんでした(クラウド上の写真など)。": "This photo couldn't be retrieved from your device's OS (for example, a cloud-only photo).",
   "端末の写真": "Device photos",
   "カレンダーに端末の写真を表示": "Show device photos in the calendar",
-  "選んだ日に撮影した写真を、日付の下に表示します。写真はこの端末の中だけで読み取り、保存や送信はしません。この設定はOSの写真アクセス権限の撤回とは別です。": "Photos taken on the selected day appear below the date. Photos are read only on this device and are never saved or sent. This setting is separate from revoking the OS's photo access permission."
+  "選んだ日に撮影した写真を、日付の下に表示します。写真はこの端末の中だけで読み取り、保存や送信はしません。この設定はOSの写真アクセス権限の撤回とは別です。": "Photos taken on the selected day appear below the date. Photos are read only on this device and are never saved or sent. This setting is separate from revoking the OS's photo access permission.",
+  "外部カレンダーの予定とシークレット予定は書き出しません。復元・インポートには対応していません。": "External-calendar and private events are not exported. Restore and import are not supported.",
+  "予定を検索": "Search events",
+  "カレンダーで絞り込み": "Filter by calendar",
+  "すべてのカレンダー": "All calendars",
+  "開始日": "From",
+  "終了日": "To",
+  "条件を解除": "Clear filters",
+  "条件に一致する予定はありません": "No events match these filters",
+  "通知時刻が過ぎているため、予定は保存しましたが通知は予約していません": "The event was saved, but its notification time has passed so no notification was scheduled.",
+  "予定は保存しましたが通知を予約できませんでした。もう一度お試しください": "The event was saved, but its notification could not be scheduled. Try again.",
+  "開始と終了の時刻を確認してください。24時間は予定編集で翌日を指定してください": "Check the start and end times. For a 24-hour shift, set the next day in the event editor.",
+  "終了は開始より後にしてください。24時間は予定編集で翌日を指定してください": "Set the end after the start. For 24 hours, choose the next day in the event editor.",
+  "最終日": "Last day"
 }

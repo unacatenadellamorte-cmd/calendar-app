@@ -521,6 +521,23 @@ describe('syncDeviceCalendarsNow', () => {
     }
   });
 
+  it('開始が取得窓より前でも窓内まで続く終日予定は削除しない', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-14T20:00:00.000Z'));
+    try {
+      getDeviceConnection.mockResolvedValue(ok({ id: 'conn1', provider: 'device', createdAt: 'x' }));
+      responseQueue = [
+        { data: [{ calendar_id: 'cal-a-id', external_calendar_id: 'cal-a', summary: '仕事' }], error: null },
+        { data: [{ external_id: 'continues', starts_at: null, event_date: '2026-04-15', event_end_date: '2026-04-18' }], error: null },
+      ];
+      listDeviceEventsInRange.mockResolvedValue([]);
+      const { syncDeviceCalendarsNow } = await load();
+      const result = await syncDeviceCalendarsNow();
+      expect(result.ok && result.value.synced[0]?.deleted).toBe(1);
+      expect(calls.find((c) => c.table === 'events' && c.method === 'in')?.args).toEqual(['external_id', ['continues']]);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('時間窓外の既存予定は削除差分の対象にしない', async () => {
     getDeviceConnection.mockResolvedValue(
       ok({ id: 'conn1', provider: 'device', createdAt: 'x' }),

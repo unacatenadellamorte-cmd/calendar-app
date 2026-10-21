@@ -23,6 +23,7 @@ import { GooglePushStatus } from '@/features/google-push/ui/GooglePushStatus';
 import { EventStamp } from '@/ui/EventStamp';
 import { StampPicker } from '@/ui/StampPicker';
 import { eventStampName, isEventStampId, type EventStampId } from '@/lib/event-stamps';
+import { addDays } from '@/lib/calendar-view';
 /** 新規作成時の初期値のヒント(月ビューの日タップ / 週ビューのスロットタップから)。 */
 export interface EventSeed {
   /** "YYYY-MM-DD"。終日オフのまま、この日付の 9:00–10:00 を既定にする。 */
@@ -41,7 +42,7 @@ interface EventFormSheetProps {
   /** 編集中の予定を削除する(渡されたときだけ削除ボタンを出す)。 */
   onDelete?: (event: EventItem) => void;
   /** リマインダーを設定/解除する(Story 5.4)。編集時のみ使う。 */
-  onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean>;
+  onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean | string>;
 }
 interface FormState {
   title: string;
@@ -50,6 +51,7 @@ interface FormState {
   startLocal: string;
   endLocal: string;
   dateLocal: string;
+  dateEndLocal: string;
   note: string;
   location: string;
   url: string;
@@ -82,6 +84,7 @@ function initialState(
       startLocal: seededStart,
       endLocal: seededEnd,
       dateLocal: seed?.date ?? seededStart.slice(0, 10),
+      dateEndLocal: seed?.date ?? seededStart.slice(0, 10),
       note: '',
       location: '',
       url: '',
@@ -111,6 +114,9 @@ function initialState(
       (editing.startsAt
         ? utcIsoToLocalInput(editing.startsAt).slice(0, 10)
         : todayLocalDate()),
+    dateEndLocal: editing.eventEndDate
+      ? addDays(editing.eventEndDate, -1)
+      : editing.eventDate ?? todayLocalDate(),
     note: editing.note ?? '',
     location: editing.location ?? '',
     url: editing.url ?? '',
@@ -133,7 +139,7 @@ function toInput(form: FormState): NewEventInput {
     stampOnly: form.stampOnly,
   };
   return form.allDay
-    ? { ...common, allDay: true, eventDate: form.dateLocal }
+    ? { ...common, allDay: true, eventDate: form.dateLocal, eventEndDate: addDays(form.dateEndLocal, 1) }
     : {
         ...common,
         allDay: false,
@@ -320,7 +326,7 @@ export function EventFormSheet({
               const date = form.allDay ? form.dateLocal : form.startLocal.slice(0, 10);
               const applied = applyEventTag(tag, date);
               if (!applied) {
-                setErrorKey('event/invalid-date');
+                setErrorKey(!tag.allDay && tag.startLocal === tag.endLocal ? 'event/invalid-time' : 'event/invalid-date');
                 return;
               }
               setSelectedTag(tag.id);
@@ -397,16 +403,16 @@ export function EventFormSheet({
         </label>
 
         {form.allDay ? (
-          <label className="flex flex-col gap-1">
-            <span className="text-meta text-ink-secondary">{t('日付')}</span>
-            <input
-              type="date"
-              value={form.dateLocal}
-              onChange={(e) => set('dateLocal', e.target.value)}
-              required
-              className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-meta text-ink-secondary">{t('日付')}</span>
+              <input type="date" value={form.dateLocal} onChange={(e) => { set('dateLocal', e.target.value); if (form.dateEndLocal < e.target.value) set('dateEndLocal', e.target.value); }} required className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-meta text-ink-secondary">{t('最終日')}</span>
+              <input type="date" min={form.dateLocal} value={form.dateEndLocal} onChange={(e) => set('dateEndLocal', e.target.value)} required className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body" />
+            </label>
+          </div>
         ) : (
           <>
             <label className="flex flex-col gap-1">

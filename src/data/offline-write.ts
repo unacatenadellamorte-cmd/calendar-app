@@ -86,7 +86,8 @@ export async function offlineDeleteEvent(id: string): Promise<Result<void>> {
 }
 
 export async function offlineRestoreEvent(event: EventItem): Promise<Result<void>> {
-  await dropOutboxFor('event', event.id, 'delete');
+  const removed = await dropOutboxFor('event', event.id, 'delete');
+  if (!removed) await enqueue({ entity: 'event', op: 'restore', targetId: event.id, payload: event });
   await cachePut('events', event);
   return ok(undefined);
 }
@@ -159,7 +160,8 @@ export async function offlineDeleteCalendar(id: string): Promise<Result<void>> {
 }
 
 export async function offlineRestoreCalendar(calendar: Calendar): Promise<Result<void>> {
-  await dropOutboxFor('calendar', calendar.id, 'delete');
+  const removed = await dropOutboxFor('calendar', calendar.id, 'delete');
+  if (!removed) await enqueue({ entity: 'calendar', op: 'restore', targetId: calendar.id, payload: calendar });
   await cachePut('calendars', calendar);
   return ok(undefined);
 }

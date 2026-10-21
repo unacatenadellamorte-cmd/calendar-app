@@ -45,7 +45,7 @@ const REMINDER_MINUTES_MAX = 10080;
 interface ReminderPickerProps {
   /** 現在のリマインダー(分)。未設定は null。 */
   value: number | null;
-  onChange: (minutes: number | null) => Promise<boolean>;
+  onChange: (minutes: number | null) => Promise<boolean | string>;
 }
 export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
   useLanguage();
@@ -82,14 +82,15 @@ export function ReminderPicker({ value, onChange }: ReminderPickerProps) {
       if (operation !== operationRef.current) return;
       if (permission !== 'granted') setWarningKey('notification/permission-denied');
     }
-    let ok = false;
+    let ok: boolean | string = false;
     try {
       ok = await onChange(minutes);
     } catch {
       if (operation === operationRef.current) setWarningKey('data/query');
     }
     if (operation !== operationRef.current) return;
-    if (!ok) setSelected(prev);
+    if (typeof ok === 'string') setWarningKey(ok);
+    if (ok === false) setSelected(prev);
     setSaving(false);
   };
   const customInvalid =

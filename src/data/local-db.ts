@@ -1,7 +1,8 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Calendar } from './calendars';
 import type { EventItem } from './events';
-import { accountOwnerMissing, localAccountOwner } from './account-scope';
+import { accountOwnerMissing, accountScopeGeneration, localAccountOwner } from './account-scope';
+import { isAccountDataBlocked } from './account-deletion-state';
 
 /**
  * IndexedDB の開設を1か所に集約する(AD-1: 表示専用の複製 + 書き込みキュー)。
@@ -68,6 +69,36 @@ function openLocalDb(name: string): Promise<LocalDb> {
 /** テスト用: シングルトンの参照を捨てる(DB 自体は消さない)。 */
 export function resetLocalDbForTests(): void {
   databases.clear();
+}
+
+/** 利用者別DBの補助メタデータを読み取る。プロフィールや一覧キャッシュに使う。 */
+export async function getMeta<T>(key: string): Promise<T | undefined> {
+  const generation = accountScopeGeneration();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  const db = await getLocalDb();
+  if (generation !== accountScopeGeneration() || isAccountDataBlocked()) throw new Error('利用者が切り替わりました');
+  const row = await db.get('meta', key);
+  if (generation !== accountScopeGeneration() || isAccountDataBlocked()) throw new Error('利用者が切り替わりました');
+  return row?.value as T | undefined;
+}
+
+/** 利用者別DBの補助メタデータを保存する。 */
+export async function putMeta<T>(key: string, value: T): Promise<void> {
+  const generation = accountScopeGeneration();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  const db = await getLocalDb();
+  if (generation !== accountScopeGeneration() || isAccountDataBlocked()) throw new Error('利用者が切り替わりました');
+  await db.put('meta', { key, value });
+  if (generation !== accountScopeGeneration() || isAccountDataBlocked()) throw new Error('利用者が切り替わりました');
+}
+
+/** 一覧キャッシュを失効させる。未取得状態と空一覧を混同しない。 */
+export async function deleteMeta(key: string): Promise<void> {
+  const generation = accountScopeGeneration();
+  if (isAccountDataBlocked()) throw new Error('アカウントの削除中です');
+  const db = await getLocalDb();
+  if (generation !== accountScopeGeneration() || isAccountDataBlocked()) throw new Error('利用者が切り替わりました');
+  await db.delete('meta', key);
 }
 
 /** 旧版の所有者不明キューは移送も削除もせず隔離し、画面へ存在だけを知らせる。 */

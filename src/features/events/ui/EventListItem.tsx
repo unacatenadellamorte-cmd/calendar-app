@@ -2,7 +2,7 @@ import { t, useLanguage } from '@/i18n';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { eventLabelColor, labelTextColor } from '@/lib/event-label';
-import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
+import { formatClock, formatEventDate, formatEventTime, localDateOf, localDateString } from '@/lib/datetime';
 import { EventStamp } from '@/ui/EventStamp';
 import { isEventStampId } from '@/lib/event-stamps';
 interface EventListItemProps {
@@ -28,10 +28,18 @@ export function EventListItem({
   const stampOnly = Boolean(event.stampOnly && knownStampId);
   let when = '';
   if (event.allDay && event.eventDate) {
-    when = compact && !showDate ? t('終日') : formatEventDate(event.eventDate);
+    const endInclusive = event.eventEndDate
+      ? localDateString(new Date(new Date(`${event.eventEndDate}T00:00:00`).getTime() - 1))
+      : event.eventDate;
+    const dateRange = endInclusive !== event.eventDate
+      ? `${formatEventDate(event.eventDate)} 〜 ${formatEventDate(endInclusive)}`
+      : formatEventDate(event.eventDate);
+    when = compact && !showDate && endInclusive === event.eventDate ? t('終日') : dateRange;
   } else if (event.startsAt) {
-    when =
-      compact && !showDate ? formatClock(event.startsAt) : formatEventTime(event.startsAt);
+    const start = compact && !showDate ? formatClock(event.startsAt) : formatEventTime(event.startsAt);
+    if (event.endsAt && localDateOf(event.endsAt) !== localDateOf(event.startsAt)) {
+      when = `${start} 〜 ${formatEventDate(localDateOf(event.endsAt))} ${formatClock(event.endsAt)}`;
+    } else when = start;
   }
   return (
     <li className="border-b border-border-hairline last:border-b-0">

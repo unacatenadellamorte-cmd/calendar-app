@@ -21,10 +21,22 @@ vi.mock('./supabase', () => ({
       let operation = 'select';
       let payload: Record<string, unknown> = {};
       let single = false;
+      let rangeStart = 0;
+      let rangeEnd = Number.POSITIVE_INFINITY;
+      let limitCount: number | null = null;
       const filters: [string, unknown][] = [];
       const chain = {
         select: () => chain,
         order: () => chain,
+        limit: (count: number) => {
+          limitCount = count;
+          return chain;
+        },
+        range: (from: number, to: number) => {
+          rangeStart = from;
+          rangeEnd = to;
+          return chain;
+        },
         insert: (value: Record<string, unknown>) => {
           operation = 'insert';
           payload = value;
@@ -87,7 +99,11 @@ vi.mock('./supabase', () => ({
                   `${table}:${payload.deleted_at ? 'delete' : (payload.title ?? payload.name)}`,
                 );
                 data = matching[0] ?? null;
-              } else data = single ? (matching[0] ?? null) : matching;
+              } else {
+                data = single
+                  ? (matching[0] ?? null)
+                  : matching.slice(rangeStart, limitCount === null ? rangeEnd + 1 : rangeStart + limitCount);
+              }
               if (name === 'events:select' && !single && server.listGate) {
                 const gate = server.listGate;
                 server.listGate = null;
@@ -102,7 +118,7 @@ vi.mock('./supabase', () => ({
                 server.offlineAfterValidation = false;
                 vi.stubGlobal('navigator', { onLine: false });
               }
-              return { data, error: null };
+              return { data, count: single ? null : matching.length, error: null };
             })
             .then(resolve, reject);
         },

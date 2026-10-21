@@ -2,18 +2,19 @@ import { t, useLanguage } from '@/i18n';
 import { BottomSheet } from '@/ui/BottomSheet';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { formatClock, formatEventDate, formatEventTime } from '@/lib/datetime';
+import { formatClock, formatEventDate, formatEventTime, localDateOf } from '@/lib/datetime';
 import { ReminderPicker } from './ReminderPicker';
 import { openExternalUrl, openMap } from '@/platform/externalLinks';
 import { EventStamp } from '@/ui/EventStamp';
 import { isEventStampId } from '@/lib/event-stamps';
+import { addDays } from '@/lib/calendar-view';
 interface EventDetailSheetProps {
   /** null なら閉じている。 */
   event: EventItem | null;
   calendar: Calendar | undefined;
   onClose: () => void;
   /** リマインダーを設定/解除する(Story 5.4)。source を問わず許可(FR20)。 */
-  onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean>;
+  onSetReminder: (event: EventItem, minutes: number | null) => Promise<boolean | string>;
 }
 /**
  * 取り込んだ予定の読み取り専用詳細(Story 3.3 / 5.3)。
@@ -30,10 +31,18 @@ export function EventDetailSheet({
   useLanguage();
   const when = (() => {
     if (!event) return '';
-    if (event.allDay && event.eventDate) return formatEventDate(event.eventDate);
+    if (event.allDay && event.eventDate) {
+      const end = event.eventEndDate ? addDays(event.eventEndDate, -1) : event.eventDate;
+      return end === event.eventDate
+        ? formatEventDate(event.eventDate)
+        : `${formatEventDate(event.eventDate)} 〜 ${formatEventDate(end)}`;
+    }
     if (event.startsAt) {
       const start = formatEventTime(event.startsAt);
-      return event.endsAt ? `${start} 〜 ${formatClock(event.endsAt)}` : start;
+      if (!event.endsAt) return start;
+      const endDate = localDateOf(event.endsAt);
+      const dateSuffix = endDate !== localDateOf(event.startsAt) ? `${formatEventDate(endDate)} ` : '';
+      return `${start} 〜 ${dateSuffix}${formatClock(event.endsAt)}`;
     }
     return '';
   })();

@@ -3,6 +3,7 @@ import type { ShiftTemplate } from './shift-templates';
 
 let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
 const calls: { method: string; args: unknown[] }[] = [];
+let rowsForIds: string[] = [];
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
@@ -10,10 +11,19 @@ function makeChain() {
     (method: string) =>
     (...args: unknown[]) => {
       calls.push({ method, args });
+      if (method === 'upsert') rowsForIds = ((args[0] as { id: string }[]) ?? []).map((row) => row.id);
       return chain;
     };
-  for (const m of ['select', 'insert', 'update', 'eq', 'is', 'order']) chain[m] = record(m);
-  chain.then = (resolve: (v: unknown) => unknown) => resolve(queryResult);
+  for (const m of ['select', 'insert', 'upsert', 'update', 'eq', 'is', 'order', 'in']) chain[m] = record(m);
+  chain.then = (resolve: (v: unknown) => unknown) => resolve({
+    ...queryResult,
+    data: queryResult.error ? queryResult.data : rowsForIds.length
+      ? rowsForIds.map((id, index) => ({
+          ...((queryResult.data as Record<string, unknown>[] | null)?.[index] ?? eventRow()),
+          id,
+        }))
+      : queryResult.data,
+  });
   return chain;
 }
 
@@ -66,6 +76,7 @@ const eventRow = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.resetModules();
   calls.length = 0;
+  rowsForIds = [];
   queryResult = { data: null, error: null };
   supabaseValue = { from };
   from.mockReset();
@@ -91,20 +102,45 @@ describe('buildShiftTimes', () => {
 });
 
 describe('createShifts', () => {
+  it('同じフォームの再送は事前発番したIDを使い、衝突を無視する', async () => {
+    queryResult = { data: [eventRow({ id: 'op-1' })], error: null };
+    const { createShifts } = await load();
+    const r = await createShifts('shift', tpl, ['2026-09-08'], ['op-1']);
+    expect(r.ok).toBe(true);
+    expect(calls.find((call) => call.method === 'upsert')?.args[0]).toEqual([
+      expect.objectContaining({ id: 'op-1' }),
+    ]);
+    expect(calls.find((call) => call.method === 'upsert')?.args[1]).toMatchObject({
+      onConflict: 'id',
+      ignoreDuplicates: true,
+    });
+  });
+  it('ID衝突時は既存行の編集・秘密・通知属性をそのまま返す', async () => {
+    queryResult = { data: [eventRow({ id: 'op-1', title: '後から編集', is_secret: true, reminder_minutes: 15 })], error: null };
+    const { createShifts } = await load();
+    const result = await createShifts('shift', tpl, ['2026-09-08'], ['op-1']);
+    expect(result.ok && result.value[0]).toMatchObject({ title: '後から編集', isSecret: true, reminderMinutes: 15 });
+  });
+  it('操作IDの件数不足や重複を拒否する', async () => {
+    const { createShifts } = await load();
+    expect((await createShifts('shift', tpl, ['2026-09-08', '2026-09-09'], ['one'])).ok).toBe(false);
+    expect((await createShifts('shift', tpl, ['2026-09-08', '2026-09-09'], ['same', 'same'])).ok).toBe(false);
+    expect(calls.some((call) => call.method === 'upsert')).toBe(false);
+  });
   it('シフト色を保存し、作成直後・キャッシュ・再取得でもラベル色として保持する', async () => {
     const color = '#06B6D4';
     queryResult = { data: [eventRow({ label_color: color })], error: null };
     const { createShifts } = await load();
     const result = await createShifts('shift', { ...tpl, color }, ['2026-09-08']);
     expect(result.ok && result.value[0]?.labelColor).toBe(color);
-    expect(calls.find((call) => call.method === 'insert')?.args[0]).toEqual([
+    expect(calls.find((call) => call.method === 'upsert')?.args[0]).toEqual([
       expect.objectContaining({ label_color: color }),
     ]);
     expect(
-      (calls.find((call) => call.method === 'select')?.args[0] as string).split(','),
+      (calls.filter((call) => call.method === 'select').at(-1)?.args[0] as string).split(','),
     ).toContain('label_color');
     const { cacheGetAll } = await import('./cache');
-    expect((await cacheGetAll('events')).find((event) => event.id === 'ev1')?.labelColor).toBe(
+    expect((await cacheGetAll('events')).find((event) => event.id === (calls.find((c) => c.method === 'upsert')?.args[0] as { id: string }[])[0]?.id)?.labelColor).toBe(
       color,
     );
     const { listEvents } = await import('./events');
@@ -127,7 +163,7 @@ describe('createShifts', () => {
         shiftTemplateId: 't1',
       });
     }
-    const insertCall = calls.find((c) => c.method === 'insert');
+    const insertCall = calls.find((c) => c.method === 'upsert');
     expect(Array.isArray(insertCall?.args[0])).toBe(true);
     expect((insertCall?.args[0] as unknown[]).length).toBe(1);
   });
@@ -140,7 +176,7 @@ describe('createShifts', () => {
     const { createShifts } = await load();
     const r = await createShifts('shift', tpl, ['2026-09-08', '2026-09-09', '2026-09-10']);
     expect(r.ok && r.value.length).toBe(3);
-    const insertCall = calls.find((c) => c.method === 'insert');
+    const insertCall = calls.find((c) => c.method === 'upsert');
     expect((insertCall?.args[0] as unknown[]).length).toBe(3);
   });
 
@@ -148,7 +184,7 @@ describe('createShifts', () => {
     const { createShifts } = await load();
     const r = await createShifts('shift', tpl, []);
     expect(r.ok && r.value).toEqual([]);
-    expect(calls.find((c) => c.method === 'insert')).toBeUndefined();
+    expect(calls.find((c) => c.method === 'upsert')).toBeUndefined();
   });
 
   it('PostgREST エラーは data/query', async () => {
@@ -191,7 +227,7 @@ it('終日シフトを月末の各選択日へ登録し、時刻・給料を持�
     { ...tpl, allDay: true, startLocal: '', endLocal: '' },
     dates,
   );
-  expect(calls.find((c) => c.method === 'insert')?.args[0]).toEqual(
+  expect(calls.find((c) => c.method === 'upsert')?.args[0]).toEqual(
     dates.map((date) =>
       expect.objectContaining({
         all_day: true,
@@ -211,12 +247,11 @@ it('終日シフトを月末の各選択日へ登録し、時刻・給料を持�
     created.ok && created.value.map((e) => [e.allDay, e.eventDate, e.startsAt, e.endsAt]),
   ).toEqual(dates.map((date) => [true, date, null, null]));
   const { cacheGetAll } = await import('./cache');
-  const cached = (await cacheGetAll('events')).filter((e) =>
-    ['holiday-0', 'holiday-1'].includes(e.id),
-  );
+  const expectedIds = (calls.find((c) => c.method === 'upsert')?.args[0] as { id: string }[]).map((row) => row.id);
+  const cached = (await cacheGetAll('events')).filter((e) => expectedIds.includes(e.id));
   expect(cached).toHaveLength(2);
   dates.forEach((date, index) => {
-    expect(cached.find((e) => e.id === `holiday-${index}`)).toMatchObject({
+    expect(cached.find((e) => e.id === expectedIds[index])).toMatchObject({
       allDay: true,
       eventDate: date,
       startsAt: null,

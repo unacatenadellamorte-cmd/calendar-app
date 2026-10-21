@@ -19,7 +19,7 @@ for (const file of readdirSync(join(root,'supabase/migrations')).filter(f=>f.end
   let sql=readFileSync(join(root,'supabase/migrations',file),'utf8');
   sql=sql.replace(/create extension if not exists supabase_vault;/g,'');
   try { await db.exec(sql); }
-  catch(e) { console.error(`失敗したマイグレーション: ${file}`); throw e; }
+  catch(e) { console.error(`失敗したマイグレーション: ${file}: ${e.message}`); throw e; }
 }
 const user='10000000-0000-4000-8000-000000000001';
 const other='10000000-0000-4000-8000-000000000002';
@@ -39,6 +39,16 @@ assert.equal(await scalar('select get_google_connection_token($1,$2)',[other,con
 assert.equal(await scalar('select get_google_refresh_token($1)',[user]),null);
 await db.query('update connections set write_granted=true where user_id=$1',[user]);
 const calendar=await scalar("insert into calendars(user_id,name,color) values($1,'検証','#112233') returning id",[user]);
+const googleCalendar1=await scalar("insert into calendars(user_id,name,color,source,external_connection_id,external_calendar_id) values($1,'Google A','#112233','google',$2,'calendar-a') returning id",[user,conn]);
+const googleCalendar2=await scalar("insert into calendars(user_id,name,color,source,external_connection_id,external_calendar_id) values($1,'Google B','#223344','google',$2,'calendar-b') returning id",[user,conn]);
+const imported=[{external_id:'same-event-id',title:'複数日',all_day:true,event_date:'2026-10-03',event_end_date:'2026-10-06'}];
+const syncWindow=['2026-10-01T00:00:00Z','2026-10-10T00:00:00Z'];
+await db.query('select apply_calendar_sync($1,$2,$3,$4,$5::jsonb,$6,$7)',[user,conn,googleCalendar1,'calendar-a',JSON.stringify(imported),...syncWindow]);
+assert.equal(await scalar("select event_end_date::text from events where external_calendar_id='calendar-a' and external_id='same-event-id'"),'2026-10-06');
+await db.query('select apply_calendar_sync($1,$2,$3,$4,$5::jsonb,$6,$7)',[user,conn,googleCalendar2,'calendar-b',JSON.stringify(imported),...syncWindow]);
+assert.equal(await scalar("select count(*)::int from events where external_id='same-event-id' and source='google'"),2);
+assert.equal(await scalar("select count(*)::int from events where external_id='same-event-id' and event_end_date='2026-10-06'"),2);
+await assert.rejects(()=>db.query('select apply_calendar_sync($1,$2,$3,$4,$5::jsonb,$6,$7)',[other,conn,googleCalendar1,'calendar-a',JSON.stringify(imported),...syncWindow]));
 await db.query("select set_google_push_target($1,$2,$3,'calendar-a')",[user,calendar,conn]);
 const event=await scalar("insert into events(user_id,calendar_id,title,all_day,event_date) values($1,$2,'検証予定',true,'2026-10-03') returning id",[user,calendar]);
 assert.equal(await scalar('select count(*)::int from event_google_links'),1);
@@ -110,5 +120,5 @@ await db.query("select finish_google_push($1,$2,$3,'error',true,'reauth-needed')
 assert.ok(await scalar("select next_attempt_at>now()+interval '30 minutes' from event_google_links where id=$1",[job.id]));
 await db.query('delete from auth.users where id=$1',[user]);
 assert.equal(await scalar('select count(*)::int from event_google_links'),0);
-console.log('SQL検証成功: 接続分離・上限・猶予・排他・秘密化競合・失効・RLS・連鎖削除');
+console.log('SQL検証成功: 接続分離・複合Google ID・event_end_date往復・所有者拒否・上限・猶予・排他・秘密化競合・失効・RLS・連鎖削除');
 await db.close();

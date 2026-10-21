@@ -41,6 +41,7 @@ export interface NormalizedGoogleEvent {
   endsAt: string | null;
   /** 終日の日付(YYYY-MM-DD)。時刻付きなら null。 */
   eventDate: string | null;
+  eventEndDate?: string | null;
 }
 
 const TITLE_MAX = 200;
@@ -72,6 +73,10 @@ export function normalizeGoogleEvent(raw: GoogleEventRaw): NormalizedGoogleEvent
       startsAt: null,
       endsAt: null,
       eventDate: startDate,
+      eventEndDate:
+        typeof raw.end?.date === 'string' && DATE_ONLY.test(raw.end.date)
+          ? raw.end.date
+          : nextDate(startDate),
     };
   }
 
@@ -121,6 +126,7 @@ export interface EventRow {
   starts_at: string | null;
   ends_at: string | null;
   event_date: string | null;
+  event_end_date?: string | null;
 }
 
 /** 正規化済みの予定を RPC 行(snake_case)に写す。 */
@@ -133,5 +139,12 @@ export function toEventRow(n: NormalizedGoogleEvent): EventRow {
     starts_at: n.startsAt,
     ends_at: n.endsAt,
     event_date: n.eventDate,
+    ...(n.allDay ? { event_end_date: n.eventEndDate ?? null } : {}),
   };
+}
+
+function nextDate(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }

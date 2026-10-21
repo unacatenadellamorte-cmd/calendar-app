@@ -8,6 +8,7 @@ import { useSecretMode } from '@/app/secret-mode-context';
 import { resolveMessage } from '@/data/messages';
 import { hideSecretEvents, type EventItem, type NewEventInput } from '@/data/events';
 import {
+  addDays,
   groupEventsByDay,
   makePriorityOf,
   monthGridDays,
@@ -58,13 +59,47 @@ export function CalendarScreen({
   const ev = useEvents(enabled);
   const { unlocked } = useSecretMode();
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchCalendarId, setSearchCalendarId] = useState('');
+  const [searchFrom, setSearchFrom] = useState('');
+  const [searchTo, setSearchTo] = useState('');
   // ロック中はシークレット予定を月・週・年・リストのどのビューからも除外する(spec-secret-mode)。
   const unlockedEvents = useMemo(
     () => hideSecretEvents(ev.events, unlocked),
     [ev.events, unlocked],
   );
+  const filteredEvents = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    const rangeStart = searchFrom ? new Date(`${searchFrom}T00:00:00`).getTime() : null;
+    const rangeEnd = searchTo ? new Date(`${addDays(searchTo, 1)}T00:00:00`).getTime() : null;
+    return unlockedEvents.filter((event) => {
+      const matchesQuery =
+        query === '' ||
+        [event.title, event.location ?? '', event.note ?? ''].some((value) =>
+          value.toLocaleLowerCase().includes(query),
+        );
+      let matchesPeriod = true;
+      if (searchFrom || searchTo) {
+        if (event.allDay && event.eventDate) {
+          const endDate = event.eventEndDate ?? addDays(event.eventDate, 1);
+          matchesPeriod = (!searchFrom || endDate > searchFrom) && (!searchTo || event.eventDate <= searchTo);
+        } else if (event.startsAt) {
+          const start = Date.parse(event.startsAt);
+          const end = event.endsAt ? Date.parse(event.endsAt) : start;
+          matchesPeriod = start === end
+            ? (rangeStart === null || start >= rangeStart) && (rangeEnd === null || start < rangeEnd)
+            : (rangeEnd === null || start < rangeEnd) && (rangeStart === null || end > rangeStart);
+        } else matchesPeriod = false;
+      }
+      return (
+        matchesQuery &&
+        (searchCalendarId === '' || event.calendarId === searchCalendarId) &&
+        matchesPeriod
+      );
+    });
+  }, [unlockedEvents, searchQuery, searchCalendarId, searchFrom, searchTo]);
   const { view, setView, cursor, visibleEvents, goPrev, goNext, goToday, jumpTo } =
-    useCalendarView(unlockedEvents, cal.calendars, initialDate);
+    useCalendarView(filteredEvents, cal.calendars, initialDate);
   const monthPay = useMemo(
     () => calculateMonthlyPay(unlockedEvents, cal.calendars, cursor.slice(0, 7)),
     [unlockedEvents, cal.calendars, cursor],
@@ -90,6 +125,12 @@ export function CalendarScreen({
     if (!selectedDay || view !== 'month' || sheetOpen || detailEvent) return;
     return registerLayerBack(() => setSelectedDay(null));
   }, [selectedDay, view, sheetOpen, detailEvent]);
+  useEffect(() => {
+    if (!unlocked) {
+      setSheetOpen(false);
+      setDetailEvent(null);
+    }
+  }, [unlocked]);
   const calendarById = useMemo(
     () => new Map(cal.calendars.map((c) => [c.id, c])),
     [cal.calendars],
@@ -97,9 +138,16 @@ export function CalendarScreen({
   // 日ごとの予定グルーピング(優先度順)は MonthView / DayEventPanel の両方が使う派生データなので、
   // ここで一度だけ計算して props で渡す(calendarById と同じ「呼び出し元で計算」の慣習)。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
+  const monthCells = useMemo(() => {
+    const { year, month } = ymd(cursor);
+    return monthGridDays(year, month, today);
+  }, [cursor, today]);
   const byDay = useMemo(
-    () => groupEventsByDay(visibleEvents, priorityOf),
-    [visibleEvents, priorityOf],
+    () => groupEventsByDay(visibleEvents, priorityOf, {
+      from: monthCells[0]?.date ?? cursor,
+      toExclusive: monthCells.at(-1) ? addDays(monthCells.at(-1)!.date, 1) : addDays(cursor, 1),
+    }),
+    [visibleEvents, priorityOf, monthCells, cursor],
   );
   const openCreate = (nextSeed?: EventSeed) => {
     setEditing(null);
@@ -221,11 +269,11 @@ export function CalendarScreen({
           <button
             type="button"
             onClick={() => navigate('/shifts/add')}
-            className="text-meta text-accent"
+            className="min-h-11 px-1 text-meta text-accent"
           >
             {t('＋シフト')}
           </button>
-          <button type="button" onClick={() => openCreate()} className="text-meta text-accent">
+          <button type="button" onClick={() => openCreate()} className="min-h-11 px-1 text-meta text-accent">
             {t('＋予定')}
           </button>
         </div>
@@ -246,6 +294,47 @@ export function CalendarScreen({
         onJump={jumpTo}
         monthPayAmount={view === 'month' && !loading ? monthPay.amount : undefined}
       />
+
+      <div className="mb-3 flex flex-col gap-2 rounded-md border border-border-hairline bg-surface-raised p-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-meta text-ink-secondary">{t('予定を検索')}</span>
+          <input
+            aria-label={t('予定を検索')}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-meta text-ink-secondary">{t('カレンダーで絞り込み')}</span>
+          <select
+            aria-label={t('カレンダーで絞り込み')}
+            value={searchCalendarId}
+            onChange={(event) => setSearchCalendarId(event.target.value)}
+            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+          >
+            <option value="">{t('すべてのカレンダー')}</option>
+            {cal.calendars.map((calendar) => (
+              <option key={calendar.id} value={calendar.id}>{calendar.name}</option>
+            ))}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-ink-secondary">{t('開始日')}</span>
+            <input aria-label={t('開始日')} type="date" value={searchFrom} onChange={(event) => setSearchFrom(event.target.value)} className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-2 text-body" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-meta text-ink-secondary">{t('終了日')}</span>
+            <input aria-label={t('終了日')} type="date" value={searchTo} onChange={(event) => setSearchTo(event.target.value)} className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-2 text-body" />
+          </label>
+        </div>
+        {(searchQuery || searchCalendarId || searchFrom || searchTo) && (
+          <button type="button" className="min-h-11 self-start text-meta text-accent" onClick={() => { setSearchQuery(''); setSearchCalendarId(''); setSearchFrom(''); setSearchTo(''); }}>
+            {t('条件を解除')}
+          </button>
+        )}
+      </div>
 
       {cal.errorKey && (
         <p
@@ -273,14 +362,18 @@ export function CalendarScreen({
 
       {ev.pendingDelete && (
         <p className="mb-3 flex items-center justify-between rounded-sm bg-surface-raised px-3 py-2 text-meta text-ink-secondary">
-          {t('「{0}」を削除しました', [ev.pendingDelete.title])}
+          {t('「{0}」を削除しました', [ev.pendingDelete.isSecret && !unlocked ? '予定' : ev.pendingDelete.title])}
           <button type="button" onClick={() => void ev.undoDelete()} className="text-accent">
             {t('取り消す')}
           </button>
         </p>
       )}
 
-      {loading ? (
+      {!loading && (searchQuery || searchCalendarId || searchFrom || searchTo) && visibleEvents.length === 0 ? (
+        <p className="mt-2 rounded-md border border-border-hairline bg-surface-raised px-4 py-4 text-meta text-ink-secondary">
+          {t('条件に一致する予定はありません')}
+        </p>
+      ) : loading ? (
         <p className="mt-2 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : view === 'month' ? (
         <>

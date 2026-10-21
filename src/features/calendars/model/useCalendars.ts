@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOnline } from '@/app/online-context';
+import { subscribeDataRefresh } from '@/app/data-refresh-notification';
 import { refreshFeaturedWidget } from '@/platform/widget';
 import {
   createCalendar,
@@ -39,12 +40,19 @@ export function useCalendars(enabled: boolean) {
   );
   const visibilityConfirmed = useRef(new Map<string, boolean>());
   const visibilityQueues = useRef(new Map<string, Promise<void>>());
+  const reorderQueue = useRef(Promise.resolve());
+  const reorderVersion = useRef(0);
+  const reorderPending = useRef(0);
+  const reorderConfirmed = useRef<Calendar[]>([]);
+  const reorderOptimistic = useRef<Calendar[]>([]);
   calendarsRef.current = calendars;
 
   const reload = useCallback(async () => {
     if (!enabled) return;
     const generation = ++reloadGeneration.current;
     const visibilityVersionAtStart = visibilityVersion.current;
+    const reorderVersionAtStart = reorderVersion.current;
+    const reorderPendingAtStart = reorderPending.current > 0;
     const pendingAtStart = new Map(
       [...visibilityOverrides.current.entries()]
         .filter(([, override]) => override.pending)
@@ -62,8 +70,12 @@ export function useCalendars(enabled: boolean) {
     const list = await listCalendars();
     if (generation !== reloadGeneration.current) return;
     if (list.ok) {
-      setCalendars(
-        sortCalendars(list.value).map((calendar) => {
+      const sorted = sortCalendars(list.value);
+      const preserveReorder = reorderPendingAtStart || reorderPending.current > 0 || reorderVersionAtStart !== reorderVersion.current;
+      const ordered = preserveReorder
+        ? [...reorderOptimistic.current.map((calendar) => sorted.find((item) => item.id === calendar.id)).filter((item): item is Calendar => Boolean(item)), ...sorted.filter((item) => !reorderOptimistic.current.some((current) => current.id === item.id))]
+        : sorted;
+      const next = ordered.map((calendar) => {
           const override = visibilityOverrides.current.get(calendar.id);
           if (!override) return calendar;
           if (
@@ -75,8 +87,13 @@ export function useCalendars(enabled: boolean) {
             return calendar;
           }
           return { ...calendar, isVisible: override.value };
-        }),
-      );
+        });
+      setCalendars(next);
+      calendarsRef.current = next;
+      if (!preserveReorder) {
+        reorderConfirmed.current = next;
+        reorderOptimistic.current = next;
+      }
     } else {
       setErrorKey(list.error.messageKey);
     }
@@ -87,10 +104,14 @@ export function useCalendars(enabled: boolean) {
     void reload();
   }, [reload]);
 
+  useEffect(() => () => { reloadGeneration.current += 1; }, [enabled]);
+
   // オンライン復帰でフラッシュされたら、実データを取り直す。
   useEffect(() => {
     if (syncNonce > 0) void reload();
   }, [syncNonce, reload]);
+
+  useEffect(() => subscribeDataRefresh(() => void reload()), [reload]);
 
   useEffect(
     () => () => {
@@ -113,21 +134,38 @@ export function useCalendars(enabled: boolean) {
 
   /** `orderedIds` の順に並べ替える(ドラッグ / ▲▼ 双方)。楽観 → 失敗でロールバック。 */
   const reorder = useCallback(async (orderedIds: string[]) => {
-    const snapshot = calendarsRef.current;
+    const snapshot = reorderOptimistic.current.length > 0 ? reorderOptimistic.current : calendarsRef.current;
     const byId = new Map(snapshot.map((c) => [c.id, c]));
     const optimistic = orderedIds
       .map((id) => byId.get(id))
       .filter((c): c is Calendar => c !== undefined);
     if (optimistic.length !== snapshot.length) return; // id 集合が食い違う → 何もしない
+    const version = ++reorderVersion.current;
+    reorderPending.current += 1;
+    reorderOptimistic.current = optimistic;
+    calendarsRef.current = optimistic;
     setCalendars(optimistic);
-    const result = await reorderCalendars(orderedIds);
-    if (result.ok) {
-      void refreshFeaturedWidget();
-      setCalendars(sortCalendars(result.value));
-    } else {
-      setCalendars(snapshot);
-      setErrorKey(result.error.messageKey);
-    }
+    const run = async () => {
+      const result = await reorderCalendars(orderedIds);
+      if (result.ok) {
+        const confirmed = sortCalendars(result.value);
+        reorderConfirmed.current = confirmed;
+        if (version !== reorderVersion.current) return;
+        reorderOptimistic.current = confirmed;
+        calendarsRef.current = confirmed;
+        void refreshFeaturedWidget();
+        setCalendars(confirmed);
+      } else {
+        if (version !== reorderVersion.current) return;
+        reorderOptimistic.current = reorderConfirmed.current.length > 0 ? reorderConfirmed.current : snapshot;
+        calendarsRef.current = reorderOptimistic.current;
+        setCalendars(reorderOptimistic.current);
+        setErrorKey(result.error.messageKey);
+      }
+    };
+    const request = reorderQueue.current.then(run, run);
+    reorderQueue.current = request.then(() => undefined, () => undefined);
+    try { await request; } finally { reorderPending.current = Math.max(0, reorderPending.current - 1); }
   }, []);
 
   const rename = useCallback(async (id: string, name: string) => {

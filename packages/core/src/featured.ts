@@ -13,6 +13,8 @@ import { compareEventsForList, type OrderableEvent, type PriorityLookup } from '
 export interface FeaturableEvent extends OrderableEvent {
   /** 時刻付きの終了(UTC ISO)。終日、または終了未設定は null。 */
   endsAt: string | null;
+  /** 終日の排他的な終了日。旧データは未設定。 */
+  eventEndDate?: string | null;
 }
 
 /**
@@ -40,7 +42,8 @@ export function selectFeaturedEvents<E extends FeaturableEvent>(
 
   const inScope = events.filter((event) => {
     if (event.allDay) {
-      return (event.eventDate ?? '') >= nowDate;
+      const start = event.eventDate ?? '';
+      return start >= nowDate || (Boolean(event.eventEndDate) && start <= nowDate && nowDate < event.eventEndDate!);
     }
     if (!event.startsAt) return false;
     // 終了時刻があれば「終わっていない」= 進行中を含む。無ければ「これから始まる」のみ。

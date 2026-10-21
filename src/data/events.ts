@@ -34,6 +34,7 @@ export interface EventItem {
   endsAt: string | null;
   /** 終日予定の日付(YYYY-MM-DD)。時刻付きなら null。 */
   eventDate: string | null;
+  eventEndDate?: string | null;
   note: string | null;
   location?: string | null;
   url?: string | null;
@@ -62,6 +63,7 @@ interface TimedInput {
 interface AllDayInput {
   allDay: true;
   eventDate: string;
+  eventEndDate?: string | null;
 }
 
 /** シフト実体を作るときだけ渡すシフト属性(AD-8)。省略時は書かない。 */
@@ -97,6 +99,7 @@ export type EventPatch = Partial<{
   startsAt: string | null;
   endsAt: string | null;
   eventDate: string | null;
+  eventEndDate?: string | null;
   isSecret: boolean;
   location?: string | null;
   url?: string | null;
@@ -124,6 +127,7 @@ export interface EventRow {
   starts_at: string | null;
   ends_at: string | null;
   event_date: string | null;
+  event_end_date?: string | null;
   note: string | null;
   source: EventSource;
   break_minutes: number | null;
@@ -143,7 +147,13 @@ export interface EventRow {
 
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 export const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,location,event_url,label_color,stamp_id,stamp_only,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
+  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,event_end_date,note,location,event_url,label_color,stamp_id,stamp_only,source,break_minutes,hourly_wage,workplace_label,shift_template_id,reminder_minutes,is_secret,created_at,updated_at';
+
+function nextDate(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 export function toEvent(row: EventRow): EventItem {
   return {
@@ -154,6 +164,7 @@ export function toEvent(row: EventRow): EventItem {
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     eventDate: row.event_date,
+    eventEndDate: row.all_day && row.event_date ? row.event_end_date ?? nextDate(row.event_date) : null,
     note: row.note,
     location: row.location ?? null,
     url: row.event_url ?? null,
@@ -239,6 +250,7 @@ interface EventInputShape {
   startsAt?: string | null;
   endsAt?: string | null;
   eventDate?: string | null;
+  eventEndDate?: string | null;
   location?: string | null;
   url?: string | null;
   labelColor?: string | null;
@@ -275,12 +287,13 @@ export function validateEventInput(input: EventInputShape): AppError | null {
     return appError('event/invalid-url', 'event/invalid-url');
   }
   if (input.allDay) {
-    if (!input.eventDate) return appError('event/invalid-date', 'event/invalid-date');
+    if (!input.eventDate || (input.eventEndDate != null && input.eventEndDate <= input.eventDate))
+      return appError('event/invalid-date', 'event/invalid-date');
   } else {
     if (!input.startsAt || !input.endsAt) {
       return appError('event/invalid-time', 'event/invalid-time');
     }
-    if (input.startsAt > input.endsAt) {
+    if (input.startsAt >= input.endsAt) {
       return appError('event/invalid-time', 'event/invalid-time');
     }
   }
@@ -309,33 +322,42 @@ function rowFromInput(input: NewEventInput): Record<string, unknown> {
     base.shift_template_id = input.shift.shiftTemplateId ?? null;
   }
   return input.allDay
-    ? { ...base, event_date: input.eventDate, starts_at: null, ends_at: null }
+    ? { ...base, event_date: input.eventDate, event_end_date: input.eventEndDate ?? nextDate(input.eventDate), starts_at: null, ends_at: null }
     : { ...base, starts_at: input.startsAt, ends_at: input.endsAt, event_date: null };
 }
 
 export async function listEvents(range: EventRange = {}): Promise<Result<EventItem[]>> {
   if (!supabase) return err(UNAVAILABLE);
   if (isOffline()) return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
-  let query = selectActive('events', COLUMNS)
-    .order('all_day', { ascending: true })
-    .order('starts_at', { ascending: true, nullsFirst: false })
-    .order('event_date', { ascending: true });
-  if (range.fromIso) {
-    query = query.or(
-      `starts_at.gte.${range.fromIso},event_date.gte.${range.fromIso.slice(0, 10)}`,
-    );
-  }
-  if (range.limit) query = query.limit(range.limit);
-
   try {
     const baseline = !range.fromIso && !range.limit ? await cacheGetAll('events') : null;
-    const { data, error } = await query;
-    if (error) {
-      if (isNetworkError(error))
-        return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
-      return err(fromPostgrest(error));
+    const rows: EventRow[] = [];
+    const ids = new Set<string>();
+    const maximum = range.limit ?? Infinity;
+    while (rows.length < maximum) {
+      const size = Math.min(1000, maximum - rows.length);
+      let query = selectActive('events', COLUMNS, { count: 'exact' })
+        .order('all_day', { ascending: true })
+        .order('starts_at', { ascending: true, nullsFirst: false })
+        .order('event_date', { ascending: true })
+        .order('id', { ascending: true });
+      if (range.fromIso) query = query.or(
+        `starts_at.gte.${range.fromIso},event_date.gte.${range.fromIso.slice(0, 10)},event_end_date.gt.${range.fromIso.slice(0, 10)}`,
+      );
+      query = rows.length ? query.range(rows.length, rows.length + size - 1) : query.limit(size);
+      const { data, error, count } = await query;
+      if (error) {
+        if (isNetworkError(error)) return ok((await cacheGetAll('events')).map(normalizeCachedEvent));
+        return err(fromPostgrest(error));
+      }
+      const page = (data ?? []) as unknown as EventRow[];
+      // ページが進まない場合や件数不足を、完全なスナップショットとして保存しない。
+      if (page.some(row => ids.has(row.id)) || (!page.length && count != null && rows.length < Math.min(count, maximum)))
+        return err(appError('data/query', 'data/query'));
+      for (const row of page) { ids.add(row.id); rows.push(row); }
+      if (count != null ? rows.length >= Math.min(count, maximum) : page.length < size) break;
     }
-    let mapped = (data as unknown as EventRow[]).map(toEvent);
+    let mapped = rows.map(toEvent);
     if (baseline) mapped = await cacheMergeSnapshot('events', mapped, baseline);
     else for (const row of mapped) await cachePut('events', row);
     return ok(mapped);
@@ -429,12 +451,13 @@ export function validateEventPatch(patch: EventPatch): AppError | null {
     patch.allDay !== undefined ||
     patch.startsAt !== undefined ||
     patch.endsAt !== undefined ||
-    patch.eventDate !== undefined;
+    patch.eventDate !== undefined ||
+    patch.eventEndDate !== undefined;
   if (touchesTime) {
     if (patch.allDay === true) {
-      if (!patch.eventDate) return appError('event/invalid-date', 'event/invalid-date');
+      if (!patch.eventDate || (patch.eventEndDate != null && patch.eventEndDate <= patch.eventDate)) return appError('event/invalid-date', 'event/invalid-date');
     } else if (patch.allDay === false) {
-      if (!patch.startsAt || !patch.endsAt || patch.startsAt > patch.endsAt) {
+      if (!patch.startsAt || !patch.endsAt || patch.startsAt >= patch.endsAt) {
         return appError('event/invalid-time', 'event/invalid-time');
       }
     } else if (
@@ -442,7 +465,7 @@ export function validateEventPatch(patch: EventPatch): AppError | null {
       patch.endsAt !== undefined &&
       patch.startsAt !== null &&
       patch.endsAt !== null &&
-      patch.startsAt > patch.endsAt
+      patch.startsAt >= patch.endsAt
     ) {
       return appError('event/invalid-time', 'event/invalid-time');
     }
@@ -483,6 +506,11 @@ export async function updateEvent(
   if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
   if (patch.eventDate !== undefined) row.event_date = patch.eventDate;
+  if (patch.eventEndDate !== undefined) row.event_end_date = patch.eventEndDate;
+  if (patch.allDay === false) row.event_end_date = null;
+  if (patch.allDay === true && patch.eventEndDate === undefined && patch.eventDate) {
+    row.event_end_date = nextDate(patch.eventDate);
+  }
   if (patch.isSecret !== undefined) row.is_secret = patch.isSecret;
 
   try {
@@ -601,9 +629,9 @@ export async function deleteEvent(
   }
 }
 
-export async function restoreEvent(event: EventItem): Promise<Result<void>> {
+export async function restoreEvent(event: EventItem, options: WriteOptions = {}): Promise<Result<void>> {
   if (!supabase) return err(UNAVAILABLE);
-  if (isOffline()) return offlineRestoreEvent(event);
+  if (isOffline()) return options.noOfflineFallback ? err(appError('data/offline', 'data/offline')) : offlineRestoreEvent(event);
 
   try {
     const { error } = await supabase
@@ -611,13 +639,13 @@ export async function restoreEvent(event: EventItem): Promise<Result<void>> {
       .update({ deleted_at: null })
       .eq('id', event.id);
     if (error) {
-      if (isNetworkError(error)) return offlineRestoreEvent(event);
+      if (isNetworkError(error)) return options.noOfflineFallback ? err(appError('data/offline', 'data/offline', error)) : offlineRestoreEvent(event);
       return err(fromPostgrest(error));
     }
     await cachePut('events', event);
     return ok(undefined);
   } catch (e) {
-    if (isNetworkError(e)) return offlineRestoreEvent(event);
+    if (isNetworkError(e)) return options.noOfflineFallback ? err(appError('data/offline', 'data/offline', e)) : offlineRestoreEvent(event);
     return err(appError('data/query', 'data/query', e));
   }
 }

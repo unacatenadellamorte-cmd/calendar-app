@@ -9,6 +9,7 @@ export function applyEventTag(
   date: string,
 ) {
   if (!isValidLocalDate(date)) return null;
+  if (!tag.allDay && tag.startLocal === tag.endLocal) return null;
   const next = new Date(`${date}T12:00:00`);
   if (tag.endLocal < tag.startLocal) next.setDate(next.getDate() + 1);
   return {

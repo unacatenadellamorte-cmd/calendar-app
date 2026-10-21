@@ -2,9 +2,10 @@ import { t, useLanguage } from '@/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { groupEventsByDay, makePriorityOf } from '@/lib/calendar-view';
-import { formatDayTitle } from '@/lib/datetime';
+import { eventOccursOnDate, makePriorityOf } from '@/lib/calendar-view';
+import { formatDayTitle, localDateOf } from '@/lib/datetime';
 import { EventListItem } from '@/features/events/ui/EventListItem';
+import { compareEventsForList } from '@core';
 interface ListViewProps {
   events: EventItem[];
   calendarById: Map<string, Calendar>;
@@ -24,7 +25,20 @@ export function ListView({
   useLanguage();
   // 日内の並びは所属カレンダーの優先度順(Story 2.2)。未知は最下位相当。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
-  const byDay = useMemo(() => groupEventsByDay(events, priorityOf), [events, priorityOf]);
+  // 長い複数日予定を全日へ展開せず、未来分は開始日に、今日まで続く過去開始分は今日に一度だけ置く。
+  const byDay = useMemo(() => {
+    const grouped = new Map<string, EventItem[]>();
+    for (const event of events) {
+      const startDate = event.allDay ? event.eventDate : event.startsAt ? localDateOf(event.startsAt) : null;
+      if (!startDate) continue;
+      const date = startDate < today && eventOccursOnDate(event, today) ? today : startDate;
+      const dayEvents = grouped.get(date) ?? [];
+      dayEvents.push(event);
+      grouped.set(date, dayEvents);
+    }
+    for (const dayEvents of grouped.values()) dayEvents.sort((a, b) => compareEventsForList(a, b, priorityOf));
+    return grouped;
+  }, [events, priorityOf, today]);
   const days = useMemo(() => [...byDay.keys()].sort(), [byDay]);
   const scrollRegionRef = useRef<HTMLDivElement>(null);
   const headerRefs = useRef(new Map<string, HTMLElement>());

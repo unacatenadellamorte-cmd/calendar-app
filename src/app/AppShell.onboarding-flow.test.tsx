@@ -344,7 +344,7 @@ describe('AppShell × OnboardingScreen(実フック、data層のみモック)', 
     renderShell();
     expect(await screen.findByRole('region', { name: '使い方ガイド' })).toBeInTheDocument();
     expect(screen.queryByLabelText('名前')).not.toBeInTheDocument();
-    expect(readFirstRunStage('u1')).toBe('tutorial');
+    await waitFor(() => expect(readFirstRunStage('u1')).toBe('tutorial'));
   });
 
   it('利用者が変わった瞬間に、前の名前入力・進捗を出さない', async () => {

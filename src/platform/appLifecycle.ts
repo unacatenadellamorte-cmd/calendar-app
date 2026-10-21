@@ -18,3 +18,16 @@ export function onAppResume(handler: () => void): () => void {
     void listenerHandle.then((listener) => listener.remove());
   };
 }
+
+export function onAppBackground(handler: () => void): () => void {
+  try {
+    const listenerHandle = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) handler();
+    });
+    return () => {
+      void listenerHandle.then((listener) => listener.remove());
+    };
+  } catch {
+    return () => {};
+  }
+}

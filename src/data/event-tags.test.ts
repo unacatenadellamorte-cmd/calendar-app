@@ -49,6 +49,19 @@ beforeEach(() => {
 });
 
 describe('event-tags data', () => {
+  it('取得済み0件を通信失敗時も空一覧として返す', async () => {
+    const { listEventTags } = await import('./event-tags');
+    result = { data: [], error: null };
+    const initial = await listEventTags();
+    expect(initial.ok).toBe(true);
+    if (!initial.ok) return;
+    expect(initial.value).toEqual([]);
+    result = { data: null, error: new TypeError('Failed to fetch') };
+    const offline = await listEventTags();
+    expect(offline.ok).toBe(true);
+    if (offline.ok) expect(offline.value).toEqual([]);
+  });
+
   it('日またぎ時刻を受け付け、camelCase に変換する', async () => {
     result = { data: row(), error: null };
     const { createEventTag, listEventTags } = await import('./event-tags');

@@ -307,6 +307,13 @@ describe('EventFormSheet', () => {
     expect(screen.getByLabelText('終了')).toHaveValue('2026-09-20T10:00');
   });
 
+  it('seed.date の終日予定は開始日と同じ最終日で始まる', async () => {
+    const user = userEvent.setup();
+    setup({ seed: { date: '2026-09-20' } });
+    await user.click(screen.getByLabelText('終日'));
+    expect(screen.getByLabelText('最終日')).toHaveValue('2026-09-20');
+  });
+
   it('seed.startLocal を渡すとその時刻から1時間が既定になる', () => {
     setup({ seed: { startLocal: '2026-09-20T14:00' } });
     expect(screen.getByLabelText('開始')).toHaveValue('2026-09-20T14:00');

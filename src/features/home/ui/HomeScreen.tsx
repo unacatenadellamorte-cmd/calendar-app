@@ -12,6 +12,7 @@ import { useFeaturedCount } from '@/features/compact/model/featuredCount';
 import { useFeaturedEvents } from '@/features/compact/model/useFeaturedEvents';
 import { CompactCard } from '@/features/compact/ui/CompactCard';
 import { PayCard } from '@/features/pay/ui/PayCard';
+import { resolveMessage } from '@/data/messages';
 /**
  * ホーム。この後の代表予定を優先度順で出すコンパクトビュー。
  * 給料見込みカードは Epic 4 でこの下に追加する。
@@ -55,6 +56,22 @@ export function HomeScreen() {
     >
       {ev.loading || cal.loading ? (
         <p className="text-meta text-ink-secondary">{t('読み込み中…')}</p>
+      ) : ev.errorKey || cal.errorKey ? (
+        <div className="flex flex-col gap-2 rounded-md border border-border-hairline bg-surface-raised px-4 py-4">
+          <p role="alert" className="text-body text-danger">
+            {resolveMessage(ev.errorKey ?? cal.errorKey ?? 'data/query')}
+          </p>
+          <button
+            type="button"
+            className="min-h-11 self-start rounded-sm border border-accent px-3 text-meta text-accent"
+            onClick={() => {
+              if (ev.errorKey) void ev.reload();
+              if (cal.errorKey) void cal.reload();
+            }}
+          >
+            {t('もう一度試す')}
+          </button>
+        </div>
       ) : (
         <>
           <CompactCard featured={featured} calendarById={calendarById} onSelect={openDay} />

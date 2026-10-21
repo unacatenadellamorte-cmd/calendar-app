@@ -5,7 +5,7 @@ import { isNetworkError } from './net';
 import { cachePut } from './cache';
 import { addDays } from '@/lib/calendar-view';
 import { localInputToUtcIso } from '@/lib/datetime';
-import type { EventItem } from './events';
+import { COLUMNS as EVENT_COLUMNS, toEvent, type EventItem, type EventRow } from './events';
 import type { ShiftTemplate } from './shift-templates';
 
 /**
@@ -15,37 +15,11 @@ import type { ShiftTemplate } from './shift-templates';
  * オフライン対応は Story 4.2 では入れない(deferred)。
  */
 
-const COLUMNS =
-  'id,calendar_id,title,all_day,starts_at,ends_at,event_date,note,label_color,source,break_minutes,hourly_wage,workplace_label,shift_template_id,created_at,updated_at';
 
 function fromPostgrest(error: PostgrestError): AppError {
   return appError('data/query', 'data/query', error);
 }
 
-function toEvent(row: Record<string, unknown>): EventItem {
-  return {
-    id: row.id as string,
-    calendarId: row.calendar_id as string,
-    title: row.title as string,
-    allDay: row.all_day as boolean,
-    startsAt: (row.starts_at as string | null) ?? null,
-    endsAt: (row.ends_at as string | null) ?? null,
-    eventDate: (row.event_date as string | null) ?? null,
-    note: (row.note as string | null) ?? null,
-    labelColor: (row.label_color as string | null) ?? null,
-    source: row.source as EventItem['source'],
-    breakMinutes: (row.break_minutes as number | null) ?? null,
-    hourlyWage: (row.hourly_wage as number | null) ?? null,
-    workplaceLabel: (row.workplace_label as string | null) ?? null,
-    shiftTemplateId: (row.shift_template_id as string | null) ?? null,
-    // 新規作成直後の行なので常に未設定(リマインダーは setEventReminder で後から設定する)。
-    reminderMinutes: null,
-    // シフト作成経路にシークレットトグルは無い(spec-secret-mode Never)。常に false。
-    isSecret: false,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
-}
 
 /**
  * 壁時計の開始・終了(HH:MM)を、対象暦日 `date` の UTC ISO に変換する。
@@ -68,21 +42,31 @@ export async function createShifts(
   shiftCalendarId: string,
   template: ShiftTemplate,
   dates: string[],
+  operationIds?: string[],
 ): Promise<Result<EventItem[]>> {
   if (!supabase) return err(appError('data/unavailable', 'data/unavailable'));
   if (dates.length === 0) return ok([]);
+  const ids = operationIds ?? dates.map(() => crypto.randomUUID());
+  if (ids.length !== dates.length || new Set(ids).size !== ids.length) {
+    return err(appError('data/query', 'data/query'));
+  }
+  if (!template.allDay && template.startLocal === template.endLocal) {
+    return err(appError('shift-template/invalid-time', 'shift-template/invalid-time', { hint: '24時間は予定編集で翌日を指定' }));
+  }
 
-  const rows = dates.map((date) => {
+  const rows = dates.map((date, index) => {
     const { startsAt, endsAt } = template.allDay
       ? { startsAt: null, endsAt: null }
       : buildShiftTimes(date, template.startLocal, template.endLocal);
     return {
+      id: ids[index]!,
       calendar_id: shiftCalendarId,
       title: template.name.trim(),
       all_day: template.allDay,
       starts_at: startsAt,
       ends_at: endsAt,
       event_date: template.allDay ? date : null,
+      event_end_date: template.allDay ? addDays(date, 1) : null,
       note: null,
       // 追加時の色を複写し、予定ごとの後からの色変更を保持する。
       label_color: template.color,
@@ -95,9 +79,19 @@ export async function createShifts(
   });
 
   try {
-    const { data, error } = await supabase.from('events').insert(rows).select(COLUMNS);
+    const { error } = await supabase
+      .from('events')
+      .upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
+      .select('id');
     if (error) return err(fromPostgrest(error));
-    const created = (data as Record<string, unknown>[]).map(toEvent);
+    const { data, error: readError } = await supabase
+      .from('events')
+      .select(EVENT_COLUMNS)
+      .in('id', ids);
+    if (readError) return err(fromPostgrest(readError));
+    const byId = new Map((data as Record<string, unknown>[]).map((row) => [row.id, row]));
+    if (ids.some((id) => !byId.has(id))) return err(appError('data/query', 'data/query'));
+    const created = ids.map((id) => toEvent(byId.get(id)! as unknown as EventRow));
     for (const row of created) await cachePut('events', row);
     return ok(created);
   } catch (e) {

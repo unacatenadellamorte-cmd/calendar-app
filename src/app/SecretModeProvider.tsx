@@ -1,6 +1,7 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { hashPasscode, isValidPasscodeFormat } from '@/lib/passcode';
 import { SecretModeContext, type SecretModeState } from './secret-mode-context';
+import { onAppBackground } from '@/platform/appLifecycle';
 
 interface SecretModeProviderProps {
   children: ReactNode;
@@ -23,11 +24,13 @@ export function SecretModeProvider({
 }: SecretModeProviderProps) {
   const [unlocked, setUnlocked] = useState(false);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const lockGeneration = useRef(0);
 
   const unlock = useCallback(
     async (passcode: string) => {
+      const generation = lockGeneration.current;
       const hash = await hashPasscode(passcode);
-      if (passcodeHash !== null && hash === passcodeHash) {
+      if (generation === lockGeneration.current && passcodeHash !== null && hash === passcodeHash) {
         setUnlocked(true);
         setErrorKey(null);
         return true;
@@ -40,9 +43,12 @@ export function SecretModeProvider({
 
   // 再ロックはパスコード不要で即座に(spec Design Notes: 隠す側に認証を課さない非対称)。
   const lock = useCallback(() => {
+    lockGeneration.current += 1;
     setUnlocked(false);
     setErrorKey(null);
   }, []);
+
+  useEffect(() => onAppBackground(lock), [lock]);
 
   const setPasscode = useCallback(
     async (passcode: string) => {

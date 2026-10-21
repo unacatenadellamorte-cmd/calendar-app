@@ -6,7 +6,7 @@ import { useOnline } from './online-context';
  */
 export function ConnectivityBar() {
   useLanguage();
-  const { online, pendingCount, flushing, syncNotice, dismissSyncNotice } = useOnline();
+  const { online, pendingCount, flushing, syncNotice, dismissSyncNotice, retryPending } = useOnline();
   if (syncNotice) {
     return (
       <div
@@ -39,6 +39,25 @@ export function ConnectivityBar() {
         className="bg-surface-raised px-4 py-1 text-center text-meta text-ink-secondary"
       >
         {t('送信中…')}
+      </div>
+    );
+  }
+  if (pendingCount > 0) {
+    return (
+      <div
+        role="status"
+        className="flex items-center justify-center gap-3 bg-surface-raised px-4 py-1 text-meta text-ink-secondary"
+      >
+        {t('未送信 {0} 件', [pendingCount])}
+        {online && (
+          <button
+            type="button"
+            onClick={retryPending}
+            className="min-h-11 rounded-sm px-2 text-accent"
+          >
+            {t('再送する')}
+          </button>
+        )}
       </div>
     );
   }

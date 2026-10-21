@@ -61,6 +61,7 @@ internal data class FeaturedWidgetEvent(
     val startsAtIso: String,
     val allDay: Boolean,
     val eventDate: String? = null,
+    val eventEndDate: String? = null,
 )
 
 /** SharedPreferences の JSON 配列を読む。壊れている/存在しない場合は空リスト(静かな表示)。 */
@@ -80,6 +81,7 @@ internal fun readFeaturedEvents(context: Context): List<FeaturedWidgetEvent> {
                         startsAtIso = obj.optString("startsAtIso", ""),
                         allDay = obj.optBoolean("allDay", false),
                         eventDate = obj.optString("eventDate", "").takeIf { it.isNotEmpty() },
+                        eventEndDate = obj.optString("eventEndDate", "").takeIf { it.isNotEmpty() },
                     ),
                 )
             }
@@ -128,7 +130,8 @@ internal fun formatStartLabel(event: FeaturedWidgetEvent, now: Date = Date()): S
         }
         val date = runCatching { parser.parse(key) }.getOrNull() ?: return "終日"
         if (parser.format(date) != key) return "終日"
-        if (key == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now)) return "終日"
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(now)
+        if (key == today || (event.eventEndDate != null && key <= today && today < event.eventEndDate)) return "終日"
         return SimpleDateFormat("M/d", Locale.getDefault()).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }.format(date) + " 終日"

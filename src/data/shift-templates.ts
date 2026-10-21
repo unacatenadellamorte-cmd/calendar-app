@@ -5,6 +5,7 @@ import { selectActive } from './soft-delete';
 import { appError, err, ok, type AppError, type Result } from './result';
 import { isPresetColor } from './calendar-colors';
 import { isNetworkError } from './net';
+import { deleteMeta, getMeta, putMeta } from './local-db';
 
 /**
  * お気に入りシフトのテンプレの data-access レイヤ(AD-9 / AD-8)。
@@ -59,6 +60,12 @@ interface ShiftTemplateRow {
 const UNAVAILABLE = appError('data/unavailable', 'data/unavailable');
 const COLUMNS =
   'id,all_day,name,start_local,end_local,break_minutes,hourly_wage,workplace_label,color,created_at,updated_at';
+const CACHE_KEY = 'shift-templates';
+
+interface CachedList {
+  fetched: true;
+  value: ShiftTemplate[];
+}
 
 const HHMM = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -129,7 +136,9 @@ function validateFields(v: NewShiftTemplateInput): AppError | null {
   }
   const worked = templateWorkedMinutes(v.startLocal, v.endLocal);
   if (worked === null) {
-    return appError('shift-template/invalid-time', 'shift-template/invalid-time');
+    return appError('shift-template/invalid-time', 'shift-template/invalid-time', {
+      hint: '24時間は予定編集で翌日を指定',
+    });
   }
   if (!Number.isInteger(v.breakMinutes) || v.breakMinutes < 0 || v.breakMinutes >= worked) {
     return appError('shift-template/invalid-break', 'shift-template/invalid-break');
@@ -177,13 +186,49 @@ export async function listShiftTemplates(): Promise<Result<ShiftTemplate[]>> {
         ascending: true,
       },
     );
-    if (error) return err(fromPostgrest(error));
-    return ok((data as unknown as ShiftTemplateRow[]).map(toTemplate));
+    if (error) {
+      if (isNetworkError(error)) {
+        const cached = await readCachedTemplates();
+        if (cached) return ok(cached);
+        return err(appError('data/offline', 'data/offline', error));
+      }
+      return err(fromPostgrest(error));
+    }
+    const templates = (data as unknown as ShiftTemplateRow[]).map(toTemplate);
+    await writeCachedTemplates(templates);
+    return ok(templates);
   } catch (e) {
-    // オフライン対応(キャッシュ)は未実装(deferred)。せめて文言はオフライン寄りにする。
-    if (isNetworkError(e)) return err(appError('data/offline', 'data/offline'));
+    if (isNetworkError(e)) {
+      const cached = await readCachedTemplates();
+      if (cached) return ok(cached);
+      return err(appError('data/offline', 'data/offline', e));
+    }
     return err(appError('data/query', 'data/query', e));
   }
+}
+
+async function readCachedTemplates(): Promise<ShiftTemplate[] | null> {
+  try {
+    const cached = await getMeta<CachedList>(CACHE_KEY);
+    return cached?.fetched === true ? cached.value : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedTemplates(value: ShiftTemplate[]): Promise<void> {
+  try {
+    await putMeta<CachedList>(CACHE_KEY, { fetched: true, value });
+  } catch {
+    // キャッシュ保存失敗はオンライン取得の成功を覆さない。
+  }
+}
+
+async function updateCachedTemplates(
+  update: (value: ShiftTemplate[]) => ShiftTemplate[],
+): Promise<void> {
+  const cached = await readCachedTemplates();
+  if (cached) await writeCachedTemplates(update(cached));
 }
 
 export async function createShiftTemplate(
@@ -199,7 +244,9 @@ export async function createShiftTemplate(
       .select(COLUMNS)
       .single();
     if (error) return err(fromPostgrest(error));
-    return ok(toTemplate(data as ShiftTemplateRow));
+    const created = toTemplate(data as ShiftTemplateRow);
+    await updateCachedTemplates((cached) => [...cached, created]);
+    return ok(created);
   } catch (e) {
     return err(appError('data/query', 'data/query', e));
   }
@@ -243,7 +290,11 @@ export async function updateShiftTemplate(
       .select(COLUMNS)
       .single();
     if (error) return err(fromPostgrest(error));
-    return ok(toTemplate(data as ShiftTemplateRow));
+    const updated = toTemplate(data as ShiftTemplateRow);
+    await updateCachedTemplates((cached) =>
+      cached.map((template) => (template.id === updated.id ? updated : template)),
+    );
+    return ok(updated);
   } catch (e) {
     return err(appError('data/query', 'data/query', e));
   }
@@ -257,6 +308,7 @@ export async function deleteShiftTemplate(id: string): Promise<Result<void>> {
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
     if (error) return err(fromPostgrest(error));
+    await updateCachedTemplates((cached) => cached.filter((template) => template.id !== id));
     return ok(undefined);
   } catch (e) {
     return err(appError('data/query', 'data/query', e));
@@ -271,6 +323,7 @@ export async function restoreShiftTemplate(id: string): Promise<Result<void>> {
       .update({ deleted_at: null })
       .eq('id', id);
     if (error) return err(fromPostgrest(error));
+    await deleteMeta(CACHE_KEY);
     return ok(undefined);
   } catch (e) {
     return err(appError('data/query', 'data/query', e));

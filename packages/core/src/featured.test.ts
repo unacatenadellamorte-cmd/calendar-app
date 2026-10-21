@@ -55,6 +55,12 @@ describe('selectFeaturedEvents / 規則1: 対象は now 以降 / 進行中のみ
     ]);
   });
 
+  it('今日を含む継続中の終日は開始日が過去でも含む', () => {
+    const ongoing = { ...allday('c1', '2026-09-06'), eventEndDate: '2026-09-10' };
+    const ended = { ...allday('c1', '2026-09-06'), eventEndDate: '2026-09-08' };
+    expect(selectFeaturedEvents([ended, ongoing], p, NOW, 3)).toEqual([ongoing]);
+  });
+
   it('JST朝はUTCの前日ではなく渡された端末日付を使う', () => {
     const yesterday = allday('c1', '2026-10-14');
     const today = allday('c1', '2026-10-15');

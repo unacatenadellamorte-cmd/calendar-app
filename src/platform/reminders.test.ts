@@ -80,7 +80,7 @@ describe('scheduleReminder', () => {
   it('id/title/schedule.at/extra.eventId を積んで schedule() を呼ぶ(allowWhileIdle: true)', async () => {
     schedule.mockResolvedValue({ notifications: [] });
     const at = new Date('2026-09-20T10:00:00.000Z');
-    await scheduleReminder({ id: 123, eventId: 'e1', title: '会議', at });
+    await scheduleReminder({ id: 123, eventId: 'e1', title: '会議', reminderMinutes: 10, at });
     expect(schedule).toHaveBeenCalledTimes(1);
     const arg = schedule.mock.calls[0]![0];
     expect(arg.notifications).toHaveLength(1);
@@ -91,6 +91,8 @@ describe('scheduleReminder', () => {
       schedule: { at, allowWhileIdle: true },
     });
     expect(typeof arg.notifications[0].body).toBe('string');
+    expect(arg.notifications[0].body).toMatch(/\d{1,2}:\d{2}/);
+    expect(arg.notifications[0].body).toContain('10分前');
   });
 });
 

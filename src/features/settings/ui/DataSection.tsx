@@ -45,6 +45,9 @@ export function DataSection() {
                 'ローカルで作成したカレンダーと予定を JSON で書き出します。取り込んだ予定は含みません。',
               )}
             </p>
+            <p className="mt-2 text-meta text-ink-secondary">
+              {t('外部カレンダーの予定とシークレット予定は書き出しません。復元・インポートには対応していません。')}
+            </p>
             <button
               type="button"
               onClick={() => void onExport()}

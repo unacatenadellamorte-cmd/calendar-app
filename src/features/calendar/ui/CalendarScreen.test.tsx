@@ -114,6 +114,33 @@ beforeEach(() => {
 });
 
 describe('CalendarScreen', () => {
+  it('検索語でタイトル・場所・メモを絞り、条件解除で戻せる', async () => {
+    evState.events = [
+      { ...sampleEvent, id: 'match', title: '公開会議', location: '京都', note: '確認' },
+      { ...sampleEvent, id: 'other', title: '別予定', location: '大阪', note: '別件' },
+    ];
+    render(<CalendarScreen />);
+    const search = screen.getByRole('textbox', { name: '予定を検索' });
+    await userEvent.setup().type(search, '京都');
+    expect(screen.getByText('公開会議')).toBeInTheDocument();
+    expect(screen.queryByText('別予定')).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: '条件を解除' }));
+    expect(screen.getByText('別予定')).toBeInTheDocument();
+  });
+
+  it('ヘッダーの予定・シフト操作は44px以上の領域を持つ', () => {
+    render(<CalendarScreen />);
+    expect(screen.getByRole('button', { name: '＋予定' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: '＋シフト' })).toHaveClass('min-h-11');
+  });
+
+  it('ロック中の秘密予定を削除したUndoバーはタイトルを表示しない', () => {
+    evState.pendingDelete = { ...sampleEvent, title: '秘密の給与予定', isSecret: true };
+    render(<CalendarScreen />);
+    expect(screen.getByText('「予定」を削除しました')).toBeInTheDocument();
+    expect(screen.queryByText('秘密の給与予定')).not.toBeInTheDocument();
+  });
+
   it.each([
     ['月', 'local', '予定を編集'],
     ['月', 'google', '予定の詳細'],

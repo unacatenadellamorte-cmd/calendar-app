@@ -34,20 +34,42 @@ export function useGoogleCalendars(connectionId: string | null) {
     errorKey: null,
   });
   const pending = useRef(new Set<string>());
+  const connectionVersion = useRef(0);
+  const catalogGeneration = useRef(0);
+  const selectionOverrides = useRef(new Map<string, boolean>());
+
+  useEffect(() => {
+    connectionVersion.current += 1;
+    catalogGeneration.current += 1;
+    pending.current.clear();
+    selectionOverrides.current.clear();
+  }, [connectionId]);
 
   const reloadCatalog = useCallback(async () => {
     if (connectionId === null) return null;
+    const generation = ++catalogGeneration.current;
+    const version = connectionVersion.current;
     const result = await listConnectionCalendars(connectionId);
-    if (result.ok) setState((s) => ({ ...s, choices: result.value }));
+    if (version !== connectionVersion.current || generation !== catalogGeneration.current) return result;
+    if (result.ok) {
+      const choices = result.value.map((choice) => {
+        const override = selectionOverrides.current.get(choice.externalCalendarId);
+        return override === undefined ? choice : { ...choice, selected: override };
+      });
+      setState((s) => ({ ...s, choices }));
+    }
     return result;
   }, [connectionId]);
 
   const refresh = useCallback(async () => {
     if (connectionId === null) return;
+    const version = connectionVersion.current;
     setState((s) => ({ ...s, refreshing: true, errorKey: null }));
     const result = await refreshGoogleCalendars(connectionId);
+    if (version !== connectionVersion.current) return;
     if (result.ok) {
       await reloadCatalog();
+      if (version !== connectionVersion.current) return;
       setState((s) => ({ ...s, refreshing: false }));
     } else {
       // 取り直しに失敗しても、直近のカタログは出し続ける。
@@ -82,7 +104,10 @@ export function useGoogleCalendars(connectionId: string | null) {
     async (externalCalendarId: string, selected: boolean) => {
       if (connectionId === null) return;
       if (pending.current.has(externalCalendarId)) return;
+      const version = connectionVersion.current;
+      const previous = state.choices.find((c) => c.externalCalendarId === externalCalendarId)?.selected ?? !selected;
       pending.current.add(externalCalendarId);
+      selectionOverrides.current.set(externalCalendarId, selected);
       setState((s) => ({
         ...s,
         errorKey: null,
@@ -92,11 +117,13 @@ export function useGoogleCalendars(connectionId: string | null) {
         ),
       }));
       const rollback = (errorKey: string) => {
+        if (version !== connectionVersion.current) return;
+        selectionOverrides.current.delete(externalCalendarId);
         setState((s) => ({
           ...s,
           errorKey,
           choices: s.choices.map((c) =>
-            c.externalCalendarId === externalCalendarId ? { ...c, selected: !selected } : c,
+            c.externalCalendarId === externalCalendarId ? { ...c, selected: previous } : c,
           ),
         }));
       };
@@ -107,14 +134,20 @@ export function useGoogleCalendars(connectionId: string | null) {
           selected,
         );
         if (!result.ok) rollback(result.error.messageKey);
+        else {
+          selectionOverrides.current.delete(externalCalendarId);
+          await reloadCatalog();
+        }
       } catch {
         rollback('connection/calendars-failed');
       } finally {
-        pending.current.delete(externalCalendarId);
-        setState((s) => ({ ...s, pendingSelections: pending.current.size }));
+        if (version === connectionVersion.current) {
+          pending.current.delete(externalCalendarId);
+          setState((s) => ({ ...s, pendingSelections: pending.current.size }));
+        }
       }
     },
-    [connectionId],
+    [connectionId, reloadCatalog, state.choices],
   );
 
   return { ...state, refresh, toggle };

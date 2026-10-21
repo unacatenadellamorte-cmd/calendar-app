@@ -142,6 +142,21 @@ describe('ListView', () => {
     expect(screen.getByText('会議ベータ')).toBeInTheDocument();
   });
 
+  it('過去開始の長期継続予定は今日に一度だけ置き、終日の最終日も表示する', () => {
+    setup([ev({
+      id: 'long',
+      title: '継続予定',
+      allDay: true,
+      startsAt: null,
+      endsAt: null,
+      eventDate: '2000-01-01',
+      eventEndDate: '2040-01-01',
+    })]);
+    expect(screen.getAllByText('継続予定')).toHaveLength(1);
+    expect(screen.getByText('1/1 終日 〜 12/31 終日')).toBeInTheDocument();
+    expect(screen.getByText('9月8日(火)')).toBeInTheDocument();
+  });
+
   it('0件なら「予定はありません」', () => {
     setup([]);
     expect(screen.getByText('予定はありません')).toBeInTheDocument();

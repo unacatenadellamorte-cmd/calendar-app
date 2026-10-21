@@ -130,14 +130,14 @@ describe('googlePushBody', () => {
       ).toBeNull();
     });
 
-    it('時刻付き: 同時刻は24時間後を終了にする', () => {
+    it('時刻付き: 同時刻は不正として書き戻さない', () => {
       expect(
         googlePushBody({
           ...baseEvent,
           starts_at: '2026-09-15T10:00:00Z',
           ends_at: '2026-09-15T10:00:00Z',
-        })?.end.dateTime,
-      ).toBe('2026-09-16T10:00:00.000Z');
+        }),
+      ).toBeNull();
     });
 
     it('時刻付き: starts_at が不正なら null', () => {

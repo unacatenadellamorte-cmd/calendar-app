@@ -112,7 +112,7 @@ describe('月表示のシフトタイル', () => {
   });
   it('別日・通常予定・外部予定は削除対象にしない', () => {
     render(<MonthShiftTiles date="2026-09-08" calendars={[calendar]} enabled events={[
-      event({ startsAt: '2026-09-07T22:00:00+09:00' }),
+      event({ startsAt: '2026-09-07T00:00:00Z', endsAt: '2026-09-07T01:00:00Z' }),
       event({ calendarId: 'ordinary', shiftTemplateId: null }),
       event({ source: 'google' }),
     ]} onDateChange={vi.fn()} onRemove={vi.fn()} onCreated={vi.fn()} />);
@@ -133,7 +133,7 @@ describe('月表示のシフトタイル', () => {
     const view = render(<MonthShiftTiles events={[]} onDateChange={vi.fn()} onRemove={vi.fn()} date="2026-09-08" calendars={[calendar]} enabled onCreated={onCreated} />);
     view.rerender(<MonthShiftTiles events={[]} onDateChange={vi.fn()} onRemove={vi.fn()} date="2026-09-21" calendars={[calendar]} enabled onCreated={onCreated} />);
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '夜勤を2026-09-21に追加' })));
-    expect(createShifts).toHaveBeenCalledWith('shift', template, ['2026-09-21']);
+    expect(createShifts).toHaveBeenCalledWith('shift', template, ['2026-09-21'], [expect.any(String)]);
     expect(onCreated).toHaveBeenCalledWith([]);
     expect(screen.getByRole('status')).toHaveTextContent('2026-09-21に「夜勤」を追加しました');
   });
@@ -228,7 +228,7 @@ it('終日タイルは時刻を表示せず月末登録後も翌日へ進む', a
     expect(tile).toHaveTextContent('終日');
     expect(tile).not.toHaveTextContent('22:00');
     await act(async () => { fireEvent.click(tile); });
-    expect(createShifts).toHaveBeenCalledWith(calendar.id, expect.objectContaining({ allDay: true }), ['2026-09-30']);
+    expect(createShifts).toHaveBeenCalledWith(calendar.id, expect.objectContaining({ allDay: true }), ['2026-09-30'], [expect.any(String)]);
     expect(onDateChange).toHaveBeenCalledWith('2026-10-01');
   } finally {
     template.allDay = false;

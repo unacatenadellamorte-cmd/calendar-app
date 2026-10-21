@@ -3,8 +3,8 @@ import XCTest
 @testable import FeaturedWidgetData
 
 final class FeaturedWidgetDataTests: XCTestCase {
-    private func event(id: String = "e1", iso: String = "2026-09-17T01:02:00Z", allDay: Bool = false, eventDate: String? = nil) -> FeaturedWidgetEvent {
-        FeaturedWidgetEvent(id: id, calendarName: "仕事", colorHex: "#0072B2", startsAtIso: iso, allDay: allDay, schemaVersion: 1, eventDate: eventDate)
+    private func event(id: String = "e1", iso: String = "2026-09-17T01:02:00Z", allDay: Bool = false, eventDate: String? = nil, eventEndDate: String? = nil) -> FeaturedWidgetEvent {
+        FeaturedWidgetEvent(id: id, calendarName: "仕事", colorHex: "#0072B2", startsAtIso: iso, allDay: allDay, schemaVersion: 1, eventDate: eventDate, eventEndDate: eventEndDate)
     }
 
     func testMissingCorruptAndEmptyPayloads() {
@@ -60,6 +60,12 @@ final class FeaturedWidgetDataTests: XCTestCase {
             XCTAssertEqual(FeaturedWidgetData.startLabel(stored, timeZone: zone, now: now), "10/16 終日")
         }
         XCTAssertEqual(FeaturedWidgetData.startLabel(event(iso: "2026-10-15T15:00:00Z", allDay: true), now: now), "終日")
+    }
+
+    func testOngoingAllDayUsesTodayLabel() {
+        let event = event(allDay: true, eventDate: "2026-10-13", eventEndDate: "2026-10-16")
+        let now = ISO8601DateFormatter().date(from: "2026-10-15T03:00:00Z")!
+        XCTAssertEqual(FeaturedWidgetData.startLabel(event, timeZone: TimeZone(identifier: "Asia/Tokyo")!, now: now), "終日")
     }
 
     func testDeepLinksAndLocalMidnight() throws {

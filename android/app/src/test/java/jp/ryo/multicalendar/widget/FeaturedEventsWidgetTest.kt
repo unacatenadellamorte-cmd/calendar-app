@@ -46,6 +46,7 @@ class FeaturedEventsWidgetTest {
         startsAtIso: String = "",
         allDay: Boolean = false,
         eventDate: String? = null,
+        eventEndDate: String? = null,
     ) = FeaturedWidgetEvent(
         id = "e1",
         calendarName = "仕事",
@@ -53,6 +54,7 @@ class FeaturedEventsWidgetTest {
         startsAtIso = startsAtIso,
         allDay = allDay,
         eventDate = eventDate,
+        eventEndDate = eventEndDate,
     )
 
     // --- maxRowsFor -----------------------------------------------------
@@ -103,6 +105,12 @@ class FeaturedEventsWidgetTest {
             TimeZone.setDefault(TimeZone.getTimeZone(zone))
             assertEquals("10/16 終日", formatStartLabel(stored, now))
         }
+    }
+
+    @Test
+    fun `今日を含む継続終日は過去開始でも今日の終日と表示する`() {
+        val stored = event(allDay = true, eventDate = "2026-10-13", eventEndDate = "2026-10-16")
+        assertEquals("終日", formatStartLabel(stored, parseIsoUtc("2026-10-15T03:00:00Z")!!))
     }
 
     @Test

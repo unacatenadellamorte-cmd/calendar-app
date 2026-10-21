@@ -182,6 +182,16 @@ describe('useEvents', () => {
     );
   });
 
+  it('終日範囲をpatchへ渡し、時刻付きへの切替では範囲を明示的に消す', async () => {
+    updateEvent.mockResolvedValue(ok(ev()));
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.update(ev(), { calendarId: 'c1', title: '複数日', allDay: true, eventDate: '2026-09-08', eventEndDate: '2026-09-11' }); });
+    expect(updateEvent).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ eventDate: '2026-09-08', eventEndDate: '2026-09-11' }));
+    await act(async () => { await result.current.update(ev(), timedInput); });
+    expect(updateEvent).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ eventDate: null, eventEndDate: null }));
+  });
+
   it('update 成功時は syncReminderForEvent を呼ぶ(時刻編集での cancel→再スケジュール、Story 5.4)', async () => {
     const updated = ev({ startsAt: '2026-09-08T05:00:00Z', endsAt: '2026-09-08T06:00:00Z' });
     updateEvent.mockResolvedValue(ok(updated));
@@ -416,6 +426,20 @@ describe('useEvents', () => {
     expect(ids.indexOf('s2')).toBeLessThan(ids.indexOf('s1'));
   });
 
+  it('addLocal は再取得済みの同じIDを二重化せず、別操作の別IDは残す', async () => {
+    const { result } = renderHook(() => useEvents(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => {
+      result.current.addLocal([
+        ev({ id: 'e1', title: 'サーバー再送結果' }),
+        ev({ id: 'independent-operation', title: '別操作' }),
+      ]);
+    });
+    expect(result.current.events.filter((event) => event.id === 'e1')).toHaveLength(1);
+    expect(result.current.events.find((event) => event.id === 'e1')?.title).toBe('サーバー再送結果');
+    expect(result.current.events.filter((event) => event.id === 'independent-operation')).toHaveLength(1);
+  });
+
   describe('refreshFeaturedWidget 呼び出し(Story 5.6)', () => {
     it('create 成功で呼ぶ', async () => {
       createEvent.mockResolvedValue(ok(ev({ id: 'e2' })));
@@ -515,7 +539,7 @@ describe('useEvents', () => {
       const { result } = renderHook(() => useEvents(true));
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      let success = false;
+      let success: boolean | string = false;
       await act(async () => {
         success = await result.current.setReminder(ev(), 30);
       });
@@ -533,7 +557,7 @@ describe('useEvents', () => {
       const { result } = renderHook(() => useEvents(true));
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      let success = true;
+      let success: boolean | string = true;
       await act(async () => {
         success = await result.current.setReminder(ev(), 30);
       });
@@ -550,6 +574,18 @@ describe('useEvents', () => {
         await result.current.setReminder(ev({ reminderMinutes: 30 }), null);
       });
       expect(setEventReminder).toHaveBeenCalledWith('e1', null);
+    });
+
+    it('通知予約に失敗しても予定保存成功を維持し、通知再試行用の警告を返す', async () => {
+      setEventReminder.mockResolvedValue(ok(ev({ reminderMinutes: 30 })));
+      syncReminderForEvent.mockResolvedValue('schedule-failed');
+      const { result } = renderHook(() => useEvents(true));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      let status: unknown;
+      await act(async () => { status = await result.current.setReminder(ev(), 30); });
+      expect(status).toBe('notification/schedule-failed');
+      expect(result.current.errorKey).toBe('notification/schedule-failed');
+      expect(result.current.events[0]?.reminderMinutes).toBe(30);
     });
   });
 });

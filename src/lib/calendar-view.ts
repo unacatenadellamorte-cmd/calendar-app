@@ -106,10 +106,24 @@ export function weekRowOf(cells: DayCell[], date: string): DayCell[] {
   return cells.slice(rowStart, rowStart + 7);
 }
 
-/** 予定がローカル暦日 `date` に出現するか(単日前提。時刻付きは開始日で判定)。 */
+/** 予定がローカル暦日 `date` と重なるか。終端ちょうどの翌日は含めない。 */
 export function eventOccursOnDate(event: EventItem, date: string): boolean {
-  if (event.allDay) return event.eventDate === date;
-  return event.startsAt ? localDateOf(event.startsAt) === date : false;
+  if (event.allDay) {
+    if (!event.eventDate) return false;
+    return event.eventEndDate == null
+      ? event.eventDate === date
+      : event.eventDate <= date && date < event.eventEndDate;
+  }
+  if (!event.startsAt) return false;
+  const start = Date.parse(event.startsAt);
+  const end = event.endsAt ? Date.parse(event.endsAt) : start;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+  const { year, month, day } = ymd(date);
+  const dayStart = new Date(year, month - 1, day).getTime();
+  const dayEnd = new Date(year, month - 1, day + 1).getTime();
+  return start === end
+    ? start >= dayStart && start < dayEnd
+    : start < dayEnd && end > dayStart;
 }
 
 /** 同じ日の中での並び順(全カレンダー同順位版)。`@core` の並び規則の特殊化。 */
@@ -125,6 +139,7 @@ export function compareWithinDay(a: EventItem, b: EventItem): number {
 export function groupEventsByDay(
   events: EventItem[],
   priorityOf: PriorityLookup = NO_PRIORITY,
+  range?: { from: string; toExclusive: string },
 ): Map<string, EventItem[]> {
   const map = new Map<string, EventItem[]>();
   for (const event of events) {
@@ -134,9 +149,23 @@ export function groupEventsByDay(
         ? localDateOf(event.startsAt)
         : null;
     if (!key) continue;
-    const arr = map.get(key);
-    if (arr) arr.push(event);
-    else map.set(key, [event]);
+    const startDate = event.allDay
+      ? event.eventDate
+      : event.startsAt ? localDateOf(event.startsAt) : null;
+    if (!startDate) continue;
+    const endExclusive = event.allDay
+      ? event.eventEndDate ?? addDays(startDate, 1)
+      : event.endsAt && Date.parse(event.endsAt) > Date.parse(event.startsAt!)
+        ? (() => { const endDate = localDateOf(event.endsAt!); return minutesIntoLocalDay(event.endsAt!) === 0 ? endDate : addDays(endDate, 1); })()
+        : addDays(startDate, 1);
+    const from = range?.from ?? startDate;
+    const to = range?.toExclusive ?? endExclusive;
+    for (let cursor = startDate < from ? from : startDate; cursor < endExclusive && cursor < to; cursor = addDays(cursor, 1)) {
+        const arr = map.get(cursor);
+        if (arr) arr.push(event);
+        else map.set(cursor, [event]);
+      continue;
+    }
   }
   for (const arr of map.values()) {
     arr.sort((a, b) => compareEventsForList(a, b, priorityOf));
@@ -159,17 +188,22 @@ interface TimedItem {
 export function layoutDayEvents(
   events: EventItem[],
   priorityOf: PriorityLookup = NO_PRIORITY,
+  date?: string,
 ): PositionedEvent[] {
   const timed: TimedItem[] = events
     .filter((e) => !e.allDay && e.startsAt)
     .map((e) => {
-      const startMin = minutesIntoLocalDay(e.startsAt as string);
-      let endMin = e.endsAt ? minutesIntoLocalDay(e.endsAt) : startMin + MIN_EVENT_MINUTES;
-      if (
-        endMin <= startMin ||
-        (e.endsAt && localDateOf(e.endsAt) !== localDateOf(e.startsAt as string))
-      )
-        endMin = 1440;
+      const day = date ?? localDateOf(e.startsAt as string);
+      const startDate = localDateOf(e.startsAt as string);
+      const endDate = e.endsAt ? localDateOf(e.endsAt) : startDate;
+      const startMin = startDate < day ? 0 : minutesIntoLocalDay(e.startsAt as string);
+      let endMin = !e.endsAt
+        ? startMin + MIN_EVENT_MINUTES
+        : endDate > day
+          ? 1440
+          : minutesIntoLocalDay(e.endsAt);
+      if (endDate < day) endMin = 0;
+      if (endDate === day && e.endsAt && Date.parse(e.endsAt) === Date.parse(e.startsAt as string)) endMin = startMin + MIN_EVENT_MINUTES;
       return { event: e, startMin, endMin: Math.max(endMin, startMin + MIN_EVENT_MINUTES) };
     })
     .sort(

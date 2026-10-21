@@ -155,6 +155,44 @@ describe('shift-templates.ts data 層', () => {
     expect(calls.map((c) => c.method)).toContain('is');
   });
 
+  it('取得済み0件を含むキャッシュを通信失敗時に使い、CRUD成功後の値も反映する', async () => {
+    const { listShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate } =
+      await load();
+    queryResult = { data: [], error: null };
+    const initial = await listShiftTemplates();
+    expect(initial.ok).toBe(true);
+    if (!initial.ok) return;
+    expect(initial.value).toEqual([]);
+
+    queryResult = { data: null, error: new TypeError('Failed to fetch') };
+    const cachedEmpty = await listShiftTemplates();
+    expect(cachedEmpty.ok).toBe(true);
+    if (!cachedEmpty.ok) return;
+    expect(cachedEmpty.value).toEqual([]);
+
+    queryResult = { data: row({ id: 't2' }), error: null };
+    expect((await createShiftTemplate(input({ name: '追加' })) ).ok).toBe(true);
+    queryResult = { data: row({ id: 't2', name: '更新' }), error: null };
+    expect((await updateShiftTemplate({
+      ...row({ id: 't2' }),
+      allDay: false,
+      startLocal: '17:00',
+      endLocal: '22:00',
+      breakMinutes: 30,
+      hourlyWage: 1100,
+      workplaceLabel: null,
+      color: '#009E73',
+      createdAt: '',
+      updatedAt: '',
+    }, { name: '更新' })).ok).toBe(true);
+    queryResult = { data: null, error: null };
+    expect((await deleteShiftTemplate('t2')).ok).toBe(true);
+    queryResult = { data: null, error: new TypeError('Failed to fetch') };
+    const afterDelete = await listShiftTemplates();
+    expect(afterDelete.ok).toBe(true);
+    if (afterDelete.ok) expect(afterDelete.value).toEqual([]);
+  });
+
   it('createShiftTemplate: 正常時は行を返す', async () => {
     queryResult = { data: row(), error: null };
     const { createShiftTemplate } = await load();

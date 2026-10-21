@@ -185,6 +185,34 @@ describe('useCalendars', () => {
     expect(result.current.errorKey).toBe('data/query');
   });
 
+  it('reorder の連続操作は直列化し、最新操作の失敗だけを確定順へ戻す', async () => {
+    listCalendars.mockResolvedValue(ok([cal({ id: 'a', priority: 0 }), cal({ id: 'b', priority: 1 })]));
+    const responses: Array<(value: ReturnType<typeof ok<Calendar[]>> | ReturnType<typeof err>) => void> = [];
+    reorderCalendars.mockImplementation(() => new Promise((resolve) => responses.push(resolve)));
+    const { result } = renderHook(() => useCalendars(true));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.reorder(['b', 'a']);
+      second = result.current.reorder(['a', 'b']);
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(reorderCalendars).toHaveBeenCalledTimes(1);
+    expect(result.current.calendars.map((c) => c.id)).toEqual(['a', 'b']);
+    await act(async () => {
+      responses[0]!(ok([cal({ id: 'b', priority: 0 }), cal({ id: 'a', priority: 1 })]));
+      await Promise.resolve();
+    });
+    expect(reorderCalendars).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      responses[1]!(err(appError('data/query', 'data/query')));
+      await Promise.all([first, second]);
+    });
+    expect(result.current.calendars.map((c) => c.id)).toEqual(['b', 'a']);
+    expect(result.current.errorKey).toBe('data/query');
+  });
+
   it('表示切替中に古いreload結果が返っても、楽観反映を巻き戻さない', async () => {
     let resolveReload!: (value: ReturnType<typeof ok<Calendar[]>>) => void;
     listCalendars

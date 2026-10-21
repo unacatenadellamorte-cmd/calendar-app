@@ -4,6 +4,9 @@ import { eventLabelColor, labelTextColor } from './event-label';
 import { applyLanguage } from '@/i18n';
 
 describe('タグの値の複写', () => {
+  it('既存の同時刻タグは適用を拒否する', () => {
+    expect(applyEventTag({ allDay: false, name: '旧タグ', color: '#009E73', startLocal: '09:00', endLocal: '09:00' }, '2026-09-30')).toBeNull();
+  });
   it('通常・月末・年末・うるう年の日付を保つ', () => {
     const tag = {
       allDay: false,

@@ -55,6 +55,8 @@ export interface FeaturedWidgetEventPayload {
   startsAtIso: string;
   /** 終日の暦日。旧保存データは未設定のまま受理する。 */
   eventDate?: string;
+  /** 終日の排他的な終了日。旧データでは未設定。 */
+  eventEndDate?: string;
   allDay: boolean;
   schemaVersion: 1;
 }
@@ -135,6 +137,7 @@ export function buildFeaturedWidgetPayload(
               new Date(event.startsAt ?? now).toISOString(),
         allDay: event.allDay,
         ...(event.allDay && event.eventDate ? { eventDate: event.eventDate } : {}),
+        ...(event.allDay && event.eventEndDate ? { eventEndDate: event.eventEndDate } : {}),
         schemaVersion: 1,
       },
     ];
@@ -160,9 +163,12 @@ function dateRangeForEvent(event: EventItem): {
 } | null {
   if (event.allDay) {
     if (!event.eventDate || !isLocalDate(event.eventDate)) return null;
+    const inclusiveEnd = event.eventEndDate
+      ? localDateString(new Date(new Date(`${event.eventEndDate}T00:00:00`).getTime() - 1))
+      : event.eventDate;
     return {
       startDate: event.eventDate,
-      endDate: event.eventDate,
+      endDate: inclusiveEnd,
       startsAtIso: null,
       endsAtIso: null,
     };

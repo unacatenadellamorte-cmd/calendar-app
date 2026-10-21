@@ -41,6 +41,7 @@ export function MonthShiftTiles({
   const navigate = useNavigate();
   const calendar = calendars.find((item) => item.isShift && item.source === 'local');
   const busyRef = useRef(false);
+  const operationRef = useRef<{ key: string; ids: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
@@ -59,6 +60,7 @@ export function MonthShiftTiles({
     dateVersionRef.current += 1;
   }
   useEffect(() => {
+    operationRef.current = null;
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -73,6 +75,7 @@ export function MonthShiftTiles({
   );
   const closeDelete = useCallback(() => setDeleteOpen(false), []);
   useEffect(() => {
+    operationRef.current = null;
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
     longPressTimer.current = null;
     pointerStart.current = null;
@@ -132,17 +135,22 @@ export function MonthShiftTiles({
     const registrationDate = date;
     const registrationDateVersion = dateVersionRef.current;
     const shouldAdvance = shiftAutoAdvance;
+    const operationKey = `${calendar.id}|${template.id}|${date}`;
+    if (operationRef.current?.key !== operationKey) {
+      operationRef.current = { key: operationKey, ids: [crypto.randomUUID()] };
+    }
     busyRef.current = true;
     setBusy(true);
     setError(null);
     setNotice('');
     try {
-      const result = await createShifts(calendar.id, template, [date]);
+      const result = await createShifts(calendar.id, template, [date], operationRef.current.ids);
       if (!result.ok) {
         setError(result.error.messageKey);
         return;
       }
       onCreated(result.value);
+      operationRef.current = null;
       setNotice(t('{0}に「{1}」を追加しました', [date, template.name]));
       if (
         shouldAdvance &&

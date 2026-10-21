@@ -12,18 +12,30 @@ interface Call {
   args: unknown[];
 }
 let calls: Call[] = [];
-let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
+let queryResult: { data: unknown; error: unknown; count?: number | null } = { data: null, error: null };
+let calendarQueryResult: { data: unknown; error: unknown; count?: number | null } = { data: [{ id: 'c1' }], error: null, count: 1 };
+let eventPages: Array<{ data: unknown; error: unknown; count?: number | null }> = [];
+let calendarPages: Array<{ data: unknown; error: unknown; count?: number | null }> = [];
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
+  let target = '';
   const record =
     (method: string) =>
     (...args: unknown[]) => {
       calls.push({ method, args });
       return chain;
     };
-  for (const m of ['select', 'is', 'not', 'eq', 'limit', 'returns']) chain[m] = record(m);
-  chain.then = (resolve: (v: unknown) => unknown) => resolve(queryResult);
+  chain.select = (...args: unknown[]) => { target = String(args[0] ?? ''); calls.push({ method: 'select', args }); return chain; };
+  for (const m of ['is', 'not', 'eq', 'limit', 'order', 'returns']) chain[m] = record(m);
+  chain.range = (...args: unknown[]) => { calls.push({ method: 'range', args }); return chain; };
+  chain.then = (resolve: (v: unknown) => unknown) => {
+    const base = target === 'id'
+      ? (calendarPages.shift() ?? calendarQueryResult)
+      : (eventPages.shift() ?? queryResult);
+    const data = Array.isArray(base.data) ? base.data : null;
+    resolve({ ...base, count: base.count ?? (data ? data.length : null) });
+  };
   return chain;
 }
 
@@ -38,9 +50,12 @@ vi.mock('./supabase', () => ({
 
 const cancelReminder = vi.fn();
 const scheduleReminder = vi.fn();
+const getPendingReminders = vi.fn();
 vi.mock('@/platform/reminders', () => ({
   cancelReminder: (...a: unknown[]) => cancelReminder(...a),
   scheduleReminder: (...a: unknown[]) => scheduleReminder(...a),
+  getPendingReminders: () => getPendingReminders(),
+  isNotificationSupported: () => true,
 }));
 
 async function load() {
@@ -92,12 +107,17 @@ beforeEach(() => {
   vi.resetModules();
   calls = [];
   queryResult = { data: null, error: null };
+  calendarQueryResult = { data: [{ id: 'c1' }], error: null, count: 1 };
+  eventPages = [];
+  calendarPages = [];
   from.mockClear();
   supabaseValue = { from };
   cancelReminder.mockReset();
   scheduleReminder.mockReset();
+  getPendingReminders.mockReset();
   cancelReminder.mockResolvedValue(undefined);
   scheduleReminder.mockResolvedValue(undefined);
+  getPendingReminders.mockResolvedValue([]);
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-20T00:00:00.000Z'));
 });
@@ -109,6 +129,13 @@ afterEach(() => {
 const expectedId = deriveNotificationId('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
 
 describe('syncReminderForEvent', () => {
+  it('秘密予定だけ通知名を「予定の通知」に伏せ、通常予定はタイトルを維持する', async () => {
+    const { syncReminderForEvent } = await load();
+    await syncReminderForEvent(ev({ title: '通常の会議', isSecret: false }));
+    await syncReminderForEvent(ev({ title: '秘密の会議', isSecret: true }));
+    expect(scheduleReminder.mock.calls[0]![0].title).toBe('通常の会議');
+    expect(scheduleReminder.mock.calls[1]![0].title).toBe('予定の通知');
+  });
   it('先に同じ導出IDで cancel する', async () => {
     const { syncReminderForEvent } = await load();
     await syncReminderForEvent(ev());
@@ -158,18 +185,83 @@ describe('syncReminderForEvent', () => {
   it('cancelReminder が失敗しても投げず、schedule は継続する', async () => {
     cancelReminder.mockRejectedValue(new Error('unavailable on web'));
     const { syncReminderForEvent } = await load();
-    await expect(syncReminderForEvent(ev())).resolves.toBeUndefined();
+    await expect(syncReminderForEvent(ev())).resolves.toBe('ok');
     expect(scheduleReminder).toHaveBeenCalledTimes(1);
   });
 
   it('scheduleReminder が失敗しても投げない', async () => {
     scheduleReminder.mockRejectedValue(new Error('unavailable on web'));
     const { syncReminderForEvent } = await load();
-    await expect(syncReminderForEvent(ev())).resolves.toBeUndefined();
+    await expect(syncReminderForEvent(ev())).resolves.toBe('schedule-failed');
   });
 });
 
 describe('resyncAllReminders', () => {
+  it('予定とカレンダーが完全0件でも、eventId付きの古い通知だけを取消す', async () => {
+    calendarPages = [{ data: [], error: null, count: 0 }];
+    eventPages = [{ data: [], error: null, count: 0 }];
+    getPendingReminders.mockResolvedValue([
+      { id: 703, extra: { eventId: 'deleted-event' } },
+      { id: 704, extra: { unrelated: true } },
+    ]);
+    const { resyncAllReminders } = await load();
+    await resyncAllReminders();
+    expect(cancelReminder).toHaveBeenCalledWith(703);
+    expect(cancelReminder).not.toHaveBeenCalledWith(704);
+  });
+
+  it('先頭ページ外の現存予定を欠落扱いせず、通知を取消さない', async () => {
+    calendarPages = [{ data: [{ id: 'c1' }], error: null, count: 1 }];
+    const rows = Array.from({ length: 7 }, (_, index) => row({
+      id: `00000000-0000-0000-0000-00000000000${index + 1}`,
+    }));
+    eventPages = [
+      { data: rows.slice(0, 2), error: null, count: 7 },
+      { data: rows.slice(2, 4), error: null, count: 7 },
+      { data: rows.slice(4, 6), error: null, count: 7 },
+      { data: rows.slice(6), error: null, count: 7 },
+    ];
+    getPendingReminders.mockResolvedValue([
+      { id: 700, extra: { eventId: rows[6]!.id } },
+    ]);
+    const { resyncAllReminders } = await load();
+    await resyncAllReminders();
+    expect(cancelReminder).not.toHaveBeenCalledWith(700);
+  });
+
+  it('途中ページの取得失敗時は既存通知を一括取消ししない', async () => {
+    calendarPages = [{ data: [{ id: 'c1' }], error: null, count: 1 }];
+    eventPages = [
+      { data: [row()], error: null, count: 7 },
+      { data: null, error: { message: 'timeout' }, count: 7 },
+    ];
+    getPendingReminders.mockResolvedValue([
+      { id: 701, extra: { eventId: 'deleted-event' } },
+    ]);
+    const { resyncAllReminders } = await load();
+    await resyncAllReminders();
+    expect(cancelReminder).not.toHaveBeenCalledWith(701);
+    expect(scheduleReminder).not.toHaveBeenCalled();
+  });
+
+  it('extra.eventIdがないOS予約は所有判定せず取消さない', async () => {
+    queryResult = { data: [row()], error: null, count: 1 };
+    getPendingReminders.mockResolvedValue([{ id: 702, extra: { unrelated: true } }]);
+    const { resyncAllReminders } = await load();
+    await resyncAllReminders();
+    expect(cancelReminder).not.toHaveBeenCalledWith(702);
+  });
+  it('現存予定・所属カレンダーにないOS予約を取消し、現存分だけ再同期する', async () => {
+    queryResult = { data: [row()], error: null };
+    getPendingReminders.mockResolvedValue([
+      { id: expectedId, extra: { eventId: row().id } },
+      { id: 999, extra: { eventId: 'deleted-event' } },
+    ]);
+    const { resyncAllReminders } = await load();
+    await resyncAllReminders();
+    expect(cancelReminder).toHaveBeenCalledWith(999);
+    expect(scheduleReminder).toHaveBeenCalledTimes(1);
+  });
   it('reminder_minutes is not null かつ有効な行だけを対象に syncReminderForEvent をループする', async () => {
     queryResult = { data: [row(), row({ id: '11111111-0000-0000-0000-000000000000' })], error: null };
     const { resyncAllReminders } = await load();
@@ -179,11 +271,11 @@ describe('resyncAllReminders', () => {
     expect(scheduleReminder).toHaveBeenCalledTimes(2);
   });
 
-  it('暴走防止の安全マージンとして limit(2000) を付ける(device-sync.ts の EXISTING_EVENTS_LIMIT と同じ考え方)', async () => {
+  it('通知一覧は上限で打ち切らず全件照合する', async () => {
     queryResult = { data: [], error: null };
     const { resyncAllReminders } = await load();
     await resyncAllReminders();
-    expect(calls.find((c) => c.method === 'limit')?.args).toEqual([2000]);
+    expect(calls.some((c) => c.method === 'limit')).toBe(false);
   });
 
   it('supabase 未設定なら何もしない', async () => {

@@ -71,6 +71,26 @@ beforeEach(() => {
 });
 
 describe('events.ts', () => {
+  it('終日予定の排他的終了日を保持し、旧行は翌日終端へ補完する', async () => {
+    const { toEvent } = await importEvents();
+    const base = row({ all_day: true, event_date: '2026-09-08' });
+    expect(toEvent({ ...base, event_end_date: '2026-09-11' } as never).eventEndDate).toBe(
+      '2026-09-11',
+    );
+    expect(toEvent(base as never).eventEndDate).toBe('2026-09-09');
+  });
+
+  it('時刻付きの開始終了同時刻は24時間扱いにせず拒否する', async () => {
+    const { validateEventInput } = await importEvents();
+    expect(
+      validateEventInput({
+        title: '同時刻',
+        allDay: false,
+        startsAt: '2026-09-08T01:00:00Z',
+        endsAt: '2026-09-08T01:00:00Z',
+      }),
+    ).not.toBeNull();
+  });
   it('listEvents: 行を camelCase に変換し、deleted_at で絞る', async () => {
     queryResult = {
       data: [

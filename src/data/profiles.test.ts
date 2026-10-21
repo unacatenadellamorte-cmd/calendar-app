@@ -78,6 +78,53 @@ describe('profiles.ts', () => {
     if (r.ok) expect(r.value).toBeNull();
   });
 
+  it('取得済みプロフィールと取得済み0件を通信失敗時に利用し、利用者別に分離する', async () => {
+    queryResult = { data: row(), error: null };
+    const { getProfile } = await importProfiles();
+    const { adoptAccountOwner } = await import('./account-scope');
+    adoptAccountOwner('u1');
+    const loaded = await getProfile();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value).toMatchObject({ id: 'u1' });
+
+    queryResult = { data: null, error: new TypeError('Failed to fetch') };
+    const cached = await getProfile();
+    expect(cached.ok).toBe(true);
+    if (!cached.ok) return;
+    expect(cached.value).toMatchObject({ id: 'u1' });
+
+    queryResult = { data: null, error: null };
+    const empty = await getProfile();
+    expect(empty.ok).toBe(true);
+    if (!empty.ok) return;
+    expect(empty.value).toBeNull();
+    queryResult = { data: null, error: new TypeError('Failed to fetch') };
+    const cachedEmpty = await getProfile();
+    expect(cachedEmpty.ok).toBe(true);
+    if (cachedEmpty.ok) expect(cachedEmpty.value).toBeNull();
+  });
+
+  it('利用者スコープが変わった遅延応答をプロフィールキャッシュへ書かない', async () => {
+    const { getProfile } = await importProfiles();
+    const { adoptAccountOwner, beginAccountTransition } = await import('./account-scope');
+    adoptAccountOwner('u1');
+    let resolveQuery!: (value: unknown) => void;
+    from.mockImplementationOnce(() => {
+      const chain = makeChain();
+      chain.then = (resolve: (value: unknown) => unknown) => {
+        resolveQuery = resolve;
+      };
+      return chain;
+    });
+    const pending = getProfile();
+    await Promise.resolve();
+    beginAccountTransition();
+    resolveQuery({ data: row(), error: null });
+    const result = await pending;
+    expect(result.ok).toBe(false);
+  });
+
   it('createProfile: 名前を trim して insert する(写真無し)', async () => {
     queryResult = { data: row({ display_name: '花子' }), error: null };
     const { createProfile } = await importProfiles();

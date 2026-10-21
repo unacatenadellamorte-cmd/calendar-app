@@ -144,6 +144,13 @@ describe('eventOccursOnDate', () => {
 });
 
 describe('groupEventsByDay', () => {
+  it('時刻付き日またぎを両日に展開し、指定範囲の左端から走査する', () => {
+    const night = ev({ id: 'night', startsAt: '2026-09-07T15:00:00Z', endsAt: '2026-09-08T16:00:00Z' });
+    const map = groupEventsByDay([night], undefined, { from: '2026-09-08', toExclusive: '2026-09-10' });
+    expect([...map.keys()]).toEqual(['2026-09-08', '2026-09-09']);
+    expect(map.get('2026-09-08')).toEqual([night]);
+    expect(map.get('2026-09-09')).toEqual([night]);
+  });
   it('出現日ごとにまとめ、時刻付き→終日・開始時刻順に並べる', () => {
     const early = ev({
       id: 'a',
@@ -192,6 +199,12 @@ describe('layoutDayEvents', () => {
   it('複数日にまたがる予定は開始日の24時まで表示する', () => {
     const event = ev({ startsAt: '2026-10-15T13:00:00Z', endsAt: '2026-10-16T14:00:00Z' });
     expect(layoutDayEvents([event])[0]).toMatchObject({ startMin: 1320, endMin: 1440 });
+  });
+  it('継続日の開始を00:00へ切り詰め、翌00:00終了は翌日に含めない', () => {
+    const overnight = ev({ startsAt: '2026-10-15T13:00:00Z', endsAt: '2026-10-15T16:00:00Z' });
+    expect(layoutDayEvents([overnight], undefined, '2026-10-16')[0]).toMatchObject({ startMin: 0, endMin: 60 });
+    expect(eventOccursOnDate(overnight, '2026-10-16')).toBe(true);
+    expect(eventOccursOnDate(ev({ startsAt: '2026-10-15T13:00:00Z', endsAt: '2026-10-16T15:00:00Z' }), '2026-10-17')).toBe(false);
   });
   it('重なる時刻付き予定を列に分割する(開始時刻順で左詰め)', () => {
     const a = ev({

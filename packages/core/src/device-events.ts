@@ -35,6 +35,7 @@ export interface NormalizedDeviceEvent {
   endsAt: string | null;
   /** 終日の日付(YYYY-MM-DD)。時刻付きなら null。 */
   eventDate: string | null;
+  eventEndDate?: string | null;
 }
 
 const TITLE_MAX = 200;
@@ -89,6 +90,10 @@ export function normalizeDeviceEvent(raw: DeviceEventRaw): NormalizedDeviceEvent
       startsAt: null,
       endsAt: null,
       eventDate: toLocalDateString(startMs),
+      eventEndDate:
+        typeof raw.endDate === 'number' && isValidEpochMs(raw.endDate) && raw.endDate > startMs
+          ? toLocalDateString(raw.endDate)
+          : toLocalDateString(startMs + 24 * 60 * 60 * 1000),
     };
   }
 
@@ -118,5 +123,6 @@ export function toDeviceEventRow(n: NormalizedDeviceEvent): EventRow {
     starts_at: n.startsAt,
     ends_at: n.endsAt,
     event_date: n.eventDate,
+    ...(n.allDay ? { event_end_date: n.eventEndDate ?? null } : {}),
   };
 }

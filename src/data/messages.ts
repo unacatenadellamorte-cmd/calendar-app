@@ -18,7 +18,7 @@ const DATA_MESSAGES: Record<string, string> = {
   'event/invalid-color': 'ラベル色を選んでください',
   'event/invalid-stamp': 'スタンプを選び直してください',
   'event/invalid-title': '予定のタイトルを入力してください',
-  'event/invalid-time': '終了は開始より後にしてください',
+  'event/invalid-time': '終了は開始より後にしてください。24時間は予定編集で翌日を指定してください',
   'event/invalid-date': '日付を選んでください',
   'event/not-editable': '取り込んだ予定はこのアプリでは編集できません',
   'event/calendar-not-writable':
@@ -35,7 +35,8 @@ const DATA_MESSAGES: Record<string, string> = {
   'sync/failed': '取り込みに失敗しました。時間をおいてもう一度お試しください',
   'export/failed': 'ファイルの書き出しに失敗しました',
   'shift-template/invalid-name': 'シフト名を入力してください',
-  'shift-template/invalid-time': '開始と終了の時刻を確認してください',
+  'shift-template/invalid-time': '開始と終了の時刻を確認してください。24時間は予定編集で翌日を指定してください',
+  'event-tag/invalid-time': '開始と終了の時刻を確認してください。24時間は予定編集で翌日を指定してください',
   'shift-template/invalid-break': '休憩は0以上で、実働時間より短くしてください',
   'shift-template/invalid-wage': '時給は0以上で入力してください',
   'shift-template/invalid-workplace': '勤務先ラベルは100文字までです',
@@ -81,6 +82,8 @@ const DATA_MESSAGES: Record<string, string> = {
   'notification/permission-denied':
     '通知が許可されていません。端末の設定から許可すると通知が届きます',
   'notification/unavailable': 'この環境は通知に対応していません。予定は保存されます',
+  'notification/past': '通知時刻が過ぎているため、予定は保存しましたが通知は予約していません',
+  'notification/schedule-failed': '予定は保存しましたが通知を予約できませんでした。もう一度お試しください',
 };
 
 const ALL: Record<string, string> = { ...AUTH_MESSAGES, ...DATA_MESSAGES };

@@ -18,6 +18,8 @@ export interface OnlineState {
   dismissSyncNotice: () => void;
   /** `syncNonce` を進め、events / calendars 等の購読 hooks に再取得させる(接続解除など、Story 3.4)。 */
   refetch: () => void;
+  /** 前面かつオンラインのとき、未送信操作を手動で再送する。 */
+  retryPending: () => void;
 }
 
 export const defaultOnlineState: OnlineState = {
@@ -28,6 +30,7 @@ export const defaultOnlineState: OnlineState = {
   syncNotice: null,
   dismissSyncNotice: () => {},
   refetch: () => {},
+  retryPending: () => {},
 };
 
 export const OnlineContext = createContext<OnlineState>(defaultOnlineState);

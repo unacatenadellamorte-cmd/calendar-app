@@ -9,6 +9,7 @@ export interface GooglePushEvent {
   title: string;
   all_day: boolean;
   event_date: string | null;
+  event_end_date?: string | null;
   starts_at: string | null;
   ends_at: string | null;
   note: string | null;
@@ -76,12 +77,16 @@ export function googlePushBody(event: GooglePushEvent): GooglePushBody | null {
     if (!isValidDate(eventDate)) {
       return null;
     }
+    const endDate =
+      typeof event.event_end_date === 'string' && isValidDate(event.event_end_date) && event.event_end_date > eventDate
+        ? event.event_end_date
+        : nextDay(eventDate);
     return {
       summary: title,
       description: note,
       location,
       start: { date: eventDate, dateTime: null },
-      end: { date: nextDay(eventDate), dateTime: null },
+      end: { date: endDate, dateTime: null },
       extendedProperties: { private: { multiCalendarEventId: id } },
     };
   }
@@ -96,12 +101,8 @@ export function googlePushBody(event: GooglePushEvent): GooglePushBody | null {
     return null;
   }
 
-  if (endMs < startMs) return null;
-  // 本人選択2Bにより、同一瞬間だけは24時間勤務として扱う。
-  // フォームでは同時刻を24時間勤務として許可しているため、Google反映でも
-  // 同一瞬間を無効値として捨てず、24時間後の終了へ変換する。
-  const safeEndMs = endMs === startMs ? endMs + 24 * 60 * 60 * 1000 : endMs;
-  if (!Number.isFinite(new Date(safeEndMs).getTime())) return null;
+  if (endMs <= startMs) return null;
+  const safeEndMs = endMs;
 
   return {
     summary: title,

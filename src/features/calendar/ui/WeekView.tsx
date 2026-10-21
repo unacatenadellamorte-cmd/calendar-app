@@ -51,8 +51,8 @@ export function WeekView({
     [dayEvents, priorityOf],
   );
   const positioned = useMemo(
-    () => layoutDayEvents(dayEvents, priorityOf),
-    [dayEvents, priorityOf],
+    () => layoutDayEvents(dayEvents, priorityOf, cursor),
+    [dayEvents, priorityOf, cursor],
   );
   const nowMin = cursor === today ? minutesIntoLocalDay(new Date().toISOString()) : null;
   const scrollRef = useRef<HTMLDivElement>(null);

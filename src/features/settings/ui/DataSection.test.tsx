@@ -39,6 +39,7 @@ describe('DataSection', () => {
     const [filename, data] = downloadJson.mock.calls[0]!;
     expect(filename).toMatch(/^calendar-app-export-\d{4}-\d{2}-\d{2}\.json$/);
     expect(data).toBe(bundle);
+    expect(screen.getByText(/外部カレンダーの予定とシークレット予定は書き出しません/)).toBeInTheDocument();
   });
 
   it('取得失敗ならメッセージを出し、downloadJson を呼ばない', async () => {

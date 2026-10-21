@@ -1,5 +1,5 @@
 import { isAccountDataBlocked } from './account-deletion-state';
-import { listOutbox, removeOutbox } from './outbox';
+import { claimOutbox, listOutbox, removeOutbox } from './outbox';
 import { cachePut, cacheRekey } from './cache';
 import { isNetworkError } from './net';
 import type { OutboxItem } from './local-db';
@@ -11,10 +11,11 @@ import {
   renameCalendar,
   reorderCalendars,
   setCalendarVisible,
+  restoreCalendar,
 } from './calendars';
-import { createEvent, deleteEvent, updateEvent } from './events';
+import { createEvent, deleteEvent, restoreEvent, updateEvent, type EventItem } from './events';
 import type { EventPatch, NewEventInput } from './events';
-import type { NewCalendarInput } from './calendars';
+import type { Calendar, NewCalendarInput } from './calendars';
 import { refreshFeaturedWidget } from '@/platform/widget';
 
 /**
@@ -61,6 +62,8 @@ async function replay(
       }
       case 'delete':
         return deleteEvent({ id: targetId, source: 'local' }, options);
+      case 'restore':
+        return restoreEvent({ ...(item.payload as EventItem), id: targetId }, options);
       default:
         return { ok: true, value: undefined };
     }
@@ -115,6 +118,8 @@ async function replay(
     }
     case 'delete':
       return deleteCalendar({ id: targetId, isShift: false }, options);
+    case 'restore':
+      return restoreCalendar({ ...(item.payload as Calendar), id: targetId }, options);
     default:
       return { ok: true, value: undefined };
   }
@@ -123,6 +128,8 @@ async function replay(
 export async function flushOutbox(): Promise<FlushResult> {
   if (isAccountDataBlocked()) return { flushed: 0, dropped: 0, interrupted: true };
   const items = await listOutbox();
+  const release = claimOutbox(items);
+  try {
   const idMap = new Map<string, string>();
   let flushed = 0;
   let dropped = 0;
@@ -157,4 +164,5 @@ export async function flushOutbox(): Promise<FlushResult> {
   // 「無条件で呼んで失敗は内部で吸収する」パターン)。
   if (flushed > 0) await refreshFeaturedWidget();
   return { flushed, dropped, interrupted: false };
+  } finally { release(); }
 }

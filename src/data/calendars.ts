@@ -318,9 +318,9 @@ export async function deleteCalendar(
 }
 
 /** 論理削除を取り消す(Undo)。 */
-export async function restoreCalendar(calendar: Calendar): Promise<Result<void>> {
+export async function restoreCalendar(calendar: Calendar, options: WriteOptions = {}): Promise<Result<void>> {
   if (!supabase) return err(UNAVAILABLE);
-  if (isOffline()) return offlineRestoreCalendar(calendar);
+  if (isOffline()) return options.noOfflineFallback ? err(appError('data/offline', 'data/offline')) : offlineRestoreCalendar(calendar);
 
   try {
     const { error } = await supabase
@@ -328,13 +328,13 @@ export async function restoreCalendar(calendar: Calendar): Promise<Result<void>>
       .update({ deleted_at: null })
       .eq('id', calendar.id);
     if (error) {
-      if (isNetworkError(error)) return offlineRestoreCalendar(calendar);
+      if (isNetworkError(error)) return options.noOfflineFallback ? err(appError('data/offline', 'data/offline', error)) : offlineRestoreCalendar(calendar);
       return err(fromPostgrest(error));
     }
     await cachePut('calendars', calendar);
     return ok(undefined);
   } catch (e) {
-    if (isNetworkError(e)) return offlineRestoreCalendar(calendar);
+    if (isNetworkError(e)) return options.noOfflineFallback ? err(appError('data/offline', 'data/offline', e)) : offlineRestoreCalendar(calendar);
     return err(appError('data/query', 'data/query', e));
   }
 }
