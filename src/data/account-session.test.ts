@@ -41,3 +41,20 @@ it('送信を先に停止し、未送信キューを保管したまま通知・�
   expect(effects.background).toHaveBeenCalledWith(null);
   expect(effects.apply).toHaveBeenCalledWith(null);
 });
+
+it('権利キャッシュの削除失敗でも通知等を解放し、利用者切替自体は失敗として止める', async () => {
+  localStorage.setItem('calendar-app.entitlements.v1.A', '[]');
+  const remove = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+    throw new Error('保存領域を利用できない');
+  });
+  const calls = effects.notifications.mock.calls.length;
+  try {
+    await expect(clearPreviousAccountSession()).rejects.toThrow('保存領域を利用できない');
+    expect(effects.notifications).toHaveBeenCalledTimes(calls + 1);
+    expect(effects.widgets).toHaveBeenCalled();
+    expect(effects.background).toHaveBeenCalledWith(null);
+  } finally {
+    remove.mockRestore();
+    localStorage.removeItem('calendar-app.entitlements.v1.A');
+  }
+});

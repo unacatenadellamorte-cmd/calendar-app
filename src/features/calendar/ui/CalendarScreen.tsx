@@ -392,7 +392,6 @@ export function CalendarScreen({
           />
           {selectedDay && (
             <DayEventPanel
-              key={selectedDay}
               date={selectedDay}
               byDay={byDay}
               calendarById={calendarById}

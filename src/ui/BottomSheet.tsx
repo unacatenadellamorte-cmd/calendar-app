@@ -78,6 +78,7 @@ export function BottomSheet({
         onClick={dismiss}
         className="absolute inset-0 bg-black/30 animate-[fade-in_150ms_ease-out]"
       />
+      <div className="relative mx-auto w-full max-w-2xl animate-[slide-up_180ms_ease-out]">
       <div
         ref={panelRef}
         role="dialog"
@@ -114,6 +115,10 @@ export function BottomSheet({
             startY.current = null;
             suppressClick.current = Math.abs(distance) > 5;
             if (dismissible && distance >= 64) {
+              if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+                dismiss();
+                return;
+              }
               setClosing(true);
               timer.current = setTimeout(dismiss, 180);
             } else {
@@ -133,6 +138,7 @@ export function BottomSheet({
         <div className="bottom-sheet-content mt-3 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain pb-6">
           {children}
         </div>
+      </div>
       </div>
     </div>,
     document.body,

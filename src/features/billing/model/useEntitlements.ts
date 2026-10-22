@@ -1,88 +1,105 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/app/auth-context';
+import { accountScopeBlocked, accountScopeGeneration } from '@/data/account-scope';
 import { env } from '@/data/env';
 import { isEntitlementActive, listMyEntitlements, type Entitlement } from '@/data/entitlements';
+import { cacheEntitlements, readCachedEntitlements } from '@/data/entitlement-cache';
 
-export interface EntitlementsState {
-  /** 取得中。取得中は権利なしとして扱う。 */
-  loading: boolean;
-  /** 有効な multi_account を持つ(複数 Google アカウント)。 */
+export interface EntitlementFlags {
   hasMultiAccount: boolean;
-  /** 予定反映を使える(calendar_write または multi_account。B は A を内包する)。 */
+  /** 本人のGoogle予定反映は標準機能。サーバーでも所有者と書込同意を検査する。 */
   canWrite: boolean;
+  canViewPhotos: boolean;
+  hasLegacyWrite: boolean;
+  hasPaidPlan: boolean;
+}
+export interface EntitlementsState extends EntitlementFlags {
+  loading: boolean;
   reload: () => void;
-  /**
-   * いま DB から再取得して反映する(購入後のポーリング用)。取得できたら判定結果、
-   * 未ログイン・失敗なら null。同じユーザーの他の useEntitlements にも反映する。
-   */
-  refresh: () => Promise<Pick<EntitlementsState, 'hasMultiAccount' | 'canWrite'> | null>;
+  refresh: () => Promise<EntitlementFlags | null>;
 }
 
 type Listener = (userId: string, rows: Entitlement[]) => void;
 const listeners = new Set<Listener>();
+const latestRequest = new Map<string, number>();
+let nextRequest = 0;
+const EMPTY: Entitlement[] = [];
 
-/** 権利行の一覧から表示用の判定を作る(期限切れは無効)。 */
-export function deriveEntitlements(
-  rows: readonly Entitlement[],
-  now: number = Date.now(),
-): Pick<EntitlementsState, 'hasMultiAccount' | 'canWrite'> {
-  const active = new Set(rows.filter((r) => isEntitlementActive(r, now)).map((r) => r.entitlement));
+/** 旧契約の有効期間と複数アカウント契約も写真表示を含む。 */
+export function deriveEntitlements(rows: readonly Entitlement[], now = Date.now(), authenticated = true): EntitlementFlags {
+  const active = new Set(authenticated ? rows.filter((row) => isEntitlementActive(row, now)).map((row) => row.entitlement) : []);
   const hasMultiAccount = active.has('multi_account');
-  return { hasMultiAccount, canWrite: hasMultiAccount || active.has('calendar_write') };
+  const hasLegacyWrite = active.has('calendar_write');
+  const canViewPhotos = hasMultiAccount || hasLegacyWrite || active.has('device_photos');
+  return { hasMultiAccount, canWrite: authenticated, canViewPhotos, hasLegacyWrite, hasPaidPlan: canViewPhotos };
 }
 
-/**
- * 自分の有料機能の権利(CAP-2 / CAP-5)。
- * 未ログイン(ゲスト含む)・Supabase 未設定・取得失敗のときは「権利なし」。
- * ここでの判定は導線の出し分けにだけ使い、上限の強制はサーバー(oauth-exchange)が行う。
- */
+/** DBを正とし、通信断だけは同じ利用者の確認済み期限付き権利を使う。 */
 export function useEntitlements(): EntitlementsState {
   const { state, session } = useAuth();
   const userId = session?.user.id ?? null;
-  const active = env.hasSupabase && state === 'authenticated';
-  const [rows, setRows] = useState<Entitlement[]>([]);
-  const [loading, setLoading] = useState(active);
+  const active = env.hasSupabase && state === 'authenticated' && userId !== null && !session?.user.is_anonymous;
+  const identity = active ? userId : null;
+  const currentIdentity = useRef(identity);
+  const identityGeneration = useRef(0);
+  if (currentIdentity.current !== identity) {
+    currentIdentity.current = identity;
+    identityGeneration.current += 1;
+  }
+  const [snapshot, setSnapshot] = useState<{ userId: string | null; rows: Entitlement[]; loading: boolean }>({ userId: identity, rows: [], loading: active });
   const [nonce, setNonce] = useState(0);
-
-  useEffect(() => {
-    setRows([]);
-    if (!active) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    void listMyEntitlements().then((result) => {
-      if (cancelled) return;
-      setLoading(false);
-      setRows(result.ok ? result.value : []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [active, userId, nonce]);
-
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
-
-  // 他のインスタンス(設定画面と PlanSheet など)が再取得した結果を取り込む。
-  useEffect(() => {
-    if (!userId) return;
-    const listener: Listener = (uid, next) => {
-      if (uid === userId) setRows(next);
-    };
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, [userId]);
+  const [clock, setClock] = useState(0);
 
   const refresh = useCallback(async () => {
-    if (!active || !userId) return null;
+    if (!identity) return null;
+    const generation = identityGeneration.current;
+    const scopeGeneration = accountScopeGeneration();
+    const request = ++nextRequest;
+    latestRequest.set(identity, request);
     const result = await listMyEntitlements();
-    if (!result.ok) return null;
-    listeners.forEach((listener) => listener(userId, result.value));
-    return deriveEntitlements(result.value);
-  }, [active, userId]);
-  // 未ログインへ切り替わった直後の描画でも、前の利用者の権利を使わない。
-  return { loading, ...deriveEntitlements(active ? rows : []), reload, refresh };
+    if (identity !== currentIdentity.current || generation !== identityGeneration.current || accountScopeBlocked() || scopeGeneration !== accountScopeGeneration() || latestRequest.get(identity) !== request) return null;
+    const rows = result.ok ? result.value : result.error.kind === 'data/offline' ? readCachedEntitlements(identity) : [];
+    if (result.ok) cacheEntitlements(identity, rows);
+    else if (result.error.kind !== 'data/offline') cacheEntitlements(identity, []);
+    listeners.forEach((listener) => listener(identity, rows));
+    return result.ok ? deriveEntitlements(rows) : null;
+  }, [identity]);
+
+  useEffect(() => {
+    if (!identity) return;
+    const listener: Listener = (uid, rows) => {
+      if (uid === currentIdentity.current) setSnapshot({ userId: uid, rows, loading: false });
+    };
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }, [identity]);
+
+  useEffect(() => {
+    if (!identity) return;
+    setSnapshot((previous) => ({ userId: identity, rows: previous.userId === identity ? previous.rows : [], loading: true }));
+    void refresh();
+  }, [identity, nonce, refresh]);
+
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  const rows = identity && snapshot.userId === identity ? snapshot.rows : EMPTY;
+  // 画面が開いたままでも期限を越えたら写真を解放する。長い期限はタイマーを分割する。
+  useEffect(() => {
+    const next = rows.map((row) => Date.parse(row.expiresAt ?? '')).filter((time) => time > Date.now());
+    if (!next.length) return;
+    const timer = setTimeout(() => setClock((n) => n + 1), Math.min(Math.min(...next) - Date.now() + 1, 2_147_483_647));
+    return () => clearTimeout(timer);
+  }, [rows, clock]);
+  useEffect(() => {
+    const resume = () => {
+      if (document.visibilityState !== 'hidden') { setClock((n) => n + 1); reload(); }
+    };
+    window.addEventListener('focus', resume);
+    document.addEventListener('visibilitychange', resume);
+    return () => {
+      window.removeEventListener('focus', resume);
+      document.removeEventListener('visibilitychange', resume);
+    };
+  }, [reload]);
+
+  return { loading: active && (snapshot.userId !== identity || snapshot.loading), ...deriveEntitlements(rows, Date.now(), active), reload, refresh };
 }

@@ -23,6 +23,9 @@ import {
 import { useShiftAutoAdvance } from '@/features/settings/model/useShiftAutoAdvance';
 import { useDevicePhotosEnabled } from '@/features/settings/model/useDevicePhotosEnabled';
 import { isDevicePhotosSupported } from '@/platform/devicePhotos';
+import { useState } from 'react';
+import { useEntitlements } from '@/features/billing/model/useEntitlements';
+import { PlanSheet } from '@/features/billing/ui/PlanSheet';
 const THEME_OPTIONS: {
   value: ThemePreference;
   label: string;
@@ -71,6 +74,8 @@ export function SettingsScreen() {
   const { monthEventSize, setMonthEventSize } = useMonthEventSize();
   const { shiftAutoAdvance, setShiftAutoAdvance } = useShiftAutoAdvance();
   const { devicePhotosEnabled, setDevicePhotosEnabled } = useDevicePhotosEnabled();
+  const { canViewPhotos, loading: checkingPlan } = useEntitlements();
+  const [photoPlanOpen, setPhotoPlanOpen] = useState(false);
   return (
     <Screen title={t('設定')} showProfileHeader>
       <section aria-labelledby="theme-heading" className="mt-2">
@@ -196,8 +201,14 @@ export function SettingsScreen() {
             <input
               type="checkbox"
               role="switch"
+              // 表示は保存値に合わせ、権利がない保存ONもOFFに戻せるようにする。
+              // 確認中は保存ONのOFFだけ許し、保存OFFからのONは権利確定まで抑止する。
               checked={devicePhotosEnabled}
-              onChange={(event) => setDevicePhotosEnabled(event.target.checked)}
+              disabled={checkingPlan && !devicePhotosEnabled}
+              onChange={(event) => {
+                if (event.target.checked && !canViewPhotos) setPhotoPlanOpen(true);
+                else setDevicePhotosEnabled(event.target.checked);
+              }}
               className="h-5 w-5 accent-accent"
             />
           </label>
@@ -247,6 +258,7 @@ export function SettingsScreen() {
       <AccountSection />
 
       <PlanSection />
+      {photoPlanOpen && <PlanSheet open reason="photos" onClose={() => setPhotoPlanOpen(false)} />}
 
       <ConnectionsSection />
 

@@ -205,3 +205,12 @@ describe('補助', () => {
     expect(await constantTimeEqual('', '')).toBe(true);
   });
 });
+
+
+it('写真商品の購入・失効を専用権利として扱い、Google複数接続を付与しない', () => {
+  for (const type of ['INITIAL_PURCHASE', 'EXPIRATION']) {
+    const plan = planRevenueCatEvent(ev({ type, entitlement_ids: ['device_photos'], product_id: 'device_photos_monthly' }));
+    expect(plan.changes).toHaveLength(1);
+    expect(plan.changes[0]).toMatchObject({ entitlement: 'device_photos', productId: 'device_photos_monthly', active: type !== 'EXPIRATION' });
+  }
+});

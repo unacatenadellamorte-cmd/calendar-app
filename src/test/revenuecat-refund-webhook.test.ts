@@ -106,7 +106,12 @@ it('返金通知を認証し、公開SDKキーでなくサーバーキーで現�
 it('API上で権利が消えていれば期限を通知時刻へ戻す', async () => {
   const { response, rpc } = await invoke();
   expect(response.status).toBe(200);
-  expect(rpc).toHaveBeenCalledTimes(2);
+  expect(rpc).toHaveBeenCalledTimes(3);
+  expect(rpc.mock.calls.map((call) => call[1].p_entitlement).sort()).toEqual([
+    'calendar_write',
+    'device_photos',
+    'multi_account',
+  ]);
   expect(
     rpc.mock.calls.every((call) => call[1].p_expires_at === '2026-10-15T00:00:00.000Z'),
   ).toBe(true);

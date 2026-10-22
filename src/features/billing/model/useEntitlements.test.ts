@@ -43,13 +43,13 @@ afterEach(() => {
 
 describe('deriveEntitlements', () => {
   it('multi_account は予定反映も含む(canWrite)', () => {
-    expect(deriveEntitlements([{ entitlement: 'multi_account', expiresAt: null }], NOW)).toEqual({
+    expect(deriveEntitlements([{ entitlement: 'multi_account', expiresAt: null }], NOW)).toMatchObject({
       hasMultiAccount: true,
       canWrite: true,
     });
   });
-  it('calendar_write だけなら canWrite のみ', () => {
-    expect(deriveEntitlements([{ entitlement: 'calendar_write', expiresAt: null }], NOW)).toEqual({
+  it('旧calendar_writeの有効期間も写真表示を含む', () => {
+    expect(deriveEntitlements([{ entitlement: 'calendar_write', expiresAt: null }], NOW)).toMatchObject({
       hasMultiAccount: false,
       canWrite: true,
     });
@@ -63,10 +63,10 @@ describe('deriveEntitlements', () => {
         ],
         NOW,
       ),
-    ).toEqual({ hasMultiAccount: false, canWrite: false });
+    ).toMatchObject({ hasMultiAccount: false, canWrite: true });
   });
   it('行なしは権利なし', () => {
-    expect(deriveEntitlements([], NOW)).toEqual({ hasMultiAccount: false, canWrite: false });
+    expect(deriveEntitlements([], NOW)).toMatchObject({ hasMultiAccount: false, canWrite: true });
   });
 });
 
@@ -98,7 +98,7 @@ describe('useEntitlements', () => {
     const { result } = renderHook(() => useEntitlements());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.hasMultiAccount).toBe(false);
-    expect(result.current.canWrite).toBe(false);
+    expect(result.current.canWrite).toBe(true);
   });
 
   it('取得失敗は権利なし', async () => {
@@ -106,7 +106,7 @@ describe('useEntitlements', () => {
     const { result } = renderHook(() => useEntitlements());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.hasMultiAccount).toBe(false);
-    expect(result.current.canWrite).toBe(false);
+    expect(result.current.canWrite).toBe(true);
   });
 
   it.each(['guest', 'loading', 'unavailable'])('未ログイン(%s)は取得せず権利なし', (state) => {
@@ -142,5 +142,80 @@ describe('useEntitlements', () => {
     act(() => result.current.reload());
     await waitFor(() => expect(result.current.hasMultiAccount).toBe(true));
     expect(listMyEntitlements).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe('写真の有料権利と標準Google同期', () => {
+  it.each([
+    [[], false, false],
+    [[{ entitlement: 'device_photos', expiresAt: '2026-11-01T00:00:00Z' }], true, false],
+    [[{ entitlement: 'calendar_write', expiresAt: '2026-11-01T00:00:00Z' }], true, false],
+    [[{ entitlement: 'multi_account', expiresAt: '2026-11-01T00:00:00Z' }], true, true],
+    [[{ entitlement: 'device_photos', expiresAt: '2026-10-01T00:00:00Z' }], false, false],
+  ] as const)('契約%j: 写真%s、複数アカウント%s', async (rows, photos, multi) => {
+    listMyEntitlements.mockResolvedValue(ok(rows));
+    const { result } = renderHook(() => useEntitlements());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current).toMatchObject({ canWrite: true, canViewPhotos: photos, hasPaidPlan: photos, hasMultiAccount: multi });
+  });
+
+  it('通信断では同じ利用者の確認済み期限内だけ写真を利用でき、オンライン失効確認後は復活しない', async () => {
+    listMyEntitlements.mockResolvedValue(ok([{ entitlement: 'device_photos', expiresAt: '2026-11-01T00:00:00Z' }]));
+    const first = renderHook(() => useEntitlements());
+    await waitFor(() => expect(first.result.current.canViewPhotos).toBe(true));
+    first.unmount();
+    listMyEntitlements.mockResolvedValue(err(appError('data/offline', 'data/offline')));
+    const next = renderHook(() => useEntitlements());
+    await waitFor(() => expect(next.result.current.loading).toBe(false));
+    expect(next.result.current.canViewPhotos).toBe(true);
+    listMyEntitlements.mockResolvedValue(ok([]));
+    await act(async () => { await next.result.current.refresh(); });
+    expect(next.result.current.canViewPhotos).toBe(false);
+    listMyEntitlements.mockResolvedValue(err(appError('data/offline', 'data/offline')));
+    act(() => next.result.current.reload());
+    await waitFor(() => expect(next.result.current.loading).toBe(false));
+    expect(next.result.current.canViewPhotos).toBe(false);
+  });
+
+  it('別利用者へ切替えた最初の描画と古い取得完了で前の権利を渡さない', async () => {
+    listMyEntitlements.mockResolvedValue(ok([{ entitlement: 'multi_account', expiresAt: null }]));
+    const { result, rerender } = renderHook(() => useEntitlements());
+    await waitFor(() => expect(result.current.canViewPhotos).toBe(true));
+    let finish!: (value: ReturnType<typeof ok>) => void;
+    listMyEntitlements.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    let oldRefresh!: Promise<unknown>;
+    act(() => { oldRefresh = result.current.refresh(); });
+    authState = { state: 'authenticated', session: { user: { id: 'u2' } } };
+    listMyEntitlements.mockResolvedValue(err(appError('data/offline', 'data/offline')));
+    rerender();
+    expect(result.current.canViewPhotos).toBe(false);
+    await act(async () => { finish(ok([{ entitlement: 'multi_account', expiresAt: null }])); await oldRefresh; });
+    expect(result.current.canViewPhotos).toBe(false);
+  });
+
+  it('別利用者の期限付きキャッシュが残っていても通信断時に採用しない', async () => {
+    listMyEntitlements.mockResolvedValue(ok([{ entitlement: 'device_photos', expiresAt: '2026-11-01T00:00:00Z' }]));
+    const { result, rerender } = renderHook(() => useEntitlements());
+    await waitFor(() => expect(result.current.canViewPhotos).toBe(true));
+    expect(Object.keys(localStorage).some((key) => key.startsWith('calendar-app.entitlements.v1.'))).toBe(true);
+    authState = { state: 'authenticated', session: { user: { id: 'u2' } } };
+    listMyEntitlements.mockResolvedValue(err(appError('data/offline', 'data/offline')));
+    rerender();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.canViewPhotos).toBe(false);
+  });
+
+  it('開いたまま有効期限を迎えたら写真を停止しGoogle予定反映は維持する', async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(NOW);
+    listMyEntitlements.mockResolvedValue(ok([{ entitlement: 'device_photos', expiresAt: new Date(NOW + 1000).toISOString() }]));
+    const { result } = renderHook(() => useEntitlements());
+    await act(async () => {});
+    expect(result.current.canViewPhotos).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1001); });
+    expect(result.current.canViewPhotos).toBe(false);
+    expect(result.current.canWrite).toBe(true);
   });
 });

@@ -49,7 +49,7 @@ const pkg = (identifier: string, priceString: string) => ({
 const offerings = {
   current: {
     availablePackages: [
-      pkg('calendar_write_monthly', '¥300'),
+      pkg('device_photos_monthly', '¥500'),
       pkg('multi_account_monthly:base', '¥1,000'),
     ],
   },
@@ -98,7 +98,7 @@ describe('利用可否', () => {
   it('configure 前は価格・購入・復元・管理が利用不可エラー', async () => {
     for (const r of [
       await purchases.getPlanPrices(),
-      await purchases.purchasePlan('calendar_write'),
+      await purchases.purchasePlan('device_photos'),
       await purchases.restorePurchases(),
       await purchases.getManagementUrl(),
     ]) {
@@ -172,7 +172,7 @@ describe('configure / logIn / logOut', () => {
       status: 'error',
       messageKey: 'purchase/offline',
     });
-    expect((await purchases.purchasePlan('calendar_write')).ok).toBe(false);
+    expect((await purchases.purchasePlan('device_photos')).ok).toBe(false);
     expect(plugin.purchasePackage).not.toHaveBeenCalled();
     await purchases.configurePurchases('u2');
     expect(purchases.getPurchasesSnapshot().userId).toBe('u2');
@@ -210,17 +210,17 @@ describe('価格', () => {
     const r = await purchases.getPlanPrices();
     expect(r).toEqual({
       ok: true,
-      value: { calendar_write: '¥300', multi_account: '¥1,000' },
+      value: { device_photos: '¥500', multi_account: '¥1,000' },
     });
   });
   it('見つからない商品は含めない(仮表示のまま)', async () => {
     plugin.getOfferings.mockResolvedValue({
-      current: { availablePackages: [pkg('calendar_write_monthly', '¥300')] },
+      current: { availablePackages: [pkg('device_photos_monthly', '¥500')] },
       all: {},
     });
     await purchases.configurePurchases('u1');
     const r = await purchases.getPlanPrices();
-    expect(r).toEqual({ ok: true, value: { calendar_write: '¥300' } });
+    expect(r).toEqual({ ok: true, value: { device_photos: '¥500' } });
   });
   it('取得失敗はエラー', async () => {
     plugin.getOfferings.mockRejectedValue(new Error('x'));
@@ -238,7 +238,7 @@ describe('購入', () => {
     await purchases.configurePurchases('u1');
     await purchases.getPlanPrices();
     plugin.getOfferings.mockClear();
-    await purchases.purchasePlan('calendar_write', 'u1');
+    await purchases.purchasePlan('device_photos', 'u1');
     expect(plugin.getOfferings).not.toHaveBeenCalled();
     expect(plugin.purchasePackage.mock.calls[0]![0].aPackage).toBe(
       offerings.current.availablePackages[0],
@@ -249,7 +249,7 @@ describe('購入', () => {
   });
   it('旧利用者を指定した購入と、購入前の旧契約取得中の切替を拒否する', async () => {
     await purchases.configurePurchases('u1');
-    expect((await purchases.purchasePlan('calendar_write', 'u2')).ok).toBe(false);
+    expect((await purchases.purchasePlan('device_photos', 'u2')).ok).toBe(false);
     let complete!: (value: unknown) => void;
     plugin.getCustomerInfo.mockImplementationOnce(
       () =>
@@ -276,7 +276,7 @@ describe('購入', () => {
         message: '秘密の本文',
         receipt: '秘密のレシート',
       });
-      await purchases.purchasePlan('calendar_write');
+      await purchases.purchasePlan('device_photos');
       expect(log).toHaveBeenLastCalledWith('課金処理', {
         stage: 'store-purchase',
         code: 'unknown',
@@ -288,10 +288,10 @@ describe('購入', () => {
   });
   it('成功すると purchased。購入するのは該当商品のパッケージ', async () => {
     await purchases.configurePurchases('u1');
-    const r = await purchases.purchasePlan('calendar_write');
+    const r = await purchases.purchasePlan('device_photos');
     expect(r).toEqual({ ok: true, value: 'purchased' });
     expect(plugin.purchasePackage).toHaveBeenCalledWith({
-      aPackage: expect.objectContaining({ identifier: '$rc_calendar_write_monthly' }),
+      aPackage: expect.objectContaining({ identifier: '$rc_device_photos_monthly' }),
     });
   });
   it('ユーザーのキャンセル(エラーコード)はエラーにしない', async () => {
@@ -300,7 +300,7 @@ describe('購入', () => {
       userCancelled: true,
     });
     await purchases.configurePurchases('u1');
-    expect(await purchases.purchasePlan('calendar_write')).toEqual({
+    expect(await purchases.purchasePlan('device_photos')).toEqual({
       ok: true,
       value: 'cancelled',
     });
@@ -310,7 +310,7 @@ describe('購入', () => {
       code: PURCHASES_ERROR_CODE.STORE_PROBLEM_ERROR,
     });
     await purchases.configurePurchases('u1');
-    expect(await purchases.purchasePlan('calendar_write')).toMatchObject({
+    expect(await purchases.purchasePlan('device_photos')).toMatchObject({
       ok: false,
       error: { messageKey: 'purchase/failed' },
     });
@@ -318,13 +318,13 @@ describe('購入', () => {
   it('通信エラー・承認待ちは専用の messageKey', async () => {
     await purchases.configurePurchases('u1');
     plugin.purchasePackage.mockRejectedValueOnce({ code: PURCHASES_ERROR_CODE.NETWORK_ERROR });
-    expect(await purchases.purchasePlan('calendar_write')).toMatchObject({
+    expect(await purchases.purchasePlan('device_photos')).toMatchObject({
       error: { messageKey: 'purchase/offline' },
     });
     plugin.purchasePackage.mockRejectedValueOnce({
       code: PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR,
     });
-    expect(await purchases.purchasePlan('calendar_write')).toMatchObject({
+    expect(await purchases.purchasePlan('device_photos')).toMatchObject({
       error: { messageKey: 'purchase/pending' },
     });
   });
@@ -388,14 +388,14 @@ describe('復元・管理', () => {
     await purchases.configurePurchases('u1');
     expect(await purchases.restorePurchases()).toEqual({
       ok: true,
-      value: { hasActiveSubscription: false },
+      value: { hasActiveSubscription: false, hasMultiAccountSubscription: false },
     });
     plugin.restorePurchases.mockResolvedValue({
       customerInfo: { activeSubscriptions: ['multi_account_monthly'] },
     });
     expect(await purchases.restorePurchases()).toEqual({
       ok: true,
-      value: { hasActiveSubscription: true },
+      value: { hasActiveSubscription: true, hasMultiAccountSubscription: true },
     });
   });
   it('復元の失敗は messageKey', async () => {

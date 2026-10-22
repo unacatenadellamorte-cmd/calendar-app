@@ -538,8 +538,8 @@
   "Google Playで定期購入を管理": "Gérer l’abonnement sur Google Play",
   "App Storeで定期購入を管理": "Gérer l’abonnement sur App Store",
   "有料プランの利用条件": "Conditions du forfait payant",
-  "予定反映プランはGoogleアカウント1件、複数アカウントプランは最大5件で予定反映も含みます。無料利用は1件の読み取り専用です。": "Le plan de synchronisation d’événements couvre 1 compte Google ; le plan multi-comptes couvre jusqu’à 5 comptes et inclut la synchronisation d’événements. Le forfait gratuit couvre 1 compte en lecture seule.",
-  "失効後は新しい反映を停止します。Google側のコピーは残ります。返金・解約の条件は購入したストアの規定に従います。": "Après expiration, les nouvelles synchronisations s’arrêteront. Les copies du côté de Google resteront. Les conditions de remboursement et d’annulation suivent la politique du magasin.",
+  "Google アカウント1件の同期と予定反映は無料で利用できます。複数アカウントプランは最大5件まで接続でき、写真表示を含みます。": "La synchronisation et la synchronisation d’événements pour 1 compte Google sont gratuites. Le forfait multi-comptes permet de connecter jusqu’à 5 comptes et inclut l’affichage des photos.",
+  "写真表示は有料プランの有効期間中のみ利用できます。期限切れ後は写真を表示せず、有効な契約の確認後に再開できます。返金・解約の条件は購入したストアの規定に従います。": "L’affichage des photos n’est disponible que pendant la durée d’un forfait payant. Après expiration, les photos ne s’affichent plus ; elles reprennent après confirmation d’un abonnement valide. Les conditions de remboursement et d’annulation suivent la politique du magasin où vous avez effectué l’achat.",
   "シークレット予定は反映せず、送信済みコピーは削除します。Googleの許可を取り消した場合、削除には再接続が必要です。": "Les événements privés ne seront pas synchronisés ; les copies envoyées seront supprimées. Si vous révoquez l’autorisation de Google, une reconnexion est nécessaire pour supprimer.",
   "Googleアカウントを接続（任意）": "Connecter un compte Google (facultatif)",
   "アプリの登録は完了しました。Googleカレンダーを使う場合は、ここで接続できます。": "Votre compte dans l’application est prêt. Connectez Google Agenda ici si vous souhaitez l’utiliser.",
@@ -595,5 +595,15 @@
   "選んだ日に撮影した写真を、日付の下に表示します。写真はこの端末の中だけで読み取り、保存や送信はしません。この設定はOSの写真アクセス権限の撤回とは別です。": "Les photos prises le jour sélectionné s’affichent sous la date. Les photos sont lues uniquement sur cet appareil et ne sont jamais enregistrées ni envoyées. Ce réglage est distinct de la révocation de l’autorisation d’accès aux photos du système.",
   "開始と終了の時刻を確認してください。24時間は予定編集で翌日を指定してください": "Vérifiez les heures de début et de fin. Pour 24 heures, indiquez le lendemain dans l’éditeur d’événement.",
   "終了は開始より後にしてください。24時間は予定編集で翌日を指定してください": "Définissez une fin après le début. Pour 24 heures, indiquez le lendemain dans l’éditeur d’événement.",
-  "最終日": "Dernier jour"
+  "最終日": "Dernier jour",
+  "写真表示": "Affichage des photos",
+  "選んだ日に撮影した端末の写真をカレンダーに表示します。": "Affiche dans le calendrier les photos de votre appareil prises à la date sélectionnée.",
+  "写真は端末内だけで読み取り、サーバーへ送信しません。": "Les photos sont lues uniquement sur l’appareil et ne sont pas envoyées au serveur.",
+  "写真表示も含みます。": "L’affichage des photos est également inclus.",
+  "Google アカウント1つの同期と予定反映は標準機能です。": "La synchronisation d’un compte Google et l’envoi d’événements vers Google sont des fonctions standard.",
+  "旧「予定反映」プランの有効期間中も写真表示を利用できます。契約は自動で切り替わりません。": "L’affichage des photos reste disponible pendant la période de validité de votre ancien abonnement « Synchronisation d’événements Google ». L’abonnement ne changera pas automatiquement.",
+  "プラン変更時の旧契約の扱いと請求時期は、ストアの確認画面と購読管理で確認してください。": "Lors d’un changement d’offre, consultez l’écran de confirmation du store et la gestion des abonnements pour connaître le traitement de l’ancien abonnement et la date de facturation.",
+  "写真表示のプランを見る": "Voir les offres avec affichage des photos",
+  "Googleへの予定反映にはログインと書き込み許可が必要です。": "La connexion et l’autorisation d’écriture sont nécessaires pour synchroniser les événements avec Google.",
+  "Googleへの反映設定を確認してください。接続と書き込み許可が必要です。": "Vérifiez les paramètres de synchronisation avec Google. Une connexion et une autorisation d’écriture sont nécessaires."
 }

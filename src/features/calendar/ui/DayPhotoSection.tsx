@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t, useLanguage } from '@/i18n';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { formatClock } from '@/lib/datetime';
@@ -11,6 +11,8 @@ import {
 } from '@/platform/devicePhotos';
 import { useDevicePhotosEnabled } from '@/features/settings/model/useDevicePhotosEnabled';
 import { useDayPhotos } from '@/features/calendar/model/useDayPhotos';
+import { useEntitlements } from '@/features/billing/model/useEntitlements';
+import { PlanSheet } from '@/features/billing/ui/PlanSheet';
 
 interface DayPhotoSectionProps {
   /** 選択中の日付 "YYYY-MM-DD"(端末のローカル日付)。 */
@@ -29,12 +31,21 @@ const VIEWPORT_HEIGHT = ROW_HEIGHT * 3;
 const OVERSCAN_ROWS = 1;
 
 /** 選択日に撮影した端末の写真。設定OFF・Webでは何も出さず、写真APIも呼ばない。 */
-export function DayPhotoSection({ date, suspended = false, userId }: DayPhotoSectionProps) {
+export function DayPhotoSection(props: DayPhotoSectionProps) {
+  const { devicePhotosEnabled } = useDevicePhotosEnabled();
+  if (!devicePhotosEnabled || !isDevicePhotosSupported()) return null;
+  return <EnabledDayPhotoSection {...props} />;
+}
+
+function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSectionProps) {
   useLanguage();
   const { devicePhotosEnabled } = useDevicePhotosEnabled();
+  const { canViewPhotos, loading: checkingPlan } = useEntitlements();
+  const [planOpen, setPlanOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<DevicePhotoAsset | null>(null);
-  const supported = devicePhotosEnabled && isDevicePhotosSupported();
+  const enabled = devicePhotosEnabled && isDevicePhotosSupported();
+  const supported = enabled && canViewPhotos;
   // OFF になったら開閉状態も捨て、ON に戻しても利用者が開くまで読まない。
   useEffect(() => {
     if (!supported) setOpen(false);
@@ -51,7 +62,14 @@ export function DayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
   useEffect(() => {
     if (!active) setPreview(null);
   }, [active]);
-  if (!supported) return null;
+  if (!enabled) return null;
+  if (!canViewPhotos) return (
+    <section className="mt-4">
+      {checkingPlan ? <p role="status" className="text-meta text-ink-secondary">{t('確認中…')}</p> :
+        <button type="button" onClick={() => setPlanOpen(true)} className="min-h-11 w-full rounded-md border border-accent px-4 text-body text-accent">{t('写真表示のプランを見る')}</button>}
+      {planOpen && <PlanSheet open reason="photos" onClose={() => setPlanOpen(false)} />}
+    </section>
+  );
   return (
     <section data-date={date} className="mt-4">
       <button
@@ -122,24 +140,14 @@ export function DayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
         <p className="mt-2 text-meta text-ink-secondary">{t('この日に撮影した写真はありません。')}</p>
       )}
       {open && state.kind === 'ready' && state.assets.length > 0 && (
-        <PhotoGrid assets={state.assets} onOpen={setPreview} />
-      )}
-      {open && state.kind === 'ready' && state.hasMore && (
-        <div className="mt-2 flex items-center justify-between gap-2">
-          {state.loadMoreFailed && (
-            <p role="alert" className="text-meta text-danger">
-              {t('写真を読み込めませんでした。')}
-            </p>
-          )}
-          <button
-            type="button"
-            disabled={state.loadingMore}
-            onClick={() => void loadMore()}
-            className="min-h-11 w-full rounded-sm border border-accent px-4 text-body text-accent"
-          >
-            {t('さらに読み込む')}
-          </button>
-        </div>
+        <PhotoGrid
+          assets={state.assets}
+          onOpen={setPreview}
+          hasMore={state.hasMore}
+          loadingMore={state.loadingMore}
+          loadMoreFailed={state.loadMoreFailed}
+          onLoadMore={loadMore}
+        />
       )}
       <PhotoPreview asset={suspended || !active ? null : preview} onClose={() => setPreview(null)} />
     </section>
@@ -149,11 +157,20 @@ export function DayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
 function PhotoGrid({
   assets,
   onOpen,
+  hasMore,
+  loadingMore,
+  loadMoreFailed,
+  onLoadMore,
 }: {
   assets: DevicePhotoAsset[];
   onOpen: (asset: DevicePhotoAsset) => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMoreFailed: boolean;
+  onLoadMore: () => Promise<void>;
 }) {
   const [scrollTop, setScrollTop] = useState(0);
+  const previousScrollTop = useRef(0);
   const rows = Math.ceil(assets.length / COLUMNS);
   const last = Math.min(
     rows - 1,
@@ -161,25 +178,59 @@ function PhotoGrid({
   );
   const first = Math.min(last, Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN_ROWS));
   return (
-    <div
-      role="list"
-      aria-label={t('撮影した写真の一覧')}
-      onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-      style={{ height: Math.min(rows * ROW_HEIGHT, VIEWPORT_HEIGHT) }}
-      className="mt-2 overflow-y-auto overscroll-contain"
-    >
-      <div style={{ height: rows * ROW_HEIGHT, position: 'relative' }}>
-        <div
-          style={{ position: 'absolute', top: first * ROW_HEIGHT, left: 0, right: 0 }}
-          className="grid grid-cols-4 gap-1"
-        >
-          {assets.slice(first * COLUMNS, (last + 1) * COLUMNS).map((asset) => (
-            <div key={asset.id} role="listitem" style={{ height: TILE_HEIGHT }}>
-              <PhotoTile asset={asset} onOpen={onOpen} />
-            </div>
-          ))}
+    <div className="mt-2">
+      <div
+        role="list"
+        aria-label={t('撮影した写真の一覧')}
+        tabIndex={0}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const nextScrollTop = element.scrollTop;
+          const scrollingDown = nextScrollTop > previousScrollTop.current;
+          previousScrollTop.current = nextScrollTop;
+          setScrollTop(nextScrollTop);
+          const remaining = element.scrollHeight - element.clientHeight - nextScrollTop;
+          if (
+            scrollingDown &&
+            remaining <= ROW_HEIGHT * 2 &&
+            hasMore &&
+            !loadingMore &&
+            !loadMoreFailed
+          ) {
+            void onLoadMore();
+          }
+        }}
+        style={{ height: Math.min(rows * ROW_HEIGHT, VIEWPORT_HEIGHT) }}
+        className="overflow-y-auto overscroll-contain focus-visible:ring-2 focus-visible:ring-accent"
+      >
+        <div style={{ height: rows * ROW_HEIGHT, position: 'relative' }}>
+          <div
+            style={{ position: 'absolute', top: first * ROW_HEIGHT, left: 0, right: 0 }}
+            className="grid grid-cols-4 gap-1"
+          >
+            {assets.slice(first * COLUMNS, (last + 1) * COLUMNS).map((asset) => (
+              <div key={asset.id} role="listitem" style={{ height: TILE_HEIGHT }}>
+                <PhotoTile asset={asset} onOpen={onOpen} />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+      {loadingMore && <p role="status" className="sr-only">{t('読み込み中…')}</p>}
+      {loadMoreFailed && (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <p role="alert" className="text-meta text-danger">
+            {t('写真を読み込めませんでした。')}
+          </p>
+          <button
+            type="button"
+            onClick={() => void onLoadMore()}
+            className="min-h-11 shrink-0 text-meta text-accent"
+          >
+            {t('再試行')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -220,10 +271,11 @@ function PhotoPreview({ asset, onClose }: { asset: DevicePhotoAsset | null; onCl
           {t('この写真は端末のOSから取得できませんでした(クラウド上の写真など)。')}
         </p>
       )}
-      {asset && src && (
+      {asset && src && !failed && (
         <img
           src={src}
           alt={t('{0} に撮影した写真', [clockOf(asset.createdMs)])}
+          onError={() => setFailed(true)}
           className="mx-auto max-h-[70dvh] w-full object-contain"
         />
       )}
@@ -240,20 +292,40 @@ function PhotoTile({
 }) {
   const { id, createdMs } = asset;
   const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let current = true;
     const controller = new AbortController();
+    setSrc(null);
+    setFailed(false);
     loadDevicePhotoThumbnail(id, controller.signal).then(
       (dataUrl) => {
         if (current) setSrc(dataUrl);
       },
-      () => {},
+      () => {
+        if (current) setFailed(true);
+      },
     );
     return () => {
       current = false;
       controller.abort();
     };
-  }, [id]);
+  }, [id, attempt]);
+  if (failed) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-1 overflow-hidden rounded-sm bg-surface-raised px-1 text-center">
+        <p role="alert" className="text-meta text-danger">{t('写真を読み込めませんでした。')}</p>
+        <button
+          type="button"
+          onClick={() => setAttempt((value) => value + 1)}
+          className="min-h-8 text-meta text-accent"
+        >
+          {t('再試行')}
+        </button>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -261,7 +333,14 @@ function PhotoTile({
       onClick={() => onOpen(asset)}
       className="h-full w-full overflow-hidden rounded-sm bg-surface-raised"
     >
-      {src && <img src={src} alt="" className="h-full w-full object-cover" />}
+      {src && (
+        <img
+          src={src}
+          alt=""
+          onError={() => setFailed(true)}
+          className="h-full w-full animate-[fade-in_180ms_ease-out] object-cover"
+        />
+      )}
     </button>
   );
 }

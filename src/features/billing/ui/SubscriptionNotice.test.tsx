@@ -63,4 +63,19 @@ describe('ストア管理の導線', () => {
     expect(screen.queryByText(/Google Play/)).not.toBeInTheDocument();
     expect(screen.getByText(/Googleへ送った予定/)).toBeInTheDocument();
   });
+
+  it('利用条件は同期の無料範囲と写真表示の期限切れ後の扱いを説明し、再購入を求めない', () => {
+    render(<SubscriptionNotice />);
+    expect(
+      screen.getByText(
+        'Google アカウント1件の同期と予定反映は無料で利用できます。複数アカウントプランは最大5件まで接続でき、写真表示を含みます。',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '写真表示は有料プランの有効期間中のみ利用できます。期限切れ後は写真を表示せず、有効な契約の確認後に再開できます。返金・解約の条件は購入したストアの規定に従います。',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/再購入/)).not.toBeInTheDocument();
+  });
 });

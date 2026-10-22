@@ -570,8 +570,9 @@ describe('ConnectionsSection のプラン案内(CAP-5)', () => {
     await user.click(await screen.findByRole('button', { name: 'Google を接続' }));
     const sheet = await screen.findByRole('dialog', { name: 'プランを選ぶ' });
     expect(startGoogleConnect).not.toHaveBeenCalled();
-    // 購入は準備中で押せない
-    expect(within(sheet).getByRole('button', { name: '予定反映(準備中)' })).toBeDisabled();
+    // 購入は準備中で押せない(予定反映は無料標準のため購入ボタンなし)
+    expect(within(sheet).queryByRole('button', { name: '予定反映(準備中)' })).not.toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: '写真表示(準備中)' })).toBeDisabled();
     expect(within(sheet).getByRole('button', { name: '複数アカウント(準備中)' })).toBeDisabled();
     expect(within(sheet).getByRole('button', { name: '無料で1つ接続する' })).toBeEnabled();
   });

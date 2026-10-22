@@ -538,8 +538,8 @@
   "Google Playで定期購入を管理": "Manage subscription on Google Play",
   "App Storeで定期購入を管理": "Manage subscription on App Store",
   "有料プランの利用条件": "Paid plan terms",
-  "予定反映プランはGoogleアカウント1件、複数アカウントプランは最大5件で予定反映も含みます。無料利用は1件の読み取り専用です。": "The event sync plan covers 1 Google account; the multiple accounts plan covers up to 5 accounts and includes event sync. The free plan covers 1 account as read-only.",
-  "失効後は新しい反映を停止します。Google側のコピーは残ります。返金・解約の条件は購入したストアの規定に従います。": "After expiration, new syncs will stop. Copies on Google’s side will remain. Refund and cancellation terms follow the store’s policy.",
+  "Google アカウント1件の同期と予定反映は無料で利用できます。複数アカウントプランは最大5件まで接続でき、写真表示を含みます。": "Syncing and event sync for 1 Google account are free. The multiple accounts plan connects up to 5 accounts and includes photo display.",
+  "写真表示は有料プランの有効期間中のみ利用できます。期限切れ後は写真を表示せず、有効な契約の確認後に再開できます。返金・解約の条件は購入したストアの規定に従います。": "Photo display is available only while a paid plan is active. After expiration, photos are not shown, and display resumes once a valid subscription is confirmed. Refund and cancellation terms follow the policy of the store where you purchased.",
   "シークレット予定は反映せず、送信済みコピーは削除します。Googleの許可を取り消した場合、削除には再接続が必要です。": "Private events won’t be synced; sent copies will be deleted. If you revoke Google permission, reconnection is needed to delete.",
   "Googleアカウントを接続（任意）": "Connect a Google account (optional)",
   "アプリの登録は完了しました。Googleカレンダーを使う場合は、ここで接続できます。": "Your app account is ready. Connect Google Calendar here if you want to use it.",
@@ -595,5 +595,15 @@
   "予定は保存しましたが通知を予約できませんでした。もう一度お試しください": "The event was saved, but its notification could not be scheduled. Try again.",
   "開始と終了の時刻を確認してください。24時間は予定編集で翌日を指定してください": "Check the start and end times. For a 24-hour shift, set the next day in the event editor.",
   "終了は開始より後にしてください。24時間は予定編集で翌日を指定してください": "Set the end after the start. For 24 hours, choose the next day in the event editor.",
-  "最終日": "Last day"
+  "最終日": "Last day",
+  "写真表示": "Photo display",
+  "選んだ日に撮影した端末の写真をカレンダーに表示します。": "Show photos from your device taken on the selected date on your calendar.",
+  "写真は端末内だけで読み取り、サーバーへ送信しません。": "Photos are read only on your device and are never sent to the server.",
+  "写真表示も含みます。": "Photo display is included.",
+  "Google アカウント1つの同期と予定反映は標準機能です。": "Syncing one Google account and syncing events to Google are standard features.",
+  "旧「予定反映」プランの有効期間中も写真表示を利用できます。契約は自動で切り替わりません。": "You can use photo display for the remainder of your existing “Event sync to Google” plan. Your subscription will not change automatically.",
+  "プラン変更時の旧契約の扱いと請求時期は、ストアの確認画面と購読管理で確認してください。": "When changing plans, check the store confirmation screen and subscription management for how your existing subscription will be handled and when you will be charged.",
+  "写真表示のプランを見る": "View photo plans",
+  "Googleへの予定反映にはログインと書き込み許可が必要です。": "Signing in and granting write permission are required to sync events to Google.",
+  "Googleへの反映設定を確認してください。接続と書き込み許可が必要です。": "Check your Google sync settings. A connection and write permission are required."
 }

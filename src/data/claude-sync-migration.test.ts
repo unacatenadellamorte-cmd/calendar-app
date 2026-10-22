@@ -477,3 +477,27 @@ it('初回シフト作成時だけマイカレンダーを1件作り、既存・
     ),
   ).toBe(0);
 });
+
+
+it('有料権利がなくても本人のGoogle予定反映は使え、匿名と他人の反映先は拒否する', async () => {
+  const user = await newUser(), other = await newUser();
+  const anon = String(await scalar('insert into auth.users(id,is_anonymous) values(gen_random_uuid(),true) returning id'));
+  expect(await scalar('select can_google_write($1)', [user])).toBe(true);
+  expect(await scalar('select can_google_write($1)', [anon])).toBe(false);
+  expect(await scalar('select can_google_write(gen_random_uuid())')).toBe(false);
+  const own = await calendar(user), foreign = await calendar(other);
+  const conn = await scalar("select upsert_google_connection($1,'synthetic','free@example.test',true)", [user]);
+  await db.query("select set_google_push_target($1,$2,$3,'free-destination')", [user, own, conn]);
+  expect(await scalar('select enabled from google_push_targets where calendar_id=$1', [own])).toBe(true);
+  await expect(db.query("select set_google_push_target($1,$2,$3,'foreign')", [user, foreign, conn])).rejects.toThrow();
+  expect(await scalar('select get_google_connection_limit($1)', [user])).toBe(1);
+});
+
+it('写真権利の通知を保存し、古い通知で失効を取り消さず接続上限を増やさない', async () => {
+  const user = await newUser();
+  expect(await scalar("select apply_revenuecat_entitlement($1,'device_photos','2030-01-01','device_photos_monthly','app_store',200)", [user])).toBe(true);
+  expect(await scalar('select get_google_connection_limit($1)', [user])).toBe(1);
+  expect(await scalar("select apply_revenuecat_entitlement($1,'device_photos','2000-01-01','device_photos_monthly','app_store',300)", [user])).toBe(true);
+  expect(await scalar("select apply_revenuecat_entitlement($1,'device_photos','2030-01-01','device_photos_monthly','app_store',100)", [user])).toBe(false);
+  expect(await scalar("select expires_at < now() from entitlements where user_id=$1 and entitlement='device_photos'", [user])).toBe(true);
+});

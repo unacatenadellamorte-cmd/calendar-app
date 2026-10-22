@@ -22,9 +22,9 @@
  */
 
 /** 本アプリが扱う権利。DB の check 制約と一致させる。 */
-export type EntitlementName = 'calendar_write' | 'multi_account';
+export type EntitlementName = 'calendar_write' | 'multi_account' | 'device_photos';
 
-const KNOWN_ENTITLEMENTS: readonly EntitlementName[] = ['calendar_write', 'multi_account'];
+const KNOWN_ENTITLEMENTS: readonly EntitlementName[] = ['calendar_write', 'multi_account', 'device_photos'];
 
 /** DB へ適用する 1 件の権利変更。 */
 export interface EntitlementChange {

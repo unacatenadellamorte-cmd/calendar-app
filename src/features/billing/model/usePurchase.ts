@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAuth } from '@/app/auth-context';
-import type { EntitlementName } from '@/data/entitlements';
+import type { PurchasablePlan } from '@/data/entitlements';
 import {
   getManagementUrl,
   configurePurchases,
@@ -59,7 +59,7 @@ export interface PurchaseApi {
   status: PurchaseStatus;
   /** 購入・復元・反映待ちの最中。 */
   busy: boolean;
-  purchase: (plan: EntitlementName) => Promise<PurchaseResult>;
+  purchase: (plan: PurchasablePlan) => Promise<PurchaseResult>;
   restore: () => Promise<PurchaseResult>;
   openManagement: () => Promise<void>;
 }
@@ -170,7 +170,7 @@ export function usePurchase(): PurchaseApi {
   /** 目的の権利が DB に現れるまで待つ。閉じた後も続け、他の画面の表示も更新する。 */
   const waitForEntitlement = useCallback(
     async (
-      isDone: (e: Pick<EntitlementsState, 'hasMultiAccount' | 'canWrite'>) => boolean,
+      isDone: (e: Pick<EntitlementsState, 'hasMultiAccount' | 'canViewPhotos' | 'hasPaidPlan'>) => boolean,
     ) => {
       update({ kind: 'syncing' });
       for (let i = 0; i < ENTITLEMENT_POLL_MAX_ATTEMPTS; i += 1) {
@@ -203,7 +203,7 @@ export function usePurchase(): PurchaseApi {
   }, [supported, authenticated, available, update, current]);
 
   const purchase = useCallback(
-    async (plan: EntitlementName): Promise<PurchaseResult> => {
+    async (plan: PurchasablePlan): Promise<PurchaseResult> => {
       const blocked = guard();
       if (blocked) return blocked;
       if (priceUserId !== userId || !prices[plan] || priceState.kind !== 'ready') {
@@ -226,7 +226,7 @@ export function usePurchase(): PurchaseApi {
           return { ok: true, outcome: 'cancelled' };
         }
         const outcome = await waitForEntitlement((e) =>
-          plan === 'multi_account' ? e.hasMultiAccount : e.canWrite,
+          plan === 'multi_account' ? e.hasMultiAccount : e.canViewPhotos,
         );
         return { ok: true, outcome };
       } finally {
@@ -253,7 +253,9 @@ export function usePurchase(): PurchaseApi {
         update({ kind: 'nothing-to-restore' });
         return { ok: true, outcome: 'settled' };
       }
-      const outcome = await waitForEntitlement((e) => e.canWrite);
+      const outcome = await waitForEntitlement((e) =>
+        result.value.hasMultiAccountSubscription ? e.hasMultiAccount : e.hasPaidPlan,
+      );
       return { ok: true, outcome };
     } finally {
       busyRef.current = false;

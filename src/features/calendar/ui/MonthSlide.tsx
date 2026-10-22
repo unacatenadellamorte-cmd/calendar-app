@@ -71,6 +71,11 @@ export function MonthSlide({
         timer.current = setTimeout(clear, 300);
       }
     }
+    // 指の移動だけなら月全体のDOMを複製し直さず、退出時の位置だけ更新する。
+    if (dragging && old?.key === monthKey && old.version === contentVersion) {
+      old.node.style.transform = current.style.transform;
+      return;
+    }
     const snapshot = current.cloneNode(true) as HTMLElement;
     snapshot.className = '';
     previous.current = { key: monthKey, node: snapshot, version: contentVersion };

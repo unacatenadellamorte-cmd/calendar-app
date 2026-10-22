@@ -7,7 +7,7 @@ import {
 } from '@revenuecat/purchases-capacitor';
 import { env } from './env';
 import { appError, err, ok, type Result } from './result';
-import type { EntitlementName } from './entitlements';
+import type { PurchasablePlan } from './entitlements';
 
 /**
  * 課金(RevenueCat SDK)の data-access レイヤ(CAP-1 / CAP-5)。Result を返し、throw しない。
@@ -21,8 +21,8 @@ import type { EntitlementName } from './entitlements';
  */
 
 /** 商品ID(ストア共通)。プランの権利名との対応。 */
-export const PRODUCT_IDS: Record<EntitlementName, string> = {
-  calendar_write: 'calendar_write_monthly',
+export const PRODUCT_IDS: Record<PurchasablePlan, string> = {
+  device_photos: 'device_photos_monthly',
   multi_account: 'multi_account_monthly',
 };
 
@@ -206,12 +206,12 @@ function matchesProduct(pkg: PurchasesPackage, productId: string): boolean {
 
 function findPackage(
   packages: PurchasesPackage[],
-  plan: EntitlementName,
+  plan: PurchasablePlan,
 ): PurchasesPackage | null {
   return packages.find((p) => matchesProduct(p, PRODUCT_IDS[plan])) ?? null;
 }
 
-export type PlanPriceStrings = Partial<Record<EntitlementName, string>>;
+export type PlanPriceStrings = Partial<Record<PurchasablePlan, string>>;
 
 /** ストアのローカライズ済み価格文字列。商品が見つからないプランは購入不可。 */
 export async function getPlanPrices(): Promise<Result<PlanPriceStrings>> {
@@ -225,7 +225,7 @@ export async function getPlanPrices(): Promise<Result<PlanPriceStrings>> {
       if (request !== generation) return unavailable();
       loadedPackages = packages;
       const prices: PlanPriceStrings = {};
-      for (const plan of Object.keys(PRODUCT_IDS) as EntitlementName[]) {
+      for (const plan of Object.keys(PRODUCT_IDS) as PurchasablePlan[]) {
         const pkg = findPackage(packages, plan);
         if (pkg?.product.priceString) prices[plan] = pkg.product.priceString;
       }
@@ -241,18 +241,18 @@ export async function getPlanPrices(): Promise<Result<PlanPriceStrings>> {
 export type PurchaseOutcome = 'purchased' | 'cancelled';
 
 /**
- * Android でプラン変更(予定反映 → 複数アカウント)のときに渡す旧商品ID。
+ * Android でプラン変更(写真表示・旧予定反映 → 複数アカウント)のときに渡す旧商品ID。
  * RevenueCat のドキュメントは oldProductID を CustomerInfo から取る形を案内している
  * (購読の ID を CustomerInfo の値のまま渡す)。見つからなければ null。
  */
-async function findOldProductId(plan: EntitlementName): Promise<string | null> {
+async function findOldProductId(plan: PurchasablePlan): Promise<string | null> {
   if (plan !== 'multi_account' || currentPlatform() !== 'android') return null;
   {
     // 旧契約の確認失敗を未契約扱いにすると二重契約になるため、例外は購入処理へ返す。
     const { customerInfo } = await Purchases.getCustomerInfo();
-    const old = PRODUCT_IDS.calendar_write;
+    const oldProducts = ['calendar_write_monthly', PRODUCT_IDS.device_photos];
     return (
-      customerInfo.activeSubscriptions.find((id) => id === old || id.startsWith(`${old}:`)) ??
+      customerInfo.activeSubscriptions.find((id) => oldProducts.some((old) => id === old || id.startsWith(`${old}:`))) ??
       null
     );
   }
@@ -260,7 +260,7 @@ async function findOldProductId(plan: EntitlementName): Promise<string | null> {
 
 /** プランを購入する。ユーザーのキャンセルはエラーにせず `cancelled` を返す。 */
 export async function purchasePlan(
-  plan: EntitlementName,
+  plan: PurchasablePlan,
   expectedUserId = snapshot.userId,
 ): Promise<Result<PurchaseOutcome>> {
   const request = generation;
@@ -271,7 +271,7 @@ export async function purchasePlan(
       snapshot.userId === expectedUserId &&
       requestedUserId === expectedUserId &&
       request === generation;
-    if (!valid()) return unavailable();
+    if (!valid() || !Object.prototype.hasOwnProperty.call(PRODUCT_IDS, plan)) return unavailable();
     let stage = 'offerings';
     try {
       const packages = loadedPackages ?? collectPackages(await Purchases.getOfferings());
@@ -302,6 +302,8 @@ export async function purchasePlan(
 export interface RestoreOutcome {
   /** 復元後、ストア側に有効な購読があるか(customerInfo.activeSubscriptions)。表示の補助のみ。 */
   hasActiveSubscription: boolean;
+  /** 複数接続の復元は、写真だけの権利で反映済みにしない。 */
+  hasMultiAccountSubscription: boolean;
 }
 
 export async function restorePurchases(): Promise<Result<RestoreOutcome>> {
@@ -312,7 +314,12 @@ export async function restorePurchases(): Promise<Result<RestoreOutcome>> {
     try {
       const { customerInfo } = await Purchases.restorePurchases();
       if (request !== generation) return unavailable();
-      return ok({ hasActiveSubscription: customerInfo.activeSubscriptions.length > 0 });
+      return ok({
+        hasActiveSubscription: customerInfo.activeSubscriptions.length > 0,
+        hasMultiAccountSubscription: customerInfo.activeSubscriptions.some((id) =>
+          id === PRODUCT_IDS.multi_account || id.startsWith(`${PRODUCT_IDS.multi_account}:`),
+        ),
+      });
     } catch (e) {
       return failure('purchase/restore-failed', 'purchase/restore-failed', e);
     }

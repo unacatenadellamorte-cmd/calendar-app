@@ -53,7 +53,7 @@ vi.mock('@/platform/externalLinks', () => ({
 }));
 
 const multi = { entitlement: 'multi_account', expiresAt: null };
-const write = { entitlement: 'calendar_write', expiresAt: null };
+const write = { entitlement: 'device_photos', expiresAt: null };
 
 async function flush() {
   await act(async () => {
@@ -79,7 +79,7 @@ beforeEach(() => {
   authState = { state: 'authenticated', session: { user: { id: 'u1' } } };
   purchases.purchasesSupported.mockReturnValue(true);
   purchases.getPlanPrices.mockResolvedValue(
-    ok({ calendar_write: '¥300', multi_account: '¥1,000' }),
+    ok({ device_photos: '¥500', multi_account: '¥1,000' }),
   );
   purchases.purchasePlan.mockResolvedValue(ok('purchased'));
   purchases.restorePurchases.mockResolvedValue(ok({ hasActiveSubscription: true }));
@@ -97,14 +97,14 @@ describe('PlanSheet(課金SDK有効)', () => {
     purchases.purchasePlan.mockResolvedValue(ok('cancelled'));
     const { rerender } = renderSheet();
     await flush();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
-    expect(purchases.purchasePlan).toHaveBeenNthCalledWith(1, 'calendar_write', 'u1');
+    expect(purchases.purchasePlan).toHaveBeenNthCalledWith(1, 'device_photos', 'u1');
 
     authState = { state: 'authenticated', session: { user: { id: 'u2' } } };
     rerender(<PlanSheet open reason="settings" onClose={vi.fn()} />);
     await flush();
-    const purchaseButton = card('予定反映').getByRole('button', { name: '予定反映 を購入' });
+    const purchaseButton = card('写真表示').getByRole('button', { name: '写真表示 を購入' });
     expect(purchaseButton).toBeDisabled();
     fireEvent.click(purchaseButton);
     expect(purchases.purchasePlan).toHaveBeenCalledTimes(1);
@@ -112,11 +112,11 @@ describe('PlanSheet(課金SDK有効)', () => {
     snapshot.userId = 'u2';
     rerender(<PlanSheet open reason="settings" onClose={vi.fn()} />);
     await flush();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeEnabled();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeEnabled();
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
     expect(purchases.purchasePlan).toHaveBeenCalledTimes(2);
-    expect(purchases.purchasePlan).toHaveBeenNthCalledWith(2, 'calendar_write', 'u2');
+    expect(purchases.purchasePlan).toHaveBeenNthCalledWith(2, 'device_photos', 'u2');
   });
 
   it('商品取得失敗は仮価格を出さず、再試行でストア価格と購入を回復する', async () => {
@@ -124,17 +124,17 @@ describe('PlanSheet(課金SDK有効)', () => {
       .mockResolvedValueOnce(
         err(appError('purchase/offerings-failed', 'purchase/offerings-failed')),
       )
-      .mockResolvedValue(ok({ calendar_write: '¥300', multi_account: '¥1,000' }));
+      .mockResolvedValue(ok({ device_photos: '¥500', multi_account: '¥1,000' }));
     renderSheet();
     await flush();
     expect(screen.getByRole('note')).toHaveTextContent('商品の情報を取得できませんでした');
     expect(screen.queryByText(/仮の表示/)).not.toBeInTheDocument();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeDisabled();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '購入を復元' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '再試行' }));
     await flush();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeEnabled();
-    expect(card('予定反映').getByText('¥300 / 月')).toBeInTheDocument();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeEnabled();
+    expect(card('写真表示').getByText('¥500 / 月')).toBeInTheDocument();
   });
 
   it('初期化失敗を表示して再試行する。同じ認証ユーザーのままで回復する', async () => {
@@ -152,7 +152,7 @@ describe('PlanSheet(課金SDK有効)', () => {
     fireEvent.click(screen.getByRole('button', { name: '再試行' }));
     await flush();
     expect(purchases.configurePurchases).toHaveBeenCalledWith('u1');
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeEnabled();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeEnabled();
   });
 
   it('商品取得中にユーザーが切り替わっても、古い価格やエラーを表示しない', async () => {
@@ -164,18 +164,18 @@ describe('PlanSheet(課金SDK有効)', () => {
             complete = resolve;
           }),
       )
-      .mockResolvedValue(ok({ calendar_write: '€4', multi_account: '€12' }));
+      .mockResolvedValue(ok({ device_photos: '€4', multi_account: '€12' }));
     const { rerender } = renderSheet();
     await flush();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeDisabled();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeDisabled();
     authState = { state: 'authenticated', session: { user: { id: 'u2' } } };
     snapshot.userId = 'u2';
     rerender(<PlanSheet open reason="settings" onClose={vi.fn()} />);
     await flush();
-    complete(ok({ calendar_write: '古い価格' }));
+    complete(ok({ device_photos: '古い価格' }));
     await flush();
     expect(screen.queryByText(/古い価格/)).not.toBeInTheDocument();
-    expect(card('予定反映').getByText('€4 / 月')).toBeInTheDocument();
+    expect(card('写真表示').getByText('€4 / 月')).toBeInTheDocument();
   });
 
   it('購入結果待ちでログアウトしたら古い結果を捨て、権利を再取得しない', async () => {
@@ -188,7 +188,7 @@ describe('PlanSheet(課金SDK有効)', () => {
     );
     const { rerender } = renderSheet();
     await flush();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
     authState = { state: 'guest', session: null };
     snapshot.userId = null;
@@ -209,7 +209,7 @@ describe('PlanSheet(課金SDK有効)', () => {
     renderSheet();
     await flush();
     listMyEntitlements.mockClear();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
     expect(screen.getByRole('status')).toHaveTextContent(
       '購入は承認待ちです。承認されると反映されます',
@@ -222,10 +222,10 @@ describe('PlanSheet(課金SDK有効)', () => {
   it('購入ボタンが有効になり、価格はストア表示(「仮の表示」注記なし)', async () => {
     renderSheet();
     await flush();
-    const w = card('予定反映');
-    expect(w.getByText('¥300 / 月')).toBeInTheDocument();
+    const w = card('写真表示');
+    expect(w.getByText('¥500 / 月')).toBeInTheDocument();
     expect(screen.queryByText(/仮の表示/)).not.toBeInTheDocument();
-    expect(w.getByRole('button', { name: '予定反映 を購入' })).toBeEnabled();
+    expect(w.getByRole('button', { name: '写真表示 を購入' })).toBeEnabled();
     expect(card('複数アカウント').getByText('¥1,000 / 月')).toBeInTheDocument();
     expect(
       screen.queryByText('有料プランは準備中のため、現在は購入できません。'),
@@ -233,14 +233,14 @@ describe('PlanSheet(課金SDK有効)', () => {
   });
 
   it('価格が取れないプランは購入できず、再試行できる', async () => {
-    purchases.getPlanPrices.mockResolvedValue(ok({ calendar_write: '¥300' }));
+    purchases.getPlanPrices.mockResolvedValue(ok({ device_photos: '¥500' }));
     renderSheet();
     await flush();
     expect(card('複数アカウント').getByText('確認中…')).toBeInTheDocument();
     expect(
       card('複数アカウント').getByRole('button', { name: '複数アカウント を購入' }),
     ).toBeDisabled();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeEnabled();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '再試行' })).toBeEnabled();
   });
 
@@ -252,9 +252,9 @@ describe('PlanSheet(課金SDK有効)', () => {
     listMyEntitlements
       .mockResolvedValueOnce(ok([])) // 2秒後
       .mockResolvedValue(ok([write])); // 4秒後
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
-    expect(purchases.purchasePlan).toHaveBeenCalledWith('calendar_write', 'u1');
+    expect(purchases.purchasePlan).toHaveBeenCalledWith('device_photos', 'u1');
     expect(screen.getByRole('status')).toHaveTextContent('反映中…');
     expect(listMyEntitlements).toHaveBeenCalledTimes(0);
 
@@ -265,14 +265,14 @@ describe('PlanSheet(課金SDK有効)', () => {
     await tick(2000);
     expect(listMyEntitlements).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('status')).toHaveTextContent('購入が反映されました。');
-    expect(card('予定反映').getByText('契約中')).toBeInTheDocument();
+    expect(card('写真表示').getByText('契約中')).toBeInTheDocument();
   });
 
   it('10回待っても反映されなければ、復元を案内する文言を出す', async () => {
     renderSheet();
     await flush();
     listMyEntitlements.mockClear();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
     await tick(2000 * 10);
     expect(listMyEntitlements).toHaveBeenCalledTimes(10);
@@ -286,7 +286,7 @@ describe('PlanSheet(課金SDK有効)', () => {
     renderSheet();
     await flush();
     listMyEntitlements.mockClear();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -300,18 +300,18 @@ describe('PlanSheet(課金SDK有効)', () => {
     );
     renderSheet();
     await flush();
-    fireEvent.click(card('予定反映').getByRole('button', { name: '予定反映 を購入' }));
+    fireEvent.click(card('写真表示').getByRole('button', { name: '写真表示 を購入' }));
     await flush();
     expect(screen.getByRole('status')).toHaveTextContent(
       '購入を完了できませんでした。もう一度お試しください',
     );
   });
 
-  it('二重課金防止: 複数アカウント有効なら「予定反映」の購入ボタンは出さず、含まれる旨を出す', async () => {
+  it('二重課金防止: 複数アカウント有効なら「写真表示」の購入ボタンは出さず、含まれる旨を出す', async () => {
     listMyEntitlements.mockResolvedValue(ok([multi]));
     renderSheet();
     await flush();
-    const w = card('予定反映');
+    const w = card('写真表示');
     expect(w.queryByRole('button')).not.toBeInTheDocument();
     expect(w.getByText('複数アカウントプランに含まれています')).toBeInTheDocument();
     const m = card('複数アカウント');
@@ -319,12 +319,12 @@ describe('PlanSheet(課金SDK有効)', () => {
     expect(m.getByText('契約中')).toBeInTheDocument();
   });
 
-  it('予定反映の契約中: 予定反映は契約中表示、複数アカウントへの変更は旧契約の扱いを一言添える', async () => {
+  it('写真表示の契約中: 写真表示は契約中表示、複数アカウントへの変更は旧契約の扱いを一言添える', async () => {
     listMyEntitlements.mockResolvedValue(ok([write]));
     renderSheet();
     await flush();
-    expect(card('予定反映').getByText('契約中')).toBeInTheDocument();
-    expect(card('予定反映').queryByRole('button')).not.toBeInTheDocument();
+    expect(card('写真表示').getByText('契約中')).toBeInTheDocument();
+    expect(card('写真表示').queryByRole('button')).not.toBeInTheDocument();
     const m = card('複数アカウント');
     expect(m.getByText(/旧契約の扱い/)).toBeInTheDocument();
     expect(m.getByRole('button', { name: '複数アカウント を購入' })).toBeEnabled();
@@ -339,7 +339,7 @@ describe('PlanSheet(課金SDK有効)', () => {
         'ログインが必要です。設定の「アカウント」からログインすると購入できます。',
       ),
     ).toBeInTheDocument();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeDisabled();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: '購入を復元' })).not.toBeInTheDocument();
     expect(purchases.getPlanPrices).not.toHaveBeenCalled();
   });
@@ -348,7 +348,7 @@ describe('PlanSheet(課金SDK有効)', () => {
     snapshot.userId = null;
     renderSheet();
     await flush();
-    expect(card('予定反映').getByRole('button', { name: '予定反映 を購入' })).toBeDisabled();
+    expect(card('写真表示').getByRole('button', { name: '写真表示 を購入' })).toBeDisabled();
   });
 
   it('購入を復元: 有効な購読があれば反映を待つ', async () => {
@@ -375,6 +375,20 @@ describe('PlanSheet(課金SDK有効)', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       '復元できる購入は見つかりませんでした。',
     );
+  });
+
+  it('複数アカウント契約の復元は既存の写真権利だけでは完了にしない', async () => {
+    listMyEntitlements.mockResolvedValue(ok([write]));
+    purchases.restorePurchases.mockResolvedValue(ok({ hasActiveSubscription: true, hasMultiAccountSubscription: true }));
+    renderSheet();
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: '購入を復元' }));
+    await flush();
+    await tick(2000);
+    expect(screen.getByRole('status')).toHaveTextContent('反映中…');
+    listMyEntitlements.mockResolvedValue(ok([multi]));
+    await tick(2000);
+    expect(screen.getByRole('status')).toHaveTextContent('購入が反映されました。');
   });
 
   it('購入を復元: 失敗はメッセージ', async () => {
@@ -422,7 +436,7 @@ describe('PlanSheet(課金SDK有効)', () => {
 });
 
 describe('PlanSection(設定画面のプラン欄)', () => {
-  it('現在の状態を出す(無料 / 予定反映 / 複数アカウント)。価格は書かない', async () => {
+  it('現在の状態を出す(無料 / 写真表示 / 複数アカウント)。価格は書かない', async () => {
     const { unmount } = render(<PlanSection />);
     await flush();
     expect(screen.getByText('無料')).toBeInTheDocument();
@@ -432,7 +446,7 @@ describe('PlanSection(設定画面のプラン欄)', () => {
     listMyEntitlements.mockResolvedValue(ok([write]));
     const second = render(<PlanSection />);
     await flush();
-    expect(screen.getByText('予定反映')).toBeInTheDocument();
+    expect(screen.getByText('写真表示')).toBeInTheDocument();
     second.unmount();
 
     listMyEntitlements.mockResolvedValue(ok([multi]));
@@ -468,4 +482,16 @@ describe('PlanSection(設定画面のプラン欄)', () => {
     await flush();
     expect(container).toBeEmptyDOMElement();
   });
+});
+
+
+it('有効な旧500円契約では写真の再購入を出さず、契約維持と復元・管理を案内する', async () => {
+  listMyEntitlements.mockResolvedValue(ok([{ entitlement: 'calendar_write', expiresAt: '2030-01-01T00:00:00Z' }]));
+  renderSheet();
+  await flush();
+  expect(card('写真表示').getByText('契約中')).toBeInTheDocument();
+  expect(card('写真表示').queryByRole('button')).toBeNull();
+  expect(screen.getByText(/旧「予定反映」プランの有効期間中も写真表示/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '購読を管理' })).toBeEnabled();
+  expect(purchases.purchasePlan).not.toHaveBeenCalled();
 });

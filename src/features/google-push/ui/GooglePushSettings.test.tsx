@@ -28,10 +28,10 @@ it('未認可では先に追加認可を求める',async()=>{
  await waitFor(()=>expect(api.authorize).toHaveBeenCalledWith({writeConnectionId:'a'}));
  expect(api.save).not.toHaveBeenCalled();
 });
-it('無料状態では反映先を設定できずプラン案内を開ける',async()=>{
+it('未ログインでは反映先を設定できずログインを案内する',async()=>{
  api.canWrite=false; render(<GooglePushSettings calendarId="local"/>);
  expect(screen.queryByLabelText('Googleアカウント')).toBeNull();
- fireEvent.click(screen.getByRole('button',{name:'プランを選ぶ'}));
- expect(screen.getByText('課金画面')).toBeInTheDocument();
+ expect(screen.getByText('Googleへの予定反映にはログインと書き込み許可が必要です。')).toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'プランを選ぶ'})).toBeNull();
  await waitFor(()=>expect(api.save).not.toHaveBeenCalled());
 });

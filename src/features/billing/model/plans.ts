@@ -1,5 +1,5 @@
 import { t } from '@/i18n';
-import type { EntitlementName } from '@/data/entitlements';
+import type { PurchasablePlan } from '@/data/entitlements';
 
 /**
  * 有料プランの定義(CAP-5)。UI はここだけを参照し、価格を各所にハードコードしない。
@@ -24,7 +24,7 @@ export type PlanPrice =
 
 export interface PlanDefinition {
   /** 購入で付く権利。entitlements.entitlement と同じ名前。 */
-  id: EntitlementName;
+  id: PurchasablePlan;
   /** プラン名(t() の原文キー)。 */
   title: string;
   /** 機能の説明(t() の原文キー)。できることだけを具体的に書き、誇張しない。 */
@@ -34,20 +34,20 @@ export interface PlanDefinition {
 
 export const PLANS: readonly PlanDefinition[] = [
   {
-    id: 'calendar_write',
-    title: '予定反映',
+    id: 'device_photos',
+    title: '写真表示',
     features: [
-      'アプリで作った予定を、選んだ Google カレンダーへ反映します(作成・編集・削除)。',
-      '接続できる Google アカウントは1つです。',
+      '選んだ日に撮影した端末の写真をカレンダーに表示します。',
+      '写真は端末内だけで読み取り、サーバーへ送信しません。',
     ],
-    price: { kind: 'placeholder', amountJpy: 300 },
+    price: { kind: 'placeholder', amountJpy: 500 },
   },
   {
     id: 'multi_account',
     title: '複数アカウント',
     features: [
       'Google アカウントを2つ以上接続して、それぞれのカレンダーを取り込めます。',
-      '予定反映も含みます。',
+      '写真表示も含みます。',
     ],
     price: { kind: 'placeholder', amountJpy: 1000 },
   },

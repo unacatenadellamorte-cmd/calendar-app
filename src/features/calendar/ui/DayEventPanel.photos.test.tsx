@@ -1,8 +1,9 @@
+vi.mock('@/features/billing/model/useEntitlements', () => ({ useEntitlements: () => ({ canViewPhotos: true, loading: false }) }));
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// 模擬するのは OS との境界(Capacitor のネイティブ橋)だけ。パネル・写真欄・設定は本物を使う。
+// 有効な写真契約を前提に、OSとの境界を模擬する。パネル・写真欄・設定は本物を使う。
 const nativePlugin = vi.hoisted(() => ({
   checkPermission: vi.fn(),
   requestPermission: vi.fn(),

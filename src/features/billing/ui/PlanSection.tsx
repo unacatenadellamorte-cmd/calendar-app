@@ -13,12 +13,12 @@ import { purchaseStatusText } from './purchaseStatusText';
 export function PlanSection() {
   useLanguage();
   const { state } = useAuth();
-  const { hasMultiAccount, canWrite } = useEntitlements();
+  const { hasMultiAccount, canViewPhotos, hasPaidPlan } = useEntitlements();
   const { supported, available, busy, status, restore, openManagement } = usePurchase();
   const [sheetOpen, setSheetOpen] = useState(false);
   if (state !== 'guest' && state !== 'authenticated') return null;
 
-  const current = hasMultiAccount ? t('複数アカウント') : canWrite ? t('予定反映') : t('無料');
+  const current = hasMultiAccount ? t('複数アカウント') : canViewPhotos ? t('写真表示') : t('無料');
   const progress = purchaseStatusText(status);
   const buttonClass =
     'min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary disabled:opacity-50';
@@ -49,7 +49,7 @@ export function PlanSection() {
                 {t('購入を復元')}
               </button>
             )}
-            {supported && canWrite && (
+            {supported && hasPaidPlan && (
               <button
                 type="button"
                 disabled={!available || busy}

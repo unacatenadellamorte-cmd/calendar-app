@@ -193,3 +193,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-device-photos-by-day-20261020.md`
   summary: iOSのPhotoKit実行環境で、写真一覧ではクラウド取得を行わず、個別拡大だけ通信を許すことを配布前に検証する。
   evidence: 2026-10-20の検証ギャップG3。JS試験はネイティブ境界を模擬し、実OS試験はAndroid専用でSwiftのisNetworkAccessAllowedを実行しない。本人は今回はローカル検証までを指定し、WindowsにはMac・PhotoKit実行環境がない。iCloudのみの架空画像を使ったiOS実行で確認するまで未検証とする。
+
+- source_spec: `spec-photo-paid-scroll-motion-20261022.md`
+  summary: Androidの複数アカウントから写真専用への予約変更導線を検討する。
+  evidence: 専用の下位プラン変更は旧実装にもなく、現在は購読管理で更新停止後、有効期間終了後に写真商品を購入する。既存契約の自動変更は本人方針により行わない。

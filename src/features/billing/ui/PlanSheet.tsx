@@ -14,10 +14,10 @@ interface PlanSheetProps {
   open: boolean;
   onClose: () => void;
   /** どの操作から開いたか。説明文だけが変わる。 */
-  reason: 'first-connect' | 'add-account' | 'settings';
+  reason: 'first-connect' | 'add-account' | 'settings' | 'photos';
   /**
    * 渡したときだけ「無料で1つ接続する」を出す(初回接続時)。無料の1アカウント
-   * (読み取り専用)の接続は課金と無関係に必ず選べるようにする。
+   * の同期と予定反映は課金と無関係に必ず選べるようにする。
    */
   onContinueFree?: () => void;
 }
@@ -27,7 +27,7 @@ interface PlanSheetProps {
  * 購入処理は usePurchase の抽象越しに呼ぶ(RevenueCat SDK)。SDK が使えない環境
  * (Web・キー未設定)では購入ボタンは「準備中」。SDK有効時は価格の取得後だけ購入可能。
  * 権利の有無は entitlements(DB)で決め、二重課金を防ぐ(複数アカウント契約中は
- * 「予定反映」の購入ボタンを出さない)。
+ * 「写真表示」の購入ボタンを出さない)。
  */
 export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetProps) {
   useLanguage();
@@ -44,8 +44,7 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
     restore,
     openManagement,
   } = usePurchase();
-  const { hasMultiAccount, canWrite } = useEntitlements();
-  const writeOnly = canWrite && !hasMultiAccount;
+  const { hasMultiAccount, canViewPhotos, hasLegacyWrite, hasPaidPlan, loading: checkingEntitlements } = useEntitlements();
   const [notice, setNotice] = useState<string | null>(null);
   const buy = async (plan: (typeof PLANS)[number]['id']) => {
     setNotice(null);
@@ -63,15 +62,18 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
     <BottomSheet open={open} title={t('プランを選ぶ')} onClose={onClose}>
       <p className="text-meta text-ink-secondary">
         {reason === 'first-connect'
-          ? t('無料プランでは Google アカウント1つのカレンダーを読み取り専用で取り込めます。')
+          ? t('Google アカウント1つの同期と予定反映は標準機能です。')
           : reason === 'add-account'
             ? t(
                 '2つ目以降の Google アカウントを接続するには「複数アカウント」プランが必要です。',
               )
             : t(
-                '無料プランでは Google アカウント1つのカレンダーを読み取り専用で取り込めます。',
+                'Google アカウント1つの同期と予定反映は標準機能です。',
               )}
       </p>
+      {hasLegacyWrite && (
+        <p className="mt-2 text-meta text-ink-secondary">{t('旧「予定反映」プランの有効期間中も写真表示を利用できます。契約は自動で切り替わりません。')}</p>
+      )}
       {!supported && (
         <p className="mt-1 text-meta text-ink-secondary">
           {t('有料プランは準備中のため、現在は購入できません。')}
@@ -110,8 +112,8 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
           const price: PlanPrice = storePrice
             ? { kind: 'store', localizedPrice: storePrice }
             : plan.price;
-          const included = plan.id === 'calendar_write' && hasMultiAccount;
-          const owned = plan.id === 'multi_account' ? hasMultiAccount : writeOnly;
+          const included = plan.id === 'device_photos' && hasMultiAccount;
+          const owned = plan.id === 'multi_account' ? hasMultiAccount : canViewPhotos;
           return (
             <li
               key={plan.id}
@@ -137,17 +139,17 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
                 <p className="mt-3 text-meta font-semibold text-ink-primary">{t('契約中')}</p>
               ) : (
                 <>
-                  {plan.id === 'multi_account' && writeOnly && (
+                  {plan.id === 'multi_account' && canViewPhotos && (
                     <p className="mt-3 text-meta text-ink-secondary">
                       {t(
-                        '「予定反映」を契約中に変更するときの旧契約の扱い(置き換え・請求のタイミング)は、ストアの確認画面と購読管理で確認してください。',
+                        'プラン変更時の旧契約の扱いと請求時期は、ストアの確認画面と購読管理で確認してください。',
                       )}
                     </p>
                   )}
                   <button
                     type="button"
                     disabled={
-                      !available || busy || !storePrice || preparation.kind !== 'ready'
+                      !available || busy || checkingEntitlements || !storePrice || preparation.kind !== 'ready'
                     }
                     onClick={() => void buy(plan.id)}
                     aria-label={
@@ -183,7 +185,7 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
           >
             {t('購入を復元')}
           </button>
-          {canWrite && (
+          {hasPaidPlan && (
             <button
               type="button"
               disabled={!available || busy}
@@ -225,7 +227,7 @@ export function PlanSheet({ open, onClose, reason, onContinueFree }: PlanSheetPr
           onClick={onClose}
           className="mt-4 min-h-11 w-full rounded-sm border border-border-hairline px-4 text-body text-ink-primary"
         >
-          {reason === 'settings' ? t('閉じる') : t('今はしない')}
+          {reason === 'settings' || reason === 'photos' ? t('閉じる') : t('今はしない')}
         </button>
       )}
     </BottomSheet>

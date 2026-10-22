@@ -75,7 +75,13 @@ await db.query("select finish_google_push($1,$2,$3,'deleted',false)",[job.id,job
 assert.equal(await scalar('select state from event_google_links'),'deleted');
 await db.query('update events set is_secret=false where id=$1',[event]);
 await db.query("update event_google_links set next_attempt_at=now()-interval '1 second'");
-assert.equal((await db.query('select claim_google_push($1)',[user])).rows.length,0);
+// 複数接続の失効後も、標準機能の先頭アカウントへの反映は継続する。
+jobs=(await db.query('select claim_google_push($1) as job',[user])).rows;
+assert.equal(jobs.length,1);
+assert.equal(jobs[0].job.remove,false);
+assert.equal(jobs[0].job.connection_id,conn);
+job=jobs[0].job;
+await db.query("select finish_google_push($1,$2,$3,'synced',true)",[job.id,job.lease_id,job.revision]);
 // SELECT権利と書き込み禁止の確認。
 await db.exec('grant usage on schema public,auth to authenticated; set role authenticated;');
 assert.equal(await scalar('select count(*)::int from event_google_links'),1);
@@ -87,7 +93,8 @@ await db.exec('reset role;');
 await db.query("update entitlements set expires_at=now()+interval '1 day' where user_id=$1",[user]);
 await db.query("insert into events(user_id,calendar_id,title,all_day,event_date) select $1,$2,'旧反映先',true,'2026-10-03' from generate_series(1,3)",[user,calendar]);
 await db.query("select set_google_push_target($1,$2,$3,'calendar-b')",[user,calendar,conn]);
-assert.equal(await scalar("select count(*)::int from event_google_links where google_calendar_id='calendar-a' and state='paused'"),4);
+assert.equal(await scalar("select count(*)::int from event_google_links where google_calendar_id='calendar-a' and state='paused'"),3);
+assert.equal(await scalar("select count(*)::int from event_google_links where google_calendar_id='calendar-a' and state='synced'"),1);
 // 旧バージョンや送信中競合でpendingが残っても先頭をふさがない。
 await db.query("update event_google_links set state='pending' where google_calendar_id='calendar-a'");
 await db.query("update event_google_links set next_attempt_at=now()-case when google_calendar_id='calendar-a' then interval '1 day' else interval '1 second' end");

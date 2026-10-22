@@ -13,7 +13,9 @@ import { isNetworkError } from './net';
  *   (oauth-exchange の接続上限など)で行う。
  */
 
-export type EntitlementName = 'calendar_write' | 'multi_account';
+export type EntitlementName = 'calendar_write' | 'multi_account' | 'device_photos';
+/** 旧商品は復元だけに残し、新規購入へ出さない。 */
+export type PurchasablePlan = Exclude<EntitlementName, 'calendar_write'>;
 
 export interface Entitlement {
   entitlement: EntitlementName;

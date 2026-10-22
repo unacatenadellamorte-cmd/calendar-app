@@ -79,11 +79,15 @@ vi.mock('@/features/shifts/model/useShiftTemplates', () => ({
   useShiftTemplates: () => ({ templates: [], loading: false, errorKey: null }),
 }));
 vi.mock('@/app/secret-mode-context', () => ({ useSecretMode: () => secretState }));
+// 写真表示は有料ガードの権利で決まる。既定は無権利(guest)、写真テストだけ権利を付ける。
+const entitlement = vi.hoisted(() => ({ canViewPhotos: false, loading: false }));
+vi.mock('@/features/billing/model/useEntitlements', () => ({ useEntitlements: () => ({ ...entitlement }) }));
 
 const { CalendarScreen } = await import('./CalendarScreen');
 
 beforeEach(() => {
   photoPlatform.native = false;
+  entitlement.canViewPhotos = false;
   resetDevicePhotosEnabledForTests();
   // 日付付きの検証データに合わせ、実行日の月替わりに依存させない。
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -148,6 +152,7 @@ describe('CalendarScreen', () => {
     ['日', 'google', '予定の詳細'],
   ] as const)('%s表示で写真の拡大中に%s予定を開くと、写真を閉じて%sだけ表示する', async (view, source, title) => {
     photoPlatform.native = true;
+    entitlement.canViewPhotos = true;
     window.localStorage.setItem(DEVICE_PHOTOS_ENABLED_STORAGE_KEY, 'true');
     resetDevicePhotosEnabledForTests();
     evState.events = [{ ...sampleEvent, source }];
