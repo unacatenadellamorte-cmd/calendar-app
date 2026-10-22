@@ -4,6 +4,7 @@ import type { Calendar } from '@/data/calendars';
 import { formatDayTitle } from '@/lib/datetime';
 import { EventListItem } from '@/features/events/ui/EventListItem';
 import { DayPhotoSection } from './DayPhotoSection';
+import { SwipeSurface } from './SwipeSurface';
 interface DayEventPanelProps {
   /** 選択中の日付 "YYYY-MM-DD"。 */
   date: string;
@@ -17,6 +18,8 @@ interface DayEventPanelProps {
   photosSuspended?: boolean;
   /** 利用者の識別子(写真の解放用)。 */
   userId?: string;
+  /** 当日予定の横スワイプ。左スワイプ(翌日)は +1、右スワイプ(前日)は -1。 */
+  onDayShift?: (delta: 1 | -1) => void;
 }
 /**
  * 月表示の折りたたみ(Option C)の下に出す、選択中の日付の予定一覧パネル。
@@ -31,10 +34,11 @@ export function DayEventPanel({
   onAddEvent,
   photosSuspended = false,
   userId,
+  onDayShift,
 }: DayEventPanelProps) {
   useLanguage();
   const dayEvents = byDay.get(date) ?? [];
-  return (
+  const body = (
     <section className="mt-3 animate-[fade-in_200ms_ease-out]">
       <h3 className="mb-1 text-body font-semibold text-ink-primary">{formatDayTitle(date)}</h3>
       {dayEvents.length === 0 ? (
@@ -64,4 +68,5 @@ export function DayEventPanel({
       <DayPhotoSection date={date} suspended={photosSuspended} userId={userId} />
     </section>
   );
+  return onDayShift ? <SwipeSurface onSwipe={onDayShift}>{body}</SwipeSurface> : body;
 }

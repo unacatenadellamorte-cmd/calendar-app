@@ -79,7 +79,6 @@ describe('写真表示の追加監査で再現した境界', () => {
     givenPermission('granted');
     nativePlugin.loadImage.mockRejectedValueOnce(new Error('OSが画像を提供できない'));
     render(<DayPhotoSection date={DAY} />);
-    fireEvent.click(screen.getByRole('button', { name: 'この日の写真' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('写真を読み込めませんでした。');
     expect(screen.queryByRole('button', { name: '9:05 の写真を拡大' })).not.toBeInTheDocument();
@@ -95,7 +94,6 @@ describe('写真表示の追加監査で再現した境界', () => {
     let finishPermission!: (value: { status: string }) => void;
     nativePlugin.requestPermission.mockReturnValue(new Promise((resolve) => { finishPermission = resolve; }));
     render(<DayPhotoSection date={DAY} />);
-    fireEvent.click(screen.getByRole('button', { name: 'この日の写真' }));
     fireEvent.click(await screen.findByRole('button', { name: '写真へのアクセスを許可' }));
     await act(async () => { appState.listener?.({ isActive: false }); });
     await act(async () => { appState.listener?.({ isActive: true }); });
@@ -130,7 +128,7 @@ describe('DayPhotoSection 写真の有料ガード', () => {
     givenPermission('granted');
     entitlement.canViewPhotos = false;
     render(<DayPhotoSection date={DAY} />);
-    expect(screen.queryByRole('button', { name: 'この日の写真' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'この日の写真' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '写真表示のプランを見る' }));
     expect(planSheet.last).toMatchObject({ open: true, reason: 'photos' });
     await act(async () => {});
@@ -144,7 +142,6 @@ describe('DayPhotoSection 写真の有料ガード', () => {
     enableSetting();
     givenPermission('granted');
     const { rerender } = render(<DayPhotoSection date={DAY} />);
-    fireEvent.click(screen.getByRole('button', { name: 'この日の写真' }));
     fireEvent.click(await screen.findByRole('button', { name: '9:05 の写真を拡大' }));
     await waitFor(() => expect(document.querySelector('[role=dialog] img')).not.toBeNull());
     nativePlugin.cancelLoads.mockClear();
@@ -155,14 +152,13 @@ describe('DayPhotoSection 写真の有料ガード', () => {
     expect(screen.queryByRole('button', { name: '9:05 の写真を拡大' })).not.toBeInTheDocument();
     expect(nativePlugin.cancelLoads).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '写真表示のプランを見る' })).toBeInTheDocument();
-    // 権利が戻っても、利用者が開き直すまで写真は読まない。
+    // 権利が戻れば、操作なしで権限を確認して読み直す(許可の要求はしない)。
     nativePlugin.checkPermission.mockClear();
     entitlement.canViewPhotos = true;
     rerender(<DayPhotoSection date={DAY} />);
-    expect(await screen.findByRole('button', { name: 'この日の写真' })).toHaveAttribute('aria-expanded', 'false');
-    await act(async () => {});
-    expect(nativePlugin.checkPermission).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: '9:05 の写真を拡大' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '9:05 の写真を拡大' })).toBeInTheDocument();
+    expect(nativePlugin.checkPermission).toHaveBeenCalled();
+    expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
   });
 });
 
@@ -177,25 +173,21 @@ describe('DayPhotoSection', () => {
     expect(nativePlugin.loadImage).not.toHaveBeenCalled();
   });
 
-  it('設定がONでも写真欄は折りたたまれ、開くまで権限の確認も要求もしない', async () => {
+  it('設定ONなら開く操作なしで権限を確認して表示し、確認だけでは許可を要求しない', async () => {
     enableSetting();
+    givenPermission('granted');
     render(<DayPhotoSection date={DAY} />);
-    expect(screen.getByRole('button', { name: 'この日の写真' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-    await act(async () => {});
-    expect(nativePlugin.checkPermission).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'この日の写真' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'この日の写真' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '9:05 の写真を拡大' })).toBeInTheDocument();
+    expect(nativePlugin.checkPermission).toHaveBeenCalled();
     expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
-    expect(nativePlugin.listAssets).not.toHaveBeenCalled();
   });
 
   it('許可済みで開くと当日の写真を撮影順に表示し、OSの権限ダイアログは出さない', async () => {
     enableSetting();
     givenPermission('granted', [photo('a'), photo('b', MORNING + 60_000)]);
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const tiles = await screen.findAllByRole('button', { name: /の写真を拡大/ });
     expect(tiles.map((tile) => tile.getAttribute('aria-label'))).toEqual([
       '9:05 の写真を拡大',
@@ -216,7 +208,6 @@ describe('DayPhotoSection', () => {
     givenPermission('prompt');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const allow = await screen.findByRole('button', { name: '写真へのアクセスを許可' });
     expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
     expect(nativePlugin.listAssets).not.toHaveBeenCalled();
@@ -231,7 +222,6 @@ describe('DayPhotoSection', () => {
     givenPermission('denied');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     expect(
       await screen.findByText(/端末の設定アプリで、このアプリの写真へのアクセスを許可してください/),
     ).toBeInTheDocument();
@@ -250,7 +240,6 @@ describe('DayPhotoSection の画像の表示失敗', () => {
     givenPermission('granted');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const thumb = await waitFor(() => {
       const img = document.querySelector('img[src^="data:"]');
       expect(img).not.toBeNull();
@@ -269,7 +258,6 @@ describe('DayPhotoSection の画像の表示失敗', () => {
     givenPermission('granted');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await user.click(await screen.findByRole('button', { name: '9:05 の写真を拡大' }));
     const dialog = await screen.findByRole('dialog', { name: '写真' });
     const full = await within(dialog).findByRole('img', { name: '9:05 に撮影した写真' });
@@ -283,9 +271,7 @@ describe('DayPhotoSection の画像の表示失敗', () => {
   it('写真一覧はキーボードでフォーカスでき、スクロール領域としてTab移動に入る', async () => {
     enableSetting();
     givenPermission('granted');
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const list = await screen.findByRole('list', { name: '撮影した写真の一覧' });
     expect(list).toHaveAttribute('tabindex', '0');
     list.focus();
@@ -300,7 +286,6 @@ describe('DayPhotoSection 一部許可', () => {
     nativePlugin.manageLimitedAccess.mockRejectedValueOnce(new Error('開けません'));
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await user.click(await screen.findByRole('button', { name: '表示する写真を選び直す' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('写真を読み込めませんでした。');
     await user.click(screen.getByRole('button', { name: '再試行' }));
@@ -311,7 +296,6 @@ describe('DayPhotoSection 一部許可', () => {
     givenPermission('limited', [photo('a')]);
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     expect(await screen.findByText('一部の写真だけが許可されています。')).toBeInTheDocument();
     expect(await screen.findAllByRole('button', { name: /の写真を拡大/ })).toHaveLength(1);
     nativePlugin.manageLimitedAccess.mockResolvedValue({ status: 'limited' });
@@ -333,7 +317,6 @@ describe('DayPhotoSection 0件と失敗', () => {
     givenPermission('granted', Array.from({ length: 40 }, (_, i) => photo(`p${i}`, MORNING + i * 60000)), true);
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const list = await screen.findByRole('list', { name: '撮影した写真の一覧' });
     expect(nativePlugin.listAssets).toHaveBeenCalledTimes(1);
     let rejectPage!: (error: Error) => void;
@@ -365,7 +348,6 @@ describe('DayPhotoSection 0件と失敗', () => {
     givenPermission('granted');
     nativePlugin.listAssets.mockReturnValue(new Promise(() => {}));
     render(<DayPhotoSection date={DAY} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'この日の写真' }));
     expect(await screen.findByRole('status')).toHaveTextContent('読み込み中…');
     expect(screen.queryByText('この日に撮影した写真はありません。')).not.toBeInTheDocument();
   });
@@ -373,16 +355,13 @@ describe('DayPhotoSection 0件と失敗', () => {
     enableSetting();
     givenPermission('unavailable');
     render(<DayPhotoSection date={DAY} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'この日の写真' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('写真を読み込めませんでした。');
     expect(nativePlugin.listAssets).not.toHaveBeenCalled();
   });
   it('0件は空の案内を出し、エラーとは区別する', async () => {
     enableSetting();
     givenPermission('granted', []);
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     expect(await screen.findByText('この日に撮影した写真はありません。')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -393,7 +372,6 @@ describe('DayPhotoSection 0件と失敗', () => {
     nativePlugin.listAssets.mockRejectedValueOnce(new Error('boom'));
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('写真を読み込めませんでした。');
     expect(screen.queryByText('この日に撮影した写真はありません。')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '再試行' }));
@@ -411,7 +389,6 @@ describe('DayPhotoSection 競合と解放', () => {
     let unmount = () => {};
     try {
       unmount = render(<DayPhotoSection date={DAY} />).unmount;
-      await userEvent.setup().click(screen.getByRole('button', { name: 'この日の写真' }));
       await waitFor(() => expect(nativePlugin.loadImage).toHaveBeenCalledTimes(2));
       fireEvent.scroll(screen.getByRole('list'), { target: { scrollTop: 100000 } });
       await waitFor(() => expect(nativePlugin.loadImage.mock.calls.some(([options]) => options.id === 'p36')).toBe(true));
@@ -432,7 +409,6 @@ describe('DayPhotoSection 競合と解放', () => {
       return <DayPhotoSection date={date} />;
     }
     const { rerender } = render(<CalendarDate date={DAY} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'この日の写真' }));
     await waitFor(() => expect(document.images.length).toBe(1));
     nativePlugin.listAssets.mockReturnValue(new Promise(() => {}));
     rerender(<CalendarDate date="2026-10-21" />);
@@ -443,10 +419,8 @@ describe('DayPhotoSection 競合と解放', () => {
     const first = Array.from({ length: 40 }, (_, i) => photo(`p${i}`, MORNING + i * 60_000));
     first[0] = photo('other-day', MORNING - 86_400_000);
     givenPermission('granted', first, true);
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
-    const list = screen.getByRole('list', { name: '撮影した写真の一覧' });
+    const list = await screen.findByRole('list', { name: '撮影した写真の一覧' });
     nativePlugin.listAssets.mockResolvedValue({ assets: [photo('last', MORNING + 50 * 60_000)], hasMore: false });
     await act(async () => {
       fireEvent.scroll(list, { target: { scrollTop: 100_000 } });
@@ -459,7 +433,6 @@ describe('DayPhotoSection 競合と解放', () => {
     givenPermission('granted');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await user.click(await screen.findByRole('button', { name: '9:05 の写真を拡大' }));
     await waitFor(() => expect(within(screen.getByRole('dialog', { name: '写真' })).getByRole('img')).toBeInTheDocument());
     nativePlugin.checkPermission.mockResolvedValue({ status: 'denied' });
@@ -473,12 +446,10 @@ describe('DayPhotoSection 競合と解放', () => {
   it('利用者が切り替わったら前の利用者の画像を解放して読み直す', async () => {
     enableSetting();
     givenPermission('granted');
-    const user = userEvent.setup();
     const view = (userId: string) => (
       <DayPhotoSection date={DAY} userId={userId} />
     );
     const { rerender } = render(view('u1'));
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await screen.findByRole('button', { name: '9:05 の写真を拡大' });
     nativePlugin.cancelLoads.mockClear();
     nativePlugin.checkPermission.mockClear();
@@ -490,9 +461,7 @@ describe('DayPhotoSection 競合と解放', () => {
   it('背面へ回ると画像を解放し、復帰時に権限を再確認して撤回後は写真を出さない', async () => {
     enableSetting();
     givenPermission('granted');
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await screen.findByRole('button', { name: '9:05 の写真を拡大' });
     const visibility = vi.spyOn(document, 'visibilityState', 'get');
     nativePlugin.cancelLoads.mockClear();
@@ -519,7 +488,6 @@ describe('DayPhotoSection 競合と解放', () => {
     givenPermission('granted');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const tile = await screen.findByRole('button', { name: '9:05 の写真を拡大' });
     await waitFor(() => expect(nativePlugin.loadImage).toHaveBeenCalledTimes(1));
     let finish: (value: { dataUrl: string }) => void = () => {};
@@ -543,7 +511,6 @@ describe('DayPhotoSection 競合と解放', () => {
     givenPermission('granted');
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     const tile = await screen.findByRole('button', { name: '9:05 の写真を拡大' });
     nativePlugin.loadImage.mockRejectedValue(new Error('unavailable'));
     await user.click(tile);
@@ -559,7 +526,6 @@ describe('DayPhotoSection 競合と解放', () => {
     givenPermission('granted', [photo('a'), photo('b', MORNING + 60_000)]);
     const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await user.click(await screen.findByRole('button', { name: '9:06 の写真を拡大' }));
     const dialog = await screen.findByRole('dialog', { name: '写真' });
     expect(nativePlugin.loadImage).toHaveBeenCalledWith(expect.objectContaining({
@@ -579,9 +545,7 @@ describe('DayPhotoSection 競合と解放', () => {
     enableSetting();
     const many = Array.from({ length: 40 }, (_, i) => photo(`p${i}`, MORNING + i * 60_000));
     givenPermission('granted', many);
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await screen.findByRole('button', { name: '9:05 の写真を拡大' });
     const rendered = screen.getAllByRole('button', { name: /の写真を拡大/ }).length;
     expect(rendered).toBeGreaterThan(0);
@@ -599,9 +563,7 @@ describe('DayPhotoSection 競合と解放', () => {
     enableSetting();
     const first = Array.from({ length: 40 }, (_, i) => photo(`p${i}`, MORNING + i * 60_000));
     givenPermission('granted', first, true);
-    const user = userEvent.setup();
     render(<DayPhotoSection date={DAY} />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await screen.findByRole('button', { name: '9:05 の写真を拡大' });
     const list = screen.getByRole('list', { name: '撮影した写真の一覧' });
     expect(nativePlugin.listAssets).toHaveBeenCalledTimes(1);
@@ -649,7 +611,7 @@ describe('DayPhotoSection 競合と解放', () => {
     expect(nativePlugin.listAssets).toHaveBeenCalledTimes(3);
   });
 
-  it('表示中にOFFにすると写真と要求を即解放し、ONへ戻しても勝手に開き直さない', async () => {
+  it('表示中にOFFにすると写真と要求を即解放し、ONへ戻せば操作なしで読み直す', async () => {
     enableSetting();
     givenPermission('granted');
     function Harness() {
@@ -668,21 +630,18 @@ describe('DayPhotoSection 競合と解放', () => {
     }
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await screen.findByRole('button', { name: /の写真を拡大/ });
     nativePlugin.cancelLoads.mockClear();
     nativePlugin.checkPermission.mockClear();
     await user.click(screen.getByRole('button', { name: 'スイッチOFF' }));
     expect(nativePlugin.cancelLoads).toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'この日の写真' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'この日の写真' })).not.toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'スイッチON' }));
-    expect(screen.getByRole('button', { name: 'この日の写真' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-    await act(async () => {});
-    expect(nativePlugin.checkPermission).not.toHaveBeenCalled();
+    // ONへ戻せば、操作なしで読み直す(許可の要求はしない)。
+    expect(await screen.findByRole('button', { name: /の写真を拡大/ })).toBeInTheDocument();
+    expect(nativePlugin.checkPermission).toHaveBeenCalled();
+    expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
   });
 
   it('日付を変えた後に遅れて返った前日の応答は、表示を上書きせず捨てる', async () => {
@@ -692,9 +651,7 @@ describe('DayPhotoSection 競合と解放', () => {
     nativePlugin.listAssets.mockImplementationOnce(
       () => new Promise((resolve) => { resolveOld = resolve; }),
     );
-    const user = userEvent.setup();
     const { rerender } = render(<DayPhotoSection date="2026-10-19" />);
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
     await waitFor(() => expect(nativePlugin.listAssets).toHaveBeenCalledTimes(1));
     nativePlugin.listAssets.mockResolvedValue({
       assets: [photo('new', MORNING + 5 * 60_000)],

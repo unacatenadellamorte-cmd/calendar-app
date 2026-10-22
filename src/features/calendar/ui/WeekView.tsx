@@ -1,12 +1,13 @@
-import { t, useLanguage } from '@/i18n';
+import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { compareEventsForList } from '@core';
-import { eventOccursOnDate, layoutDayEvents, makePriorityOf } from '@/lib/calendar-view';
+import { addDays, eventOccursOnDate, layoutDayEvents, makePriorityOf, ymd } from '@/lib/calendar-view';
 import { minutesIntoLocalDay } from '@/lib/datetime';
 import { EventChip } from './EventChip';
 import { DayPhotoSection } from './DayPhotoSection';
+import { SwipeSurface } from './SwipeSurface';
 interface WeekViewProps {
   cursor: string;
   events: EventItem[];
@@ -16,6 +17,8 @@ interface WeekViewProps {
   onEventTap: (event: EventItem) => void;
   photosSuspended?: boolean;
   userId?: string;
+  /** 週の帯・当日予定の送りと帯の日付タップで cursor を動かす。未指定なら帯と送りは出さない。 */
+  onDateChange?: (date: string) => void;
 }
 const HOUR_PX = 48;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -33,6 +36,7 @@ export function WeekView({
   onEventTap,
   photosSuspended,
   userId,
+  onDateChange,
 }: WeekViewProps) {
   useLanguage();
   // 重なり順・終日帯の並びは所属カレンダーの優先度順(Story 2.3)。
@@ -68,8 +72,17 @@ export function WeekView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor]);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    <div>
+  // cursor を含む日曜始まりの7日(月表示の折りたたみ週と同じ並び)。
+  const weekDays = useMemo(() => {
+    const { year, month, day } = ymd(cursor);
+    const start = addDays(cursor, -new Date(year, month - 1, day).getDay());
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  }, [cursor]);
+  const labels = weekdayLabels();
+  const shiftDay = (delta: 1 | -1) => onDateChange?.(addDays(cursor, delta));
+  const shiftWeek = (delta: 1 | -1) => onDateChange?.(addDays(cursor, delta * 7));
+  const content = (
+    <>
       <div className="mb-2 flex items-start gap-2 border-b border-border-hairline pb-2">
         <span className="mt-0.5 flex-none text-meta text-ink-secondary">{t('終日')}</span>
         <div className="flex flex-1 flex-wrap gap-1">
@@ -146,6 +159,33 @@ export function WeekView({
         </div>
       </div>
       <DayPhotoSection date={cursor} suspended={photosSuspended} userId={userId} />
+    </>
+  );
+  if (!onDateChange) return <div>{content}</div>;
+  return (
+    <div>
+      <SwipeSurface onSwipe={shiftWeek} className="mb-2">
+        <div className="grid grid-cols-7 text-center" data-testid="week-strip">
+          {weekDays.map((date, i) => (
+            <button
+              key={date}
+              type="button"
+              aria-pressed={date === cursor}
+              aria-label={t('{0}月{1}日を開く', [ymd(date).month, ymd(date).day])}
+              onClick={() => onDateChange(date)}
+              className={[
+                'touch-manipulation flex min-h-11 flex-col items-center justify-center rounded-sm text-meta tabular',
+                date === cursor ? 'ring-2 ring-inset ring-accent' : '',
+                date === today ? 'font-semibold text-accent' : 'text-ink-secondary',
+              ].join(' ')}
+            >
+              <span>{labels[i]}</span>
+              <span>{ymd(date).day}</span>
+            </button>
+          ))}
+        </div>
+      </SwipeSurface>
+      <SwipeSurface onSwipe={shiftDay}>{content}</SwipeSurface>
     </div>
   );
 }

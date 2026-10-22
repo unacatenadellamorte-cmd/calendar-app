@@ -30,7 +30,7 @@ const ROW_HEIGHT = TILE_HEIGHT + 4;
 const VIEWPORT_HEIGHT = ROW_HEIGHT * 3;
 const OVERSCAN_ROWS = 1;
 
-/** 選択日に撮影した端末の写真。設定OFF・Webでは何も出さず、写真APIも呼ばない。 */
+/** 選択日に撮影した端末の写真。設定ON・有効権利なら開く操作なしで表示する。設定OFF・Webでは何も出さず、写真APIも呼ばない。 */
 export function DayPhotoSection(props: DayPhotoSectionProps) {
   const { devicePhotosEnabled } = useDevicePhotosEnabled();
   if (!devicePhotosEnabled || !isDevicePhotosSupported()) return null;
@@ -42,21 +42,16 @@ function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
   const { devicePhotosEnabled } = useDevicePhotosEnabled();
   const { canViewPhotos, loading: checkingPlan } = useEntitlements();
   const [planOpen, setPlanOpen] = useState(false);
-  const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<DevicePhotoAsset | null>(null);
   const enabled = devicePhotosEnabled && isDevicePhotosSupported();
   const supported = enabled && canViewPhotos;
-  // OFF になったら開閉状態も捨て、ON に戻しても利用者が開くまで読まない。
-  useEffect(() => {
-    if (!supported) setOpen(false);
-  }, [supported]);
-  // 欄を閉じる・日付変更・OFF では拡大表示も閉じる(画像は PhotoPreview の解除で解放)。
+  // 日付変更・OFF・他レイヤーの表示では拡大表示も閉じる(画像は PhotoPreview の解除で解放)。
   useEffect(() => {
     setPreview(null);
-  }, [open, date, supported, suspended, userId]);
+  }, [date, supported, suspended, userId]);
   const { state, active, requestPermission, reload, reselectLimited, loadMore } = useDayPhotos(
     date,
-    supported && open,
+    supported,
     userId,
   );
   useEffect(() => {
@@ -72,21 +67,11 @@ function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
   );
   return (
     <section data-date={date} className="mt-4">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex min-h-11 w-full items-center justify-between rounded-md border border-border-hairline bg-surface-raised px-4 text-body text-ink-primary"
-      >
-        {t('この日の写真')}
-        <span aria-hidden="true" className="text-ink-secondary">
-          {open ? '▲' : '▼'}
-        </span>
-      </button>
-      {open && state.kind === 'loading' && (
+      <h3 className="mb-1 text-body font-semibold text-ink-primary">{t('この日の写真')}</h3>
+      {state.kind === 'loading' && (
         <p role="status" className="mt-2 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       )}
-      {open && state.kind === 'needs-permission' && state.permission === 'denied' && (
+      {state.kind === 'needs-permission' && state.permission === 'denied' && (
         <div className="mt-2 space-y-2">
           <p className="text-meta text-ink-secondary">
             {t('端末の設定アプリで、このアプリの写真へのアクセスを許可してください。')}
@@ -100,7 +85,7 @@ function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
           </button>
         </div>
       )}
-      {open && state.kind === 'needs-permission' && state.permission === 'prompt' && (
+      {state.kind === 'needs-permission' && state.permission === 'prompt' && (
         <div className="mt-2 space-y-2">
           <p className="text-meta text-ink-secondary">
             {t('この日に撮影した写真を表示するには、写真へのアクセスを許可してください。')}
@@ -114,7 +99,7 @@ function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
           </button>
         </div>
       )}
-      {open && state.kind === 'ready' && state.limited && (
+      {state.kind === 'ready' && state.limited && (
         <div className="mt-2 flex items-center justify-between gap-2">
           <p className="text-meta text-ink-secondary">{t('一部の写真だけが許可されています。')}</p>
           <button
@@ -126,7 +111,7 @@ function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
           </button>
         </div>
       )}
-      {open && state.kind === 'error' && (
+      {state.kind === 'error' && (
         <div className="mt-2 flex items-center justify-between gap-2">
           <p role="alert" className="text-meta text-danger">
             {t('写真を読み込めませんでした。')}
@@ -136,10 +121,10 @@ function EnabledDayPhotoSection({ date, suspended = false, userId }: DayPhotoSec
           </button>
         </div>
       )}
-      {open && state.kind === 'ready' && state.assets.length === 0 && (
+      {state.kind === 'ready' && state.assets.length === 0 && (
         <p className="mt-2 text-meta text-ink-secondary">{t('この日に撮影した写真はありません。')}</p>
       )}
-      {open && state.kind === 'ready' && state.assets.length > 0 && (
+      {state.kind === 'ready' && state.assets.length > 0 && (
         <PhotoGrid
           assets={state.assets}
           onOpen={setPreview}

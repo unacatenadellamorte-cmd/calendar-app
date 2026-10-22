@@ -29,6 +29,7 @@ import { WeekView } from './WeekView';
 import { ListView } from './ListView';
 import { YearView } from './YearView';
 import { DayEventPanel } from './DayEventPanel';
+import { DayPhotoSection } from './DayPhotoSection';
 import { MonthShiftTiles } from './MonthShiftTiles';
 import { calculateMonthlyPay } from '@/features/pay/model/usePayEstimate';
 interface CalendarScreenProps {
@@ -63,6 +64,11 @@ export function CalendarScreen({
   const [searchCalendarId, setSearchCalendarId] = useState('');
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
+  // 検索条件はフォーカス中か条件が残る間だけ展開し、それ以外は入力1行にする。
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const hasSearchCondition = Boolean(searchQuery || searchCalendarId || searchFrom || searchTo);
+  const searchExpanded = searchFocused || hasSearchCondition;
   // ロック中はシークレット予定を月・週・年・リストのどのビューからも除外する(spec-secret-mode)。
   const unlockedEvents = useMemo(
     () => hideSecretEvents(ev.events, unlocked),
@@ -169,7 +175,11 @@ export function CalendarScreen({
     jumpTo(date);
     setView('month');
   };
-  // 短いタップは週と当日の一覧、長押しはその日の新規入力を直接開く。
+  // 短いタップは日付の選択だけ、ダブルタップは週と当日の一覧、長押しはその日の新規入力を開く。
+  const selectDay = (date: string) => {
+    jumpTo(date);
+    if (selectedDay) setSelectedDay(date);
+  };
   const openDayPanel = (date: string) => {
     jumpTo(date);
     setSelectedDay(date);
@@ -180,12 +190,12 @@ export function CalendarScreen({
   };
   // 「月表示に戻る」: 折りたたみ解除。
   const closeDayPanel = () => setSelectedDay(null);
-  // 月表示の日付ダブルタップ: 折りたたみを解除し、その日を cursor にして「日」ビューへ
-  // (年→月ドリルダウンと同じ jumpTo + setView の再利用。新規UIは作らない)。
-  const openDayView = (date: string) => {
-    setSelectedDay(null);
-    jumpTo(date);
-    setView('week');
+  // 折りたたみ中の左右スワイプは7日、当日予定の左右スワイプは1日。どちらも選択日と cursor を揃えて動かす。
+  const shiftSelectedDay = (days: number) => {
+    if (!selectedDay) return;
+    const next = addDays(selectedDay, days);
+    jumpTo(next);
+    setSelectedDay(next);
   };
   // selectedDay(折りたたみ状態)の妥当性を、月送り・ビュー切替・年→月ドリルダウン等の
   // あらゆる画面状態変化のあとに一律で再評価する(個別の遷移経路をそれぞれ塞がない)。
@@ -295,16 +305,23 @@ export function CalendarScreen({
         monthPayAmount={view === 'month' && !loading ? monthPay.amount : undefined}
       />
 
-      <div className="mb-3 flex flex-col gap-2 rounded-md border border-border-hairline bg-surface-raised p-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-meta text-ink-secondary">{t('予定を検索')}</span>
-          <input
-            aria-label={t('予定を検索')}
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
-          />
-        </label>
+      <div
+        className="mb-3 flex flex-col gap-2 rounded-md border border-border-hairline bg-surface-raised p-3"
+        onFocus={() => setSearchFocused(true)}
+        onBlur={(event) => {
+          // 条件欄の内側へのフォーカス移動では閉じない。
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSearchFocused(false);
+        }}
+      >
+        <input
+          ref={searchInputRef}
+          aria-label={t('予定を検索')}
+          placeholder={t('予定を検索')}
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-3 text-body"
+        />
+        {searchExpanded && (<>
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('カレンダーで絞り込み')}</span>
           <select
@@ -329,11 +346,23 @@ export function CalendarScreen({
             <input aria-label={t('終了日')} type="date" value={searchTo} onChange={(event) => setSearchTo(event.target.value)} className="min-h-11 rounded-sm border border-border-hairline bg-surface-base px-2 text-body" />
           </label>
         </div>
-        {(searchQuery || searchCalendarId || searchFrom || searchTo) && (
-          <button type="button" className="min-h-11 self-start text-meta text-accent" onClick={() => { setSearchQuery(''); setSearchCalendarId(''); setSearchFrom(''); setSearchTo(''); }}>
+        {hasSearchCondition && (
+          <button
+            type="button"
+            className="min-h-11 self-start text-meta text-accent"
+            onClick={() => {
+              setSearchQuery('');
+              setSearchCalendarId('');
+              setSearchFrom('');
+              setSearchTo('');
+              // 押したボタンは消えるので、フォーカスを入力欄へ戻す(外へ出た時点で1行に戻る)。
+              searchInputRef.current?.focus();
+            }}
+          >
             {t('条件を解除')}
           </button>
         )}
+        </>)}
       </div>
 
       {cal.errorKey && (
@@ -382,13 +411,13 @@ export function CalendarScreen({
             byDay={byDay}
             calendarById={calendarById}
             today={today}
-            onDayTap={openDayPanel}
+            onDayTap={selectDay}
             onDayLongPress={openDayCreate}
-            onDayDoubleTap={openDayView}
+            onDayDoubleTap={openDayPanel}
             collapsedToWeekOf={selectedDay ?? undefined}
             onBackToMonth={closeDayPanel}
-            onSwipeLeft={goNext}
-            onSwipeRight={goPrev}
+            onSwipeLeft={selectedDay ? () => shiftSelectedDay(7) : goNext}
+            onSwipeRight={selectedDay ? () => shiftSelectedDay(-7) : goPrev}
           />
           {selectedDay && (
             <DayEventPanel
@@ -399,9 +428,11 @@ export function CalendarScreen({
               onAddEvent={() => openCreate({ date: selectedDay })}
               photosSuspended={sheetOpen || detailEvent !== null}
               userId={session?.user.id}
+              onDayShift={(delta) => shiftSelectedDay(delta)}
             />
           )}
           {!selectedDay && (
+            <>
             <MonthShiftTiles
               date={cursor}
               calendars={cal.calendars}
@@ -411,6 +442,12 @@ export function CalendarScreen({
               onDateChange={jumpTo}
               onRemove={ev.remove}
             />
+            <DayPhotoSection
+              date={cursor}
+              suspended={sheetOpen || detailEvent !== null}
+              userId={session?.user.id}
+            />
+            </>
           )}
         </>
       ) : view === 'week' ? (
@@ -423,6 +460,7 @@ export function CalendarScreen({
           onEventTap={openEdit}
           photosSuspended={sheetOpen || detailEvent !== null}
           userId={session?.user.id}
+          onDateChange={jumpTo}
         />
       ) : view === 'year' ? (
         <YearView

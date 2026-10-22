@@ -27,7 +27,7 @@ export type DayPhotosState =
     };
 
 /**
- * 選択日の端末写真を読む。`active`(設定ON かつ 写真欄が開いている)の間だけ OS を呼ぶ。
+ * 選択日の端末写真を読む。`active`(設定ON かつ 有効権利あり)の間だけ OS を呼ぶ。
  * 日付変更・非アクティブ化・画面退出では、進行中の要求の結果を捨てて画像を解放する。
  */
 export function useDayPhotos(date: string, wanted: boolean, userId?: string) {

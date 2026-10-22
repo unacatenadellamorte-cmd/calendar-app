@@ -2,7 +2,8 @@
 import { execFileSync } from 'node:child_process';
 const expression = `(async () => {
   const wait = async (predicate, stage) => { for(let i=0;i<120;i++){if(predicate())return;await new Promise(r=>setTimeout(r,100));}throw new Error('表示待ち: '+stage); };
-  const button = text => [...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text||(text==='この日の写真'&&b.textContent.includes(text)));
+  const button = text => [...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
+  const photoHeading = () => [...document.querySelectorAll('h3')].find(h=>h.textContent.trim()==='この日の写真');
   const tiles = () => [...document.querySelectorAll('button[aria-label]')].filter(b=>b.getAttribute('aria-label').includes('の写真を拡大'));
   const grid = () => document.querySelector('[role=list]');
   // 一覧の内側の高さ(行数×行高)。下端までの続き取得で増えていく。
@@ -25,8 +26,7 @@ const expression = `(async () => {
   const entitled=document.querySelector('#photo-entitled');if(!entitled)throw new Error('写真契約の検証欄がない');
   if(!toggle.checked)toggle.click();
   if(!entitled.checked)entitled.click();
-  await wait(()=>button('この日の写真'),'写真欄');
-  if(button('この日の写真').getAttribute('aria-expanded')!=='true')button('この日の写真').click();
+  await wait(()=>photoHeading(),'写真欄の自動表示');
   const choose = async date => {
     setDay(date);
     await wait(()=>document.querySelector('section[data-date]')?.dataset.date===date,'日付変更');
@@ -50,7 +50,7 @@ const expression = `(async () => {
   for(let i=0;i<10;i++){await choose('2026-10-20');await choose('2026-10-22');}
   // 写真契約なし: 写真欄は案内に変わり、画像・一覧は出ず、OSへの写真要求も発生しない。
   entitled.click();
-  await wait(()=>!button('この日の写真')&&button('写真表示のプランを見る'),'権利なしの案内');
+  await wait(()=>!photoHeading()&&button('写真表示のプランを見る'),'権利なしの案内');
   // 区間内にOS APIが呼ばれた回数の差分(メソッド名と回数だけ)。
   const callsSince=before=>Object.fromEntries(Object.entries(osCalls).filter(([method,n])=>n!==(before[method]||0)).map(([method,n])=>[method,n-(before[method]||0)]));
   const freeBefore={...osCalls};
@@ -60,14 +60,12 @@ const expression = `(async () => {
   if(grid())throw new Error('権利なしで一覧が表示された');
   const freeCalls=callsSince(freeBefore);
   if(Object.keys(freeCalls).length)throw new Error('権利なしでOS APIが呼ばれた: '+Object.keys(freeCalls).join(','));
-  // 契約を戻しても、利用者が開くまでは開かず、写真も読まない。権利復帰の前後でOS呼出回数が変わらないことも確かめる。
+  // 設定ONのまま契約が戻ると、許可済みの写真を操作なしで再表示する。
   const restoreBefore={...osCalls};
-  entitled.click();await wait(()=>button('この日の写真'),'権利の復帰');
-  await new Promise(r=>setTimeout(r,1000));
-  if(button('この日の写真').getAttribute('aria-expanded')==='true')throw new Error('権利の復帰で自動的に開いた');
+  entitled.click();await wait(()=>photoHeading()&&tiles().length>0,'権利復帰後の写真の自動表示');
   const restoreCalls=callsSince(restoreBefore);
-  if(Object.keys(restoreCalls).length)throw new Error('権利の復帰でOS APIが呼ばれた: '+Object.keys(restoreCalls).join(','));
-  toggle.click();await wait(()=>!button('この日の写真'),'表示OFF');
+  if(!restoreCalls.listAssets)throw new Error('権利の復帰後に写真が再取得されていない');
+  toggle.click();await wait(()=>!photoHeading(),'表示OFF');
   if(document.images.length)throw new Error('OFF後に画像が残存');
   return {時間帯:Intl.DateTimeFormat().resolvedOptions().timeZone,日別件数:counts,最終行と拡大:'成功',日付往復:10,権利なし表示:'案内のみ',権利なし中画像数:0,権利なし中OS呼出回数:freeCalls,権利復帰中OS呼出回数:restoreCalls,OFF後画像数:document.images.length};
 })()`;

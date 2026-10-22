@@ -86,6 +86,7 @@ vi.mock('@/features/billing/model/useEntitlements', () => ({ useEntitlements: ()
 const { CalendarScreen } = await import('./CalendarScreen');
 
 beforeEach(() => {
+  photoPlugin.listAssets.mockResolvedValue({ assets: [{ id: 'qa-photo', createdMs: Date.UTC(2026, 8, 8, 1) }], hasMore: false });
   photoPlatform.native = false;
   entitlement.canViewPhotos = false;
   resetDevicePhotosEnabledForTests();
@@ -159,8 +160,7 @@ describe('CalendarScreen', () => {
     const user = userEvent.setup();
     const page = render(<CalendarScreen />);
     if (view === '日') await user.click(screen.getByRole('radio', { name: '日' }));
-    else await user.click(screen.getByRole('button', { name: '9月8日を開く' }));
-    await user.click(screen.getByRole('button', { name: 'この日の写真' }));
+    else await user.dblClick(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(await screen.findByRole('button', { name: /の写真を拡大/ }));
     expect(screen.getByRole('dialog', { name: '写真' })).toBeInTheDocument();
     page.rerender(<CalendarScreen initialEventId="e1" initialRequestKey="photos-to-event" />);
@@ -204,11 +204,11 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('dialog', { name: '予定を編集' })).toBeInTheDocument();
     expect(navigateMock).toHaveBeenCalledWith('/calendar', { replace: true });
   });
-  it('折りたたみでDOM位置が変わっても同じ位置の2回目タップで日表示へ進む', () => {
+  it('折りたたみでDOM位置が変わっても同じ位置の2回目タップで元の日付を拡大する(日ビューへは切り替えない)', () => {
     render(<CalendarScreen />);
     const day = screen.getByRole('button', { name: '9月8日を開く' });
     fireEvent.click(day, { detail: 1, clientX: 150, clientY: 420 });
-    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
     fireEvent(
       document.body,
       Object.assign(new Event('pointerdown', { bubbles: true }), {
@@ -219,12 +219,14 @@ describe('CalendarScreen', () => {
         clientY: 420,
       }),
     );
-    expect(screen.getByRole('radio', { name: '日' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '月' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('週一覧でAndroidの戻るを押すと同じ日付の月表示へ戻り、画面遷移しない', () => {
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     expect(backHandlers.size).toBe(1);
     act(() => Array.from(backHandlers).at(-1)?.());
     expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
@@ -238,7 +240,7 @@ describe('CalendarScreen', () => {
   });
   it('週一覧から予定入力を開いたときは入力レイヤーだけが戻るを受け取る', () => {
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     fireEvent.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
     expect(backHandlers.size).toBe(1);
     act(() => Array.from(backHandlers).at(-1)?.());
@@ -247,7 +249,7 @@ describe('CalendarScreen', () => {
     expect(backHandlers.size).toBe(0);
     expect(navigateMock).not.toHaveBeenCalled();
   });
-  it('予定が詰まった日の予定名タップで週と一覧を開き、一覧から編集できる', async () => {
+  it('予定が詰まった日は予定名タップでは選択だけで、ダブルタップで週と一覧を開き、一覧から編集できる', async () => {
     const user = userEvent.setup();
     evState.events = Array.from({ length: 5 }, (_, i) => ({
       ...sampleEvent,
@@ -256,6 +258,8 @@ describe('CalendarScreen', () => {
     }));
     render(<CalendarScreen />);
     await user.click(screen.getByRole('button', { name: /予定0/ }));
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    await user.dblClick(screen.getByRole('button', { name: '9月8日を開く' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
@@ -291,7 +295,7 @@ describe('CalendarScreen', () => {
       vi.useRealTimers();
     }
   });
-  it('タブは年・月・日・リストの順で、日付の通常タップは週と予定一覧を開く', async () => {
+  it('タブは年・月・日・リストの順で、日付の通常タップは選択だけで拡大しない', async () => {
     render(<CalendarScreen />);
     expect(screen.getAllByRole('radio').map((button) => button.textContent)).toEqual([
       '年',
@@ -304,8 +308,10 @@ describe('CalendarScreen', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '＋ この日に予定を追加' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('既定は月ビュー(日セルの追加ボタンを描画)', () => {
@@ -505,7 +511,7 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('button', { name: '3月1日を開く' })).toBeInTheDocument();
   });
 
-  it('月ビューで「他 N 件」をタップするとその日の週表示と予定一覧を開く', async () => {
+  it('月ビューで「他 N 件」をタップするとその日を選択するだけで、週表示へ折りたたまない', async () => {
     const user = userEvent.setup();
     evState.events = [0, 1, 2, 3].map((i) => ({
       ...sampleEvent,
@@ -517,15 +523,14 @@ describe('CalendarScreen', () => {
     render(<CalendarScreen />);
     await user.click(screen.getByRole('button', { name: '他 1 件' }));
     expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '＋ この日に予定を追加' })).toBeInTheDocument();
-    expect(screen.getByText('9月18日(金)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '9月1日を開く' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月18日を開く' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: '＋ この日に予定を追加' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
   });
 
-  it('月ビューで日セルを短くタップすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
+  it('月ビューで日セルをダブルタップすると、その日を含む週に折りたたまれ、その日の予定一覧パネルが出る(クイックシフトシートは開かない)', async () => {
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
 
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
     // 折りたたみ中は同じ月グリッド内でも他の週の日付は消える(9/8を含む週の外)。
@@ -541,7 +546,7 @@ describe('CalendarScreen', () => {
   it('「月表示に戻る」を押すと全体の月グリッドに戻りパネルが閉じる', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(screen.getByRole('button', { name: '月表示に戻る' }));
 
     expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
@@ -552,7 +557,7 @@ describe('CalendarScreen', () => {
   it('パネルの「＋ この日に予定を追加」を押すと、その日をシードした予定フォームが開く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
 
     expect(screen.getByRole('dialog', { name: '予定を追加' })).toBeInTheDocument();
@@ -562,7 +567,7 @@ describe('CalendarScreen', () => {
   it('折りたたみ中に月を送ると selectedDay が自動でクリアされる(パネルが宙に浮かない)', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '次へ' }));
@@ -576,7 +581,7 @@ describe('CalendarScreen', () => {
   it('折りたたみ中に別ビューへ切り替えると selectedDay が自動でクリアされ、月ビューに戻ってもパネルは出ない', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
-    fireEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+    fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     await user.click(screen.getByRole('radio', { name: 'リスト' }));
     await user.click(screen.getByRole('radio', { name: '月' }));
 
@@ -585,14 +590,15 @@ describe('CalendarScreen', () => {
     expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
   });
 
-  it('月ビューで日セルをダブルタップすると、その日を cursor にして「日」ビューへ切り替わる(折りたたみ解除)', async () => {
+  it('月ビューで日セルをダブルタップしても「日」ビューへは切り替わらず、選択週と当日予定を開く', async () => {
     const user = userEvent.setup();
     render(<CalendarScreen />);
     await user.dblClick(screen.getByRole('button', { name: '9月15日を開く' }));
 
-    expect(screen.getByRole('radio', { name: '日', checked: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '7時に予定を追加' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '月表示に戻る' })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '月', checked: true })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '7時に予定を追加' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '9月15日(火)' })).toBeInTheDocument();
   });
 
   it('ヘッダーの「＋シフト」をタップすると /shifts/add へ遷移する', async () => {
@@ -675,6 +681,178 @@ describe('CalendarScreen', () => {
     // 描画されうるため、日付ボタンの有無ではなく見出しテキストで判定する)
     expect(screen.getByRole('heading', { name: '2026年8月' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '2026年9月' })).not.toBeInTheDocument();
+  });
+
+  describe('閲覧操作(送り・写真・検索)', () => {
+    const swipe = (target: Element, from: number, to: number, dy = 0) => {
+      fireEvent.touchStart(target, { touches: [{ clientX: from, clientY: 100 }] });
+      fireEvent.touchEnd(target, { changedTouches: [{ clientX: to, clientY: 100 + dy }] });
+    };
+
+    it('日付はキーボードでも当日予定を開ける', () => {
+      render(<CalendarScreen />);
+      fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter' });
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+    });
+
+    it.each(['月', '日'])('%sの週送りと日送りは年越しでも表示種別を保つ', (view) => {
+      vi.setSystemTime(new Date('2026-12-31T00:00:00+09:00'));
+      render(<CalendarScreen />);
+      if (view === '日') fireEvent.click(screen.getByRole('radio', { name: '日' }));
+      else fireEvent.doubleClick(screen.getByRole('button', { name: '12月31日を開く' }));
+      const week = () => view === '月' ? screen.getByTestId('month-grid') : screen.getAllByTestId('swipe-surface')[0]!;
+      const day = () => screen.getAllByTestId('swipe-surface').at(-1)!;
+      swipe(week(), 100, 20);
+      expect(screen.getByRole('heading', { name: '1月7日(木)' })).toBeInTheDocument();
+      if (view === '月') expect(screen.getByRole('heading', { name: '2027年1月' })).toBeInTheDocument();
+      swipe(week(), 20, 100);
+      swipe(day(), 100, 20);
+      expect(screen.getByRole('heading', { name: '1月1日(金)' })).toBeInTheDocument();
+      swipe(day(), 20, 100);
+      expect(screen.getByRole('heading', { name: '12月31日(木)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: view, checked: true })).toBeInTheDocument();
+    });
+
+    it.each(['月', '日'])('%sの予定を縦に動かし始めた後の横ぶれや取消で日付を送らない', (view) => {
+      render(<CalendarScreen />);
+      if (view === '日') fireEvent.click(screen.getByRole('radio', { name: '日' }));
+      else fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      const panel = screen.getAllByTestId('swipe-surface').at(-1)!;
+      fireEvent.touchStart(panel, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(panel, { touches: [{ clientX: 102, clientY: 130 }] });
+      fireEvent.touchEnd(panel, { changedTouches: [{ clientX: 250, clientY: 140 }] });
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      fireEvent.touchStart(panel, { touches: [{ clientX: 100, clientY: 100 }] });
+      fireEvent.touchMove(panel, { touches: [{ clientX: 160, clientY: 102 }] });
+      fireEvent.touchCancel(panel);
+      fireEvent.touchEnd(panel, { changedTouches: [{ clientX: 250, clientY: 102 }] });
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+    });
+
+    it.each(['月', '日'])('%sで写真ダイアログの横操作が背面の日付を送らず、予定スワイプの合成クリックだけを抑止する', async (view) => {
+      photoPlatform.native = true;
+      entitlement.canViewPhotos = true;
+      window.localStorage.setItem(DEVICE_PHOTOS_ENABLED_STORAGE_KEY, 'true');
+      resetDevicePhotosEnabledForTests();
+      render(<CalendarScreen />);
+      if (view === '日') fireEvent.click(screen.getByRole('radio', { name: '日' }));
+      else fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      fireEvent.click(await screen.findByRole('button', { name: /の写真を拡大/ }));
+      swipe(screen.getByRole('dialog', { name: '写真' }), 100, 20);
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: '写真' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+      const tile = await screen.findByRole('button', { name: /の写真を拡大/ });
+      photoPlugin.listAssets.mockResolvedValue({ assets: [{ id: 'qa-next-photo', createdMs: Date.UTC(2026, 8, 9, 1) }], hasMore: false });
+      swipe(tile, 100, 20);
+      const nextTile = await screen.findByRole('button', { name: /の写真を拡大/ });
+      fireEvent.click(nextTile, { detail: 1 });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      // キーボード由来のクリック(detail=0)は直後でも通す。
+      photoPlugin.listAssets.mockResolvedValue({ assets: [{ id: 'qa-photo', createdMs: Date.UTC(2026, 8, 8, 1) }], hasMore: false });
+      swipe(nextTile, 20, 100);
+      fireEvent.click(await screen.findByRole('button', { name: /の写真を拡大/ }), { detail: 0 });
+      expect(screen.getByRole('dialog', { name: '写真' })).toBeInTheDocument();
+    });
+
+    it('折りたたんだ週の帯は左右で7日ずつ、月をまたいでも折りたたみのまま送る', () => {
+      render(<CalendarScreen />);
+      fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      const grid = screen.getByTestId('month-grid');
+      swipe(grid, 100, 30);
+      expect(screen.getByRole('heading', { name: '9月15日(火)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+      swipe(screen.getByTestId('month-grid'), 100, 30);
+      swipe(screen.getByTestId('month-grid'), 100, 30);
+      expect(screen.getByRole('heading', { name: '9月29日(火)' })).toBeInTheDocument();
+      swipe(screen.getByTestId('month-grid'), 100, 30);
+      expect(screen.getByRole('heading', { name: '10月6日(火)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '2026年10月' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '月表示に戻る' })).toBeInTheDocument();
+      swipe(screen.getByTestId('month-grid'), 30, 100);
+      expect(screen.getByRole('heading', { name: '9月29日(火)' })).toBeInTheDocument();
+    });
+
+    it('当日予定の左右スワイプは1日ずつ、縦の動きは何も送らず、予定のクリックも誤発火しない', () => {
+      render(<CalendarScreen />);
+      fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      const panel = screen.getAllByTestId('swipe-surface').at(-1)!;
+      swipe(panel, 100, 20, 80);
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      swipe(panel, 100, 20);
+      expect(screen.getByRole('heading', { name: '9月9日(水)' })).toBeInTheDocument();
+      swipe(screen.getByRole('heading', { name: '9月9日(水)' }).closest('[data-testid=swipe-surface]')!, 20, 100);
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      // スワイプ直後に合成されるクリックは予定を開かない。
+      swipe(screen.getByRole('heading', { name: '9月8日(火)' }).closest('[data-testid=swipe-surface]')!, 100, 20);
+      const item = within(screen.getByRole('heading', { name: '9月9日(水)' }).closest('section')!);
+      expect(item.queryByRole('button', { name: /会議アルファ/ })).not.toBeInTheDocument();
+      swipe(screen.getByRole('heading', { name: '9月9日(水)' }).closest('[data-testid=swipe-surface]')!, 20, 100);
+      fireEvent.click(within(screen.getByRole('heading', { name: '9月8日(火)' }).closest('section')!).getByRole('button', { name: /会議アルファ/ }), { detail: 1 });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('日ビューでも週の帯は7日、当日予定は1日ずつ送り、月へは切り替わらない', async () => {
+      render(<CalendarScreen />);
+      fireEvent.click(screen.getByRole('radio', { name: '日' }));
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      const [band, day] = screen.getAllByTestId('swipe-surface');
+      swipe(band!, 100, 30);
+      expect(screen.getByRole('heading', { name: '9月15日(火)' })).toBeInTheDocument();
+      swipe(screen.getAllByTestId('swipe-surface')[1]!, 100, 30);
+      expect(screen.getByRole('heading', { name: '9月16日(水)' })).toBeInTheDocument();
+      swipe(screen.getAllByTestId('swipe-surface')[1]!, 30, 100);
+      swipe(screen.getAllByTestId('swipe-surface')[0]!, 30, 100);
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: '日', checked: true })).toBeInTheDocument();
+      expect(day).toBeDefined();
+      // スワイプ直後の合成クリック抑止が切れた後、週の帯の日付をタップするとその日へ移る。
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      fireEvent.click(within(screen.getByTestId('week-strip')).getByRole('button', { name: '9月10日を開く' }));
+      expect(screen.getByRole('heading', { name: '9月10日(木)' })).toBeInTheDocument();
+    });
+
+    it('月全体では登録シフトの下に選択日の写真を押さずに表示し、拡大後も写真欄は1か所だけにする', async () => {
+      photoPlatform.native = true;
+      entitlement.canViewPhotos = true;
+      window.localStorage.setItem(DEVICE_PHOTOS_ENABLED_STORAGE_KEY, 'true');
+      resetDevicePhotosEnabledForTests();
+      photoPlugin.listAssets.mockClear();
+      const user = userEvent.setup();
+      render(<CalendarScreen />);
+      const photos = await screen.findByRole('heading', { name: 'この日の写真' });
+      const shifts = screen.getByRole('heading', { name: '登録シフト' });
+      expect(shifts.compareDocumentPosition(photos) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(await screen.findByRole('button', { name: /の写真を拡大/ })).toBeInTheDocument();
+      expect(photoPlugin.listAssets).toHaveBeenCalledTimes(1);
+      await user.dblClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      expect(await screen.findAllByRole('heading', { name: 'この日の写真' })).toHaveLength(1);
+      await screen.findByRole('button', { name: /の写真を拡大/ });
+      expect(photoPlugin.listAssets).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('heading', { name: '登録シフト' })).not.toBeInTheDocument();
+    });
+
+    it('検索は通常1行で、フォーカス中は条件を展開し、入力が残る間は保持して、全解除後に外へ出ると1行へ戻る', async () => {
+      const user = userEvent.setup();
+      render(<CalendarScreen />);
+      expect(screen.queryByRole('combobox', { name: 'カレンダーで絞り込み' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('開始日')).not.toBeInTheDocument();
+      const search = screen.getByRole('textbox', { name: '予定を検索' });
+      await user.click(search);
+      expect(screen.getByRole('combobox', { name: 'カレンダーで絞り込み' })).toBeInTheDocument();
+      expect(screen.getByLabelText('開始日')).toBeInTheDocument();
+      // 条件欄へフォーカスを移しても閉じない。
+      await user.selectOptions(screen.getByRole('combobox', { name: 'カレンダーで絞り込み' }), 'c1');
+      expect(screen.getByLabelText('終了日')).toBeInTheDocument();
+      // フォーカスが外へ出ても、条件が残る間は展開したまま。
+      await user.click(document.body);
+      expect(screen.getByLabelText('開始日')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '条件を解除' }));
+      expect(screen.getByLabelText('開始日')).toBeInTheDocument();
+      await user.click(document.body);
+      expect(screen.queryByLabelText('開始日')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '条件を解除' })).not.toBeInTheDocument();
+    });
   });
 
   describe('initialEventId(ディープリンク calendar-app://event/{id} 由来)', () => {

@@ -13,7 +13,7 @@ interface MonthViewProps {
   today: string;
   onDayTap: (date: string) => void;
   onDayLongPress?: (date: string) => void;
-  /** 日付セルのダブルタップ。その日を cursor にして「日」ビューへ切り替える呼び出し側の配線を想定。 */
+  /** 日付セルのダブルタップで、その週と当日の予定を広げる。 */
   onDayDoubleTap: (date: string) => void;
   /**
    * 指定があれば、その日を含む週の1行だけに月グリッドを折りたたむ(Option C)。
@@ -282,6 +282,9 @@ export function MonthView({
                     if (event.key === 'Enter' && event.shiftKey) {
                       event.preventDefault();
                       onDayLongPress?.(cell.date);
+                    } else if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onDayDoubleTap(cell.date);
                     }
                   }}
                   onClick={(e) => {
