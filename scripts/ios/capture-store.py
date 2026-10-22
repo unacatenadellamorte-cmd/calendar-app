@@ -51,8 +51,8 @@ def prepare_photos(udid, fixture_dir):
     """隔離シミュレータの写真ライブラリに架空の写真だけを入れ、製品アプリへ読み取り許可を与える。"""
     try:
         photos = photo_review.write_fixture_photos(fixture_dir)
-        run('xcrun', 'simctl', 'privacy', udid, 'grant', 'photos', photo_review.BUNDLE_ID)
         run('xcrun', 'simctl', 'addmedia', udid, *[str(path) for path in photos])
+        run('xcrun', 'simctl', 'privacy', udid, 'grant', 'photos', photo_review.BUNDLE_ID)
         return True
     except (OSError, subprocess.SubprocessError) as error:
         print('写真fixtureを投入できませんでした:', type(error).__name__, flush=True)
@@ -90,6 +90,11 @@ def capture_photo_review(device, app, index, original_index, output, manifest):
                 continue
             run('xcrun', 'simctl', 'launch', udid, photo_review.BUNDLE_ID, '-AppleLanguages', '(ja)', '-AppleLocale', 'ja_JP')
             launched = True
+            # 初回のライブラリ作成・起動後に隔離シミュレータの許可を再適用する。
+            # 製品の許可案内のボタンを撮影用JSから押し、OSの現在値を取り直す。
+            time.sleep(5)
+            if photos_ready:
+                run('xcrun', 'simctl', 'privacy', udid, 'grant', 'photos', photo_review.BUNDLE_ID)
             time.sleep(25)
             name = f'20261022_ios_iphone_ja_{label}.png'
             run('xcrun', 'simctl', 'io', udid, 'screenshot', str(output / name))

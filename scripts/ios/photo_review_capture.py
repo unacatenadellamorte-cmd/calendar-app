@@ -38,6 +38,14 @@ OPEN_PHOTO_LIST_SCRIPT = """
     if (button) {
       button.click();
       var section = button.closest('section');
+      var permissionTimer = setInterval(function () {
+        var permission = Array.prototype.find.call(section.querySelectorAll('button'), function (el) {
+          return el.textContent.indexOf('写真へのアクセスを許可') !== -1;
+        });
+        // 起動後にsimctlで許可を再適用してから製品のボタンを押す。
+        if (permission && tries > 20) { permission.click(); clearInterval(permissionTimer); }
+        if (++tries > 80) { clearInterval(permissionTimer); }
+      }, 500);
       [500, 1500, 4000, 8000].forEach(function (delay) {
         setTimeout(function () { section.scrollIntoView({block: 'center'}); }, delay);
       });
