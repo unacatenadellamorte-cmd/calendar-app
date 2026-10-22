@@ -95,6 +95,8 @@ def capture_photo_review(device, app, index, original_index, output, manifest):
             time.sleep(5)
             if photos_ready:
                 run('xcrun', 'simctl', 'privacy', udid, 'grant', 'photos', photo_review.BUNDLE_ID)
+                # OSのプライバシー設定変更でプロセスが終了するため、再インストールせず再起動する。
+                run('xcrun', 'simctl', 'launch', udid, photo_review.BUNDLE_ID, '-AppleLanguages', '(ja)', '-AppleLocale', 'ja_JP')
             time.sleep(25)
             name = f'20261022_ios_iphone_ja_{label}.png'
             run('xcrun', 'simctl', 'io', udid, 'screenshot', str(output / name))
