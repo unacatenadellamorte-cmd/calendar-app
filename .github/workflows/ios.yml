@@ -10,6 +10,10 @@ on:
         description: ストア掲載用の実画面を架空データで撮影する
         type: boolean
         default: false
+      photo_review_only:
+        description: 写真商品の審査画像2枚だけを撮影する（captureも指定）
+        type: boolean
+        default: false
       upload:
         description: 検証済みの1.0.25 (32)をApp Store Connectへ送信する
         type: boolean
@@ -326,6 +330,7 @@ jobs:
       - run: python3 scripts/ios/capture-store.py
         env:
           CAPTURE_OUTPUT: ${{ runner.temp }}/出力画像
+          PHOTO_REVIEW_ONLY: ${{ inputs.photo_review_only && '1' || '0' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

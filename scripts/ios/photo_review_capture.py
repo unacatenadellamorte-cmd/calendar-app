@@ -25,11 +25,24 @@ ENTITLEMENT_ROWS = [{'entitlement': 'device_photos', 'expires_at': '2099-12-31T0
 OPEN_PHOTO_LIST_SCRIPT = """
 (function () {
   var tries = 0;
+  var dayOpened = false;
   var timer = setInterval(function () {
+    if (!dayOpened) {
+      var day = document.querySelector('button[data-day-button][aria-pressed="true"]');
+      if (day) { day.click(); dayOpened = true; }
+      return;
+    }
     var button = Array.prototype.find.call(document.querySelectorAll('button'), function (el) {
       return el.textContent.indexOf('この日の写真') !== -1 && el.getAttribute('aria-expanded') === 'false';
     });
-    if (button) { button.click(); clearInterval(timer); }
+    if (button) {
+      button.click();
+      var section = button.closest('section');
+      [500, 1500, 4000, 8000].forEach(function (delay) {
+        setTimeout(function () { section.scrollIntoView({block: 'center'}); }, delay);
+      });
+      clearInterval(timer);
+    }
     else if (++tries > 120) { clearInterval(timer); }
   }, 500);
 })();
@@ -90,4 +103,6 @@ def startup_script(route: str, session: dict, *, open_photo_list: bool = False) 
     ]
     if open_photo_list:
         parts.append(OPEN_PHOTO_LIST_SCRIPT)
+    else:
+        parts.append('var photoSettingsTimer=setInterval(function(){var heading=document.getElementById("device-photos-heading");if(heading){heading.scrollIntoView({block:"start"});clearInterval(photoSettingsTimer);}},500);')
     return '<script>' + ''.join(parts) + '</script>'

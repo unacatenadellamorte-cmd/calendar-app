@@ -123,7 +123,7 @@ targets = [
 ]
 manifest = []
 try:
-    for family, device in targets:
+    for family, device in ([] if os.environ.get('PHOTO_REVIEW_ONLY') == '1' else targets):
         udid = device['udid']
         if device['state'] != 'Booted':
             run('xcrun', 'simctl', 'boot', udid)
