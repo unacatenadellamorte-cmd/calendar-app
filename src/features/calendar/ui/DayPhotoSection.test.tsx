@@ -61,6 +61,36 @@ function givenPermission(status: string, assets = [photo('a')], hasMore = false)
   }));
 }
 
+// 2026-10-22の追加調査。正しい期待が現状では失敗することを固定し、修正済みとは扱わない。
+describe('写真表示の追加監査で再現した未修正の問題', () => {
+  it.fails('縮小画像を取得できないときは、空のボタンだけにせず失敗を案内する', async () => {
+    enableSetting();
+    givenPermission('granted');
+    nativePlugin.loadImage.mockRejectedValue(new Error('OSが画像を提供できない'));
+    render(<DayPhotoSection date={DAY} />);
+    fireEvent.click(screen.getByRole('button', { name: 'この日の写真' }));
+    await screen.findByRole('button', { name: '9:05 の写真を拡大' });
+    await act(async () => {});
+    expect(screen.getByRole('alert')).toHaveTextContent(/写真/);
+  });
+
+  it.fails('権限確認中に背面化と復帰が先行しても、その後の許可完了で写真を表示する', async () => {
+    enableSetting();
+    givenPermission('prompt');
+    let finishPermission!: (value: { status: string }) => void;
+    nativePlugin.requestPermission.mockReturnValue(new Promise((resolve) => { finishPermission = resolve; }));
+    render(<DayPhotoSection date={DAY} />);
+    fireEvent.click(screen.getByRole('button', { name: 'この日の写真' }));
+    fireEvent.click(await screen.findByRole('button', { name: '写真へのアクセスを許可' }));
+    await act(async () => { appState.listener?.({ isActive: false }); });
+    await act(async () => { appState.listener?.({ isActive: true }); });
+    await screen.findByRole('button', { name: '写真へのアクセスを許可' });
+    nativePlugin.checkPermission.mockResolvedValue({ status: 'granted' });
+    await act(async () => { finishPermission({ status: 'granted' }); });
+    expect(screen.getByRole('button', { name: '9:05 の写真を拡大' })).toBeInTheDocument();
+  });
+});
+
 beforeEach(() => {
   process.env.TZ = 'Asia/Tokyo';
   platform.native = true;
