@@ -1,5 +1,42 @@
 # 全20項目改修後の両ストア再提出（2026-10-22）
 
+## 最新確定：写真プランを含む1.0.25（32）の両ストア申請完了
+
+2026-10-22にAndroidとiOSの32番を審査へ提出した。審査承認・一般公開・実機受入はこの結果に含めない。Google1アカウントの同期と予定反映を標準化し、写真を月額500円、複数Googleアカウント最大5件と写真を月額1000円に変更。有効な旧契約も写真利用可。旧商品は実価格300円を維持し、自動解約・自動移行なし。iOSは購入導線だけ外して更新を維持、Androidは旧基本プランをINACTIVEにした。両OSとも日本のみ。
+
+- Android：既存Alphaのリリース11、送信履歴9で32・Alpha・審査中を別取得。送信受付は12:04 JST。既存28は維持し、未送信31のリリース10だけ破棄した。テスター・地域は不変。難読化なしのためマッピング未添付の警告だけ残る。自分のPlayタブは終了時に閉じた。
+- iOS：署名CI39713733221、IPA送信CI39715251381が成功。Apple側32/VALID、build ID c9e90dbb-1e4b-4e84-849b-f7a49c80dba0。旧31提出を取下げて新しい提出[df4e01f8-2b1c-49d0-bf77-73ba75880c9a](https://appstoreconnect.apple.com/apps/6817586147/distribution/reviewsubmissions/details/df4e01f8-2b1c-49d0-bf77-73ba75880c9a)へ、アプリ・購読グループ・旧商品・multi・新写真の5項目を送信した。別取得で集約WAITING_FOR_REVIEW、アプリWAITING_FOR_REVIEW、32・MANUAL（手動公開）を確認。審査連絡先・ログイン情報不変、内部TestFlightに32追加、日英アプリ説明・3商品の審査メモを新プランへ更新した。
+- 新写真商品6825605307：500円、日本のみ、review screenshot 555e813e-8076-468f-b614-a8d9910788a0の配送COMPLETE。画像名はSOURCE。撮影環境と目視の範囲は下記記録のとおりで、実機購入の成功を表すものではない。
+- RevenueCat：device_photosを両OS新商品へ紐付け、default販売一覧はdevice_photosとmulti_accountのみ。旧商品・旧権利は削除しない。Supabase写真マイグレーション・Webhook配布済み、前後件数は予定166/カレンダー79/接続4/権利2不変。秘密値は記録していない。
+- 公開ポリシー：写真の端末内処理・外部非送信・メモリ内キャッシュ・OS権限・個別表示時のクラウド取得を追記した。公開ブランチは6316608でHTMLだけ更新、Pages39716626016成功、HTTP200・更新日2026年10月22日・写真説明を再取得した。従来のWeb本体は維持した。
+
+### 写真審査画像と価格データの補完
+
+審査画像の原本はworkspaceの出力画像/20261022_ios_review_39717047364/20261022_ios_iphone_ja_photo-day-list.png。iOS18.5の隔離シミュレーターで、架空の認証・写真権利を使い、製品の「この日の写真」と許可前の案内を目視確認した。写真設定の説明と現在のプラン「写真表示」も別画像で確認。**iOSのサムネイル実表示は未確認**で、審査メモにもその範囲を明記した。Appleの画像名SOURCEはサーバーの読戻し値で、元のファイル名とは区別する。
+
+撮影CI39714750092は成功したが写真欄へ到達していなかった。39717047364は写真欄・プラン表示まで成功。39718179986は起動後のOS許可変更でアプリが終了し撮影後の終了処理が失敗した。再起動を加えた39719062346は成功しOSの許可ダイアログを確認したが、アプリのサムネイルを撮影した証拠にはしない。設定変更による終了と製品クラッシュは断定せず区別する。配布32番の製品コードは変えていない。
+
+写真商品の追加時にAppleがIAP_SUBMISSION_NOT_ALLOWED_MISSING_PRICING_DATAを返し、販売対象外の174地域にも価格データが必要と分かった。日本500円の公式equalizationsから174件を補完し、合計175価格・販売対象JPNのみ・新地域自動追加false・日本500円不変を別取得した。READY_TO_SUBMITへ遷移後、5項目を13:08 JSTに送信できた。apple-photo-equalized-prices-verified.jsonに結果を保存。[Appleの提出手順](https://developer.apple.com/documentation/appstoreconnectapi/submitting-subscriptions-and-subscription-groups-for-app-review)に沿い、審査画像と商品版の審査項目を分けて処理した。
+
+### 配布成果物
+
+製品ソースはfcd1bb2。後続変更は審査画像の撮影処理、送信IPAの固定、公開ポリシー、記録のみで、配布した32番の製品コードは変わらない。
+
+| 成果物 | 実体 | サイズ | SHA256 |
+|---|---|---:|---|
+| Android32 | store-resubmission-20261022/android32-build/app/outputs/bundle/release/app-release.aab | 13,706,750 bytes | 34C3C91C916ED901ED36CF68EA1A6F65A419C0C140D5D1F2124B48D0929B7660 |
+| iOS32 | store-resubmission-20261022/ios-1.0.25-32-run39713733221/Multi-calendar.ipa | 8,528,455 bytes | 5be60da444c53311184480cfe7a32a97619307d931eb050d7f9c8f6cd0bf5492 |
+
+上記パスの基準はC:/Users/Ryo/AppData/Local/calendar-app。署名・登録証明書・版・主App/Widgetを照合済み。本番成果物に撮影fixtureやローカル撮影URLは混入していない。Appleの独立読戻しはapple-photo32-submission-verified.json。
+
+### 検証と限界
+
+全178ファイル1778件、型検査成功、lintエラー0・既存警告1。Android JVM52件、Android release/lint/署名、Macの実App/Widget署名コンパイル・アーカイブが成功。専用API36/emulator-5580では実MediaStoreの架空120枚40/40/40、縮小256・拡大1600以内、日付10往復、無権利/閉じたままの復帰でOS呼出0、OFF後画像0を確認。専用AVDはデータを消さず停止した。実機・実購入/復元/返金・iOS限定写真/iCloudの受入と長時間メモリ測定は未実施。
+
+Androidのmultiから写真への専用予約変更は既存の改善候補として先送り。購読管理で更新停止し満了後に写真商品を購入する経路を維持する。
+
+以下は時点を区別した過去の記録で、現在の提出状態はこの最新節を優先する。
+
 ## 最新：写真プラン化と32番の再提出準備
 
 本人がGoogle1アカウント同期・予定反映を標準、写真表示を新500円商品、複数アカウント1000円には写真も含めると確定。旧商品の実価格は両OSとも300円であり価格を変更しない。有効旧権利は写真も利用可、自動契約移行なし。iOSは旧商品をアプリ購入導線とRevenueCat販売一覧から外すだけでストア更新は維持、Androidは旧基本プランの新規受付を停止する。
