@@ -380,8 +380,9 @@ export function EventFormSheet({
         </label>
 
         <StampPicker
+          key={editing?.id ?? 'new'}
+          collapsible
           value={form.stampId}
-          color={previewColor}
           onChange={(stampId) =>
             setForm((current) => ({
               ...current,
@@ -478,7 +479,7 @@ export function EventFormSheet({
             }}
           >
             {form.stampId && (
-              <EventStamp id={form.stampId} color={labelTextColor(previewColor)} />
+              <EventStamp id={form.stampId} />
             )}{' '}
             {form.stampOnly ? '' : form.title || t('予定のプレビュー')}
           </span>

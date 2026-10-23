@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MonthSlide } from './MonthSlide';
 
@@ -14,6 +14,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('月の横スライド', () => {
+  it('日送り時の退出コピーにも直前のタイムラインのスクロール位置を保つ', () => {
+    const renderDay = (date: string) => (
+      <MonthSlide monthKey={date} offset={0} dragging={false}>
+        <div data-page-scroll style={{ height: 200, overflowY: 'auto' }}>
+          <div style={{ height: 1200 }}>{date}</div>
+        </div>
+      </MonthSlide>
+    );
+    const { rerender, container } = render(renderDay('2026-10-23'));
+    const scroller = container.querySelector<HTMLElement>('[data-page-scroll]')!;
+    scroller.scrollTop = 360;
+    fireEvent.scroll(scroller);
+    rerender(renderDay('2026-10-24'));
+    expect(container.querySelector<HTMLElement>('.month-page-exit [data-page-scroll]')?.scrollTop).toBe(360);
+  });
   it('次のドラッグ開始時に前のアニメーションを止め指の移動を優先する', () => {
     const { rerender, container } = render(page('2026-09'));
     rerender(page('2026-10'));

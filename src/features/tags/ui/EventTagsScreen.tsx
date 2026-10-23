@@ -96,7 +96,7 @@ function EventTagsScreenContent({ state }: { state: ReturnType<typeof useAuth>['
               >
                 <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
                   {tag.stampId && (
-                    <EventStamp id={tag.stampId} color={labelTextColor(tag.color)} />
+                    <EventStamp id={tag.stampId} />
                   )}
                   <span className="truncate">{tag.name}</span>
                 </span>

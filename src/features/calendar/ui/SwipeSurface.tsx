@@ -1,10 +1,17 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { MonthSlide } from './MonthSlide';
 
 interface SwipeSurfaceProps {
   /** 横スワイプ確定時。左スワイプ(次へ)は +1、右スワイプ(前へ)は -1。 */
   onSwipe: (direction: 1 | -1) => void;
   children: ReactNode;
   className?: string;
+  /** 週帯など、横移動にページ送りを付ける場合の表示先頭日。 */
+  pageKey?: string;
+  /** 予定の公開範囲が変わった際に退出コピーを破棄するための値。 */
+  contentVersion?: unknown;
+  /** 写真など、スワイプ対象には含めても退出コピーを作らない内容。 */
+  footer?: ReactNode;
 }
 
 const THRESHOLD_PX = 50;
@@ -16,7 +23,9 @@ const CLICK_GUARD_MS = 400;
  * 横スワイプだけを拾う薄いラッパー。縦の動きはスクロールに任せ、何も呼ばない。
  * 横スワイプが成立した直後の1回のクリックは握りつぶし、予定や画像を誤って開かない。
  */
-export function SwipeSurface({ onSwipe, children, className }: SwipeSurfaceProps) {
+export function SwipeSurface({ onSwipe, children, className, pageKey, contentVersion, footer }: SwipeSurfaceProps) {
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<'x' | 'y' | null>(null);
   const suppressClick = useRef(false);
@@ -27,6 +36,10 @@ export function SwipeSurface({ onSwipe, children, className }: SwipeSurfaceProps
   const reset = () => {
     start.current = null;
     axis.current = null;
+    if (pageKey !== undefined) {
+      setDragOffset(0);
+      setDragging(false);
+    }
   };
   return (
     <div
@@ -60,6 +73,11 @@ export function SwipeSurface({ onSwipe, children, className }: SwipeSurfaceProps
         if (!axis.current && Math.max(Math.abs(dx), Math.abs(dy)) > AXIS_LOCK_PX) {
           axis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
         }
+        if (pageKey !== undefined && axis.current === 'x') {
+          const width = event.currentTarget.getBoundingClientRect().width || 400;
+          setDragging(true);
+          setDragOffset(Math.max(-width, Math.min(width, dx)));
+        }
       }}
       onTouchEnd={(event) => {
         const origin = start.current;
@@ -86,7 +104,12 @@ export function SwipeSurface({ onSwipe, children, className }: SwipeSurfaceProps
         event.stopPropagation();
       }}
     >
-      {children}
+      {pageKey === undefined ? children : (
+        <MonthSlide monthKey={pageKey} offset={dragOffset} dragging={dragging} contentVersion={contentVersion}>
+          {children}
+        </MonthSlide>
+      )}
+      {footer}
     </div>
   );
 }

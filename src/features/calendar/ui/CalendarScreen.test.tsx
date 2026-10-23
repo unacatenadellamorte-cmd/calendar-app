@@ -689,6 +689,64 @@ describe('CalendarScreen', () => {
       fireEvent.touchEnd(target, { changedTouches: [{ clientX: to, clientY: 100 + dy }] });
     };
 
+    it.each(['月', '日'])('%sの週帯は指に追従し、同月の次週・前週をページ送りする', (view) => {
+      render(<CalendarScreen />);
+      if (view === '日') fireEvent.click(screen.getByRole('radio', { name: '日' }));
+      else fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      const strip = () => view === '月' ? screen.getByTestId('month-grid') : screen.getAllByTestId('swipe-surface')[0]!;
+      const viewport = () => view === '月' ? strip().closest('[data-testid="month-slide"]')! : strip().querySelector('[data-testid="month-slide"]')!;
+      fireEvent.touchStart(strip(), { touches: [{ clientX: 150, clientY: 100 }] });
+      fireEvent.touchMove(strip(), { touches: [{ clientX: 90, clientY: 102 }] });
+      expect((viewport().firstElementChild as HTMLElement).style.transform).toBe('translateX(-60px)');
+      fireEvent.touchEnd(strip(), { changedTouches: [{ clientX: 70, clientY: 102 }] });
+      expect(screen.getByRole('heading', { name: '9月15日(火)' })).toBeInTheDocument();
+      expect(viewport().querySelector('.month-page-exit')).toHaveAttribute('inert');
+      expect(viewport().querySelector('.month-page-enter')?.getAttribute('style')).toContain('100% + -60px');
+      expect(screen.getByRole('button', { name: '9月15日を開く' })).toBeInTheDocument();
+      // 逆方向へ続けて送っても、退出コピーは1枚だけに保つ。
+      swipe(strip(), 20, 100);
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      expect(viewport().querySelectorAll('.month-page-exit')).toHaveLength(1);
+      expect(viewport().querySelector('.month-page-enter')?.getAttribute('style')).toContain('-100%');
+    });
+
+    it.each(['月', '日'])('%sの当日予定も翌日・前日へスライドし、写真を退出コピーへ含めない', async (view) => {
+      photoPlatform.native = true;
+      entitlement.canViewPhotos = true;
+      window.localStorage.setItem(DEVICE_PHOTOS_ENABLED_STORAGE_KEY, 'true');
+      resetDevicePhotosEnabledForTests();
+      render(<CalendarScreen />);
+      if (view === '日') fireEvent.click(screen.getByRole('radio', { name: '日' }));
+      else fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      await screen.findByRole('button', { name: /の写真を拡大/ });
+      const day = () => screen.getAllByTestId('swipe-surface').at(-1)!;
+      swipe(day(), 100, 20);
+      expect(screen.getByRole('heading', { name: '9月9日(水)' })).toBeInTheDocument();
+      const outgoing = day().querySelector('.month-page-exit');
+      expect(outgoing).toHaveAttribute('inert');
+      expect(outgoing?.querySelector('img')).toBeNull();
+      expect(outgoing).not.toHaveTextContent('この日の写真');
+      expect(day().querySelector('.month-page-enter')?.getAttribute('style')).toContain('100%');
+      expect(screen.getAllByRole('heading', { name: 'この日の写真' })).toHaveLength(1);
+      expect(day().querySelector('section[data-date]')).toHaveAttribute('data-date', '2026-09-09');
+      swipe(day(), 20, 100);
+      expect(screen.getByRole('heading', { name: '9月8日(火)' })).toBeInTheDocument();
+      expect(day().querySelector('.month-page-enter')?.getAttribute('style')).toContain('-100%');
+    });
+
+    it('週の退出アニメーション中も秘密の公開範囲が変わればコピーを直ちに消す', () => {
+      secretState.unlocked = true;
+      evState.events = [{ ...sampleEvent, title: '退出中の秘密予定', isSecret: true }];
+      const page = render(<CalendarScreen />);
+      fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
+      swipe(screen.getByTestId('month-grid'), 100, 20);
+      expect(page.container.querySelector('.month-page-exit')).toHaveTextContent('退出中の秘密予定');
+      secretState.unlocked = false;
+      page.rerender(<CalendarScreen />);
+      expect(page.container.querySelector('.month-page-exit')).toBeNull();
+      expect(page.container).not.toHaveTextContent('退出中の秘密予定');
+    });
+
     it('日付はキーボードでも当日予定を開ける', () => {
       render(<CalendarScreen />);
       fireEvent.keyDown(screen.getByRole('button', { name: '9月8日を開く' }), { key: 'Enter' });

@@ -3,7 +3,7 @@ import { EVENT_STAMPS } from '@/lib/event-stamps';
 
 export function EventStamp({
   id,
-  color = 'currentColor',
+  color = 'var(--color-accent)',
   size = '1.25em',
   label = true,
 }: {
@@ -32,6 +32,8 @@ export function EventStamp({
       className="shrink-0"
       style={{ display: 'inline-block', verticalAlign: '-0.2em' }}
     >
+      {/* ラベルがテーマ色と同系色でも線画を読めるよう、テーマの面色で縁を付ける。 */}
+      <path d={path} stroke="var(--color-surface-base)" strokeWidth="3.7" />
       <path d={path} />
     </svg>
   );

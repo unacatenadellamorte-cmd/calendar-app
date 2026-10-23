@@ -79,6 +79,7 @@ export function WeekView({
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [cursor]);
   const labels = weekdayLabels();
+  const pageContentVersion = useMemo(() => ({ events, calendarById, userId }), [events, calendarById, userId]);
   const shiftDay = (delta: 1 | -1) => onDateChange?.(addDays(cursor, delta));
   const shiftWeek = (delta: 1 | -1) => onDateChange?.(addDays(cursor, delta * 7));
   const content = (
@@ -102,7 +103,7 @@ export function WeekView({
         </div>
       </div>
 
-      <div ref={scrollRef} className="max-h-[calc(100dvh-16rem)] overflow-y-auto">
+      <div ref={scrollRef} data-page-scroll className="max-h-[calc(100dvh-16rem)] overflow-y-auto">
         <div className="flex">
           <div className="relative w-12 flex-none" style={{ height: HOUR_PX * 24 }}>
             {HOURS.map((h) => (
@@ -158,13 +159,13 @@ export function WeekView({
           </div>
         </div>
       </div>
-      <DayPhotoSection date={cursor} suspended={photosSuspended} userId={userId} />
     </>
   );
-  if (!onDateChange) return <div>{content}</div>;
+  const photos = <DayPhotoSection date={cursor} suspended={photosSuspended} userId={userId} />;
+  if (!onDateChange) return <div>{content}{photos}</div>;
   return (
     <div>
-      <SwipeSurface onSwipe={shiftWeek} className="mb-2">
+      <SwipeSurface onSwipe={shiftWeek} className="mb-2" pageKey={weekDays[0]}>
         <div className="grid grid-cols-7 text-center" data-testid="week-strip">
           {weekDays.map((date, i) => (
             <button
@@ -185,7 +186,9 @@ export function WeekView({
           ))}
         </div>
       </SwipeSurface>
-      <SwipeSurface onSwipe={shiftDay}>{content}</SwipeSurface>
+      <SwipeSurface onSwipe={shiftDay} pageKey={cursor} contentVersion={pageContentVersion} footer={photos}>
+        {content}
+      </SwipeSurface>
     </div>
   );
 }

@@ -71,10 +71,7 @@ export function EventListItem({
             }
           >
             {knownStampId && (
-              <EventStamp
-                id={knownStampId}
-                color={filled ? labelTextColor(color) : 'currentColor'}
-              />
+              <EventStamp id={knownStampId} />
             )}
             {!stampOnly && event.title}
           </span>

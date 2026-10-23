@@ -113,7 +113,6 @@ export function EventTagFormSheet({
         </p>
         <StampPicker
           value={stampId}
-          color={color}
           onChange={setStampId}
           disabled={submitting}
         />
@@ -176,7 +175,7 @@ export function EventTagFormSheet({
           style={{ backgroundColor: color, color: labelTextColor(color) }}
         >
           <span className="flex min-w-0 items-center gap-2">
-            {stampId && <EventStamp id={stampId} color={labelTextColor(color)} />}
+            {stampId && <EventStamp id={stampId} />}
             <span className="truncate">{name || (stampId ? '' : t('予定のプレビュー'))}</span>
           </span>
         </div>

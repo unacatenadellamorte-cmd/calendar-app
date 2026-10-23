@@ -144,6 +144,12 @@ export function CalendarScreen({
   // 日ごとの予定グルーピング(優先度順)は MonthView / DayEventPanel の両方が使う派生データなので、
   // ここで一度だけ計算して props で渡す(calendarById と同じ「呼び出し元で計算」の慣習)。
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
+  // 日付移動で作り直す byDay と分け、週送り中も退出ページを保つ。
+  // 秘密の公開範囲や予定・カレンダーが変わった場合は即座に破棄する。
+  const pageContentVersion = useMemo(
+    () => ({ events: visibleEvents, calendars: calendarById }),
+    [visibleEvents, calendarById],
+  );
   const monthCells = useMemo(() => {
     const { year, month } = ymd(cursor);
     return monthGridDays(year, month, today);
@@ -416,11 +422,13 @@ export function CalendarScreen({
             onDayDoubleTap={openDayPanel}
             collapsedToWeekOf={selectedDay ?? undefined}
             onBackToMonth={closeDayPanel}
+            contentVersion={pageContentVersion}
             onSwipeLeft={selectedDay ? () => shiftSelectedDay(7) : goNext}
             onSwipeRight={selectedDay ? () => shiftSelectedDay(-7) : goPrev}
           />
           {selectedDay && (
             <DayEventPanel
+              contentVersion={pageContentVersion}
               date={selectedDay}
               byDay={byDay}
               calendarById={calendarById}

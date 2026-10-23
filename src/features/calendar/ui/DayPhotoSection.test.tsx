@@ -160,6 +160,42 @@ describe('DayPhotoSection 写真の有料ガード', () => {
     expect(nativePlugin.checkPermission).toHaveBeenCalled();
     expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
   });
+
+  it('背面で権利が失効し、復帰後に権利が戻っても写真を自動表示できる', async () => {
+    enableSetting();
+    givenPermission('granted');
+    const { rerender } = render(<DayPhotoSection date={DAY} />);
+    await screen.findByRole('button', { name: '9:05 の写真を拡大' });
+    await act(async () => { appState.listener?.({ isActive: false }); });
+    entitlement.canViewPhotos = false;
+    rerender(<DayPhotoSection date={DAY} />);
+    await act(async () => {});
+    nativePlugin.checkPermission.mockClear();
+    nativePlugin.listAssets.mockClear();
+    await act(async () => { appState.listener?.({ isActive: true }); });
+    expect(nativePlugin.checkPermission).not.toHaveBeenCalled();
+    expect(nativePlugin.listAssets).not.toHaveBeenCalled();
+    entitlement.canViewPhotos = true;
+    rerender(<DayPhotoSection date={DAY} />);
+    expect(await screen.findByRole('button', { name: '9:05 の写真を拡大' })).toBeInTheDocument();
+    expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
+  });
+
+  it('権利がない間に背面化し、背面のまま権利が戻っても復帰まで写真を読まない', async () => {
+    enableSetting();
+    givenPermission('granted');
+    entitlement.canViewPhotos = false;
+    const { rerender } = render(<DayPhotoSection date={DAY} />);
+    await act(async () => { appState.listener?.({ isActive: false }); });
+    entitlement.canViewPhotos = true;
+    rerender(<DayPhotoSection date={DAY} />);
+    await act(async () => {});
+    expect(nativePlugin.checkPermission).not.toHaveBeenCalled();
+    expect(nativePlugin.listAssets).not.toHaveBeenCalled();
+    await act(async () => { appState.listener?.({ isActive: true }); });
+    expect(await screen.findByRole('button', { name: '9:05 の写真を拡大' })).toBeInTheDocument();
+    expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
+  });
 });
 
 describe('DayPhotoSection', () => {

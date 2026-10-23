@@ -26,6 +26,8 @@ interface MonthViewProps {
   onSwipeLeft?: () => void;
   /** 右スワイプ(前月へ)。 */
   onSwipeRight?: () => void;
+  /** 日付移動では変えず、予定の内容や公開範囲が変わったら更新する。 */
+  contentVersion?: unknown;
 }
 const MAX_CHIPS = 3;
 /** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
@@ -41,6 +43,7 @@ export function MonthView({
   onBackToMonth,
   onSwipeLeft,
   onSwipeRight,
+  contentVersion = byDay,
 }: MonthViewProps) {
   useLanguage();
   const { year, month } = ymd(cursor);
@@ -202,10 +205,11 @@ export function MonthView({
       )}
 
       <MonthSlide
-        monthKey={cursor.slice(0, 7)}
+        key={isCollapsed ? 'week' : 'month'}
+        monthKey={isCollapsed ? cells[0]!.date : cursor.slice(0, 7)}
         offset={dragOffset}
         dragging={dragging}
-        contentVersion={byDay}
+        contentVersion={contentVersion}
       >
         <div
           key={`${year}-${month}`}

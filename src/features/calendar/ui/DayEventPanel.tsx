@@ -20,6 +20,7 @@ interface DayEventPanelProps {
   userId?: string;
   /** 当日予定の横スワイプ。左スワイプ(翌日)は +1、右スワイプ(前日)は -1。 */
   onDayShift?: (delta: 1 | -1) => void;
+  contentVersion?: unknown;
 }
 /**
  * 月表示の折りたたみ(Option C)の下に出す、選択中の日付の予定一覧パネル。
@@ -35,6 +36,7 @@ export function DayEventPanel({
   photosSuspended = false,
   userId,
   onDayShift,
+  contentVersion = byDay,
 }: DayEventPanelProps) {
   useLanguage();
   const dayEvents = byDay.get(date) ?? [];
@@ -64,9 +66,12 @@ export function DayEventPanel({
       >
         {t('＋ この日に予定を追加')}
       </button>
-
-      <DayPhotoSection date={date} suspended={photosSuspended} userId={userId} />
     </section>
   );
-  return onDayShift ? <SwipeSurface onSwipe={onDayShift}>{body}</SwipeSurface> : body;
+  const photos = <DayPhotoSection date={date} suspended={photosSuspended} userId={userId} />;
+  return onDayShift ? (
+    <SwipeSurface onSwipe={onDayShift} pageKey={date} contentVersion={contentVersion} footer={photos}>
+      {body}
+    </SwipeSurface>
+  ) : <>{body}{photos}</>;
 }

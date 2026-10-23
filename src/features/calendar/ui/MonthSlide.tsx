@@ -19,7 +19,7 @@ export function MonthSlide({
 }: MonthSlideProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const page = useRef<HTMLDivElement>(null);
-  const previous = useRef<{ key: string; node: HTMLElement; version: unknown } | null>(null);
+  const previous = useRef<{ key: string; node: HTMLElement; version: unknown; scrollTops: number[] } | null>(null);
   const outgoing = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => {
@@ -56,6 +56,9 @@ export function MonthSlide({
         ghost.style.transform = '';
         ghost.style.transition = 'none';
         host.appendChild(ghost);
+        ghost.querySelectorAll<HTMLElement>('[data-page-scroll]').forEach((node, index) => {
+          node.scrollTop = old.scrollTops[index] ?? 0;
+        });
         outgoing.current = ghost;
         const fromOffset =
           /translateX\((-?[\d.]+)px\)/.exec(
@@ -78,11 +81,28 @@ export function MonthSlide({
     }
     const snapshot = current.cloneNode(true) as HTMLElement;
     snapshot.className = '';
-    previous.current = { key: monthKey, node: snapshot, version: contentVersion };
+    previous.current = {
+      key: monthKey,
+      node: snapshot,
+      version: contentVersion,
+      scrollTops: Array.from(current.querySelectorAll<HTMLElement>('[data-page-scroll]'), (node) => node.scrollTop),
+    };
   });
   useLayoutEffect(() => clear, []);
   return (
-    <div ref={viewport} className="relative overflow-hidden" data-testid="month-slide">
+    <div
+      ref={viewport}
+      className="relative overflow-hidden"
+      data-testid="month-slide"
+      onScrollCapture={() => {
+        if (previous.current && page.current) {
+          previous.current.scrollTops = Array.from(
+            page.current.querySelectorAll<HTMLElement>('[data-page-scroll]'),
+            (node) => node.scrollTop,
+          );
+        }
+      }}
+    >
       <div
         ref={page}
         style={

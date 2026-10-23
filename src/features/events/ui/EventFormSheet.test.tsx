@@ -53,6 +53,20 @@ function setup(overrides: Partial<Parameters<typeof EventFormSheet>[0]> = {}) {
 }
 
 describe('EventFormSheet', () => {
+  it('スタンプ一覧は＋で開き、選択後に閉じても保存値とテーマ色のプレビューを保持する', async () => {
+    const user = userEvent.setup();
+    const { onCreate } = setup();
+    expect(screen.queryByRole('group', { name: 'スタンプを選択' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('タイトル'), '予定');
+    await user.click(screen.getByRole('button', { name: 'スタンプを選択' }));
+    await user.click(screen.getByRole('button', { name: '学校' }));
+    await user.click(screen.getByRole('button', { name: 'スタンプを選択' }));
+    expect(screen.queryByRole('group', { name: 'スタンプを選択' })).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '学校' })).toHaveAttribute('stroke', 'var(--color-accent)');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ stampId: 'school', title: '予定' }));
+  });
+
   it('新規予定は先頭のシフトではなく通常カレンダーを既定にする', async () => {
     const shift = { ...calendars[0]!, id: 'shift', name: 'シフト', isShift: true };
     setup({ calendars: [shift, ...calendars] });
@@ -517,6 +531,7 @@ describe('予定タグの適用', () => {
     await waitFor(() => expect(screen.getByLabelText('タグ')).not.toBeDisabled());
     await userEvent.selectOptions(screen.getByLabelText('タグ'), 'tag1');
     expect(screen.getByLabelText('タイトル')).toHaveValue('仕事');
+    await userEvent.click(screen.getByRole('button', { name: 'スタンプを選択' }));
     expect(screen.getByRole('button', { name: '仕事' })).toHaveAttribute(
       'aria-pressed',
       'true',

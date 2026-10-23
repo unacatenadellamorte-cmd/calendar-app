@@ -43,7 +43,9 @@ export function useDayPhotos(date: string, wanted: boolean, userId?: string) {
     return () => document.removeEventListener('visibilitychange', onChange);
   }, [wanted]);
   useEffect(() => {
-    if (!wanted || !isDevicePhotosSupported()) return;
+    // 権利の失効中も復帰通知を受け取り、再有効化時に古い背面状態を残さない。
+    // 写真の権限確認と読込は active の判定で止める。
+    if (!isDevicePhotosSupported()) return;
     let disposed = false;
     const listener = App.addListener('appStateChange', ({ isActive }) => {
       if (!disposed) setNativeHidden(!isActive);
@@ -52,7 +54,7 @@ export function useDayPhotos(date: string, wanted: boolean, userId?: string) {
       disposed = true;
       void listener.then((handle) => handle.remove()).catch(() => {});
     };
-  }, [wanted]);
+  }, []);
   const active = wanted && !hidden && !nativeHidden;
   // 再確認・再試行のたびに進め、権限の確認から読み直す。
   const [reloadKey, setReloadKey] = useState(0);
