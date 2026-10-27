@@ -2,9 +2,10 @@ import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
+import { makePriorityOf, monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
 import { EventChip } from './EventChip';
 import { MonthSlide } from './MonthSlide';
+import { layoutMonthEventSlots } from '@/lib/month-event-layout';
 interface MonthViewProps {
   cursor: string;
   /** 日付("YYYY-MM-DD")→ その日の予定(優先度順)。呼び出し元(`CalendarScreen`)で計算済みのものを渡す。 */
@@ -28,6 +29,7 @@ interface MonthViewProps {
   onSwipeRight?: () => void;
   /** 日付移動では変えず、予定の内容や公開範囲が変わったら更新する。 */
   contentVersion?: unknown;
+  stampedEventIds?: readonly string[];
 }
 const MAX_CHIPS = 3;
 /** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
@@ -44,6 +46,7 @@ export function MonthView({
   onSwipeLeft,
   onSwipeRight,
   contentVersion = byDay,
+  stampedEventIds = [],
 }: MonthViewProps) {
   useLanguage();
   const { year, month } = ymd(cursor);
@@ -57,6 +60,10 @@ export function MonthView({
   // ここでの防御を残すことで、そのクリアが反映されるまでの1フレームも壊れた表示にしない。)
   const isCollapsed = Boolean(weekCells && weekCells.length > 0);
   const cells = isCollapsed ? (weekCells as DayCell[]) : allCells;
+  const slotsByDay = useMemo(
+    () => layoutMonthEventSlots(cells.map((cell) => cell.date), byDay, MAX_CHIPS, makePriorityOf(calendarById)),
+    [cells, byDay, calendarById],
+  );
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const swipeAxis = useRef<'x' | 'y' | null>(null);
@@ -222,8 +229,8 @@ export function MonthView({
         >
           {cells.map((cell) => {
             const dayEvents = byDay.get(cell.date) ?? [];
-            const shown = dayEvents.slice(0, MAX_CHIPS);
-            const overflow = dayEvents.length - shown.length;
+            const slots = slotsByDay.get(cell.date) ?? [];
+            const overflow = dayEvents.length - slots.filter(Boolean).length;
             return (
               <div
                 key={cell.date}
@@ -314,15 +321,18 @@ export function MonthView({
                   {cell.day}
                 </button>
 
-                {shown.map((event) => (
-                  <EventChip
-                    key={event.id}
-                    event={event}
-                    calendar={calendarById.get(event.calendarId)}
-                    onTap={() => onDayTap(cell.date)}
-                    showTime={false}
-                    month
-                  />
+                {slots.map((slot, lane) => (
+                  <div key={slot?.event.id ?? `empty-${lane}`} className="month-event-slot">
+                    {slot && <EventChip
+                      event={slot.event}
+                      calendar={calendarById.get(slot.event.calendarId)}
+                      onTap={() => onDayTap(cell.date)}
+                      showTime={false}
+                      month
+                      connection={slot}
+                      stampAnimation={stampedEventIds.includes(slot.event.id)}
+                    />}
+                  </div>
                 ))}
 
                 {overflow > 0 && (

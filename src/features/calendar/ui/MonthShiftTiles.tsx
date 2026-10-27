@@ -43,6 +43,7 @@ export function MonthShiftTiles({
   const busyRef = useRef(false);
   const operationRef = useRef<{ key: string; ids: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pressedTemplateId, setPressedTemplateId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -143,6 +144,7 @@ export function MonthShiftTiles({
     setBusy(true);
     setError(null);
     setNotice('');
+    setPressedTemplateId(template.id);
     try {
       const result = await createShifts(calendar.id, template, [date], operationRef.current.ids);
       if (!result.ok) {
@@ -165,6 +167,7 @@ export function MonthShiftTiles({
     } finally {
       busyRef.current = false;
       setBusy(false);
+      setPressedTemplateId(null);
     }
   };
   return (
@@ -323,7 +326,7 @@ export function MonthShiftTiles({
               }}
               onContextMenu={(event) => event.preventDefault()}
               aria-label={t('{0}を{1}に追加', [template.name, date])}
-              className="flex aspect-square min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-border-hairline border-t-2 bg-surface-raised p-1 disabled:opacity-50"
+              className={`touch-manipulation flex aspect-square min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-border-hairline border-t-2 bg-surface-raised p-1 disabled:opacity-50 ${pressedTemplateId === template.id ? 'shift-stamp-press' : ''}`}
               style={{ borderTopColor: template.color }}
             >
               <span className="line-clamp-2 max-w-full break-words text-xs font-semibold">

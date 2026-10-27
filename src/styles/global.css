@@ -273,6 +273,31 @@ textarea { font-size: max(16px, 1rem); }
 .month-event-chip {
   font-size: var(--month-event-font-size, 8px);
 }
+.month-event-slot {
+  height: calc(var(--month-event-font-size, 8px) * 1.6);
+  flex-shrink: 0;
+}
+/* 押した反応と、保存が確定して予定を置く動きを分ける。 */
+.shift-stamp-press {
+  animation: shift-stamp-press 180ms ease-out;
+  opacity: 1;
+}
+.shift-stamp-arrival {
+  animation: shift-stamp-arrival 450ms ease-out;
+  transform-origin: center;
+}
+@keyframes shift-stamp-press {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(0.9); }
+}
+@keyframes shift-stamp-arrival {
+  0% { opacity: 0.35; transform: scale(1.16) rotate(-3deg); }
+  55% { opacity: 1; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shift-stamp-press, .shift-stamp-arrival { animation: none; }
+}
 .app-screen > main {
   padding-bottom: calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
 }

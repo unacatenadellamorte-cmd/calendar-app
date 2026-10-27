@@ -34,6 +34,24 @@ const event = (over: Partial<EventItem> = {}): EventItem => ({
 });
 
 describe('月表示のシフトタイル', () => {
+  it('通信中も押した反応を返し、連打を防ぎ、保存成功後にだけ予定を追加する', async () => {
+    let finish!: (value: ReturnType<typeof ok<EventItem[]>>) => void;
+    createShifts.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const onCreated = vi.fn();
+    render(<MonthShiftTiles date="2026-09-08" calendars={[calendar]} enabled events={[]}
+      onDateChange={vi.fn()} onRemove={vi.fn()} onCreated={onCreated} />);
+    const button = screen.getByRole('button', { name: '夜勤を2026-09-08に追加' });
+    fireEvent.click(button);
+    expect(button).toHaveClass('shift-stamp-press');
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(createShifts).toHaveBeenCalledTimes(1);
+    expect(onCreated).not.toHaveBeenCalled();
+    await act(async () => finish(ok([event()])));
+    expect(onCreated).toHaveBeenCalledWith([event()]);
+    expect(button).not.toBeDisabled();
+    expect(button).not.toHaveClass('shift-stamp-press');
+  });
   it('短押しは追加し、500ms長押しは編集だけを開く', () => {
     vi.useFakeTimers();
     try {

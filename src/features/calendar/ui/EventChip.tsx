@@ -6,6 +6,7 @@ import { eventLabelColor, labelTextColor } from '@/lib/event-label';
 import { formatClock } from '@/lib/datetime';
 import { EventStamp } from '@/ui/EventStamp';
 import { eventStampName, isEventStampId } from '@/lib/event-stamps';
+import type { MonthEventSlot } from '@/lib/month-event-layout';
 interface EventChipProps {
   event: EventItem;
   calendar: Calendar | undefined;
@@ -18,6 +19,8 @@ interface EventChipProps {
   showTime?: boolean;
   /** 月表示の狭いセル向け。件名が収まらないときだけ横に流す。 */
   month?: boolean;
+  connection?: Omit<MonthEventSlot, 'event'>;
+  stampAnimation?: boolean;
 }
 /**
  * 予定チップ。カレンダーの色バー(色だけで意味を運ばないため name/time と併用)+ 時刻 + タイトル。
@@ -31,6 +34,8 @@ export function EventChip({
   wrap = false,
   showTime = true,
   month = false,
+  connection,
+  stampAnimation = false,
 }: EventChipProps) {
   useLanguage();
   const titleViewportRef = useRef<HTMLSpanElement>(null);
@@ -99,7 +104,20 @@ export function EventChip({
               paddingInline: 2,
             }
           : {}),
+        ...(connection ? {
+          height: '100%',
+          width: `calc(100% + ${(connection.joinedBefore ? 2 : 0) + (connection.joinedAfter ? 3 : 0)}px)`,
+          marginLeft: connection.joinedBefore ? -2 : 0,
+          borderTopLeftRadius: connection.joinedBefore ? 0 : undefined,
+          borderBottomLeftRadius: connection.joinedBefore ? 0 : undefined,
+          borderTopRightRadius: connection.joinedAfter ? 0 : undefined,
+          borderBottomRightRadius: connection.joinedAfter ? 0 : undefined,
+          ...(connection.joinedBefore ? { borderLeftWidth: 0 } : {}),
+        } : {}),
       }}
+      data-event-id={event.id}
+      data-joined-before={connection?.joinedBefore || undefined}
+      data-joined-after={connection?.joinedAfter || undefined}
       aria-label={label}
       title={
         calendar
@@ -110,11 +128,13 @@ export function EventChip({
       }
       className={[
         'flex w-full items-baseline gap-1 overflow-hidden rounded-sm border-l-[3px]',
+        stampAnimation ? 'shift-stamp-arrival' : '',
         month
           ? 'month-event-chip bg-surface-raised px-0 py-0 text-left text-[0.5rem] leading-tight text-ink-primary'
           : 'bg-surface-raised px-1.5 py-0.5 text-left text-meta text-ink-primary',
       ].join(' ')}
     >
+      {connection?.continuesBefore && !connection.joinedBefore && <span aria-hidden="true" className="shrink-0">←</span>}
       {showTime && time && (
         <span
           className={filled ? 'flex-none tabular' : 'flex-none tabular text-ink-secondary'}
@@ -146,6 +166,7 @@ export function EventChip({
           {visibleTitle}
         </span>
       )}
+      {connection?.continuesAfter && !connection.joinedAfter && <span aria-hidden="true" className="shrink-0">→</span>}
     </button>
   );
 }

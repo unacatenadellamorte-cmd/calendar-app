@@ -4,6 +4,7 @@ import type { ShiftTemplate } from './shift-templates';
 let queryResult: { data: unknown; error: unknown } = { data: null, error: null };
 const calls: { method: string; args: unknown[] }[] = [];
 let rowsForIds: string[] = [];
+let responses: { data: unknown; error: unknown }[] = [];
 
 function makeChain() {
   const chain: Record<string, unknown> = {};
@@ -15,7 +16,7 @@ function makeChain() {
       return chain;
     };
   for (const m of ['select', 'insert', 'upsert', 'update', 'eq', 'is', 'order', 'in']) chain[m] = record(m);
-  chain.then = (resolve: (v: unknown) => unknown) => resolve({
+  chain.then = (resolve: (v: unknown) => unknown) => resolve(responses.shift() ?? {
     ...queryResult,
     data: queryResult.error ? queryResult.data : rowsForIds.length
       ? rowsForIds.map((id, index) => ({
@@ -77,6 +78,7 @@ beforeEach(() => {
   vi.resetModules();
   calls.length = 0;
   rowsForIds = [];
+  responses = [];
   queryResult = { data: null, error: null };
   supabaseValue = { from };
   from.mockReset();
@@ -102,6 +104,31 @@ describe('buildShiftTimes', () => {
 });
 
 describe('createShifts', () => {
+  it('新規登録は返却行を使い、再取得の通信を増やさない', async () => {
+    const { createShifts } = await load();
+    const result = await createShifts('shift', tpl, ['2026-09-08'], ['fast']);
+    expect(result.ok && result.value[0]?.id).toBe('fast');
+    expect(from).toHaveBeenCalledTimes(1);
+  });
+  it('一部が再送でも不足IDだけ取得し、編集済みの既存行と新規行を順番どおり返す', async () => {
+    responses = [
+      { data: [eventRow({ id: 'new' })], error: null },
+      { data: [eventRow({ id: 'old', title: '編集済み', is_secret: true, reminder_minutes: 15 })], error: null },
+    ];
+    const { createShifts } = await load();
+    const result = await createShifts('shift', tpl, ['2026-09-08', '2026-09-09'], ['old', 'new']);
+    expect(result.ok && result.value.map((event) => event.id)).toEqual(['old', 'new']);
+    expect(result.ok && result.value[0]).toMatchObject({ title: '編集済み', isSecret: true, reminderMinutes: 15 });
+    expect(calls.find((call) => call.method === 'in')?.args).toEqual(['id', ['old']]);
+  });
+  it.each([
+    { data: [], error: null },
+    { data: null, error: { message: '読取失敗', code: '42501' } },
+  ])('再送したIDを読み戻せないときは成功扱いしない: %j', async (response) => {
+    responses = [{ data: [], error: null }, response];
+    const { createShifts } = await load();
+    expect((await createShifts('shift', tpl, ['2026-09-08'], ['old'])).ok).toBe(false);
+  });
   it('同じフォームの再送は事前発番したIDを使い、衝突を無視する', async () => {
     queryResult = { data: [eventRow({ id: 'op-1' })], error: null };
     const { createShifts } = await load();

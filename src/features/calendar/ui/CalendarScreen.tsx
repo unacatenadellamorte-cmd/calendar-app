@@ -61,6 +61,12 @@ export function CalendarScreen({
   const { unlocked } = useSecretMode();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [stampedEventIds, setStampedEventIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (stampedEventIds.length === 0) return;
+    const timer = setTimeout(() => setStampedEventIds([]), 500);
+    return () => clearTimeout(timer);
+  }, [stampedEventIds]);
   const [searchCalendarId, setSearchCalendarId] = useState('');
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
@@ -413,6 +419,7 @@ export function CalendarScreen({
       ) : view === 'month' ? (
         <>
           <MonthView
+            stampedEventIds={stampedEventIds}
             cursor={cursor}
             byDay={byDay}
             calendarById={calendarById}
@@ -445,7 +452,10 @@ export function CalendarScreen({
               date={cursor}
               calendars={cal.calendars}
               enabled={enabled}
-              onCreated={ev.addLocal}
+              onCreated={(events) => {
+                ev.addLocal(events);
+                setStampedEventIds(events.map((event) => event.id));
+              }}
               events={visibleEvents}
               onDateChange={jumpTo}
               onRemove={ev.remove}

@@ -79,17 +79,22 @@ export async function createShifts(
   });
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('events')
       .upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
-      .select('id');
+      .select(EVENT_COLUMNS);
     if (error) return err(fromPostgrest(error));
-    const { data, error: readError } = await supabase
-      .from('events')
-      .select(EVENT_COLUMNS)
-      .in('id', ids);
-    if (readError) return err(fromPostgrest(readError));
-    const byId = new Map((data as Record<string, unknown>[]).map((row) => [row.id, row]));
+    // 新規登録は保存応答だけで確定する。再送で衝突したIDだけを読み戻し、編集済み属性を保つ。
+    const byId = new Map(((data ?? []) as EventRow[]).map((row) => [row.id, row]));
+    const missingIds = ids.filter((id) => !byId.has(id));
+    if (missingIds.length > 0) {
+      const { data: existing, error: readError } = await supabase
+        .from('events')
+        .select(EVENT_COLUMNS)
+        .in('id', missingIds);
+      if (readError) return err(fromPostgrest(readError));
+      for (const row of (existing ?? []) as EventRow[]) byId.set(row.id, row);
+    }
     if (ids.some((id) => !byId.has(id))) return err(appError('data/query', 'data/query'));
     const created = ids.map((id) => toEvent(byId.get(id)! as unknown as EventRow));
     for (const row of created) await cachePut('events', row);

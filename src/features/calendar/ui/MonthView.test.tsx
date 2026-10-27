@@ -78,6 +78,18 @@ function setup(
 }
 
 describe('MonthView', () => {
+  it('夜勤を隣接日に同じ段の帯でつなぎ、保存した予定だけにスタンプの動きを付ける', () => {
+    const night = ev({ id: 'night', title: '夜勤', startsAt: new Date('2026-09-08T22:00').toISOString(), endsAt: new Date('2026-09-09T06:00').toISOString() });
+    const { container, onDayTap } = setup([ev(), night], { stampedEventIds: ['night'] });
+    const chips = container.querySelectorAll<HTMLButtonElement>('[data-event-id="night"]');
+    expect(chips).toHaveLength(2);
+    expect(chips[0]).toHaveAttribute('data-joined-after', 'true');
+    expect(chips[1]).toHaveAttribute('data-joined-before', 'true');
+    expect(chips[0]).toHaveClass('shift-stamp-arrival');
+    expect(container.querySelector('[data-event-id="e1"]')).not.toHaveClass('shift-stamp-arrival');
+    fireEvent.click(chips[1]!);
+    expect(onDayTap).toHaveBeenCalledWith('2026-09-09');
+  });
   it('長押し後に指の下へ移動したセル外のボタンも誤タップせず、次の操作は受け付ける', () => {
     vi.useFakeTimers();
     try {
