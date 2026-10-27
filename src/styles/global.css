@@ -278,7 +278,7 @@ textarea { font-size: max(16px, 1rem); }
   height: calc(var(--month-event-font-size, 8px) * 1.6);
   flex-shrink: 0;
 }
-/* 各日は上に詰め、段差は日付の境目にある細い線だけで吸収する。 */
+/* 各日は上に詰め、日付の境目は帯から滑らかに続く曲線でつなぐ。 */
 .month-event-connector {
   position: absolute;
   left: calc(100% - 4px);

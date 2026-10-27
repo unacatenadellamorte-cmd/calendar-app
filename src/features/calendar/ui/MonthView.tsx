@@ -343,13 +343,12 @@ export function MonthView({
                         data-lane-offset={slot.nextLaneOffset}
                       >
                         <path
-                          d={`M 0 0 H 6.5 V ${slot.nextLaneOffset} H 13`}
+                          d={`M 0 0 C 6.5 0 6.5 ${slot.nextLaneOffset} 13 ${slot.nextLaneOffset}`}
                           fill="none"
                           stroke={slot.event.source === 'local'
                             ? eventLabelColor(slot.event, calendarById.get(slot.event.calendarId))
                             : calendarById.get(slot.event.calendarId)?.color ?? 'var(--color-ink-disabled)'}
-                          strokeWidth="2.5"
-                          strokeLinejoin="miter"
+                          strokeWidth="5"
                           strokeLinecap="round"
                           vectorEffect="non-scaling-stroke"
                         />
