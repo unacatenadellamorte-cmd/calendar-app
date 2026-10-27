@@ -33,6 +33,12 @@ interface MonthViewProps {
   stampedEventIds?: readonly string[];
 }
 const MAX_CHIPS = 3;
+/** 縦の区間を残し、両端の90度だけを丸く曲げる。 */
+function connectorPath(offset: number): string {
+  if (offset === 0) return 'M 0 0 H 13';
+  const bend = Math.sign(offset) * 0.25;
+  return `M 0 0 H 3 Q 6.5 0 6.5 ${bend} V ${offset - bend} Q 6.5 ${offset} 10 ${offset} H 13`;
+}
 /** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
 export function MonthView({
   cursor,
@@ -343,7 +349,7 @@ export function MonthView({
                         data-lane-offset={slot.nextLaneOffset}
                       >
                         <path
-                          d={`M 0 0 C 6.5 0 6.5 ${slot.nextLaneOffset} 13 ${slot.nextLaneOffset}`}
+                          d={connectorPath(slot.nextLaneOffset)}
                           fill="none"
                           stroke={slot.event.source === 'local'
                             ? eventLabelColor(slot.event, calendarById.get(slot.event.calendarId))
