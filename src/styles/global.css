@@ -274,8 +274,20 @@ textarea { font-size: max(16px, 1rem); }
   font-size: var(--month-event-font-size, 8px);
 }
 .month-event-slot {
+  position: relative;
   height: calc(var(--month-event-font-size, 8px) * 1.6);
   flex-shrink: 0;
+}
+/* 各日は上に詰め、段差は日付の境目にある細い線だけで吸収する。 */
+.month-event-connector {
+  position: absolute;
+  left: calc(100% - 4px);
+  top: 50%;
+  width: 13px;
+  height: calc(var(--month-event-font-size, 8px) * 1.6 + 0.125rem);
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
 }
 /* 押した反応と、保存が確定して予定を置く動きを分ける。 */
 .shift-stamp-press {

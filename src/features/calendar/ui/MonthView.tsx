@@ -6,6 +6,7 @@ import { makePriorityOf, monthGridDays, weekRowOf, ymd, type DayCell } from '@/l
 import { EventChip } from './EventChip';
 import { MonthSlide } from './MonthSlide';
 import { layoutMonthEventSlots } from '@/lib/month-event-layout';
+import { eventLabelColor } from '@/lib/event-label';
 interface MonthViewProps {
   cursor: string;
   /** 日付("YYYY-MM-DD")→ その日の予定(優先度順)。呼び出し元(`CalendarScreen`)で計算済みのものを渡す。 */
@@ -332,6 +333,27 @@ export function MonthView({
                       connection={slot}
                       stampAnimation={stampedEventIds.includes(slot.event.id)}
                     />}
+                    {slot?.joinedAfter && (
+                      <svg
+                        aria-hidden="true"
+                        className="month-event-connector"
+                        viewBox="0 0 13 1"
+                        preserveAspectRatio="none"
+                        data-connector-event={slot.event.id}
+                        data-lane-offset={slot.nextLaneOffset}
+                      >
+                        <path
+                          d={`M 0 0 L 13 ${slot.nextLaneOffset}`}
+                          fill="none"
+                          stroke={slot.event.source === 'local'
+                            ? eventLabelColor(slot.event, calendarById.get(slot.event.calendarId))
+                            : calendarById.get(slot.event.calendarId)?.color ?? 'var(--color-ink-disabled)'}
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      </svg>
+                    )}
                   </div>
                 ))}
 

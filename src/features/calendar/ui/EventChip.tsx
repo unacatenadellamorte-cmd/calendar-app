@@ -106,13 +106,6 @@ export function EventChip({
           : {}),
         ...(connection ? {
           height: '100%',
-          width: `calc(100% + ${(connection.joinedBefore ? 2 : 0) + (connection.joinedAfter ? 3 : 0)}px)`,
-          marginLeft: connection.joinedBefore ? -2 : 0,
-          borderTopLeftRadius: connection.joinedBefore ? 0 : undefined,
-          borderBottomLeftRadius: connection.joinedBefore ? 0 : undefined,
-          borderTopRightRadius: connection.joinedAfter ? 0 : undefined,
-          borderBottomRightRadius: connection.joinedAfter ? 0 : undefined,
-          ...(connection.joinedBefore ? { borderLeftWidth: 0 } : {}),
         } : {}),
       }}
       data-event-id={event.id}

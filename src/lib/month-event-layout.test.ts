@@ -14,7 +14,7 @@ const event = (over: Partial<EventItem> = {}): EventItem => ({
 const dates = monthGridDays(2026, 9, '2026-09-08').map((cell) => cell.date);
 
 describe('月表示の連続した予定の段', () => {
-  it('前日の別予定の有無に左右されず、夜勤を同じ段でつなぐ', () => {
+  it('前日に別予定があっても翌日は上へ詰め、夜勤の段差を接続線へ渡す', () => {
     const night = event();
     const daytime = event({ id: 'day', startsAt: new Date('2026-09-08T09:00').toISOString(), endsAt: new Date('2026-09-08T10:00').toISOString() });
     const layout = layoutMonthEventSlots(dates, groupEventsByDay([daytime, night]), 3);
@@ -22,7 +22,9 @@ describe('月表示の連続した予定の段', () => {
     const after = layout.get('2026-09-09')!;
     const lane = before.findIndex((slot) => slot?.event.id === 'night');
     expect(before[lane]).toMatchObject({ joinedBefore: false, joinedAfter: true });
-    expect(after[lane]).toMatchObject({ event: { id: 'night' }, joinedBefore: true, joinedAfter: false });
+    expect(before[lane]?.nextLaneOffset).toBe(-1);
+    expect(after[0]).toMatchObject({ event: { id: 'night' }, joinedBefore: true, joinedAfter: false });
+    expect(after).toHaveLength(1);
   });
   it('0時終了は翌日の帯につなげず、同名の別勤務もつなげない', () => {
     const first = event({ endsAt: new Date('2026-09-09T00:00').toISOString() });
@@ -56,7 +58,7 @@ describe('月表示の連続した予定の段', () => {
     const layout = layoutMonthEventSlots(dates, byDay, 3);
     const lane = layout.get('2026-09-08')!.findIndex((slot) => slot?.event.id === night.id);
     expect(layout.get('2026-09-08')![lane]).toMatchObject({ joinedAfter: true, continuesAfter: true });
-    expect(layout.get('2026-09-09')![lane]?.joinedBefore).toBe(true);
+    expect(layout.get('2026-09-09')!.find((slot) => slot?.event.id === night.id)?.joinedBefore).toBe(true);
     expect(layout.get('2026-09-09')!.filter(Boolean).map((slot) => slot!.event.id).sort()).toEqual(['a', 'b', 'c', 'night']);
     expect(layout.get('2026-09-10')).toEqual([]);
   });
@@ -65,17 +67,29 @@ describe('月表示の連続した予定の段', () => {
     const garbage = (id: string, date: string) => event({ id, calendarId: 'garbage', title: '可燃ごみ', allDay: true, eventDate: date, startsAt: null, endsAt: null });
     const night = event({ startsAt: new Date('2026-09-02T22:00').toISOString(), endsAt: new Date('2026-09-03T06:00').toISOString() });
     const layout = layoutMonthEventSlots(dates, groupEventsByDay([garbage('g1', '2026-09-01'), night, garbage('g3', '2026-09-03')], priority), 3, priority);
-    expect(layout.get('2026-09-02')!.map((slot) => slot?.event.id ?? null)).toEqual([null, 'night']);
+    expect(layout.get('2026-09-02')!.map((slot) => slot?.event.id ?? null)).toEqual(['night']);
     expect(layout.get('2026-09-03')!.map((slot) => slot?.event.id ?? null)).toEqual(['g3', 'night']);
-    expect(layout.get('2026-09-02')![1]?.joinedAfter).toBe(true);
+    expect(layout.get('2026-09-02')![0]).toMatchObject({ joinedAfter: true, nextLaneOffset: 1 });
     expect(layout.get('2026-09-03')![1]?.joinedBefore).toBe(true);
   });
-  it('予定3件＋夜勤は夜勤を4段目で翌日へつなぎ、通常予定だけなら3件上限を保つ', () => {
+  it('予定3件の下の夜勤を翌日は1段目へ戻し、通常予定だけなら3件上限を保つ', () => {
     const priority = (id: string) => id === 'plans' ? 0 : 1;
     const plans = ['a', 'b', 'c', 'd'].map((id) => event({ id, calendarId: 'plans', title: id, allDay: true, eventDate: '2026-09-08', startsAt: null, endsAt: null }));
     const night = event();
     const layout = layoutMonthEventSlots(dates, groupEventsByDay([...plans, night], priority), 3, priority);
     expect(layout.get('2026-09-08')!.map((slot) => slot?.event.id ?? null)).toEqual(['a', 'b', 'c', 'night']);
-    expect(layout.get('2026-09-09')!.map((slot) => slot?.event.id ?? null)).toEqual([null, null, null, 'night']);
+    expect(layout.get('2026-09-09')!.map((slot) => slot?.event.id ?? null)).toEqual(['night']);
+    expect(layout.get('2026-09-08')![3]?.nextLaneOffset).toBe(-3);
+  });
+  it('3日間の帯は各日の表示順に合わせて上下し、後日の予定へ空き段を残さない', () => {
+    const priority = (id: string) => ({ plans: 0, shift: 1, meeting: 2 })[id] ?? 99;
+    const long = event({ endsAt: new Date('2026-09-10T06:00').toISOString() });
+    const plan = event({ id: 'plan', calendarId: 'plans', allDay: true, eventDate: '2026-09-09', startsAt: null, endsAt: null });
+    const meeting = event({ id: 'meeting', calendarId: 'meeting', allDay: true, eventDate: '2026-09-10', startsAt: null, endsAt: null });
+    const layout = layoutMonthEventSlots(dates, groupEventsByDay([long, plan, meeting], priority), 3, priority);
+    expect(layout.get('2026-09-08')![0]).toMatchObject({ nextLaneOffset: 1 });
+    expect(layout.get('2026-09-09')!.map((slot) => slot?.event.id)).toEqual(['plan', 'night']);
+    expect(layout.get('2026-09-09')![1]).toMatchObject({ joinedBefore: true, nextLaneOffset: -1 });
+    expect(layout.get('2026-09-10')!.map((slot) => slot?.event.id)).toEqual(['night', 'meeting']);
   });
 });
