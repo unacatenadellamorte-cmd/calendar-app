@@ -7,6 +7,7 @@ import { EventChip } from './EventChip';
 import { MonthSlide } from './MonthSlide';
 import { layoutMonthEventSlots } from '@/lib/month-event-layout';
 import { eventLabelColor } from '@/lib/event-label';
+import { MonthEventConnector } from './MonthEventConnector';
 interface MonthViewProps {
   cursor: string;
   /** 日付("YYYY-MM-DD")→ その日の予定(優先度順)。呼び出し元(`CalendarScreen`)で計算済みのものを渡す。 */
@@ -33,12 +34,6 @@ interface MonthViewProps {
   stampedEventIds?: readonly string[];
 }
 const MAX_CHIPS = 3;
-/** 縦の区間を残し、両端の90度だけを丸く曲げる。 */
-function connectorPath(offset: number): string {
-  if (offset === 0) return 'M 0 0 H 13';
-  const bend = Math.sign(offset) * 0.25;
-  return `M 0 0 H 3 Q 6.5 0 6.5 ${bend} V ${offset - bend} Q 6.5 ${offset} 10 ${offset} H 13`;
-}
 /** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
 export function MonthView({
   cursor,
@@ -340,25 +335,13 @@ export function MonthView({
                       stampAnimation={stampedEventIds.includes(slot.event.id)}
                     />}
                     {slot?.joinedAfter && (
-                      <svg
-                        aria-hidden="true"
-                        className="month-event-connector"
-                        viewBox="0 0 13 1"
-                        preserveAspectRatio="none"
-                        data-connector-event={slot.event.id}
-                        data-lane-offset={slot.nextLaneOffset}
-                      >
-                        <path
-                          d={connectorPath(slot.nextLaneOffset)}
-                          fill="none"
-                          stroke={slot.event.source === 'local'
+                      <MonthEventConnector
+                        eventId={slot.event.id}
+                        offset={slot.nextLaneOffset}
+                        color={slot.event.source === 'local'
                             ? eventLabelColor(slot.event, calendarById.get(slot.event.calendarId))
                             : calendarById.get(slot.event.calendarId)?.color ?? 'var(--color-ink-disabled)'}
-                          strokeWidth="5"
-                          strokeLinecap="round"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      </svg>
+                      />
                     )}
                   </div>
                 ))}

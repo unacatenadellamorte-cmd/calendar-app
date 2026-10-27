@@ -78,7 +78,7 @@ function setup(
 }
 
 describe('MonthView', () => {
-  it('夜勤を隣接日へ細い線でつなぎ、保存した予定だけにスタンプの動きを付ける', () => {
+  it('夜勤のラベルを一続きの塗りでつなぎ、保存した予定だけにスタンプの動きを付ける', () => {
     const night = ev({ id: 'night', title: '夜勤', startsAt: new Date('2026-09-08T22:00').toISOString(), endsAt: new Date('2026-09-09T06:00').toISOString() });
     const { container, onDayTap } = setup([ev(), night], { stampedEventIds: ['night'] });
     const chips = container.querySelectorAll<HTMLButtonElement>('[data-event-id="night"]');
@@ -87,8 +87,11 @@ describe('MonthView', () => {
     expect(chips[1]).toHaveAttribute('data-joined-before', 'true');
     const connector = container.querySelector('[data-connector-event="night"]');
     expect(connector).toHaveAttribute('data-lane-offset', '-1');
-    expect(connector?.querySelector('path')).toHaveAttribute('stroke-width', '5');
-    expect(connector?.querySelector('path')).toHaveAttribute('d', 'M 0 0 H 3 Q 6.5 0 6.5 -0.25 V -0.75 Q 6.5 -1 10 -1 H 13');
+    expect(connector?.querySelector('path')).not.toHaveAttribute('fill', 'none');
+    expect(connector?.querySelector('path')).toHaveAttribute('transform', 'scale(1 -1)');
+    expect(chips[0]!.style.backgroundColor).toBe('transparent');
+    expect(chips[0]!.style.borderTopRightRadius).toBe('0');
+    expect(chips[1]!.style.borderTopLeftRadius).toBe('0');
     expect(chips[0]).toHaveClass('shift-stamp-arrival');
     expect(container.querySelector('[data-event-id="e1"]')).not.toHaveClass('shift-stamp-arrival');
     fireEvent.click(chips[1]!);
