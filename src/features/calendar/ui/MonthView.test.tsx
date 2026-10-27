@@ -87,7 +87,8 @@ describe('MonthView', () => {
     expect(chips[1]).toHaveAttribute('data-joined-before', 'true');
     const connector = container.querySelector('[data-connector-event="night"]');
     expect(connector).toHaveAttribute('data-lane-offset', '-1');
-    expect(connector?.querySelector('path')).toHaveAttribute('stroke-width', '1.5');
+    expect(connector?.querySelector('path')).toHaveAttribute('stroke-width', '2.5');
+    expect(connector?.querySelector('path')).toHaveAttribute('d', 'M 0 0 H 6.5 V -1 H 13');
     expect(chips[0]).toHaveClass('shift-stamp-arrival');
     expect(container.querySelector('[data-event-id="e1"]')).not.toHaveClass('shift-stamp-arrival');
     fireEvent.click(chips[1]!);
