@@ -2,7 +2,7 @@ import { t, useLanguage, weekdayLabels } from '@/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
-import { makePriorityOf, monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
+import { addDays, makePriorityOf, monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
 import { EventChip } from './EventChip';
 import { MonthSlide } from './MonthSlide';
 import { layoutMonthEventSlots } from '@/lib/month-event-layout';
@@ -338,6 +338,9 @@ export function MonthView({
                       <MonthEventConnector
                         eventId={slot.event.id}
                         offset={slot.nextLaneOffset}
+                        joinedBefore={slot.joinedBefore}
+                        filled={slot.event.source === 'local'}
+                        nextJoinedAfter={slotsByDay.get(addDays(cell.date, 1))?.find((next) => next?.event.id === slot.event.id)?.joinedAfter ?? false}
                         color={slot.event.source === 'local'
                             ? eventLabelColor(slot.event, calendarById.get(slot.event.calendarId))
                             : calendarById.get(slot.event.calendarId)?.color ?? 'var(--color-ink-disabled)'}
