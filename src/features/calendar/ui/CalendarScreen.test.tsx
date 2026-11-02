@@ -246,7 +246,8 @@ describe('CalendarScreen', () => {
     act(() => Array.from(backHandlers).at(-1)?.());
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
-    expect(backHandlers.size).toBe(0);
+    // 退出後のDOM更新に続く、戻る処理の解除まで確認する。
+    await waitFor(() => expect(backHandlers.size).toBe(0));
     expect(navigateMock).not.toHaveBeenCalled();
   });
   it('予定が詰まった日は予定名タップでは選択だけで、ダブルタップで週と一覧を開き、一覧から編集できる', async () => {
