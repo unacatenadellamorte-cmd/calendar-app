@@ -78,11 +78,11 @@
     --color-danger: #ff8f80;
     --color-chrome-surface: #0a1830;
     --color-chrome-ink: #ffffff;
-    --ui-sheen: linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.015) 60%);
-    --ui-edge: rgb(160 200 255 / 0.16);
+    --ui-sheen: linear-gradient(125deg, rgb(225 245 255 / 0.18), rgb(225 245 255 / 0.035) 32%, transparent 46%, rgb(110 185 240 / 0.06) 72%, transparent), linear-gradient(180deg, rgb(255 255 255 / 0.045), transparent 48%);
+    --ui-edge: rgb(180 220 255 / 0.3);
     --ui-glow: 0 0 0 3px rgb(92 196 230 / 0.22);
     --ui-shadow: 0 10px 30px rgb(2 8 20 / 0.5);
-    --ui-glass: rgb(15 27 49 / 0.78);
+    --ui-glass: rgb(17 35 62 / 0.52);
     --ui-chrome-bg: #0a1830;
   }
 }
@@ -101,10 +101,10 @@
   --color-danger: #ff8f80;
   --color-chrome-surface: #0a1830;
   --color-chrome-ink: #ffffff;
-  --ui-sheen: linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.015) 60%);
-  --ui-edge: rgb(160 200 255 / 0.16);
+  --ui-sheen: linear-gradient(125deg, rgb(225 245 255 / 0.18), rgb(225 245 255 / 0.035) 32%, transparent 46%, rgb(110 185 240 / 0.06) 72%, transparent), linear-gradient(180deg, rgb(255 255 255 / 0.045), transparent 48%);
+  --ui-edge: rgb(180 220 255 / 0.3);
   --ui-glow: 0 0 0 3px rgb(92 196 230 / 0.22);
   --ui-shadow: 0 10px 30px rgb(2 8 20 / 0.5);
-  --ui-glass: rgb(15 27 49 / 0.78);
+  --ui-glass: rgb(17 35 62 / 0.52);
   --ui-chrome-bg: #0a1830;
 }
