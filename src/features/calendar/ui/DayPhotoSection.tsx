@@ -247,7 +247,7 @@ function PhotoPreview({ asset, onClose }: { asset: DevicePhotoAsset | null; onCl
     };
   }, [id]);
   return (
-    <BottomSheet open={asset !== null} title={t('写真')} onClose={onClose}>
+    <BottomSheet open={asset !== null} title={t('写真')} onClose={onClose} animateDismiss={false}>
       {asset && !src && !failed && (
         <p className="text-meta text-ink-secondary">{t('読み込み中…')}</p>
       )}

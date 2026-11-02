@@ -18,7 +18,7 @@ export function CompactCard({ featured, calendarById, onSelect }: CompactCardPro
   useLanguage();
   if (featured.length === 0) {
     return (
-      <p className="rounded-md border border-border-hairline bg-surface-raised px-4 py-4 text-body text-ink-secondary">
+      <p className="upcoming-card rounded-md border border-border-hairline bg-surface-raised px-4 py-4 text-body text-ink-secondary">
         {t('この後の予定はありません')}
       </p>
     );
@@ -26,7 +26,7 @@ export function CompactCard({ featured, calendarById, onSelect }: CompactCardPro
   return (
     <ul
       aria-label={t('この後の予定')}
-      className="rounded-md border border-border-hairline bg-surface-raised px-3"
+      className="upcoming-card rounded-md border border-border-hairline bg-surface-raised px-3"
     >
       {featured.map((event) => (
         <EventListItem

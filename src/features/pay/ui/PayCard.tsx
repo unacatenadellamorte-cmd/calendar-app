@@ -20,7 +20,8 @@ export function PayCard({ events, calendars }: PayCardProps) {
   return (
     <section
       aria-label={t('{0}の給料見込み', [pay.monthLabel])}
-      className="mt-3 rounded-md border border-border-hairline bg-surface-raised"
+      data-edit-id="pay-summary"
+      className="pay-summary mt-3 rounded-md border border-border-hairline bg-surface-raised"
     >
       <div className="flex items-center justify-between px-4 pt-3 text-meta text-ink-secondary">
         <span>{t('{0}の給料見込み', [pay.monthLabel])}</span>

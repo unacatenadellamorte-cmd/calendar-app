@@ -19,7 +19,12 @@ export function MonthSlide({
 }: MonthSlideProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const page = useRef<HTMLDivElement>(null);
-  const previous = useRef<{ key: string; node: HTMLElement; version: unknown; scrollTops: number[] } | null>(null);
+  const previous = useRef<{
+    key: string;
+    node: HTMLElement;
+    version: unknown;
+    scrollTops: number[];
+  } | null>(null);
   const outgoing = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => {
@@ -85,7 +90,10 @@ export function MonthSlide({
       key: monthKey,
       node: snapshot,
       version: contentVersion,
-      scrollTops: Array.from(current.querySelectorAll<HTMLElement>('[data-page-scroll]'), (node) => node.scrollTop),
+      scrollTops: Array.from(
+        current.querySelectorAll<HTMLElement>('[data-page-scroll]'),
+        (node) => node.scrollTop,
+      ),
     };
   });
   useLayoutEffect(() => clear, []);
@@ -94,6 +102,7 @@ export function MonthSlide({
       ref={viewport}
       className="relative overflow-hidden"
       data-testid="month-slide"
+      data-page-dragging={dragging || undefined}
       onScrollCapture={() => {
         if (previous.current && page.current) {
           previous.current.scrollTops = Array.from(
@@ -108,7 +117,7 @@ export function MonthSlide({
         style={
           {
             transform: `translateX(${offset}px)`,
-            transition: dragging ? 'none' : 'transform 180ms ease-out',
+            transition: dragging ? 'none' : 'transform var(--motion-base) var(--ease-out)',
           } as CSSProperties
         }
       >

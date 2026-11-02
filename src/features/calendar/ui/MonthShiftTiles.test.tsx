@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { resetShiftAutoAdvanceForTests } from '@/features/settings/model/useShiftAutoAdvance';
 import { MonthShiftTiles } from './MonthShiftTiles';
@@ -136,14 +136,14 @@ describe('月表示のシフトタイル', () => {
     ]} onDateChange={vi.fn()} onRemove={vi.fn()} onCreated={vi.fn()} />);
     expect(screen.getByRole('button', { name: '選択日のシフトを削除' })).toBeDisabled();
   });
-  it('選択ウィンドウを閉じるだけでは削除しない', () => {
+  it('選択ウィンドウを閉じるだけでは削除しない', async () => {
     const onRemove = vi.fn();
     render(<MonthShiftTiles date="2026-09-08" calendars={[calendar]} enabled events={[event(), event({ id: 'e2' })]}
       onDateChange={vi.fn()} onRemove={onRemove} onCreated={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: '選択日のシフトを削除' }));
     fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
     expect(onRemove).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
   it('選択日だけを登録し、成功した予定をカレンダーへ反映する', async () => {
     const onCreated = vi.fn();

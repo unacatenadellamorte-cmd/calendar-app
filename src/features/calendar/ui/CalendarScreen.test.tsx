@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within, fireEvent } from '@testing-library/react';
+import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
@@ -238,13 +238,13 @@ describe('CalendarScreen', () => {
     expect(backHandlers.size).toBe(0);
     expect(navigateMock).not.toHaveBeenCalled();
   });
-  it('週一覧から予定入力を開いたときは入力レイヤーだけが戻るを受け取る', () => {
+  it('週一覧から予定入力を開いたときは入力レイヤーだけが戻るを受け取る', async () => {
     render(<CalendarScreen />);
     fireEvent.doubleClick(screen.getByRole('button', { name: '9月8日を開く' }));
     fireEvent.click(screen.getByRole('button', { name: '＋ この日に予定を追加' }));
     expect(backHandlers.size).toBe(1);
     act(() => Array.from(backHandlers).at(-1)?.());
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: '9月1日を開く' })).toBeInTheDocument();
     expect(backHandlers.size).toBe(0);
     expect(navigateMock).not.toHaveBeenCalled();

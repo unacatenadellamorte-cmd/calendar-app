@@ -68,7 +68,7 @@ export function QuickShiftScreen() {
   };
   return (
     <Screen title={t('シフトを追加')}>
-      <div className="flex flex-col gap-4">
+      <div className="quick-shift-panel flex flex-col gap-4">
         <label className="flex flex-col gap-1">
           <span className="text-meta text-ink-secondary">{t('起点日')}</span>
           <input

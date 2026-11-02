@@ -1,5 +1,6 @@
 @import './tokens.css';
 @import 'tailwindcss';
+@import './ui-refresh.css';
 
 /*
  * Tailwind 4 の CSS-first 設定。@theme でトークン変数を Tailwind に橋渡しし、
@@ -164,6 +165,7 @@ textarea { font-size: max(16px, 1rem); }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -203,7 +205,7 @@ textarea { font-size: max(16px, 1rem); }
   inset: 0 0 auto;
   z-index: 40;
   height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  background: var(--color-chrome-surface);
+  background: var(--ui-chrome-bg);
   color: var(--color-chrome-ink);
   /* ステータスバーと見出しの間に境界線を描かず、一体の上部面として見せる。 */
   border-bottom: 0;
@@ -212,7 +214,7 @@ textarea { font-size: max(16px, 1rem); }
 .screen-header,
 .calendar-date-nav,
 .app-bottom-tabs {
-  background-color: var(--color-chrome-surface);
+  background-color: var(--ui-chrome-bg);
   color: var(--color-chrome-ink);
 }
 /* プロフィール付き見出しと並び順画面のラベル下端を角張らせる。 */
@@ -225,19 +227,19 @@ textarea { font-size: max(16px, 1rem); }
 .calendar-date-nav h2 button,
 .calendar-date-nav h2 span,
 .calendar-date-nav .calendar-pay { color: var(--color-chrome-ink); }
-.calendar-view-switcher { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
+.calendar-view-switcher { background-color: var(--ui-chrome-bg); color: var(--color-chrome-ink); }
 .calendar-view-option[aria-checked='false'] { color: var(--color-chrome-ink); }
 .app-bottom-tabs a:not([aria-current='page']) { color: color-mix(in srgb, var(--color-chrome-ink) 78%, transparent); }
 .app-bottom-tabs a[aria-current='page'] {
   color: var(--color-chrome-ink);
-  background-color: color-mix(in srgb, var(--color-chrome-ink) 15%, transparent);
+  background-color: transparent;
   font-weight: 700;
-  box-shadow: inset 0 3px var(--color-chrome-ink);
+  box-shadow: none;
 }
 .calendar-today-button,
-.calendar-date-button { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
-.shift-description { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
-.shift-control { background-color: var(--color-chrome-surface); color: var(--color-chrome-ink); }
+.calendar-date-button { background-color: var(--ui-chrome-bg); color: var(--color-chrome-ink); }
+.shift-description { background-color: var(--ui-chrome-bg); color: var(--color-chrome-ink); }
+.shift-control { background-color: var(--ui-chrome-bg); color: var(--color-chrome-ink); }
 .shift-control-prev, .shift-control-next { color: var(--color-chrome-ink); }
 .shift-control-delete { color: #ffb4ab; }
 
@@ -246,7 +248,7 @@ textarea { font-size: max(16px, 1rem); }
 :root[data-background='custom'][data-background-screen='photo'] .app-shell .app-bottom-tabs,
 :root[data-background='custom'][data-background-screen='photo'] .app-shell .shift-description,
 :root[data-background='custom'][data-background-screen='photo'] .app-shell .shift-control {
-  background-color: var(--color-chrome-surface);
+  background-color: var(--ui-chrome-bg);
 }
 
 /* 画像を保存していても、ホーム/月以外は通常の不透明面を使う。 */
@@ -262,7 +264,7 @@ textarea { font-size: max(16px, 1rem); }
   background-color: var(--color-surface-raised);
 }
 :root[data-background='custom']:not([data-background-screen='photo']) .app-shell .app-bottom-tabs {
-  background-color: var(--color-chrome-surface);
+  background-color: var(--ui-chrome-bg);
 }
 .month-event-title {
   min-width: 0;
@@ -291,11 +293,11 @@ textarea { font-size: max(16px, 1rem); }
 }
 /* 押した反応と、保存が確定して予定を置く動きを分ける。 */
 .shift-stamp-press {
-  animation: shift-stamp-press 180ms ease-out;
+  animation: shift-stamp-press var(--motion-fast) var(--ease-out);
   opacity: 1;
 }
 .shift-stamp-arrival {
-  animation: shift-stamp-arrival 450ms ease-out;
+  animation: shift-stamp-arrival 420ms var(--ease-spring);
   transform-origin: center;
 }
 @keyframes shift-stamp-press {
@@ -361,14 +363,14 @@ textarea { font-size: max(16px, 1rem); }
 
 /* 月のページ送り。旧月と新月を同じ速度で横に移動する。 */
 .month-page-enter {
-  animation: month-enter 280ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: month-enter var(--motion-slow) var(--ease-out) both;
 }
 .month-page-exit {
   position: absolute;
   inset: 0 0 auto;
   width: 100%;
   pointer-events: none;
-  animation: month-exit 280ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: month-exit var(--motion-slow) var(--ease-out) both;
 }
 @keyframes month-enter {
   from {

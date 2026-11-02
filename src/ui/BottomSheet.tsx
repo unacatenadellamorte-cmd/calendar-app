@@ -8,6 +8,8 @@ interface BottomSheetProps {
   onClose: () => void;
   children: ReactNode;
   dismissible?: boolean;
+  /** 写真など即時に解放する内容では退出待ちを省く。 */
+  animateDismiss?: boolean;
 }
 /** 下へ引いて閉じられるレイヤー。本文のスクロールとハンドル操作は分離する。 */
 export function BottomSheet({
@@ -16,6 +18,7 @@ export function BottomSheet({
   onClose,
   children,
   dismissible = true,
+  animateDismiss = true,
 }: BottomSheetProps) {
   useLanguage();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -26,13 +29,23 @@ export function BottomSheet({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [offset, setOffset] = useState(0);
   const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
   const dismiss = useCallback(() => {
-    if (dismissible) closeRef.current();
-  }, [dismissible]);
+    // 背景・つまみ・戻るの閉鎖を同じ退出動作にそろえ、連打を一度にまとめる。
+    if (!dismissible || closingRef.current) return;
+    if (!animateDismiss || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      closeRef.current();
+      return;
+    }
+    closingRef.current = true;
+    setClosing(true);
+    timer.current = setTimeout(() => closeRef.current(), 180);
+  }, [dismissible, animateDismiss]);
   useEffect(() => {
     if (!open) return;
     setOffset(0);
     setClosing(false);
+    closingRef.current = false;
     const previousFocus = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
     const unregister = registerLayerBack(dismiss);
@@ -76,69 +89,70 @@ export function BottomSheet({
         type="button"
         aria-label={t('閉じる')}
         onClick={dismiss}
-        className="absolute inset-0 bg-black/30 animate-[fade-in_150ms_ease-out]"
+        data-closing={closing ? 'true' : undefined}
+        className="sheet-backdrop absolute inset-0"
       />
-      <div className="relative mx-auto w-full max-w-2xl animate-[slide-up_180ms_ease-out]">
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        style={{
-          paddingBottom:
-            'calc(1rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))',
-          transform: `translateY(${closing ? '100%' : `${offset}px`})`,
-          transition: closing || offset === 0 ? 'transform 180ms ease-out' : 'none',
-        }}
-        className="bottom-sheet relative mx-auto flex max-h-[90dvh] w-full min-w-0 max-w-2xl flex-col overflow-x-hidden rounded-t-lg bg-surface-base px-4 pb-4 shadow-lg"
-      >
-        <button
-          type="button"
-          aria-label={t('下にスライドして閉じる')}
-          onClick={() => {
-            if (!suppressClick.current) dismiss();
-            suppressClick.current = false;
+      <div className="sheet-wrap relative mx-auto w-full max-w-2xl">
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          tabIndex={-1}
+          style={{
+            paddingBottom:
+              'calc(1rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))',
+            transform: `translateY(${closing ? '100%' : `${offset}px`})`,
+            transition: closing || offset === 0 ? 'transform 180ms var(--ease-out)' : 'none',
           }}
-          className="flex min-h-11 w-full shrink-0 touch-none flex-col items-center justify-center gap-1"
-          onPointerDown={(e) => {
-            if (!dismissible) return;
-            suppressClick.current = false;
-            startY.current = e.clientY;
-            e.currentTarget.setPointerCapture?.(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            if (dismissible && startY.current !== null) setOffset(Math.max(0, e.clientY - startY.current));
-          }}
-          onPointerUp={(e) => {
-            const distance = startY.current === null ? 0 : e.clientY - startY.current;
-            startY.current = null;
-            suppressClick.current = Math.abs(distance) > 5;
-            if (dismissible && distance >= 64) {
-              if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-                dismiss();
-                return;
-              }
-              setClosing(true);
-              timer.current = setTimeout(dismiss, 180);
-            } else {
-              setOffset(0);
-              setClosing(false);
-            }
-          }}
-          onPointerCancel={() => {
-            startY.current = null;
-            setOffset(0);
-          }}
+          data-edit-id="bottom-sheet"
+          className="bottom-sheet relative mx-auto flex max-h-[90dvh] w-full min-w-0 max-w-2xl flex-col overflow-x-hidden rounded-t-lg bg-surface-base px-4 pb-4"
         >
-          <span className="h-1 w-10 rounded-full bg-border-hairline" />
-          <span className="text-[10px] text-ink-secondary">{t('下にスライドして閉じる')}</span>
-        </button>
-        <h2 className="shrink-0 text-body font-semibold text-ink-primary">{title}</h2>
-        <div className="bottom-sheet-content mt-3 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain pb-6">
-          {children}
+          <button
+            type="button"
+            aria-label={t('下にスライドして閉じる')}
+            onClick={() => {
+              if (!suppressClick.current) dismiss();
+              suppressClick.current = false;
+            }}
+            className="flex min-h-11 w-full shrink-0 touch-none flex-col items-center justify-center gap-1"
+            onPointerDown={(e) => {
+              if (!dismissible || closingRef.current) return;
+              suppressClick.current = false;
+              startY.current = e.clientY;
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              if (dismissible && startY.current !== null)
+                setOffset(Math.max(0, e.clientY - startY.current));
+            }}
+            onPointerUp={(e) => {
+              if (closingRef.current) return;
+              const distance = startY.current === null ? 0 : e.clientY - startY.current;
+              startY.current = null;
+              suppressClick.current = Math.abs(distance) > 5;
+              if (dismissible && distance >= 64) {
+                dismiss();
+              } else {
+                setOffset(0);
+                setClosing(false);
+              }
+            }}
+            onPointerCancel={() => {
+              startY.current = null;
+              setOffset(0);
+            }}
+          >
+            <span className="bottom-sheet-grip" />
+            <span className="text-[10px] text-ink-secondary">
+              {t('下にスライドして閉じる')}
+            </span>
+          </button>
+          <h2 className="shrink-0 text-body font-semibold text-ink-primary">{title}</h2>
+          <div className="bottom-sheet-content mt-3 w-full min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain pb-6">
+            {children}
+          </div>
         </div>
-      </div>
       </div>
     </div>,
     document.body,

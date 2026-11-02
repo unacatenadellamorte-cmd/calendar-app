@@ -16,6 +16,7 @@ afterEach(() => {
 
 describe('入力レイヤー', () => {
   it('Androidの戻るは画面遷移せず現在の閉じる処理を呼ぶ', () => {
+    vi.useFakeTimers();
     const close = vi.fn();
     const { rerender, unmount } = render(
       <BottomSheet open title="入力" onClose={vi.fn()}>
@@ -28,9 +29,51 @@ describe('入力レイヤー', () => {
       </BottomSheet>,
     );
     act(() => back.close?.());
+    expect(close).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(180));
     expect(close).toHaveBeenCalledOnce();
     unmount();
     expect(back.unregister).toHaveBeenCalled();
+  });
+  it('閉じる操作が重なっても退出後に一度だけ通知する', () => {
+    vi.useFakeTimers();
+    const close = vi.fn();
+    render(
+      <BottomSheet open title="入力" onClose={close}>
+        本文
+      </BottomSheet>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    act(() => back.close?.());
+    act(() => vi.advanceTimersByTime(179));
+    expect(close).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(close).toHaveBeenCalledOnce();
+  });
+  it('退出中に画面を離れた場合は閉じる通知を残さない', () => {
+    vi.useFakeTimers();
+    const close = vi.fn();
+    const { unmount } = render(
+      <BottomSheet open title="入力" onClose={close}>
+        本文
+      </BottomSheet>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    unmount();
+    act(() => vi.advanceTimersByTime(200));
+    expect(close).not.toHaveBeenCalled();
+  });
+  it('動きを減らす設定なら退出を待たずに閉じる', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }));
+    const close = vi.fn();
+    render(
+      <BottomSheet open title="入力" onClose={close}>
+        本文
+      </BottomSheet>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(close).toHaveBeenCalledOnce();
   });
   it('つまみを下へ64px以上引くと閉じ、短い移動やキャンセルでは閉じない', () => {
     vi.useFakeTimers();
