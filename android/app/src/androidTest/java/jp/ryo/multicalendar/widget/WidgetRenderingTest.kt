@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +38,68 @@ class WidgetRenderingTest {
     private val context: Context = instrumentation.targetContext
     private val appWidgetManager = AppWidgetManager.getInstance(context)
     private val hostId = ("calendar-widget-smoke".hashCode() and 0x7fff) + 1000
+
+    @Test
+    fun themeGlassSurfacesRenderAcrossAllWidgetKinds() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 4)
+        val ids = mutableListOf<Int>()
+        val day = todayWidgetDay().toKey()
+        val themes = listOf(
+            listOf("light", "#ffffff", "#1a1c1e", "#585f68", "#2563eb", "#eaf1ff"),
+            listOf("dark", "#0f1b31", "#e9f0fa", "#a3b4cc", "#5cc4e6", "#123350"),
+            listOf("sakura", "#fff8fa", "#35232c", "#72505f", "#a52c62", "#fbe1ed"),
+            listOf("leaf", "#f7fcf6", "#233322", "#526a4e", "#326c36", "#dcefd9"),
+            listOf("ocean", "#f5fbff", "#193344", "#476577", "#086d9e", "#d8effa"),
+            listOf("lavender", "#fbf8ff", "#302641", "#665577", "#7042a8", "#ebe0fa"),
+        )
+        try {
+            val event = JSONObject().put("id", "glass-sample").put("title", "朝シフト")
+                .put("calendarName", "シフト").put("colorHex", "#327caa")
+                .put("startDate", day).put("endDate", day).put("allDay", true)
+            prefs.edit().putInt(WEEK_OFFSET_KEY, 0).putInt(MONTH_OFFSET_KEY, 0)
+                .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja")
+                    .put("events", JSONArray().put(event)).toString()).commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            themes.forEach { theme ->
+                val appearance = JSONObject().put("schemaVersion", 1).put("theme", theme[0])
+                    .put("backgroundColor", theme[1]).put("primaryTextColor", theme[2])
+                    .put("secondaryTextColor", theme[3]).put("accentColor", theme[4])
+                    .put("todayColor", theme[5]).put("todayTextColor", theme[4]).put("appFontScale", 1)
+                prefs.edit().putString(WIDGET_APPEARANCE_KEY, appearance.toString()).commit()
+                assertEquals(theme[1].lowercase(), "#%06x".format(readWidgetAppearance(context).backgroundColor.toArgb() and 0xffffff))
+                listOf(
+                    Triple(FeaturedEventsWidgetReceiver::class.java, "day", 190),
+                    Triple(WeekEventsWidgetReceiver::class.java, "week", 180),
+                    Triple(MonthEventsWidgetReceiver::class.java, "month", 330),
+                ).forEach { (receiver, kind, height) ->
+                    val view = renderProvider(host, ComponentName(context, receiver), 380, height, ids, "朝シフト")
+                    // 一覧のアダプター更新後も予定が残っている状態で撮影する。
+                    waitUntil("${theme[0]} $kind の予定描画") {
+                        layoutForAssertions(view, 380, height)
+                        findText(view, "朝シフト")
+                    }
+                    saveBitmap(view, "widget-glass-${theme[0]}-$kind.png", 380, height)
+                }
+            }
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            // 検証で触れたキーだけを元の値へ戻す。
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
+            }
+            listOf(WEEK_OFFSET_KEY, MONTH_OFFSET_KEY).forEach { key ->
+                (previous[key] as? Int)?.let { edit.putInt(key, it) } ?: edit.remove(key)
+            }
+            edit.commit()
+        }
+    }
 
     @Test
     fun monthNavigationRendersEventsWithinOneSecond() {

@@ -56,7 +56,7 @@ private fun WeekEventsContent() {
     val weekdayHeight = 16f * scale
     val cellHeightDp = (size.height.value - 12f - headerHeight - weekdayHeight).coerceAtLeast(1f)
 
-    Column(modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp)) {
+    Column(modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(6.dp)) {
         Row(modifier = GlanceModifier.fillMaxWidth().height(headerHeight.dp)) {
             Row(modifier = GlanceModifier.width(64.dp)) {
                 Text("▲", style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.clickable(actionRunCallback<WeekPreviousAction>()).padding(horizontal = 4.dp, vertical = 2.dp))

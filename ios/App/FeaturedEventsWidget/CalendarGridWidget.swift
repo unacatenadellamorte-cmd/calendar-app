@@ -24,6 +24,8 @@ struct CalendarGridProvider: TimelineProvider {
 
 struct CalendarGridWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: WidgetThemeColors { WidgetThemeColors(scheme: colorScheme) }
     let entry: CalendarGridEntry
 
     private var isLarge: Bool { family == .systemLarge }
@@ -53,17 +55,18 @@ struct CalendarGridWidgetEntryView: View {
                 Link(destination: CalendarGridData.createLink(for: entry.date)) {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(colors.accent)
                         .accessibilityLabel(CalendarGridData.addEventLabel(language: language))
                 }
             }
-            .foregroundColor(.primary)
+            .foregroundColor(colors.primary)
             .frame(height: 20)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: rowSpacing) {
                 ForEach(CalendarGridData.weekdayLabels(language: language), id: \.self) { weekday in
                     Text(weekday)
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(colors.secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 12)
                 }
@@ -92,14 +95,14 @@ struct CalendarGridWidgetEntryView: View {
                         Text("+\(day.events.count - 2)").font(.system(size: 6, weight: .semibold))
                     }
                 }
-                .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? .white : .primary) : .secondary)
+                .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? colors.todayText : colors.primary) : colors.secondary)
                 ForEach(Array(day.events.prefix(2)), id: \.id) { event in
                     HStack(spacing: 2) {
                         if !event.filledLabel { Rectangle().fill(dayColor(event)).frame(width: 2) }
                         Text(event.title)
                             .font(.system(size: 7))
                             .lineLimit(1)
-                            .foregroundColor(.primary)
+                            .foregroundColor(colors.primary)
                     }
                     .padding(.horizontal, 2)
                     .background(dayColor(event).opacity(event.filledLabel ? 0.35 : 0))
@@ -108,7 +111,7 @@ struct CalendarGridWidgetEntryView: View {
                 HStack(spacing: 2) {
                     Text(number)
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? .white : .primary) : .secondary)
+                        .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? colors.todayText : colors.primary) : colors.secondary)
                     if let event = day.events.first {
                         Circle().fill(dayColor(event)).frame(width: 4, height: 4)
                     }
@@ -119,7 +122,7 @@ struct CalendarGridWidgetEntryView: View {
         .padding(2)
         .frame(maxWidth: .infinity)
         .frame(height: height, alignment: .topLeading)
-        .background(day.isToday ? Color.accentColor : Color.clear)
+        .background(day.isToday ? colors.today : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 
@@ -132,9 +135,9 @@ struct CalendarGridWidgetEntryView: View {
 
     var body: some View {
         if #available(iOSApplicationExtension 17.0, *) {
-            content.containerBackground(for: .widget) { Color(uiColor: .systemBackground) }
+            content.containerBackground(for: .widget) { WidgetGlassSurface(colors: colors) }
         } else {
-            content.padding().background(Color(uiColor: .systemBackground))
+            content.padding().background(WidgetGlassSurface(colors: colors))
         }
     }
 }

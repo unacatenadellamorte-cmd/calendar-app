@@ -40,10 +40,10 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
         val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val dark = savedTheme == "dark" || (savedTheme == "system" && systemDark)
         val defaults = if (dark) WidgetAppearance(
-            backgroundColor = Color(0xFF16181C), surfaceColor = Color(0xFF1E2126),
-            primaryTextColor = Color(0xFFE6E8EB), secondaryTextColor = Color(0xFF9AA1A9),
-            mutedTextColor = Color(0xFF5B616A), accentColor = Color(0xFF6AA0FF),
-            todayColor = Color(0xFF1C2740), todayTextColor = Color(0xFF6AA0FF),
+            backgroundColor = Color(0xFF0F1B31), surfaceColor = Color(0xFF152643),
+            primaryTextColor = Color(0xFFE9F0FA), secondaryTextColor = Color(0xFFA3B4CC),
+            mutedTextColor = Color(0xFF6A7C96), accentColor = Color(0xFF5CC4E6),
+            todayColor = Color(0xFF123350), todayTextColor = Color(0xFF5CC4E6),
         ) else WidgetAppearance()
         WidgetAppearance(
             backgroundColor = if (savedTheme == "system") defaults.backgroundColor else json.safeColor("backgroundColor", defaults.backgroundColor),

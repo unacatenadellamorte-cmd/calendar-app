@@ -34,11 +34,11 @@ function isDarkTheme(theme: ThemePreference): boolean {
 export function buildWidgetAppearance(theme: ThemePreference = readStoredTheme(), monthEventSize: MonthEventSize = readStoredMonthEventSize()): WidgetAppearance {
   const palette = theme in themePalettes ? themePalettes[theme as keyof typeof themePalettes].colors : null;
   const dark = isDarkTheme(theme);
-  const backgroundColor = palette?.[0] ?? cssColor('surface-base', dark ? '#16181C' : FALLBACK.backgroundColor);
-  const surfaceColor = palette?.[2] ?? cssColor('surface-raised', dark ? '#1E2126' : FALLBACK.surfaceColor);
-  const primaryTextColor = palette?.[3] ?? cssColor('ink-primary', dark ? '#E6E8EB' : FALLBACK.primaryTextColor);
-  const secondaryTextColor = palette?.[4] ?? cssColor('ink-secondary', dark ? '#9AA1A9' : FALLBACK.secondaryTextColor);
-  const mutedTextColor = palette?.[5] ?? cssColor('ink-disabled', dark ? '#5B616A' : FALLBACK.mutedTextColor);
-  const accentColor = palette?.[6] ?? cssColor('accent', dark ? '#6AA0FF' : FALLBACK.accentColor);
-  return { schemaVersion: 1, theme, backgroundColor, surfaceColor, primaryTextColor, secondaryTextColor, mutedTextColor, accentColor, todayColor: palette?.[7] ?? cssColor('accent-weak', dark ? '#1C2740' : FALLBACK.todayColor), todayTextColor: accentColor, appFontScale: FONT_SCALE[monthEventSize] };
+  const backgroundColor = palette?.[0] ?? cssColor('surface-base', dark ? '#0f1b31' : FALLBACK.backgroundColor);
+  const surfaceColor = palette?.[2] ?? cssColor('surface-raised', dark ? '#152643' : FALLBACK.surfaceColor);
+  const primaryTextColor = palette?.[3] ?? cssColor('ink-primary', dark ? '#e9f0fa' : FALLBACK.primaryTextColor);
+  const secondaryTextColor = palette?.[4] ?? cssColor('ink-secondary', dark ? '#a3b4cc' : FALLBACK.secondaryTextColor);
+  const mutedTextColor = palette?.[5] ?? cssColor('ink-disabled', dark ? '#6a7c96' : FALLBACK.mutedTextColor);
+  const accentColor = palette?.[6] ?? cssColor('accent', dark ? '#5cc4e6' : FALLBACK.accentColor);
+  return { schemaVersion: 1, theme, backgroundColor, surfaceColor, primaryTextColor, secondaryTextColor, mutedTextColor, accentColor, todayColor: palette?.[7] ?? cssColor('accent-weak', dark ? '#123350' : FALLBACK.todayColor), todayTextColor: accentColor, appFontScale: FONT_SCALE[monthEventSize] };
 }
