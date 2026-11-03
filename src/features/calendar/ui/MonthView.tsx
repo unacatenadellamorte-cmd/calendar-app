@@ -32,6 +32,8 @@ interface MonthViewProps {
   /** 日付移動では変えず、予定の内容や公開範囲が変わったら更新する。 */
   contentVersion?: unknown;
   stampedEventIds?: readonly string[];
+  /** 端末の写真がある日付。含まれる日の日付の右へ小さなカメラを出す(未指定なら出さない)。 */
+  photoDays?: ReadonlySet<string>;
 }
 const MAX_CHIPS = 3;
 /** 月ビュー。7列グリッド、セル内は優先度順に最大3件 +「他 N 件」。 */
@@ -49,6 +51,7 @@ export function MonthView({
   onSwipeRight,
   contentVersion = byDay,
   stampedEventIds = [],
+  photoDays,
 }: MonthViewProps) {
   useLanguage();
   const { year, month } = ymd(cursor);
@@ -287,6 +290,7 @@ export function MonthView({
                   cell.date === cursor ? 'ring-2 ring-inset ring-accent' : '',
                 ].join(' ')}
               >
+                <div className="flex items-center gap-0.5 self-start">
                 <button
                   type="button"
                   data-day-button
@@ -312,7 +316,7 @@ export function MonthView({
                   className={[
                     // touch-manipulation: iOS Safari 等でダブルタップがブラウザのズームジェスチャーと
                     // 衝突しないよう、このボタン上ではダブルタップジェスチャーをズームに回さない。
-                    'touch-manipulation self-start rounded-full px-1 text-meta tabular',
+                    'touch-manipulation rounded-full px-1 text-meta tabular',
                     cell.isToday
                       ? 'bg-accent font-semibold text-on-accent'
                       : cell.inMonth
@@ -322,6 +326,26 @@ export function MonthView({
                 >
                   {cell.day}
                 </button>
+                {photoDays?.has(cell.date) && (
+                  <svg
+                    role="img"
+                    aria-label={t('写真')}
+                    data-photo-marker={cell.date}
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0 text-ink-secondary"
+                  >
+                    <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+                    <circle cx="12" cy="13.5" r="3.5" />
+                  </svg>
+                )}
+                </div>
 
                 {slots.map((slot, lane) => (
                   <div key={slot?.event.id ?? `empty-${lane}`} className="month-event-slot">

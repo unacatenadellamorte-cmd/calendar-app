@@ -66,4 +66,20 @@ public class DevicePhotosPluginTest {
         assertFalse(DevicePhotosPlugin.isValidMediaId("12/../3"));
         assertFalse(DevicePhotosPlugin.isValidMediaId(null));
     }
+
+    @Test
+    public void 日ごとの有無照会は件数と範囲を検証する() {
+        assertTrue(DevicePhotosPlugin.isValidDayRanges(new long[] {0L}, new long[] {1L}));
+        assertFalse(DevicePhotosPlugin.isValidDayRanges(new long[] {}, new long[] {}));
+        assertFalse(DevicePhotosPlugin.isValidDayRanges(new long[] {5L}, new long[] {5L}));
+        assertFalse(DevicePhotosPlugin.isValidDayRanges(new long[] {1L, 2L}, new long[] {3L}));
+        assertFalse(DevicePhotosPlugin.isValidDayRanges(null, null));
+        long[] many = new long[DevicePhotosPlugin.MAX_DAY_RANGES + 1];
+        long[] manyTo = new long[many.length];
+        for (int i = 0; i < many.length; i++) { many[i] = i; manyTo[i] = i + 1L; }
+        assertFalse(DevicePhotosPlugin.isValidDayRanges(many, manyTo));
+        assertTrue(DevicePhotosPlugin.isValidDayRanges(
+            java.util.Arrays.copyOf(many, DevicePhotosPlugin.MAX_DAY_RANGES),
+            java.util.Arrays.copyOf(manyTo, DevicePhotosPlugin.MAX_DAY_RANGES)));
+    }
 }
