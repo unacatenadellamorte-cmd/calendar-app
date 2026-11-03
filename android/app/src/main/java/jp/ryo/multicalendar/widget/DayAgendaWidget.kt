@@ -101,7 +101,7 @@ internal fun DayAgendaContent() {
     val railAppearance = appearance.copy(appFontScale = appearance.appFontScale *
         ((size.height.value - 12f) / ((if (compact) 108f else 154f) * scale)).coerceAtMost(1f))
     val railWidth = (size.width.value * 0.25f).coerceIn(56f, 100f)
-    Row(modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor.copy(alpha = 0.94f)).padding(horizontal = 10.dp, vertical = 6.dp)) {
+    Row(modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(horizontal = 10.dp, vertical = 6.dp)) {
         Column(modifier = GlanceModifier.width(railWidth.dp).fillMaxHeight().clickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = GlanceModifier.fillMaxWidth()) {
                 Text(text = "▲", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayPreviousAction>()))
@@ -155,7 +155,7 @@ internal fun DayAgendaContent() {
 @Composable
 private fun CompactDayAgenda(event: CalendarOverviewEvent?, selectedDay: WidgetDay, appearance: WidgetAppearance, language: String, today: WidgetDay) {
     val context = LocalContext.current
-    Row(modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(3.dp)) {
+    Row(modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(3.dp)) {
         Column(modifier = GlanceModifier.width(58.dp)) {
             Row {
                 Text(text = "▲", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayPreviousAction>()))

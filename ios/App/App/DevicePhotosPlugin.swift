@@ -13,6 +13,8 @@ public class DevicePhotosPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "checkPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "listAssets", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hasPhotosInRanges", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelDayChecks", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "loadImage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cancelLoad", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cancelLoads", returnType: CAPPluginReturnPromise),
@@ -21,10 +23,14 @@ public class DevicePhotosPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static let maxPageSize = 100
     private static let maxImageSide = 1600
+    // 月グリッド(前後月を含む6週)の日数。
+    private static let maxDayRanges = 42
     private let manager = PHImageManager.default()
     // 登録・完了・取消はメインキューで直列化し、同じ画像も要求ごとに区別する。
     private var requests: [UUID: ImageLoad] = [:]
     private var lists: [UUID: PhotoListLoad] = [:]
+    // 月カレンダーの有無照会。画像読込の一括取消(cancelLoads)とは独立させる。
+    private var dayChecks: [UUID: PhotoListLoad] = [:]
 
     private func statusString(_ status: PHAuthorizationStatus) -> String {
         switch status {
@@ -114,6 +120,59 @@ public class DevicePhotosPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    /// 各日の範囲に撮影日時の写真が1枚でもあるかだけを返す(月カレンダーの目印用)。識別子・日時・画像は返さない。
+    @objc func hasPhotosInRanges(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { self.startDayCheck(call) }
+    }
+
+    private func startDayCheck(_ call: CAPPluginCall) {
+        guard let raw = call.getArray("ranges", [String: Any].self),
+              !raw.isEmpty, raw.count <= DevicePhotosPlugin.maxDayRanges else {
+            call.reject("引数が不正です。", "invalid-arguments")
+            return
+        }
+        var ranges: [(Double, Double)] = []
+        for item in raw {
+            guard let from = (item["fromMs"] as? NSNumber)?.doubleValue,
+                  let to = (item["toMs"] as? NSNumber)?.doubleValue,
+                  from.isFinite, to.isFinite, to > from else {
+                call.reject("引数が不正です。", "invalid-arguments")
+                return
+            }
+            ranges.append((from, to))
+        }
+        guard canRead() else {
+            call.reject("写真へのアクセスが許可されていません。", "permission-denied")
+            return
+        }
+        let token = UUID()
+        let pending = PhotoListLoad(call: call)
+        dayChecks[token] = pending
+        DispatchQueue.global(qos: .userInitiated).async {
+            var flags: [Bool] = []
+            for (from, to) in ranges {
+                if pending.isCancelled { return }
+                let options = PHFetchOptions()
+                options.predicate = NSPredicate(
+                    format: "creationDate != nil AND creationDate >= %@ AND creationDate < %@",
+                    Date(timeIntervalSince1970: from / 1000) as NSDate,
+                    Date(timeIntervalSince1970: to / 1000) as NSDate
+                )
+                options.includeHiddenAssets = false
+                options.fetchLimit = 1
+                flags.append(PHAsset.fetchAssets(with: .image, options: options).count > 0)
+            }
+            DispatchQueue.main.async {
+                guard self.dayChecks.removeValue(forKey: token) != nil, !pending.isCancelled else { return }
+                guard self.canRead() else {
+                    call.reject("写真へのアクセスが許可されていません。", "permission-denied")
+                    return
+                }
+                call.resolve(["hasPhotos": flags])
+            }
+        }
+    }
+
     @objc func loadImage(_ call: CAPPluginCall) {
         DispatchQueue.main.async { self.startLoad(call) }
     }
@@ -177,6 +236,19 @@ public class DevicePhotosPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let requestId = call.getString("requestId") {
                     self.cancelRequests { $0.key == key && $0.requestId == requestId }
                 } else { self.cancelRequests { $0.key == key } }
+            }
+            call.resolve()
+        }
+    }
+
+    /// 月カレンダーの有無照会だけを取り消す(画像読込・日の写真一覧は止めない)。
+    @objc func cancelDayChecks(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let pending = Array(self.dayChecks.values)
+            self.dayChecks.removeAll()
+            for check in pending {
+                check.cancel()
+                check.call.reject("取り消されました。", "cancelled")
             }
             call.resolve()
         }

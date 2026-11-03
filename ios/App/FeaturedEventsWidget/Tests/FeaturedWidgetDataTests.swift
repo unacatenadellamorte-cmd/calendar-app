@@ -3,6 +3,24 @@ import XCTest
 @testable import FeaturedWidgetData
 
 final class FeaturedWidgetDataTests: XCTestCase {
+    func testWidgetThemeSharedColorsAndInvalidValues() throws {
+        let value = try XCTUnwrap(WidgetAppearanceData.decode(##"{"schemaVersion":1,"theme":"sakura","backgroundColor":"#fff8fa","accentColor":"broken"}"##))
+        XCTAssertEqual(value.theme, "sakura")
+        XCTAssertEqual(value.rgb(\.backgroundColor, fallback: 0), 0xfff8fa)
+        XCTAssertEqual(value.rgb(\.accentColor, fallback: 0xa52c62), 0xa52c62)
+        XCTAssertEqual(value.rgb(\.primaryTextColor, fallback: 0x35232c), 0x35232c)
+        XCTAssertNil(WidgetAppearanceData.decode(##"{"schemaVersion":2}"##))
+        XCTAssertNil(WidgetAppearanceData.decode("壊れたJSON"))
+    }
+
+    func testWidgetAppearanceReadsSameAppGroupKey() throws {
+        let suite = "widget-theme-test-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(##"{"schemaVersion":1,"theme":"ocean","backgroundColor":"#f5fbff"}"##, forKey: "widgetAppearance")
+        XCTAssertEqual(WidgetAppearanceData.read(defaults: defaults)?.theme, "ocean")
+    }
+
     private func event(id: String = "e1", iso: String = "2026-09-17T01:02:00Z", allDay: Bool = false, eventDate: String? = nil, eventEndDate: String? = nil) -> FeaturedWidgetEvent {
         FeaturedWidgetEvent(id: id, calendarName: "仕事", colorHex: "#0072B2", startsAtIso: iso, allDay: allDay, schemaVersion: 1, eventDate: eventDate, eventEndDate: eventEndDate)
     }

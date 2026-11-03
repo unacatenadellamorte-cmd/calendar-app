@@ -7,6 +7,8 @@ const nativePlugin = vi.hoisted(() => ({
   checkPermission: vi.fn(),
   requestPermission: vi.fn(),
   listAssets: vi.fn(),
+  hasPhotosInRanges: vi.fn(),
+  cancelDayChecks: vi.fn(async () => {}),
   loadImage: vi.fn(),
   cancelLoads: vi.fn(async () => {}),
   cancelLoad: vi.fn(async () => {}),
@@ -18,8 +20,10 @@ vi.mock('@capacitor/core', () => ({
 }));
 
 import {
+  cancelDevicePhotoDayChecks,
   cancelDevicePhotoPreview,
   checkDevicePhotoPermission,
+  listDevicePhotoDays,
   listDevicePhotosForDay,
   loadDevicePhotoPreview,
   loadDevicePhotoThumbnail,
@@ -27,6 +31,7 @@ import {
   releaseDevicePhotoCache,
   reselectLimitedDevicePhotos,
   requestDevicePhotoPermission,
+  subscribeDevicePhotoAccessChange,
 } from './devicePhotos';
 
 const originalTimeZone = process.env.TZ;
@@ -248,4 +253,58 @@ it('画面外へ出た縮小画像は順番待ちから取り除き、表示中�
     finish({ dataUrl: 'data:image/jpeg;base64,DONE' });
     await Promise.all([first, second, queued]);
   }
+});
+
+it('日ごとの有無照会は夏時間の日も含めローカル日付の範囲で1回だけ問い合わせ、写真のある日だけ返す', async () => {
+  process.env.TZ = 'America/New_York';
+  nativePlugin.hasPhotosInRanges.mockResolvedValue({ hasPhotos: [false, true, false] });
+  const days = await listDevicePhotoDays(['2026-03-07', '2026-03-08', '2026-03-09', '2026-03-08']);
+  expect([...days]).toEqual(['2026-03-08']);
+  expect(nativePlugin.hasPhotosInRanges).toHaveBeenCalledTimes(1);
+  const { ranges } = nativePlugin.hasPhotosInRanges.mock.calls[0]![0] as { ranges: { fromMs: number; toMs: number }[] };
+  expect(ranges).toHaveLength(3);
+  // 夏時間開始日(3/8)は23時間、前後は24時間で、日ごとの範囲が切れ目なく並ぶ。
+  expect(ranges.map((r) => (r.toMs - r.fromMs) / 3600_000)).toEqual([24, 23, 24]);
+  expect(ranges[0]!.toMs).toBe(ranges[1]!.fromMs);
+  expect(nativePlugin.requestPermission).not.toHaveBeenCalled();
+});
+
+it('日ごとの有無照会はWebでは呼ばず、不正な応答・多すぎる日付は拒否し、存在しない日付は照会しない', async () => {
+  platform.native = false;
+  expect((await listDevicePhotoDays(['2026-09-08'])).size).toBe(0);
+  expect(nativePlugin.hasPhotosInRanges).not.toHaveBeenCalled();
+  platform.native = true;
+  nativePlugin.hasPhotosInRanges.mockResolvedValue({ hasPhotos: [true, true] });
+  await expect(listDevicePhotoDays(['2026-09-08'])).rejects.toThrow();
+  await expect(listDevicePhotoDays(Array.from({ length: 43 }, (_, i) => `2026-10-${String((i % 28) + 1).padStart(2, '0')}`))).rejects.toThrow();
+  nativePlugin.hasPhotosInRanges.mockClear();
+  expect((await listDevicePhotoDays(['2026-02-30'])).size).toBe(0);
+  expect(nativePlugin.hasPhotosInRanges).not.toHaveBeenCalled();
+  // 文字列の "true" など真偽値以外は「写真あり」と扱わない。
+  nativePlugin.hasPhotosInRanges.mockResolvedValue({ hasPhotos: ['true'] });
+  expect((await listDevicePhotoDays(['2026-09-08'])).size).toBe(0);
+});
+
+it('許可の要求・選び直しが終わると、成否にかかわらずアクセス変更を購読者へ知らせる', async () => {
+  const listener = vi.fn();
+  const unsubscribe = subscribeDevicePhotoAccessChange(listener);
+  nativePlugin.requestPermission.mockResolvedValue({ status: 'granted' });
+  nativePlugin.manageLimitedAccess.mockRejectedValue(new Error('x'));
+  await requestDevicePhotoPermission();
+  expect(listener).toHaveBeenCalledTimes(1);
+  await expect(reselectLimitedDevicePhotos()).rejects.toThrow();
+  expect(listener).toHaveBeenCalledTimes(2);
+  unsubscribe();
+  await requestDevicePhotoPermission();
+  expect(listener).toHaveBeenCalledTimes(2);
+});
+
+it('月の有無照会の取消は専用で、画像読込の一括取消(cancelLoads)を呼ばない', () => {
+  nativePlugin.cancelLoads.mockClear();
+  cancelDevicePhotoDayChecks();
+  expect(nativePlugin.cancelDayChecks).toHaveBeenCalledTimes(1);
+  expect(nativePlugin.cancelLoads).not.toHaveBeenCalled();
+  platform.native = false;
+  cancelDevicePhotoDayChecks();
+  expect(nativePlugin.cancelDayChecks).toHaveBeenCalledTimes(1);
 });

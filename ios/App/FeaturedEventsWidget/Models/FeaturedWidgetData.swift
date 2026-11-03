@@ -1,5 +1,35 @@
 import Foundation
 
+/** アプリが共有する配色。壊れた値は項目ごとに安全な既定色へ戻す。 */
+struct WidgetAppearanceData: Decodable {
+    var schemaVersion: Int?
+    var theme: String?
+    var backgroundColor: String?
+    var primaryTextColor: String?
+    var secondaryTextColor: String?
+    var accentColor: String?
+    var todayColor: String?
+    var todayTextColor: String?
+
+    static func read(defaults: UserDefaults? = UserDefaults(suiteName: FeaturedWidgetData.group)) -> Self? {
+        decode(defaults?.string(forKey: "widgetAppearance"))
+    }
+
+    static func decode(_ raw: String?) -> Self? {
+        guard let data = raw?.data(using: .utf8),
+              let value = try? JSONDecoder().decode(Self.self, from: data),
+              value.schemaVersion == 1 else { return nil }
+        return value
+    }
+
+    func rgb(_ key: KeyPath<Self, String?>, fallback: UInt32) -> UInt32 {
+        guard let value = self[keyPath: key], value.hasPrefix("#"), value.count == 7,
+              value.dropFirst().allSatisfy({ $0.isASCII && $0.isHexDigit }),
+              let rgb = UInt32(value.dropFirst(), radix: 16) else { return fallback }
+        return rgb
+    }
+}
+
 // JS側で選抜済みの配列を読むだけにし、優先度の再計算や予定タイトルの保持はしない。
 struct FeaturedWidgetEvent: Decodable, Equatable {
     let id: String

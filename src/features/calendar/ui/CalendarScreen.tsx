@@ -22,6 +22,10 @@ import { EventFormSheet, type EventSeed } from '@/features/events/ui/EventFormSh
 import { EventDetailSheet } from '@/features/events/ui/EventDetailSheet';
 import { useCalendarView } from '@/features/calendar/model/useCalendarView';
 import { registerLayerBack } from '@/platform/layerBack';
+import { isDevicePhotosSupported } from '@/platform/devicePhotos';
+import { useDevicePhotosEnabled } from '@/features/settings/model/useDevicePhotosEnabled';
+import { useEntitlements } from '@/features/billing/model/useEntitlements';
+import { useMonthPhotoDays } from '@/features/calendar/model/useMonthPhotoDays';
 import { ViewSwitcher } from './ViewSwitcher';
 import { DateNav } from './DateNav';
 import { MonthView } from './MonthView';
@@ -152,14 +156,22 @@ export function CalendarScreen({
   const priorityOf = useMemo(() => makePriorityOf(calendarById), [calendarById]);
   // 日付移動で作り直す byDay と分け、週送り中も退出ページを保つ。
   // 秘密の公開範囲や予定・カレンダーが変わった場合は即座に破棄する。
+  // 写真マーカーの権利・設定・利用者が変わったら、退出アニメーション用の複製も破棄する。
+  const { devicePhotosEnabled } = useDevicePhotosEnabled();
+  const { canViewPhotos } = useEntitlements();
+  const photosAllowed = devicePhotosEnabled && canViewPhotos && isDevicePhotosSupported();
+  const photoMarkersWanted = view === 'month' && photosAllowed;
   const pageContentVersion = useMemo(
-    () => ({ events: visibleEvents, calendars: calendarById }),
-    [visibleEvents, calendarById],
+    () => ({ events: visibleEvents, calendars: calendarById, photosAllowed, userId: session?.user.id }),
+    [visibleEvents, calendarById, photosAllowed, session?.user.id],
   );
   const monthCells = useMemo(() => {
     const { year, month } = ymd(cursor);
     return monthGridDays(year, month, today);
   }, [cursor, today]);
+  // 月表示だけ、表示グリッド(前後月を含む)の写真の有無を調べる。許可の要求はしない。
+  const monthDates = useMemo(() => monthCells.map((cell) => cell.date), [monthCells]);
+  const photoDays = useMonthPhotoDays(monthDates, photoMarkersWanted, session?.user.id);
   const byDay = useMemo(
     () => groupEventsByDay(visibleEvents, priorityOf, {
       from: monthCells[0]?.date ?? cursor,
@@ -430,6 +442,7 @@ export function CalendarScreen({
             collapsedToWeekOf={selectedDay ?? undefined}
             onBackToMonth={closeDayPanel}
             contentVersion={pageContentVersion}
+            photoDays={photoDays}
             onSwipeLeft={selectedDay ? () => shiftSelectedDay(7) : goNext}
             onSwipeRight={selectedDay ? () => shiftSelectedDay(-7) : goPrev}
           />

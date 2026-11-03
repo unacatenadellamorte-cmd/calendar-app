@@ -44,6 +44,10 @@ interface DevicePhotosPlugin {
     allowNetwork: boolean;
     requestId: string;
   }): Promise<{ dataUrl: string }>;
+  /** 各範囲に撮影日時の写真が1枚でもあるかだけを返す(IDも画像も返さない)。 */
+  hasPhotosInRanges(options: { ranges: { fromMs: number; toMs: number }[] }): Promise<{ hasPhotos: boolean[] }>;
+  /** 月カレンダーの有無照会だけを取り消す(画像読込の取消とは別)。 */
+  cancelDayChecks(): Promise<void>;
   /** 実行中・待機中の画像読込をすべて取り消す(OS 側のリクエストも解放する)。 */
   cancelLoads(): Promise<void>;
   /** 指定した1枚の画像読込だけを取り消す。 */
@@ -86,6 +90,17 @@ export function localDayRangeMs(date: string): { fromMs: number; toMs: number } 
   };
 }
 
+// 写真へのアクセス範囲が変わった(許可・一部許可の選び直し)ことを、画面側へ知らせる。
+// OS の前面復帰通知が来ない場合でも、月カレンダーの目印を読み直すために使う。
+const accessListeners = new Set<() => void>();
+export function subscribeDevicePhotoAccessChange(listener: () => void): () => void {
+  accessListeners.add(listener);
+  return () => { accessListeners.delete(listener); };
+}
+function notifyAccessChange(): void {
+  for (const listener of [...accessListeners]) listener();
+}
+
 /** 権限の状態を確認する(OS の要求ダイアログは出さない)。 */
 export async function checkDevicePhotoPermission(): Promise<DevicePhotoPermission> {
   if (!isDevicePhotosSupported()) return 'unavailable';
@@ -96,15 +111,23 @@ export async function checkDevicePhotoPermission(): Promise<DevicePhotoPermissio
 /** OS の権限ダイアログを出す。利用者が写真欄で操作した時だけ呼ぶ。 */
 export async function requestDevicePhotoPermission(): Promise<DevicePhotoPermission> {
   if (!isDevicePhotosSupported()) return 'unavailable';
-  const { status } = await DevicePhotos.requestPermission();
-  return status;
+  try {
+    const { status } = await DevicePhotos.requestPermission();
+    return status;
+  } finally {
+    notifyAccessChange();
+  }
 }
 
 /** 一部許可のとき、OS の選択画面で見せる写真を選び直す。利用者が操作した時だけ呼ぶ。 */
 export async function reselectLimitedDevicePhotos(): Promise<DevicePhotoPermission> {
   if (!isDevicePhotosSupported()) return 'unavailable';
-  const { status } = await DevicePhotos.manageLimitedAccess();
-  return status;
+  try {
+    const { status } = await DevicePhotos.manageLimitedAccess();
+    return status;
+  } finally {
+    notifyAccessChange();
+  }
 }
 
 /**
@@ -119,6 +142,43 @@ export async function listDevicePhotosForDay(date: string, offset: number): Prom
     .filter((asset) => asset.createdMs >= fromMs && asset.createdMs < toMs)
     .sort((a, b) => a.createdMs - b.createdMs);
   return { assets, hasMore: page.hasMore, nextOffset: offset + page.assets.length };
+}
+
+/** 月グリッド(前後月を含む最大6週)の日数。 */
+export const DEVICE_PHOTO_DAY_MARKER_MAX_DAYS = 42;
+
+/**
+ * 指定した日付(端末のローカル日付)のうち、撮影日時の写真がある日だけを返す。
+ * 1回のネイティブ照会で日ごとの有無だけを受け取り、写真の識別子や画像は扱わない。
+ * 画像読込の取消(`releaseDevicePhotoCache`)の対象外。権限の要求ダイアログは出さない。
+ */
+export async function listDevicePhotoDays(dates: readonly string[]): Promise<Set<string>> {
+  if (!isDevicePhotosSupported() || dates.length === 0) return new Set();
+  if (dates.length > DEVICE_PHOTO_DAY_MARKER_MAX_DAYS) throw new Error('日付が多すぎます。');
+  const targets: { date: string; fromMs: number; toMs: number }[] = [];
+  for (const date of new Set(dates)) {
+    try {
+      targets.push({ date, ...localDayRangeMs(date) });
+    } catch {
+      // 存在しない日付は照会せず、マーカーも出さない。
+    }
+  }
+  if (targets.length === 0) return new Set();
+  const { hasPhotos } = await DevicePhotos.hasPhotosInRanges({
+    ranges: targets.map(({ fromMs, toMs }) => ({ fromMs, toMs })),
+  });
+  if (!Array.isArray(hasPhotos) || hasPhotos.length !== targets.length) throw new Error('応答が不正です。');
+  return new Set(targets.filter((_, index) => hasPhotos[index] === true).map((target) => target.date));
+}
+
+/** 月カレンダーの有無照会だけを取り消す。画像読込・日の写真一覧には触れない。 */
+export function cancelDevicePhotoDayChecks(): void {
+  if (!isDevicePhotosSupported()) return;
+  try {
+    void DevicePhotos.cancelDayChecks().catch(() => {});
+  } catch {
+    // 取消の失敗は結果の破棄(古い応答の無視)で吸収する。
+  }
 }
 
 // 縮小画像はメモリ上にだけ置く(ディスクへは保存しない)。

@@ -42,4 +42,10 @@ describe('buildWidgetAppearance', () => {
     localStorage.setItem('calendar-app.month-event-size', 'broken');
     expect(buildWidgetAppearance().appFontScale).toBe(0.8);
   });
+
+  it('CSSがまだ読めないdarkでもアプリと同じ濃紺を共有する', () => {
+    expect(buildWidgetAppearance('dark')).toMatchObject({
+      backgroundColor: '#0f1b31', primaryTextColor: '#e9f0fa', accentColor: '#5cc4e6',
+    });
+  });
 });

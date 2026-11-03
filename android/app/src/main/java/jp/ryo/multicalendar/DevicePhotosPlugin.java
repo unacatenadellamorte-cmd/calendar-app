@@ -47,6 +47,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class DevicePhotosPlugin extends Plugin {
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_IMAGE_SIDE = 1600;
+    // 月グリッド(前後月を含む6週)の日数。
+    static final int MAX_DAY_RANGES = 42;
     private static final int JPEG_QUALITY = 80;
     private static final String PREFS = "device_photos";
     private static final String KEY_ASKED = "permission_asked";
@@ -55,6 +57,8 @@ public class DevicePhotosPlugin extends Plugin {
     private final ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(2);
     private final ThreadPoolExecutor queryExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(1);
     private final Map<String, PhotoListLoad> lists = new ConcurrentHashMap<>();
+    // 月カレンダーの有無照会。画像読込の一括取消(cancelLoads)とは独立させ、破棄時にだけ止める。
+    private final Map<String, PhotoListLoad> dayChecks = new ConcurrentHashMap<>();
     // 実行中・待機中の読込。取り消されたら結果を捨てる。
     private final Map<String, ImageLoad> loads = new ConcurrentHashMap<>();
     private ActivityResultLauncher<String[]> permissionLauncher;
@@ -106,6 +110,15 @@ public class DevicePhotosPlugin extends Plugin {
         int sample = 1;
         while (longest / (sample * 2) >= maxSide) sample *= 2;
         return sample;
+    }
+
+    static boolean isValidDayRanges(long[] fromMs, long[] toMs) {
+        if (fromMs == null || toMs == null || fromMs.length != toMs.length) return false;
+        if (fromMs.length == 0 || fromMs.length > MAX_DAY_RANGES) return false;
+        for (int i = 0; i < fromMs.length; i++) {
+            if (toMs[i] <= fromMs[i]) return false;
+        }
+        return true;
     }
 
     static boolean isValidMediaId(String id) {
@@ -270,6 +283,87 @@ public class DevicePhotosPlugin extends Plugin {
         }
         // 8.0 未満は並び順の末尾に LIMIT/OFFSET を付ける(値は検証済みの整数のみ)。
         return resolver.query(uri, projection, selection, args, order + " LIMIT " + limit + " OFFSET " + offset, signal);
+    }
+
+    /**
+     * 各日の範囲に撮影日時の写真が1枚でもあるかだけを返す(月カレンダーの目印用)。
+     * 識別子・日時・画像は返さない。範囲はJS側がローカル日付(夏時間追従)で計算して渡す。
+     */
+    @PluginMethod
+    public void hasPhotosInRanges(PluginCall call) {
+        JSArray ranges = call.getArray("ranges");
+        long[] fromMs;
+        long[] toMs;
+        try {
+            if (ranges == null || ranges.length() > MAX_DAY_RANGES) throw new org.json.JSONException("size");
+            fromMs = new long[ranges.length()];
+            toMs = new long[ranges.length()];
+            for (int i = 0; i < ranges.length(); i++) {
+                org.json.JSONObject range = ranges.getJSONObject(i);
+                fromMs[i] = range.getLong("fromMs");
+                toMs[i] = range.getLong("toMs");
+            }
+        } catch (org.json.JSONException error) {
+            call.reject("引数が不正です", "invalid-arguments");
+            return;
+        }
+        if (!isValidDayRanges(fromMs, toMs)) {
+            call.reject("引数が不正です", "invalid-arguments");
+            return;
+        }
+        if (!canRead()) {
+            call.reject("写真へのアクセスが許可されていません", "permission-denied");
+            return;
+        }
+        PhotoListLoad pending = new PhotoListLoad(call);
+        String queryId = UUID.randomUUID().toString();
+        dayChecks.put(queryId, pending);
+        pending.task = new FutureTask<>(() -> {
+            if (pending.finished.get()) return null;
+            String taken = MediaStore.Images.Media.DATE_TAKEN;
+            String selection = taken + " > 0 AND " + taken + " >= ? AND " + taken + " < ?";
+            String[] projection = {MediaStore.Images.Media._ID};
+            ContentResolver resolver = getContext().getContentResolver();
+            JSArray hasPhotos = new JSArray();
+            try {
+                for (int i = 0; i < fromMs.length && !pending.finished.get(); i++) {
+                    String[] args = {String.valueOf(fromMs[i]), String.valueOf(toMs[i])};
+                    try (Cursor cursor = queryPage(resolver, projection, selection, args,
+                        MediaStore.Images.Media._ID + " ASC", 0, 1, pending.signal)) {
+                        if (cursor == null) {
+                            pending.rejectUnavailable();
+                            return null;
+                        }
+                        hasPhotos.put(cursor.moveToFirst());
+                    }
+                }
+                JSObject result = new JSObject();
+                result.put("hasPhotos", hasPhotos);
+                if (pending.finished.compareAndSet(false, true)) {
+                    if (canRead()) call.resolve(result);
+                    else call.reject("写真へのアクセスが許可されていません", "permission-denied");
+                }
+            } catch (RuntimeException error) {
+                pending.rejectUnavailable();
+            } finally {
+                dayChecks.remove(queryId, pending);
+            }
+            return null;
+        });
+        try {
+            queryExecutor.execute(pending.task);
+        } catch (java.util.concurrent.RejectedExecutionException error) {
+            dayChecks.remove(queryId, pending);
+            pending.cancel();
+        }
+    }
+
+    /** 月カレンダーの有無照会だけを取り消す(画像読込・日の写真一覧は止めない)。 */
+    @PluginMethod
+    public void cancelDayChecks(PluginCall call) {
+        for (PhotoListLoad check : dayChecks.values()) check.cancel();
+        dayChecks.clear();
+        call.resolve();
     }
 
     @PluginMethod
@@ -447,6 +541,8 @@ public class DevicePhotosPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         cancelAll();
+        for (PhotoListLoad check : dayChecks.values()) check.cancel();
+        dayChecks.clear();
         executor.shutdownNow();
         queryExecutor.shutdownNow();
         PluginCall call = pendingPermission;

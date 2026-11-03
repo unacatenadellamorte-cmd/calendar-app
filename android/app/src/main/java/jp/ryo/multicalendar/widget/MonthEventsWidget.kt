@@ -65,7 +65,7 @@ private fun MonthEventsContent() {
     val cellHeightDp = ((size.height.value - 12f - headerHeight - weekdayHeight) / rows.size)
         .coerceAtLeast(1f)
     Column(
-        modifier = GlanceModifier.fillMaxSize().background(appearance.backgroundColor).padding(6.dp),
+        modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(6.dp),
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth().height(headerHeight.dp)) {
             Row(modifier = GlanceModifier.defaultWeight()) {

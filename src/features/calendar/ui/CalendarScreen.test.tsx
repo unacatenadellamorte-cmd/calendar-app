@@ -11,6 +11,8 @@ const photoPlugin = vi.hoisted(() => ({
   checkPermission: vi.fn(async () => ({ status: 'granted' })),
   listAssets: vi.fn(async () => ({ assets: [{ id: 'qa-photo', createdMs: Date.UTC(2026, 8, 8, 1) }], hasMore: false })),
   loadImage: vi.fn(async () => ({ dataUrl: 'data:image/jpeg;base64,QQ==' })),
+  hasPhotosInRanges: vi.fn(async ({ ranges }: { ranges: unknown[] }) => ({ hasPhotos: ranges.map(() => false) })),
+  cancelDayChecks: vi.fn(async () => {}),
   cancelLoads: vi.fn(async () => {}),
   cancelLoad: vi.fn(async () => {}),
 }));

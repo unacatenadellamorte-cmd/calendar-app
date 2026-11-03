@@ -5,6 +5,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WidgetAppearanceTest {
+    @Test fun `ガラス面はテーマ背景へアクセントを薄く重ねる`() {
+        val appearance = WidgetAppearance(backgroundColor = Color(0xFFFFF8FA), accentColor = Color(0xFFA52C62))
+        val tinted = widgetGlassTint(appearance)
+        assertEquals(0.972f, tinted.red, 0.002f)
+        assertEquals(0.909f, tinted.green, 0.002f)
+        assertEquals(0.933f, tinted.blue, 0.002f)
+        assertEquals(1f, tinted.alpha, 0f)
+    }
+
     @Test fun `中間明度でも読める黒文字へ補正する`() {
         assertEquals(Color.Black, widgetFilledLabelTextColor(Color(0xFF7B7B7B)))
     }
