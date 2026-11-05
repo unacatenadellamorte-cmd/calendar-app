@@ -49,7 +49,7 @@ export function HomeScreen() {
       title={t('この後の予定')}
       showProfileHeader
       action={
-        <Link to="/calendars" className="text-meta text-accent">
+        <Link to="/calendars" className="inline-flex min-h-11 items-center px-2 text-meta text-accent">
           {t('カレンダーの並び順 ›')}
         </Link>
       }

@@ -59,7 +59,7 @@ export function DateNav({
             type="button"
             onClick={() => setJumpOpen((v) => !v)}
             aria-expanded={jumpOpen}
-            className="max-w-full text-left [overflow-wrap:anywhere]"
+            className="min-h-11 max-w-full text-left [overflow-wrap:anywhere]"
           >
             {title}
           </button>
