@@ -50,7 +50,7 @@
     box-shadow: var(--ui-glow);
   }
   .app-shell :is(input, select, textarea)::placeholder {
-    color: var(--color-ink-disabled);
+    color: var(--color-ink-secondary);
   }
 }
 
@@ -360,6 +360,11 @@
 .bottom-sheet :is(input, select, textarea):focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+/* シートはbody直下へ出るため、本文と同じ案内文字の濃さを明示する。 */
+.bottom-sheet :is(input, textarea)::placeholder {
+  color: var(--color-ink-secondary);
+  opacity: 1;
 }
 @supports (backdrop-filter: blur(1px)) {
   :root[data-theme='dark']:not([data-background='custom'])

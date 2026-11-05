@@ -23,15 +23,15 @@ export function PayCard({ events, calendars }: PayCardProps) {
       data-edit-id="pay-summary"
       className="pay-summary mt-3 rounded-md border border-border-hairline bg-surface-raised"
     >
-      <div className="flex items-center justify-between px-4 pt-3 text-meta text-ink-secondary">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 pt-3 text-meta text-ink-secondary">
         <span>{t('{0}の給料見込み', [pay.monthLabel])}</span>
         <span className="text-meta text-ink-secondary">{t('概算・目安')}</span>
-        <span className="flex gap-1">
+        <span className="ml-auto flex shrink-0 gap-1">
           <button
             type="button"
             aria-label={t('前の月')}
             onClick={pay.prev}
-            className="h-11 w-9 rounded-sm border border-border-hairline text-ink-secondary"
+            className="h-11 w-11 rounded-sm border border-border-hairline text-ink-secondary"
           >
             ‹
           </button>
@@ -40,7 +40,7 @@ export function PayCard({ events, calendars }: PayCardProps) {
             aria-label={t('次の月')}
             onClick={pay.next}
             disabled={!pay.canNext}
-            className="h-11 w-9 rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
+            className="h-11 w-11 rounded-sm border border-border-hairline text-ink-secondary disabled:opacity-40"
           >
             ›
           </button>
