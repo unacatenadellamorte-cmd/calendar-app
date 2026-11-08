@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BackgroundSection } from './BackgroundSection';
 
@@ -45,8 +45,11 @@ async function openCrop() {
   render(<BackgroundSection />);
   const input = screen.getByLabelText('背景画像を選ぶ');
   await waitFor(() => expect(input).toBeEnabled());
-  fireEvent.change(input, {
-    target: { files: [new File(['x'], '背景.png', { type: 'image/png' })] },
+  // 画像の読込みマイクロタスクと開いた直後の状態初期化を終えてから操作する。
+  await act(async () => {
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], '背景.png', { type: 'image/png' })] },
+    });
   });
   await screen.findByRole('application', { name: '背景画像の切り出し範囲' });
 }
