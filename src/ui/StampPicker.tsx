@@ -30,46 +30,48 @@ export function StampPicker({
           aria-expanded={expanded}
           aria-controls={listId}
           onClick={() => setExpanded((current) => !current)}
-          className="flex min-h-11 w-11 items-center justify-center rounded-full border border-border-hairline bg-surface-base text-title text-accent"
+          className="stamp-picker-toggle flex min-h-11 w-11 items-center justify-center rounded-full border border-border-hairline bg-surface-base text-title text-accent"
         >
-          <span aria-hidden="true">{expanded ? '−' : '＋'}</span>
+          <span aria-hidden="true">＋</span>
         </button>
       )}
-      {visible && <div
-        id={listId}
-        className="grid grid-cols-4 gap-2 sm:grid-cols-8"
-        role="group"
-        aria-label={t('スタンプを選択')}
-      >
-        <button
-          type="button"
-          aria-pressed={!value}
-          aria-label={t('スタンプなし')}
-          onClick={() => onChange(null)}
-          className="flex aspect-square items-center justify-center rounded-full border border-border-hairline text-meta"
+      {visible && (
+        <div
+          id={listId}
+          className="stamp-picker-list grid grid-cols-4 gap-2 sm:grid-cols-8"
+          role="group"
+          aria-label={t('スタンプを選択')}
         >
-          ×
-        </button>
-        {EVENT_STAMPS.map(([id, name]) => (
           <button
-            key={id}
             type="button"
-            aria-label={t(name)}
-            title={t(name)}
-            aria-pressed={value === id}
-            onClick={() => onChange(id as EventStampId)}
-            className="flex aspect-square items-center justify-center rounded-full border-2 p-2 focus-visible:outline focus-visible:outline-2"
-            style={{
-              color,
-              borderColor: value === id ? color : 'var(--color-border-hairline)',
-              backgroundColor: 'var(--color-surface-base)',
-              boxShadow: value === id ? '0 0 0 2px var(--color-accent)' : undefined,
-            }}
+            aria-pressed={!value}
+            aria-label={t('スタンプなし')}
+            onClick={() => onChange(null)}
+            className="flex aspect-square items-center justify-center rounded-full border border-border-hairline text-meta"
           >
-            <EventStamp id={id} size={24} label={false} />
+            ×
           </button>
-        ))}
-      </div>}
+          {EVENT_STAMPS.map(([id, name]) => (
+            <button
+              key={id}
+              type="button"
+              aria-label={t(name)}
+              title={t(name)}
+              aria-pressed={value === id}
+              onClick={() => onChange(id as EventStampId)}
+              className="flex aspect-square items-center justify-center rounded-full border-2 p-2 focus-visible:outline focus-visible:outline-2"
+              style={{
+                color,
+                borderColor: value === id ? color : 'var(--color-border-hairline)',
+                backgroundColor: 'var(--color-surface-base)',
+                boxShadow: value === id ? '0 0 0 2px var(--color-accent)' : undefined,
+              }}
+            >
+              <EventStamp id={id} size={24} label={false} />
+            </button>
+          ))}
+        </div>
+      )}
     </fieldset>
   );
 }

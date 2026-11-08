@@ -1,6 +1,6 @@
 import { t, useLanguage } from '@/i18n';
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import type { CSSProperties, ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 interface Tab {
   to: string;
   label: string;
@@ -63,13 +63,26 @@ const TABS: Tab[] = [
  */
 export function BottomTabs() {
   useLanguage();
+  const { pathname } = useLocation();
+  const selected = TABS.findIndex((tab) =>
+    tab.to === '/'
+      ? pathname === '/'
+      : pathname === tab.to || pathname.startsWith(`${tab.to}/`),
+  );
   return (
     <nav
       aria-label={t('メインナビゲーション')}
       data-edit-id="bottom-tabs"
       className="app-bottom-tabs fixed inset-x-0 bottom-0 z-10 flex border-t border-border-hairline bg-surface-base"
-      style={{ paddingBottom: 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))' }}
+      style={
+        {
+          paddingBottom: 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))',
+          '--tab-index': Math.max(0, selected),
+          '--tab-visible': selected < 0 ? 0 : 1,
+        } as CSSProperties
+      }
     >
+      <span className="app-tab-highlight" aria-hidden="true" />
       {TABS.map((tab) => (
         <NavLink
           key={tab.to}
@@ -84,7 +97,10 @@ export function BottomTabs() {
         >
           {({ isActive }) => (
             <>
-              <span aria-hidden="true" className="flex h-6 items-center justify-center leading-none">
+              <span
+                aria-hidden="true"
+                className="flex h-6 items-center justify-center leading-none"
+              >
                 {tab.icon}
               </span>
               <span className="tracking-wide">{tab.label}</span>
