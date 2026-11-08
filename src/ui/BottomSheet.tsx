@@ -92,7 +92,10 @@ export function BottomSheet({
         data-closing={closing ? 'true' : undefined}
         className="sheet-backdrop absolute inset-0"
       />
-      <div className="sheet-wrap relative mx-auto w-full max-w-2xl">
+      <div
+        data-closing={closing ? 'true' : undefined}
+        className="sheet-wrap relative mx-auto w-full max-w-2xl"
+      >
         <div
           ref={panelRef}
           role="dialog"

@@ -1,4 +1,5 @@
 import { t, useLanguage } from '@/i18n';
+import type { CSSProperties } from 'react';
 import type { ViewMode } from '@/features/calendar/model/useCalendarView';
 interface ViewSwitcherProps {
   view: ViewMode;
@@ -44,7 +45,11 @@ export function ViewSwitcher({ view, onChange }: ViewSwitcherProps) {
       role="radiogroup"
       aria-label={t('表示切替')}
       className="calendar-view-switcher flex overflow-hidden rounded-sm border border-border-hairline text-meta"
+      style={
+        { '--view-index': ITEMS.findIndex((item) => item.value === view) } as CSSProperties
+      }
     >
+      <span className="calendar-view-highlight" aria-hidden="true" />
       {ITEMS.map(({ value, label }) => {
         const active = view === value;
         return (
