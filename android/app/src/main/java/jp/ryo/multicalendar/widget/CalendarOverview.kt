@@ -206,7 +206,7 @@ internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int, fontScale: F
 internal fun monthEventLineCapacity(cellHeightDp: Float, fontScale: Float = 1f): Int {
     val scale = fontScale.coerceAtLeast(0.5f)
     // 日付行・上下余白を含む保守的な12dp行高。本文は8spに抑え、日本語フォントの上下に余白を残す。
-    return floor((cellHeightDp - 4f - 14f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
+    return floor((cellHeightDp - 2f - 16f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
 }
 
 /** 超過件数は日付行に表示するため、イベント行の実容量までタイトルを描く。 */

@@ -819,7 +819,10 @@ class WidgetRenderingTest {
             var top = view.top
             var parent = view.parent as? View ?: return false
             while (true) {
-                if (left < 0 || top < 0 || left + view.width > parent.width || top + view.height > parent.height) return false
+                if (left < 0 || top < 0 || left + view.width > parent.width || top + view.height > parent.height) {
+                    android.util.Log.e("WidgetTextBounds", "$expected: ($left,$top) ${view.width}x${view.height}, 親=${parent.javaClass.simpleName} ${parent.width}x${parent.height}")
+                    return false
+                }
                 left += parent.left - parent.scrollX
                 top += parent.top - parent.scrollY
                 parent = parent.parent as? View ?: return true

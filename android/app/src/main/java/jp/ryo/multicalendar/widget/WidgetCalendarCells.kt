@@ -48,9 +48,9 @@ internal fun CalendarWidgetDayCell(
                 .then(cellModifier)
                 .fillMaxHeight()
                 .widgetClickable(actionStartActivity(dayWidgetIntent(context, day)))
-                .padding(2.dp),
+                .padding(horizontal = 2.dp, vertical = 1.dp),
         ) {
-            Row(modifier = GlanceModifier.fillMaxWidth().height((14f * fontScale).dp)
+            Row(modifier = GlanceModifier.fillMaxWidth().height((16f * fontScale).dp)
                 .background(if (isToday) appearance.todayColor else Color.Transparent).cornerRadius(6.dp)) {
                 Text(
                     text = day.day.toString(),

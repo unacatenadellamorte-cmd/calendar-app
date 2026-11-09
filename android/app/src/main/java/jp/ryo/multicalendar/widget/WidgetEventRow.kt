@@ -54,7 +54,7 @@ internal fun WidgetEventRow(
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val cellWidth = width / 7f
         val labelHeight = 12f * fontScale
-        val top = 2f + 14f * fontScale
+        val top = 1f + 16f * fontScale
         // 同じ色でも別の予定は合流させない。重複IDも列内の位置で照合する。
         rows.flatten().distinctBy { it.id }.forEach { event ->
             val path = Path()
