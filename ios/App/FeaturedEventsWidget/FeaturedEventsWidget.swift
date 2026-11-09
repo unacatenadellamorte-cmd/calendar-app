@@ -40,10 +40,11 @@ struct WidgetThemeColors {
 
 /** 壁紙のぼかしに依存せず、薄い色面・斜めの反射・縁でガラス感を出す。 */
 struct WidgetGlassSurface: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let colors: WidgetThemeColors
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(colors.background.opacity(0.94))
+            .fill(colors.background.opacity(reduceTransparency ? 1 : 0.96))
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(LinearGradient(colors: [.white.opacity(0.14), .clear, colors.accent.opacity(0.05)],
@@ -51,9 +52,37 @@ struct WidgetGlassSurface: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(LinearGradient(stops: [.init(color: .clear, location: 0.55),
+                                                 .init(color: .black.opacity(0.10), location: 1)],
+                                         startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(LinearGradient(colors: [.white.opacity(0.62), colors.accent.opacity(0.22)],
                                                  startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.22), .clear, colors.accent.opacity(0.16)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.7)
+                    .padding(2)
+            )
+    }
+}
+
+extension View {
+    /** 更新箇所だけ短く切り替え、動きを減らす設定ではOSの暗黙アニメーションも止める。 */
+    @ViewBuilder
+    func widgetUpdate<Value: Equatable>(_ value: Value, reduceMotion: Bool) -> some View {
+        if #available(iOSApplicationExtension 17.0, *) {
+            self.contentTransition(.opacity)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: value)
+                .transaction { transaction in
+                    if reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
+                }
+        } else {
+            self
+        }
     }
 }
 
@@ -82,6 +111,7 @@ struct FeaturedEventsProvider: TimelineProvider {
 struct FeaturedEventsWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let entry: FeaturedWidgetEntry
     private var colors: WidgetThemeColors { WidgetThemeColors(scheme: colorScheme) }
 
@@ -112,11 +142,16 @@ struct FeaturedEventsWidgetEntryView: View {
                             .accessibilityHidden(true)
                         Text(FeaturedWidgetData.startLabel(event))
                             .font(.caption.bold())
-                            .fixedSize()
+                            .lineLimit(2)
+                            .widgetUpdate(FeaturedWidgetData.startLabel(event), reduceMotion: reduceMotion)
                         Text(event.calendarName)
                             .font(.caption)
                             .lineLimit(1)
                     }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(colors.today.opacity(0.65), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .widgetUpdate(event, reduceMotion: reduceMotion)
                 }
             }
             Spacer(minLength: 0)

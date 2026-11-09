@@ -40,6 +40,61 @@ class WidgetRenderingTest {
     private val hostId = ("calendar-widget-smoke".hashCode() and 0x7fff) + 1000
 
     @Test
+    fun crossDayMarkersKeepPriorityAndRenderAtDifferentLanes() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 5)
+        val ids = mutableListOf<Int>()
+        val first = weekWidgetDays(todayWidgetDay())[1]
+        val second = addWidgetDays(first, 1)
+        val third = addWidgetDays(first, 2)
+        fun event(id: String, title: String, from: WidgetDay, until: WidgetDay = from, color: String = "#327caa") =
+            JSONObject().put("id", id).put("title", title).put("calendarName", "検証")
+                .put("startDate", from.toKey()).put("endDate", until.toKey()).put("allDay", true)
+                .put("filledLabel", true).put("colorHex", color)
+        val priorityEvents = JSONArray().apply {
+            repeat(3) { put(event("single$it", "予定${it + 1}", first, color = "#6a68b7")) }
+            put(event("shift", "夜勤", first, second))
+            put(event("meeting", "会議", second, color = "#8a689c"))
+        }
+        val garbageEvents = JSONArray().apply {
+            put(event("garbage1", "可燃ごみ", first, color = "#b35a64"))
+            put(event("garbage3", "可燃ごみ", third, color = "#b35a64"))
+            put(event("shift", "夜勤", second, third))
+            put(event("meeting", "会議", third, color = "#8a689c"))
+        }
+        try {
+            prefs.edit().putInt(MONTH_OFFSET_KEY, 0).commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            listOf("light", "dark").forEach { theme ->
+                prefs.edit().putString(WIDGET_APPEARANCE_KEY,
+                    """{"schemaVersion":1,"theme":"$theme","appFontScale":1}""").commit()
+                listOf("priority" to priorityEvents, "garbage" to garbageEvents).forEach { (name, events) ->
+                prefs.edit().putString(CALENDAR_OVERVIEW_KEY,
+                    JSONObject().put("language", "ja").put("events", events).toString()).commit()
+                // 先頭日は予定3件→夜勤、翌日は夜勤→会議の優先順を維持する。
+                val month = renderProvider(host, ComponentName(context, MonthEventsWidgetReceiver::class.java), 400, 600, ids, "会議")
+                val week = renderProvider(host, ComponentName(context, WeekEventsWidgetReceiver::class.java), 400, 180, ids, "会議")
+                saveBitmap(month, "widget-marker-$theme-$name-month.png", 400, 600)
+                saveBitmap(week, "widget-marker-$theme-$name-week.png", 400, 180)
+                }
+            }
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
+            }
+            (previous[MONTH_OFFSET_KEY] as? Int)?.let { edit.putInt(MONTH_OFFSET_KEY, it) } ?: edit.remove(MONTH_OFFSET_KEY)
+            edit.commit()
+        }
+    }
+
+    @Test
     fun themeGlassSurfacesRenderAcrossAllWidgetKinds() {
         org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
         val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
@@ -136,8 +191,8 @@ class WidgetRenderingTest {
             assertText(view, "+1")
             saveBitmap(view, "widget-month-response-september.png", 380, 515)
             // 実際のRemoteViewsのクリックから、ホストへの新しい描画到着までを測る。
-            listOf("▲" to WidgetDay(2026, 8, 1), "▼" to anchor,
-                "▼" to WidgetDay(2026, 10, 1), "▲" to anchor).forEach { (arrow, month) ->
+            listOf("‹" to WidgetDay(2026, 8, 1), "›" to anchor,
+                "›" to WidgetDay(2026, 10, 1), "‹" to anchor).forEach { (arrow, month) ->
                 val firstEvent = eventsForWidgetDay(readCalendarOverview(context).events, month).first().title
                 val started = android.os.SystemClock.elapsedRealtime()
                 runOnMain { assertTrue("矢印をクリックできない", clickText(view, arrow)) }
@@ -228,7 +283,7 @@ class WidgetRenderingTest {
             assertTextViewsFitParent(week, listOf(weekHeaderText(weekWidgetDays(today))))
             assertNoEllipsis(week, weekHeaderText(weekWidgetDays(today)))
             saveBitmap(week, "widget-week-unified.png", 380, 180)
-            listOf("▼" to 7, "▲" to 0).forEach { (arrow, offset) ->
+            listOf("›" to 7, "‹" to 0).forEach { (arrow, offset) ->
                 val started = android.os.SystemClock.elapsedRealtime()
                 runOnMain { assertTrue(clickText(week, arrow)) }
                 waitUntil("週移動") { findText(week, "先頭予定$offset") }
@@ -239,7 +294,7 @@ class WidgetRenderingTest {
                 assertTrue("週切替に${elapsed}ms", elapsed <= 1000)
             }
             val todayIndex = weekWidgetDays(today).indexOf(today)
-            listOf("▼" to 1, "▲" to 0).forEach { (arrow, offset) ->
+            listOf("›" to 1, "‹" to 0).forEach { (arrow, offset) ->
                 val started = android.os.SystemClock.elapsedRealtime()
                 runOnMain { assertTrue(clickText(day, arrow)) }
                 waitUntil("日移動") {
@@ -254,9 +309,9 @@ class WidgetRenderingTest {
             }
             // 連続操作と共有データ更新が重なっても、最後の日付から巻き戻らない。
             runOnMain {
-                assertTrue(clickText(day, "▼"))
-                assertTrue(clickText(day, "▼"))
-                assertTrue(clickText(day, "▲"))
+                assertTrue(clickText(day, "›"))
+                assertTrue(clickText(day, "›"))
+                assertTrue(clickText(day, "‹"))
             }
             waitUntil("連続操作の最終日") {
                 layoutForAssertions(day, 380, 270)
@@ -268,7 +323,7 @@ class WidgetRenderingTest {
                 assertText(day, "先頭予定${todayIndex + 1}")
                 assertTrue("古い日に巻き戻った", !findText(day, "先頭予定$todayIndex"))
             }
-            runOnMain { assertTrue(clickText(day, "▲")) }
+            runOnMain { assertTrue(clickText(day, "‹")) }
             waitUntil("今日へ戻る") { layoutForAssertions(day, 380, 270); findText(day, "先頭予定$todayIndex") }
             // アプリで順番を変えた共有データを受け取ると、どちらもその場で並び替わる。
             val reversed = JSONArray()
@@ -358,7 +413,7 @@ class WidgetRenderingTest {
             )
             targets.forEachIndexed { index, (view, height, nextDate) ->
                 val started = android.os.SystemClock.elapsedRealtime()
-                runOnMain { assertTrue(clickText(view, "▼")) }
+                runOnMain { assertTrue(clickText(view, "›")) }
                 waitUntil("非操作後の切替$index") {
                     layoutForAssertions(view, if (index == 2) 384 else 380, height)
                     findText(view, title(nextDate))
@@ -647,7 +702,7 @@ class WidgetRenderingTest {
             val nextMonth = monthAnchor(today, 1)
             val nextTitle = eventsForWidgetDay(readCalendarOverview(context).events, nextMonth).first().title
             val started = android.os.SystemClock.elapsedRealtime()
-            runOnMain { assertTrue(clickText(month, "▼")) }
+            runOnMain { assertTrue(clickText(month, "›")) }
             waitUntil("色付きラベルの翌月") { findText(month, "${nextMonth.year}/${nextMonth.month}月") && findText(month, nextTitle) }
             layoutForAssertions(month, 380, 515)
             val elapsed = android.os.SystemClock.elapsedRealtime() - started

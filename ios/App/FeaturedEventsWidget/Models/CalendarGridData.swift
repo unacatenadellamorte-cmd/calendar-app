@@ -121,6 +121,10 @@ enum CalendarGridData {
         }
     }
 
+    static func displayRange(_ event: CalendarOverviewEvent, timeZone: TimeZone = .current) -> (startDate: String, endDate: String) {
+        event.allDay ? (event.startDate, event.endDate) : timedRange(event, timeZone: timeZone)
+    }
+
     private static func timedRange(_ event: CalendarOverviewEvent, timeZone: TimeZone) -> (startDate: String, endDate: String) {
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

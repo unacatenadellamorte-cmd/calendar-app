@@ -3,6 +3,16 @@ import XCTest
 @testable import FeaturedWidgetData
 
 final class FeaturedWidgetDataTests: XCTestCase {
+    func testCrossDayMarkerRangeKeepsExclusiveMidnight() throws {
+        let zone = try XCTUnwrap(TimeZone(identifier: "Asia/Tokyo"))
+        let event = CalendarOverviewEvent(id: "night", title: "夜勤", calendarName: "シフト", colorHex: "#327caa",
+            startDate: "2026-11-09", endDate: "2026-11-10", startsAtIso: "2026-11-09T13:00:00Z",
+            endsAtIso: "2026-11-10T15:00:00Z", allDay: false, filledLabel: true)
+        let range = CalendarGridData.displayRange(event, timeZone: zone)
+        XCTAssertEqual(range.startDate, "2026-11-09")
+        XCTAssertEqual(range.endDate, "2026-11-10")
+    }
+
     func testWidgetThemeSharedColorsAndInvalidValues() throws {
         let value = try XCTUnwrap(WidgetAppearanceData.decode(##"{"schemaVersion":1,"theme":"sakura","backgroundColor":"#fff8fa","accentColor":"broken"}"##))
         XCTAssertEqual(value.theme, "sakura")
