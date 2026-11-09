@@ -158,6 +158,9 @@ struct FeaturedEventsWidgetEntryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .foregroundColor(colors.primary)
+        .transaction { transaction in
+            if reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
+        }
         .widgetURL(FeaturedWidgetData.deepLink(entry.events.first, now: entry.date))
     }
 

@@ -41,6 +41,9 @@ struct CalendarGridWidgetEntryView: View {
         GeometryReader { geometry in
             gridContent(availableHeight: geometry.size.height)
         }
+        .transaction { transaction in
+            if reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
+        }
     }
 
     private func gridContent(availableHeight: CGFloat) -> some View {
