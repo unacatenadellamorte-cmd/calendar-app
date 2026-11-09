@@ -7,6 +7,27 @@ import org.junit.Test
 
 class CalendarOverviewTest {
     @Test
+    fun `日またぎでも日ごとの優先順を維持して段を変える`() {
+        val first = WidgetDay(2026, 11, 1)
+        val second = WidgetDay(2026, 11, 2)
+        fun event(id: String, from: WidgetDay, until: WidgetDay = from) = CalendarOverviewEvent(
+            id, id, "予定", "#2563eb", from, until, "", true,
+        )
+        val events = listOf(event("予定1", first), event("予定2", first), event("予定3", first),
+            event("夜勤", first, second), event("会議", second))
+        val rows = widgetRowEvents(listOf(first, second, null), events, 4)
+        assertEquals(listOf("予定1", "予定2", "予定3", "夜勤"), rows[0].map { it.id })
+        assertEquals(listOf("夜勤", "会議"), rows[1].map { it.id })
+        assertTrue(rows[2].isEmpty())
+        val shift = events[3]
+        assertEquals("夜勤", widgetContinuationTitle(shift, first, false, true))
+        assertEquals("夜勤→", widgetContinuationTitle(shift, first, false, false))
+        assertEquals("←夜勤", widgetContinuationTitle(shift, second, false, false))
+        assertEquals(listOf("夜勤", "会議"), widgetRowEvents(listOf(second), events, 3)[0].map { it.id })
+        assertTrue(widgetRowEvents(listOf(first), events, 0)[0].isEmpty())
+    }
+
+    @Test
     fun `週は日曜始まりで月境界をまたぐ`() {
         val days = weekWidgetDays(WidgetDay(2026, 9, 16)) // 水曜
         assertEquals(7, days.size)

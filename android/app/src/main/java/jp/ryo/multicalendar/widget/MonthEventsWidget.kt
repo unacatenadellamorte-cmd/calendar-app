@@ -8,12 +8,12 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -60,7 +60,7 @@ private fun MonthEventsContent() {
     // 曜日は必ず日曜始まりにする。月初の曜日を起点にすると、9月は火曜始まりになってしまう。
     val weekdayDays = weekWidgetDays(displayedMonth)
     val rows = days.chunked(7)
-    val headerHeight = 28f * fontScale.coerceAtLeast(1f)
+    val headerHeight = 36f * fontScale.coerceAtLeast(1f)
     val weekdayHeight = 16f * fontScale.coerceAtLeast(1f)
     val cellHeightDp = ((size.height.value - 12f - headerHeight - weekdayHeight) / rows.size)
         .coerceAtLeast(1f)
@@ -68,28 +68,29 @@ private fun MonthEventsContent() {
         modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(6.dp),
     ) {
         Row(modifier = GlanceModifier.fillMaxWidth().height(headerHeight.dp)) {
-            Row(modifier = GlanceModifier.defaultWeight()) {
+            Row(modifier = GlanceModifier.width(72.dp)) {
                 Text(
-                    text = "▲",
-                    style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                    modifier = GlanceModifier.clickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 7.dp, vertical = 2.dp),
+                    text = "‹",
+                    style = TextStyle(fontSize = scaledSp(22f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                    modifier = GlanceModifier.width(32.dp).height(headerHeight.dp).widgetControlBackground(appearance).widgetClickable(actionRunCallback<MonthPreviousAction>()).padding(horizontal = 7.dp, vertical = 2.dp),
                 )
-                Spacer(modifier = GlanceModifier.width(10.dp))
+                Spacer(modifier = GlanceModifier.width(8.dp))
                 Text(
-                    text = "▼",
-                    style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
-                    modifier = GlanceModifier.clickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 7.dp, vertical = 2.dp),
+                    text = "›",
+                    style = TextStyle(fontSize = scaledSp(22f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)),
+                    modifier = GlanceModifier.width(32.dp).height(headerHeight.dp).widgetControlBackground(appearance).widgetClickable(actionRunCallback<MonthNextAction>()).padding(horizontal = 7.dp, vertical = 2.dp),
                 )
             }
             Text(
                 text = "${displayedMonth.year}/${displayedMonth.month}${widgetText(overview.language, "month")}",
-                style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor), textAlign = TextAlign.Center),
+                maxLines = 1,
+                style = TextStyle(fontSize = scaledSp(if (size.width.value < 250f) 11f else 16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor), textAlign = TextAlign.Center),
                 modifier = GlanceModifier.defaultWeight(),
             )
             Text(
                 text = "＋",
                 style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.End),
-                modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 2.dp),
+                modifier = GlanceModifier.width(36.dp).height(headerHeight.dp).widgetControlBackground(appearance).widgetClickable(actionStartActivity(createWidgetIntent(context, displayedMonth))).padding(horizontal = 5.dp, vertical = 2.dp),
             )
         }
         Row(modifier = GlanceModifier.fillMaxWidth().height(weekdayHeight.dp)) {
@@ -105,24 +106,7 @@ private fun MonthEventsContent() {
             rows.forEach { row ->
                 // グリッドを1つの子にまとめ、Glanceの子要素上限で5週目以降が落ちないようにする。
                 Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                    Row(modifier = GlanceModifier.fillMaxWidth().height(cellHeightDp.dp)) {
-                        row.forEach { day ->
-                            if (day == null) {
-                                MonthBlankCell(GlanceModifier.defaultWeight())
-                            } else {
-                                CalendarWidgetDayCell(
-                                    context,
-                                    overview,
-                                    appearance,
-                                    today,
-                                    day,
-                                    cellHeightDp,
-                                    fontScale,
-                                    GlanceModifier.defaultWeight(),
-                                )
-                            }
-                        }
-                    }
+                    WidgetEventRow(row, overview, appearance, today, cellHeightDp, fontScale)
                 }
             }
         }

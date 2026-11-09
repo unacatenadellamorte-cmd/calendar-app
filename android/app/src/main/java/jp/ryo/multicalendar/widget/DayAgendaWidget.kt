@@ -6,7 +6,6 @@ import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.lazy.LazyColumn
@@ -102,10 +101,10 @@ internal fun DayAgendaContent() {
         ((size.height.value - 12f) / ((if (compact) 108f else 154f) * scale)).coerceAtMost(1f))
     val railWidth = (size.width.value * 0.25f).coerceIn(56f, 100f)
     Row(modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Column(modifier = GlanceModifier.width(railWidth.dp).fillMaxHeight().clickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = GlanceModifier.width(railWidth.dp).fillMaxHeight().widgetClickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = GlanceModifier.fillMaxWidth()) {
-                Text(text = "▲", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayPreviousAction>()))
-                Text(text = "▼", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayNextAction>()))
+                Text(text = "‹", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().widgetControlBackground(appearance).widgetClickable(actionRunCallback<DayPreviousAction>()))
+                Text(text = "›", style = TextStyle(fontSize = scaledSp(13f, railAppearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().widgetControlBackground(appearance).widgetClickable(actionRunCallback<DayNextAction>()))
             }
             Text(
                 text = widgetWeekdayLabel(selectedDay, overview.language) + if (overview.language == "ja") "曜日" else "",
@@ -118,17 +117,17 @@ internal fun DayAgendaContent() {
                 Spacer(modifier = GlanceModifier.height(4.dp))
             }
             Row(modifier = GlanceModifier.fillMaxWidth()) {
-                Text(text = "⚙", style = TextStyle(fontSize = scaledSp(if (compact) 20f else 25f, railAppearance), color = ColorProvider(appearance.secondaryTextColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(widgetDeepLinkIntent(context, "settings", ""))))
-                Text(text = "＋", style = TextStyle(fontSize = scaledSp(if (compact) 20f else 22f, railAppearance), color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(createWidgetIntent(context, selectedDay))))
+                Text(text = "⚙", style = TextStyle(fontSize = scaledSp(if (compact) 20f else 25f, railAppearance), color = ColorProvider(appearance.secondaryTextColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().widgetClickable(actionStartActivity(widgetDeepLinkIntent(context, "settings", ""))))
+                Text(text = "＋", style = TextStyle(fontSize = scaledSp(if (compact) 20f else 22f, railAppearance), color = ColorProvider(appearance.accentColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().widgetClickable(actionStartActivity(createWidgetIntent(context, selectedDay))))
             }
         }
         Spacer(modifier = GlanceModifier.width(12.dp))
         if (events.isEmpty()) {
-            Text(text = if (overview.language == "ja") "予定はありません" else "—", style = TextStyle(fontSize = scaledSp(14f, appearance), color = ColorProvider(appearance.secondaryTextColor)), modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(dayWidgetIntent(context, selectedDay))))
+            Text(text = if (overview.language == "ja") "予定はありません" else "—", style = TextStyle(fontSize = scaledSp(14f, appearance), color = ColorProvider(appearance.secondaryTextColor)), modifier = GlanceModifier.defaultWeight().widgetClickable(actionStartActivity(dayWidgetIntent(context, selectedDay))))
         } else {
             LazyColumn(modifier = GlanceModifier.defaultWeight().fillMaxHeight()) {
                 items(events) { event ->
-                    Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp).clickable(actionStartActivity(if (event.id.isBlank()) dayWidgetIntent(context, event.startDate) else widgetDeepLinkIntent(context, "event", event.id)))) {
+                    Row(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 6.dp).widgetClickable(actionStartActivity(if (event.id.isBlank()) dayWidgetIntent(context, event.startDate) else widgetDeepLinkIntent(context, "event", event.id)))) {
                         Spacer(modifier = GlanceModifier.width(4.dp).height((42f * scale).dp).background(widgetEventColor(event.colorHex, appearance.accentColor)))
                         Spacer(modifier = GlanceModifier.width(8.dp))
                         Column(modifier = GlanceModifier.defaultWeight()) {
@@ -158,12 +157,12 @@ private fun CompactDayAgenda(event: CalendarOverviewEvent?, selectedDay: WidgetD
     Row(modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(3.dp)) {
         Column(modifier = GlanceModifier.width(58.dp)) {
             Row {
-                Text(text = "▲", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayPreviousAction>()))
-                Text(text = "▼", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().clickable(actionRunCallback<DayNextAction>()))
+                Text(text = "‹", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().widgetControlBackground(appearance).widgetClickable(actionRunCallback<DayPreviousAction>()))
+                Text(text = "›", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.defaultWeight().widgetControlBackground(appearance).widgetClickable(actionRunCallback<DayNextAction>()))
             }
-            Text(text = if (selectedDay.year != today.year) "${selectedDay.year}/${selectedDay.month}/${selectedDay.day}" else "${selectedDay.month}/${selectedDay.day}", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.primaryTextColor)), modifier = GlanceModifier.fillMaxWidth().clickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), maxLines = 1)
+            Text(text = if (selectedDay.year != today.year) "${selectedDay.year}/${selectedDay.month}/${selectedDay.day}" else "${selectedDay.month}/${selectedDay.day}", style = TextStyle(fontSize = scaledSp(11f, appearance), color = ColorProvider(appearance.primaryTextColor)), modifier = GlanceModifier.fillMaxWidth().widgetClickable(actionStartActivity(dayWidgetIntent(context, selectedDay))), maxLines = 1)
         }
-        Column(modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity(if (event?.id.isNullOrBlank()) dayWidgetIntent(context, selectedDay) else widgetDeepLinkIntent(context, "event", event!!.id)))) {
+        Column(modifier = GlanceModifier.defaultWeight().widgetClickable(actionStartActivity(if (event?.id.isNullOrBlank()) dayWidgetIntent(context, selectedDay) else widgetDeepLinkIntent(context, "event", event!!.id)))) {
             val eventColor = widgetEventColor(event?.colorHex.orEmpty(), appearance.primaryTextColor)
             Text(
                 text = event?.title?.ifBlank { event.calendarName } ?: "—",
@@ -176,6 +175,6 @@ private fun CompactDayAgenda(event: CalendarOverviewEvent?, selectedDay: WidgetD
             )
             if (event != null) Text(text = agendaEventDetail(event, today, language), style = TextStyle(fontSize = scaledSp(10f, appearance), color = ColorProvider(appearance.secondaryTextColor)), maxLines = 1)
         }
-        Text(text = "＋", style = TextStyle(fontSize = scaledSp(18f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.clickable(actionStartActivity(createWidgetIntent(context, selectedDay))))
+        Text(text = "＋", style = TextStyle(fontSize = scaledSp(18f, appearance), color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.widgetClickable(actionStartActivity(createWidgetIntent(context, selectedDay))))
     }
 }

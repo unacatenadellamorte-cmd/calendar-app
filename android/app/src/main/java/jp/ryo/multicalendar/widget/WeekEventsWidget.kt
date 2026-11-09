@@ -7,12 +7,12 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -52,30 +52,26 @@ private fun WeekEventsContent() {
     val today = todayWidgetDay()
     val offset = widgetDateOffset(WEEK_OFFSET_STATE)
     val days = weekWidgetDays(addWidgetDays(today, offset * 7))
-    val headerHeight = 28f * scale
+    val headerHeight = 36f * scale
     val weekdayHeight = 16f * scale
     val cellHeightDp = (size.height.value - 12f - headerHeight - weekdayHeight).coerceAtLeast(1f)
 
     Column(modifier = GlanceModifier.fillMaxSize().widgetGlassBackground(appearance).padding(6.dp)) {
         Row(modifier = GlanceModifier.fillMaxWidth().height(headerHeight.dp)) {
-            Row(modifier = GlanceModifier.width(64.dp)) {
-                Text("▲", style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.clickable(actionRunCallback<WeekPreviousAction>()).padding(horizontal = 4.dp, vertical = 2.dp))
-                Spacer(modifier = GlanceModifier.width(10.dp))
-                Text("▼", style = TextStyle(fontSize = scaledSp(13f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.clickable(actionRunCallback<WeekNextAction>()).padding(horizontal = 4.dp, vertical = 2.dp))
+            Row(modifier = GlanceModifier.width(72.dp)) {
+                Text("‹", style = TextStyle(fontSize = scaledSp(22f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.width(32.dp).height(headerHeight.dp).widgetControlBackground(appearance).widgetClickable(actionRunCallback<WeekPreviousAction>()).padding(horizontal = 7.dp, vertical = 2.dp))
+                Spacer(modifier = GlanceModifier.width(8.dp))
+                Text("›", style = TextStyle(fontSize = scaledSp(22f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor)), modifier = GlanceModifier.width(32.dp).height(headerHeight.dp).widgetControlBackground(appearance).widgetClickable(actionRunCallback<WeekNextAction>()).padding(horizontal = 7.dp, vertical = 2.dp))
             }
             Text(if (size.width.value < 300f) "${days.first().year}/${days.first().month}" else weekHeaderText(days), maxLines = 1, style = TextStyle(fontSize = scaledSp(if (size.width.value < 250f) 11f else 16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.primaryTextColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight())
-            Text("＋", style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.End), modifier = GlanceModifier.width(64.dp).clickable(actionStartActivity(createWidgetIntent(context, days.first()))).padding(horizontal = 5.dp, vertical = 2.dp))
+            Text("＋", style = TextStyle(fontSize = scaledSp(16f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.accentColor), textAlign = TextAlign.End), modifier = GlanceModifier.width(36.dp).height(headerHeight.dp).widgetControlBackground(appearance).widgetClickable(actionStartActivity(createWidgetIntent(context, days.first()))).padding(horizontal = 5.dp, vertical = 2.dp))
         }
         Row(modifier = GlanceModifier.fillMaxWidth().height(weekdayHeight.dp)) {
             days.forEach { day ->
                 Text(widgetWeekdayLabel(day, overview.language), style = TextStyle(fontSize = scaledSp(9f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor), textAlign = TextAlign.Center), modifier = GlanceModifier.defaultWeight().padding(1.dp))
             }
         }
-        Row(modifier = GlanceModifier.fillMaxWidth().height(cellHeightDp.dp)) {
-            days.forEach { day ->
-                CalendarWidgetDayCell(context, overview, appearance, today, day, cellHeightDp, fontScale, GlanceModifier.defaultWeight())
-            }
-        }
+        WidgetEventRow(days, overview, appearance, today, cellHeightDp, fontScale)
     }
 }
 
