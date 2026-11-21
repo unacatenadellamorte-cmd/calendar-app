@@ -1,9 +1,16 @@
-import { useLayoutEffect, useRef, type ReactNode, type CSSProperties } from 'react';
+import { useImperativeHandle, useLayoutEffect, useRef, type Ref, type ReactNode, type CSSProperties } from 'react';
+
+export interface PageDragHandle {
+  move: (offset: number) => void;
+  reset: (keepExitPosition?: boolean) => void;
+}
 
 interface MonthSlideProps {
   monthKey: string;
-  offset: number;
-  dragging: boolean;
+  offset?: number;
+  dragging?: boolean;
+  /** 指の移動はReactの再描画を通さず、表示専用レイヤーへ渡す。 */
+  motionRef?: Ref<PageDragHandle>;
   children: ReactNode;
   /** 予定の公開範囲や内容が変わったら表示用コピーも即座に破棄する。 */
   contentVersion?: unknown;
@@ -12,8 +19,9 @@ interface MonthSlideProps {
 /** 退出する月は操作不能の表示用コピーにし、予定やフォームの状態は複製しない。 */
 export function MonthSlide({
   monthKey,
-  offset,
-  dragging,
+  offset = 0,
+  dragging = false,
+  motionRef,
   children,
   contentVersion,
 }: MonthSlideProps) {
@@ -27,6 +35,7 @@ export function MonthSlide({
   } | null>(null);
   const outgoing = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerDragging = useRef(false);
   const clear = () => {
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = null;
@@ -34,6 +43,27 @@ export function MonthSlide({
     outgoing.current = null;
     page.current?.classList.remove('month-page-enter');
   };
+  useImperativeHandle(motionRef, () => ({
+    move(value) {
+      const current = page.current;
+      if (!current) return;
+      if (!pointerDragging.current) clear();
+      pointerDragging.current = true;
+      current.style.transition = 'none';
+      current.style.transform = `translateX(${value}px)`;
+      if (previous.current) previous.current.node.style.transform = current.style.transform;
+      if (viewport.current) viewport.current.dataset.pageDragging = 'true';
+    },
+    reset(keepExitPosition = false) {
+      pointerDragging.current = false;
+      const current = page.current;
+      if (!current) return;
+      current.style.transition = 'transform var(--motion-base) var(--ease-out)';
+      current.style.transform = 'translateX(0px)';
+      if (!keepExitPosition && previous.current) previous.current.node.style.transform = current.style.transform;
+      if (viewport.current) delete viewport.current.dataset.pageDragging;
+    },
+  }));
   useLayoutEffect(() => {
     const current = page.current;
     const host = viewport.current;

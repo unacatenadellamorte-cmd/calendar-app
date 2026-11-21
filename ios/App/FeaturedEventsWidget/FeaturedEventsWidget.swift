@@ -8,11 +8,14 @@ struct WidgetThemeColors {
     let accent: Color
     let today: Color
     let todayText: Color
+    /// テーマ「ガラス」。透明寄りの面と反射で描く(iOS実機/Xcode未検証)。
+    let glass: Bool
 
     init(scheme: ColorScheme) {
         let saved = WidgetAppearanceData.read()
         let requestedTheme = saved?.theme ?? "system"
-        let theme = ["light", "dark", "system", "sakura", "leaf", "ocean", "lavender"].contains(requestedTheme) ? requestedTheme : "system"
+        let theme = ["light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass"].contains(requestedTheme) ? requestedTheme : "system"
+        glass = theme == "glass"
         let dark = theme == "dark" || (theme == "system" && scheme == .dark)
         // 端末追従は、アプリを開いていない間の外観変更にも追従させる。
         let custom = theme == "system" ? nil : saved
@@ -44,10 +47,10 @@ struct WidgetGlassSurface: View {
     let colors: WidgetThemeColors
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(colors.background.opacity(reduceTransparency ? 1 : 0.96))
+            .fill(colors.background.opacity(reduceTransparency ? 1 : (colors.glass ? 0.76 : 0.96)))
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(LinearGradient(colors: [.white.opacity(0.14), .clear, colors.accent.opacity(0.05)],
+                    .fill(LinearGradient(colors: [.white.opacity(colors.glass && !reduceTransparency ? 0.5 : 0.14), .clear, colors.accent.opacity(0.05)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
             )
             .overlay(
@@ -59,7 +62,7 @@ struct WidgetGlassSurface: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(LinearGradient(colors: [.white.opacity(0.62), colors.accent.opacity(0.22)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: colors.glass ? 2 : 1)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -67,6 +70,23 @@ struct WidgetGlassSurface: View {
                                                  startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.7)
                     .padding(2)
             )
+            .overlay(glassRim)
+    }
+
+    /** ガラスの厚い縁の内側に、屈折で色が分かれたような細い線を重ねる(物理屈折ではない近似)。 */
+    @ViewBuilder
+    private var glassRim: some View {
+        if colors.glass && !reduceTransparency {
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .strokeBorder(Color(red: 0.56, green: 0.85, blue: 1).opacity(0.40), lineWidth: 1.2)
+                .padding(3)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color(red: 1, green: 0.69, blue: 0.88).opacity(0.22), lineWidth: 1)
+                        .padding(4.5)
+                )
+                .allowsHitTesting(false)
+        }
     }
 }
 
@@ -141,14 +161,16 @@ struct FeaturedEventsWidgetEntryView: View {
                             .frame(width: 4, height: 24)
                             .accessibilityHidden(true)
                         Text(FeaturedWidgetData.startLabel(event))
-                            .font(.caption.bold())
+                            .font(.footnote.bold())
                             .lineLimit(2)
                             .widgetUpdate(FeaturedWidgetData.startLabel(event), reduceMotion: reduceMotion)
                         Text(event.calendarName)
-                            .font(.caption)
+                            .font(.footnote)
                             .lineLimit(1)
                     }
-                    .padding(8)
+                    .padding(.leading, 11)
+                    .padding(.trailing, 8)
+                    .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(colors.today.opacity(0.65), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .widgetUpdate(event, reduceMotion: reduceMotion)

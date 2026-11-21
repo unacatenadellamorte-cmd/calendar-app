@@ -27,7 +27,14 @@ export function BottomSheet({
   const suppressClick = useRef(false);
   const startY = useRef<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [offset, setOffset] = useState(0);
+  const offset = useRef(0);
+  const setOffset = useCallback((value: number) => {
+    offset.current = value;
+    const panel = panelRef.current;
+    if (!panel) return;
+    panel.style.transition = value === 0 ? 'transform 180ms var(--ease-out)' : 'none';
+    panel.style.transform = `translateY(${value}px)`;
+  }, []);
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
   const dismiss = useCallback(() => {
@@ -38,6 +45,7 @@ export function BottomSheet({
       return;
     }
     closingRef.current = true;
+    if (panelRef.current) panelRef.current.style.transition = 'transform 180ms var(--ease-out)';
     setClosing(true);
     timer.current = setTimeout(() => closeRef.current(), 180);
   }, [dismissible, animateDismiss]);
@@ -81,7 +89,7 @@ export function BottomSheet({
       if (timer.current) clearTimeout(timer.current);
       previousFocus?.focus();
     };
-  }, [open, dismiss]);
+  }, [open, dismiss, setOffset]);
   if (!open) return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex w-full max-w-full flex-col justify-end overflow-x-hidden overscroll-none">
@@ -105,8 +113,8 @@ export function BottomSheet({
           style={{
             paddingBottom:
               'calc(1rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))',
-            transform: `translateY(${closing ? '100%' : `${offset}px`})`,
-            transition: closing || offset === 0 ? 'transform 180ms var(--ease-out)' : 'none',
+            transform: `translateY(${closing ? '100%' : `${offset.current}px`})`,
+            transition: closing || offset.current === 0 ? 'transform 180ms var(--ease-out)' : 'none',
           }}
           data-edit-id="bottom-sheet"
           className="bottom-sheet relative mx-auto flex max-h-[90dvh] w-full min-w-0 max-w-2xl flex-col overflow-x-hidden rounded-t-lg bg-surface-base px-4 pb-4"

@@ -19,6 +19,8 @@ internal data class WidgetAppearance(
     val todayColor: Color = Color(0xFFEAF1FF),
     val todayTextColor: Color = Color(0xFF2563EB),
     val appFontScale: Float = 1f,
+    /** テーマ「ガラス」。透明寄りの面と反射・厚みのある縁で描く。 */
+    val glass: Boolean = false,
 )
 
 private fun JSONObject.safeColor(key: String, fallback: Color): Color {
@@ -34,7 +36,7 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
         val json = JSONObject(raw)
         if (json.optInt("schemaVersion", 0) != 1) return WidgetAppearance()
         val savedTheme = when (json.optString("theme", "system")) {
-            "light", "dark", "system", "sakura", "leaf", "ocean", "lavender" -> json.optString("theme", "system")
+            "light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass" -> json.optString("theme", "system")
             else -> "system"
         }
         val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -54,6 +56,7 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
             accentColor = if (savedTheme == "system") defaults.accentColor else json.safeColor("accentColor", defaults.accentColor),
             todayColor = if (savedTheme == "system") defaults.todayColor else json.safeColor("todayColor", defaults.todayColor),
             todayTextColor = if (savedTheme == "system") defaults.todayTextColor else json.safeColor("todayTextColor", defaults.todayTextColor),
+            glass = savedTheme == "glass",
             appFontScale = json.optDouble("appFontScale", 1.0).toFloat().let { if (it.isFinite()) it.coerceIn(0.8f, 1.2f) else 1f },
         )
     } catch (_: Exception) { WidgetAppearance() }

@@ -109,6 +109,7 @@ class WidgetRenderingTest {
             listOf("leaf", "#f7fcf6", "#233322", "#526a4e", "#326c36", "#dcefd9"),
             listOf("ocean", "#f5fbff", "#193344", "#476577", "#086d9e", "#d8effa"),
             listOf("lavender", "#fbf8ff", "#302641", "#665577", "#7042a8", "#ebe0fa"),
+            listOf("glass", "#eef6fb", "#14283a", "#3e576b", "#0a6fa5", "#d2eaf7"),
         )
         try {
             val event = JSONObject().put("id", "glass-sample").put("title", "朝シフト")
@@ -126,6 +127,14 @@ class WidgetRenderingTest {
                     .put("todayColor", theme[5]).put("todayTextColor", theme[4]).put("appFontScale", 1)
                 prefs.edit().putString(WIDGET_APPEARANCE_KEY, appearance.toString()).commit()
                 assertEquals(theme[1].lowercase(), "#%06x".format(readWidgetAppearance(context).backgroundColor.toArgb() and 0xffffff))
+                // 選択された波紋の実資産と、全テーマの外部予定文字色を確認する。
+                val rippleId = widgetRippleResource(readWidgetAppearance(context))
+                assertTrue(context.getDrawable(rippleId) is android.graphics.drawable.RippleDrawable)
+                context.resources.getXml(rippleId).use { xml ->
+                    while (xml.eventType != org.xmlpull.v1.XmlPullParser.START_TAG) xml.next()
+                    val color = xml.getAttributeValue("http://schemas.android.com/apk/res/android", "color")
+                    assertEquals(android.graphics.Color.parseColor("#40" + theme[4].removePrefix("#")), android.graphics.Color.parseColor(color))
+                }
                 listOf(
                     Triple(FeaturedEventsWidgetReceiver::class.java, "day", 190),
                     Triple(WeekEventsWidgetReceiver::class.java, "week", 180),
@@ -138,6 +147,7 @@ class WidgetRenderingTest {
                         findText(view, "朝シフト")
                     }
                     saveBitmap(view, "widget-glass-${theme[0]}-$kind.png", 380, height)
+                    assertEquals(android.graphics.Color.parseColor(theme[2]), findTextColor(view, "朝シフト"))
                 }
             }
         } finally {
@@ -505,7 +515,7 @@ class WidgetRenderingTest {
         assertTrue("予定が画面外または高さゼロ: $title", boxes.any {
             it.text.contains(title) && it.bottom > it.top && it.right > it.left && it.top >= 0 && it.bottom <= view.height
         })
-        assertTrue("予定色が違う", findTextColor(view, title) == android.graphics.Color.parseColor("#0072B2"))
+        assertTrue("予定の本文色が違う", findTextColor(view, title) == android.graphics.Color.parseColor("#1A1C1E"))
     }
 
     private fun findTextColor(view: View, text: String): Int? {
@@ -673,9 +683,9 @@ class WidgetRenderingTest {
             layoutForAssertions(day, 380, 270)
             saveBitmap(month, "widget-label-month-inspect.png", 380, 515)
             assertLabelRendering(week, "確認予定長め", true, localColor)
-            assertLabelRendering(week, "ラベル155", false, externalColor)
+            assertLabelRendering(week, "ラベル155", false, externalColor, android.graphics.Color.parseColor("#1A1C1E"))
             assertLabelRendering(month, "確認予定長め", true, localColor)
-            assertLabelRendering(month, "ラベル155", false, externalColor)
+            assertLabelRendering(month, "ラベル155", false, externalColor, android.graphics.Color.parseColor("#1A1C1E"))
             assertLabelRendering(day, "確認予定長め", true, localColor)
             assertLabelRendering(day, "ラベル155", false, externalColor, android.graphics.Color.parseColor("#1A1C1E"))
             val lastDay = monthGridDays(today.year, today.month).filterNotNull().last()

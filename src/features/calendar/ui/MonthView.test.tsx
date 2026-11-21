@@ -382,6 +382,23 @@ describe('MonthView', () => {
   });
 
   describe('スワイプ検出', () => {
+    it('指の連続移動中は予定グリッドを再描画せず、取消後も日付を開ける', async () => {
+      const byDay = toByDay([ev()]);
+      const lookup = vi.spyOn(byDay, 'get');
+      const { onDayTap } = setup([], { byDay });
+      const grid = screen.getByTestId('month-grid');
+      lookup.mockClear();
+      fireEvent.touchStart(grid, { touches: [{ clientX: 200, clientY: 100 }] });
+      for (let i = 1; i <= 20; i++) {
+        fireEvent.touchMove(grid, { touches: [{ clientX: 200 - i * 6, clientY: 101 }] });
+      }
+      fireEvent.touchCancel(grid);
+      expect(lookup).not.toHaveBeenCalled();
+      expect((screen.getByTestId('month-slide').firstElementChild as HTMLElement).style.transform).toBe('translateX(0px)');
+      await userEvent.click(screen.getByRole('button', { name: '9月8日を開く' }));
+      expect(onDayTap).toHaveBeenCalledWith('2026-09-08');
+      lookup.mockRestore();
+    });
     it('横ドラッグに追従し、閾値未満とキャンセルでは元へ戻る', () => {
       const { onSwipeLeft, onSwipeRight } = setup();
       const grid = screen.getByTestId('month-grid');

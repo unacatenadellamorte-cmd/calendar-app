@@ -13,6 +13,7 @@ describe('buildWidgetAppearance', () => {
     ['leaf', '#f7fcf6', '#326c36'],
     ['ocean', '#f5fbff', '#086d9e'],
     ['lavender', '#fbf8ff', '#7042a8'],
+    ['glass', '#eef6fb', '#0a6fa5'],
   ] as const)('%s paletteをそのまま共有する', (theme, backgroundColor, accentColor) => {
     expect(buildWidgetAppearance(theme)).toMatchObject({ theme, backgroundColor, accentColor });
   });

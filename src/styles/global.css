@@ -1,6 +1,7 @@
 @import './tokens.css';
 @import 'tailwindcss';
 @import './ui-refresh.css';
+@import './theme-glass.css';
 
 /*
  * Tailwind 4 の CSS-first 設定。@theme でトークン変数を Tailwind に橋渡しし、
@@ -174,7 +175,7 @@ textarea { font-size: max(16px, 1rem); }
   background-image: var(--app-background-image);
   background-position: center;
   background-size: cover;
-  background-attachment: fixed;
+  background-attachment: scroll;
 }
 :root[data-background='custom'][data-background-screen='photo'] .app-shell {
   background-color: transparent;

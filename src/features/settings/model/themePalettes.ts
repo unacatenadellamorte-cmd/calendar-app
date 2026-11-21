@@ -4,6 +4,7 @@ export const themePalettes = {
   leaf: { label: '若葉', colors: ['#f7fcf6', '#eaf3e7', '#ffffff', '#233322', '#526a4e', '#8fa58b', '#326c36', '#dcefd9', '#ffffff', '#cadfc6', '#b5362b'] },
   ocean: { label: '海', colors: ['#f5fbff', '#e5f1f8', '#ffffff', '#193344', '#476577', '#88a1b0', '#086d9e', '#d8effa', '#ffffff', '#c4dce9', '#b5362b'] },
   lavender: { label: 'ラベンダー', colors: ['#fbf8ff', '#eee8f7', '#ffffff', '#302641', '#665577', '#a192b3', '#7042a8', '#ebe0fa', '#ffffff', '#d9cce8', '#b5362b'] },
+  glass: { label: 'ガラス', colors: ['#eef6fb', '#dfeaf3', '#ffffff', '#14283a', '#3e576b', '#869cad', '#0a6fa5', '#d2eaf7', '#ffffff', '#c3d9e8', '#b5362b'] },
 } as const;
 
 export const paletteTokens = ['surface-base', 'surface-sunken', 'surface-raised', 'ink-primary', 'ink-secondary', 'ink-disabled', 'accent', 'accent-weak', 'on-accent', 'border-hairline', 'danger'] as const;

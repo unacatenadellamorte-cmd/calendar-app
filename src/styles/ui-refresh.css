@@ -58,7 +58,7 @@
 :root[data-theme='dark']:not([data-background='custom']) body,
 :root:not([data-theme]):not([data-background='custom']) body {
   background-image: var(--ui-backdrop, none);
-  background-attachment: fixed;
+  background-attachment: scroll;
 }
 :root[data-theme='dark'],
 :root:not([data-theme]) {
@@ -271,7 +271,7 @@
 /* 背景の光は実際の画面の背後へ置く。写真背景の設定はそのまま優先する。 */
 :root[data-theme='dark']:not([data-background='custom']) .app-shell {
   background-image: var(--ui-backdrop);
-  background-attachment: fixed;
+  background-attachment: scroll;
 }
 :root[data-theme='dark']:not([data-background='custom']) .app-shell .app-screen {
   background-color: transparent;

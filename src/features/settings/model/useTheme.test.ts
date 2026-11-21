@@ -35,7 +35,7 @@ describe('readStoredTheme', () => {
 
 describe('applyTheme', () => {
   it('追加配色を保存値から復元し、標準テーマへ戻すと配色を解除する', () => {
-    for (const theme of ['sakura', 'leaf', 'ocean', 'lavender'] as const) {
+    for (const theme of ['sakura', 'leaf', 'ocean', 'lavender', 'glass'] as const) {
       window.localStorage.setItem('calendar-app.theme', theme);
       applyTheme(readStoredTheme());
       expect(document.documentElement.dataset.theme).toBe(theme);
@@ -61,6 +61,10 @@ describe('applyTheme', () => {
     expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Dark });
     applyTheme('light');
     expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Dark });
+    // ガラスは明るい曇りガラスの上部面なので、濃いアイコンと濃い文字にする。
+    applyTheme('glass');
+    expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Light });
+    expect(document.documentElement.style.getPropertyValue('--color-chrome-ink')).toBe('#14283a');
     expect(Capacitor.isNativePlatform).toHaveBeenCalled();
   });
 });

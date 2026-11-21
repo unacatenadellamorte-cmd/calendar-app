@@ -1,10 +1,10 @@
 import { t, useLanguage, weekdayLabels } from '@/i18n';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { EventItem } from '@/data/events';
 import type { Calendar } from '@/data/calendars';
 import { addDays, makePriorityOf, monthGridDays, weekRowOf, ymd, type DayCell } from '@/lib/calendar-view';
 import { EventChip } from './EventChip';
-import { MonthSlide } from './MonthSlide';
+import { MonthSlide, type PageDragHandle } from './MonthSlide';
 import { layoutMonthEventSlots } from '@/lib/month-event-layout';
 import { eventLabelColor } from '@/lib/event-label';
 import { MonthEventConnector } from './MonthEventConnector';
@@ -69,8 +69,8 @@ export function MonthView({
     () => layoutMonthEventSlots(cells.map((cell) => cell.date), byDay, MAX_CHIPS, makePriorityOf(calendarById)),
     [cells, byDay, calendarById],
   );
-  const [dragOffset, setDragOffset] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const dragLayer = useRef<PageDragHandle>(null);
+  const dragWidth = useRef(400);
   const swipeAxis = useRef<'x' | 'y' | null>(null);
   // スワイプ検出
   const touchStartRef = useRef<{
@@ -140,6 +140,7 @@ export function MonthView({
     swipeAxis.current = null;
     const touch = e.touches[0];
     if (!touch) return;
+    dragWidth.current = e.currentTarget.getBoundingClientRect().width || 400;
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   };
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -159,9 +160,8 @@ export function MonthView({
       suppressClickRef.current = true;
     }
     if (swipeAxis.current === 'x') {
-      setDragging(true);
-      const width = e.currentTarget.getBoundingClientRect().width || 400;
-      setDragOffset(Math.max(-width, Math.min(width, dx)));
+      const width = dragWidth.current;
+      dragLayer.current?.move(Math.max(-width, Math.min(width, dx)));
     }
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
@@ -174,8 +174,9 @@ export function MonthView({
     const deltaX = touch.clientX - touchStartRef.current.x;
     const deltaY = touch.clientY - touchStartRef.current.y;
     touchStartRef.current = null;
-    setDragging(false);
-    setDragOffset(0);
+    const changesPage = swipeAxis.current !== 'y' &&
+      Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50;
+    dragLayer.current?.reset(changesPage && Boolean(deltaX > 0 ? onSwipeRight : onSwipeLeft));
     // 横方向の移動が縦方向より大きく、かつ50px以上の場合を月送りと判定
     if (
       swipeAxis.current !== 'y' &&
@@ -196,8 +197,7 @@ export function MonthView({
   const handleTouchCancel = () => {
     touchStartRef.current = null;
     swipeAxis.current = null;
-    setDragging(false);
-    setDragOffset(0);
+    dragLayer.current?.reset();
     cancelHold();
   };
   return (
@@ -219,8 +219,7 @@ export function MonthView({
       <MonthSlide
         key={isCollapsed ? 'week' : 'month'}
         monthKey={isCollapsed ? cells[0]!.date : cursor.slice(0, 7)}
-        offset={dragOffset}
-        dragging={dragging}
+        motionRef={dragLayer}
         contentVersion={contentVersion}
       >
         <div

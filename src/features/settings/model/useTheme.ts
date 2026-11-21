@@ -7,7 +7,7 @@ import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents
 export type ThemePreference = 'system' | 'light' | 'dark' | PaletteName;
 
 const STORAGE_KEY = 'calendar-app.theme';
-const VALID: readonly ThemePreference[] = ['system', 'light', 'dark', 'sakura', 'leaf', 'ocean', 'lavender'];
+const VALID: readonly ThemePreference[] = ['system', 'light', 'dark', 'sakura', 'leaf', 'ocean', 'lavender', 'glass'];
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (VALID as readonly string[]).includes(value);
@@ -37,14 +37,18 @@ export function applyTheme(preference: ThemePreference): void {
     root.style.removeProperty('--color-chrome-surface');
   } else if (preference === 'dark') {
     root.style.setProperty('--color-chrome-surface', '#090b0f');
+  } else if (preference === 'glass') {
+    // ガラスは上部・下部の面も明るい曇りガラスにし、濃い文字で可読性を保つ。
+    root.style.setProperty('--color-chrome-surface', '#e4f0f8');
   } else {
     root.style.setProperty('--color-chrome-surface', 'color-mix(in srgb, var(--color-ink-primary) 90%, #000)');
   }
-  root.style.setProperty('--color-chrome-ink', '#ffffff');
+  root.style.setProperty('--color-chrome-ink', preference === 'glass' ? '#14283a' : '#ffffff');
   // v8 の SystemBars.Dark は「暗い面に明るいアイコン」を意味する。
   // Web 実行時は未実装なので失敗を握りつぶし、CSS 面だけで継続する。
   // chrome面は system 選択時も常に濃色なので、OS設定に任せず白アイコンを指定する。
-  const systemBarStyle = SystemBarsStyle.Dark;
+  // ガラスだけは明るい面なので、濃いアイコン(LIGHT)を指定する。
+  const systemBarStyle = preference === 'glass' ? SystemBarsStyle.Light : SystemBarsStyle.Dark;
   if (Capacitor.isNativePlatform() && SystemBars && typeof SystemBars.setStyle === 'function') {
     void Promise.resolve(SystemBars.setStyle({ style: systemBarStyle })).catch(() => undefined);
   }

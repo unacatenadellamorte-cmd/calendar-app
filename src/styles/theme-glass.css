@@ -1,0 +1,84 @@
+/*
+ * テーマ「ガラス」(data-theme='glass')。
+ * - 透明ガラス: 面の色を薄くして背後の光だまりを見せ、縁の厚み・反射・内側の影で立体感を出す。
+ * - すりガラス: ぼかしは小さい半径(10px)で、カード/バー/シートだけに限定する。
+ * - CSSによる近似であり、背景の文字を歪ませる物理的な屈折ではない。縁の色ずれと反射の帯で屈折感を表す。
+ * - 低負荷fallback: 透過軽減設定・ぼかし非対応では不透明寄りの面に切り替え、ぼかしを使わない。
+ * - 動きは足さない(常時アニメーションなし)。
+ */
+:root[data-theme='glass'] {
+  --ui-backdrop:
+    radial-gradient(ellipse 70% 40% at 95% 6%, rgb(120 205 255 / 0.62), transparent 70%),
+    radial-gradient(ellipse 60% 38% at -8% 42%, rgb(190 170 255 / 0.5), transparent 70%),
+    radial-gradient(ellipse 75% 36% at 80% 98%, rgb(120 230 205 / 0.45), transparent 75%),
+    linear-gradient(180deg, #eaf4fb, #dbe9f5);
+  --ui-glass: rgb(255 255 255 / 0.42);
+  --ui-glass-solid: rgb(248 252 255 / 0.94);
+  --ui-sheen:
+    linear-gradient(118deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.12) 28%, transparent 46%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 44%, rgb(120 170 220 / 0.1));
+  --ui-edge: rgb(255 255 255 / 0.78);
+  --ui-glow: 0 0 0 3px rgb(10 111 165 / 0.26);
+  --ui-shadow: 0 14px 34px rgb(40 80 130 / 0.2), 0 3px 8px rgb(40 80 130 / 0.12);
+  --ui-glass-depth:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+    inset 1.5px 0 0 rgb(255 255 255 / 0.5),
+    inset -1px 0 0 rgb(150 190 235 / 0.32),
+    inset 0 -2px 3px rgb(100 150 205 / 0.28),
+    inset 0 0 0 1px rgb(180 235 255 / 0.4),
+    var(--ui-shadow);
+}
+:root[data-theme='glass']:not([data-background='custom']) body,
+:root[data-theme='glass']:not([data-background='custom']) .app-shell {
+  background-image: var(--ui-backdrop);
+  /* fixedはスクロール毎に全面再描画になりやすいので使わない(低負荷)。 */
+  background-attachment: scroll;
+}
+:root[data-theme='glass']:not([data-background='custom']) .app-shell .app-screen {
+  background-color: transparent;
+}
+
+/* ガラスの面。文字面は十分な白濁を残して可読性を保つ。 */
+:root[data-theme='glass']
+  .app-shell
+  :is(.calendar-view-switcher, .calendar-date-nav, .app-bottom-tabs, .screen-header),
+:root[data-theme='glass'] .app-shell .bg-surface-raised.border:not(.month-event-chip),
+:root[data-theme='glass'] .app-shell :is(.upcoming-card, .pay-summary, .quick-shift-panel),
+:root[data-theme='glass'] .bottom-sheet {
+  background-color: var(--ui-glass-solid);
+  background-image: var(--ui-sheen);
+  border-color: var(--ui-edge);
+  box-shadow: var(--ui-glass-depth);
+}
+:root[data-theme='glass'] .bottom-sheet {
+  background-color: rgb(246 251 255 / 0.9);
+}
+:root[data-theme='glass'] .app-shell .screen-header {
+  color: var(--color-ink-primary);
+}
+
+/* ぼかしが使える端末のみ、透明寄りの面にする(小半径で描画負荷を抑える)。 */
+@supports (backdrop-filter: blur(1px)) {
+  @media not (prefers-reduced-transparency: reduce) {
+    :root[data-theme='glass']
+      .app-shell
+      :is(.calendar-view-switcher, .calendar-date-nav, .app-bottom-tabs),
+    :root[data-theme='glass'] .app-shell .bg-surface-raised.border:not(.month-event-chip),
+    :root[data-theme='glass'] .app-shell :is(.upcoming-card, .pay-summary, .quick-shift-panel) {
+      background-color: var(--ui-glass);
+      -webkit-backdrop-filter: blur(10px) saturate(1.5);
+      backdrop-filter: blur(10px) saturate(1.5);
+    }
+    :root[data-theme='glass'] .bottom-sheet {
+      background-color: rgb(246 251 255 / 0.62);
+      -webkit-backdrop-filter: blur(14px) saturate(1.5);
+      backdrop-filter: blur(14px) saturate(1.5);
+    }
+  }
+}
+/* 日付の格子は薄い線で、ガラスの背後の光を邪魔しない。 */
+:root[data-theme='glass'] .app-shell .grid-cols-7.border-t.border-l {
+  border-color: rgb(120 165 205 / 0.28);
+}
+/* 明るいガラス面では、削除の淡い赤を濃い赤へ替えて判別しやすくする。 */
+:root[data-theme='glass'] .shift-control-delete { color: var(--color-danger); }

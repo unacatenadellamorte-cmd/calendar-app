@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { MonthSlide } from './MonthSlide';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { MonthSlide, type PageDragHandle } from './MonthSlide';
 
 interface SwipeSurfaceProps {
   /** 横スワイプ確定時。左スワイプ(次へ)は +1、右スワイプ(前へ)は -1。 */
@@ -24,8 +24,8 @@ const CLICK_GUARD_MS = 400;
  * 横スワイプが成立した直後の1回のクリックは握りつぶし、予定や画像を誤って開かない。
  */
 export function SwipeSurface({ onSwipe, children, className, pageKey, contentVersion, footer }: SwipeSurfaceProps) {
-  const [dragOffset, setDragOffset] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const dragLayer = useRef<PageDragHandle>(null);
+  const dragWidth = useRef(400);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<'x' | 'y' | null>(null);
   const suppressClick = useRef(false);
@@ -33,12 +33,11 @@ export function SwipeSurface({ onSwipe, children, className, pageKey, contentVer
   useEffect(() => () => {
     if (guardTimer.current !== null) clearTimeout(guardTimer.current);
   }, []);
-  const reset = () => {
+  const reset = (keepExitPosition = false) => {
     start.current = null;
     axis.current = null;
     if (pageKey !== undefined) {
-      setDragOffset(0);
-      setDragging(false);
+      dragLayer.current?.reset(keepExitPosition);
     }
   };
   return (
@@ -58,6 +57,7 @@ export function SwipeSurface({ onSwipe, children, className, pageKey, contentVer
           return;
         }
         axis.current = null;
+        dragWidth.current = event.currentTarget.getBoundingClientRect().width || 400;
         start.current = { x: touch.clientX, y: touch.clientY };
       }}
       onTouchMove={(event) => {
@@ -74,19 +74,18 @@ export function SwipeSurface({ onSwipe, children, className, pageKey, contentVer
           axis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
         }
         if (pageKey !== undefined && axis.current === 'x') {
-          const width = event.currentTarget.getBoundingClientRect().width || 400;
-          setDragging(true);
-          setDragOffset(Math.max(-width, Math.min(width, dx)));
+          const width = dragWidth.current;
+          dragLayer.current?.move(Math.max(-width, Math.min(width, dx)));
         }
       }}
       onTouchEnd={(event) => {
         const origin = start.current;
         const touch = event.changedTouches[0];
         const lockedAxis = axis.current;
-        reset();
-        if (!origin || !touch || lockedAxis === 'y') return;
+        if (!origin || !touch || lockedAxis === 'y') { reset(); return; }
         const dx = touch.clientX - origin.x;
         const dy = touch.clientY - origin.y;
+        reset(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESHOLD_PX);
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > THRESHOLD_PX) {
           suppressClick.current = true;
           if (guardTimer.current !== null) clearTimeout(guardTimer.current);
@@ -96,7 +95,7 @@ export function SwipeSurface({ onSwipe, children, className, pageKey, contentVer
           onSwipe(dx < 0 ? 1 : -1);
         }
       }}
-      onTouchCancel={reset}
+      onTouchCancel={() => reset()}
       onClickCapture={(event) => {
         if (!event.currentTarget.contains(event.target as Node) || event.detail === 0 || !suppressClick.current) return;
         suppressClick.current = false;
@@ -105,7 +104,7 @@ export function SwipeSurface({ onSwipe, children, className, pageKey, contentVer
       }}
     >
       {pageKey === undefined ? children : (
-        <MonthSlide monthKey={pageKey} offset={dragOffset} dragging={dragging} contentVersion={contentVersion}>
+        <MonthSlide monthKey={pageKey} motionRef={dragLayer} contentVersion={contentVersion}>
           {children}
         </MonthSlide>
       )}

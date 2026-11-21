@@ -43,7 +43,7 @@ internal fun WidgetEventRow(
     fontScale: Float,
 ) {
     val context = LocalContext.current
-    val width = (LocalSize.current.width.value - 12f).coerceAtLeast(1f)
+    val width = (LocalSize.current.width.value - 15f).coerceAtLeast(1f)
     val density = minOf(context.resources.displayMetrics.density, 2f, 512f / width)
     val capacity = monthEventLineCapacity(cellHeight, fontScale).coerceAtMost(4)
     val rows = remember(days, overview, capacity) { widgetRowEvents(days, overview.events, capacity) }
@@ -66,6 +66,18 @@ internal fun WidgetEventRow(
                                 top + lane * labelHeight, (column + 1) * cellWidth - 2f,
                                 top + (lane + 1) * labelHeight), 2f, 2f, Path.Direction.CW) }
                             path.op(body, Path.Op.UNION)
+                        }
+                    }
+                }
+            } else {
+                // 予定色は細いマーカーに残し、件名はテーマの本文色で読みやすくする。
+                rows.forEachIndexed { column, labels ->
+                    labels.forEachIndexed { lane, label ->
+                        if (label.id == event.id) {
+                            val x = column * cellWidth + 2.8f
+                            val y = top + lane * labelHeight
+                            path.moveTo(x, y + 2f)
+                            path.lineTo(x, y + labelHeight - 2f)
                         }
                     }
                 }

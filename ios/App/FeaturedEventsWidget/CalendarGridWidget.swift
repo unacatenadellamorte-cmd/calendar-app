@@ -40,6 +40,7 @@ struct CalendarGridWidgetEntryView: View {
     private var content: some View {
         GeometryReader { geometry in
             gridContent(availableHeight: geometry.size.height)
+                .padding(.leading, 3)
         }
         .transaction { transaction in
             if reduceMotion { transaction.animation = nil; transaction.disablesAnimations = true }
@@ -54,7 +55,7 @@ struct CalendarGridWidgetEntryView: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(CalendarGridData.monthTitle(entry.date, language: language))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .widgetUpdate(CalendarGridData.monthTitle(entry.date, language: language), reduceMotion: reduceMotion)
                 Spacer(minLength: 4)
                 Link(destination: CalendarGridData.createLink(for: entry.date)) {
@@ -72,7 +73,7 @@ struct CalendarGridWidgetEntryView: View {
             HStack(spacing: 0) {
                 ForEach(CalendarGridData.weekdayLabels(language: language), id: \.self) { weekday in
                     Text(weekday)
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(colors.secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 12)
@@ -88,8 +89,8 @@ struct CalendarGridWidgetEntryView: View {
     }
 
     private func weekRow(_ week: [CalendarGridDay], height: CGFloat) -> some View {
-        let pitch: CGFloat = isLarge ? 10 : 7
-        let dateHeight: CGFloat = isLarge ? 13 : 9
+        let pitch: CGFloat = isLarge ? 11 : 9
+        let dateHeight: CGFloat = isLarge ? 14 : 11
         let capacity = min(4, max(0, Int((height - dateHeight - 2) / pitch)))
         let shown = week.map { Array($0.events.prefix(capacity)) }
         return ZStack(alignment: .topLeading) {
@@ -131,10 +132,10 @@ struct CalendarGridWidgetEntryView: View {
         return VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 1) {
                     Text(number)
-                        .font(.system(size: isLarge ? 9 : 8, weight: .bold))
+                        .font(.system(size: isLarge ? 10 : 9, weight: .bold))
                     Spacer(minLength: 0)
                     if day.events.count > shown[column].count {
-                        Text("+\(day.events.count - shown[column].count)").font(.system(size: 6, weight: .semibold))
+                        Text("+\(day.events.count - shown[column].count)").font(.system(size: 7, weight: .semibold))
                     }
                 }
                 .foregroundColor(day.isInDisplayedMonth ? (day.isToday ? colors.todayText : colors.primary) : colors.secondary)
@@ -148,13 +149,14 @@ struct CalendarGridWidgetEntryView: View {
                     HStack(spacing: 2) {
                         if !event.filledLabel { Rectangle().fill(dayColor(event)).frame(width: 2) }
                         Text(title)
-                            .font(.system(size: isLarge ? 7 : 6))
+                            .font(.system(size: isLarge ? 8 : 7))
                             .lineLimit(1)
                             .foregroundColor(event.filledLabel ? labelInk(event) : colors.primary)
                             .widgetUpdate(title, reduceMotion: reduceMotion)
                     }
                     .frame(height: pitch)
-                    .padding(.horizontal, 1)
+                    .padding(.leading, 3)
+                    .padding(.trailing, 1)
                 }
         }
         .padding(.horizontal, 2)
