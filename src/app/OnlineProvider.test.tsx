@@ -47,6 +47,20 @@ afterEach(() => {
 });
 
 describe('OnlineProvider', () => {
+  it('破棄後に件数取得が失敗しても再送タイマーを作らない', async () => {
+    vi.useFakeTimers();
+    let rejectCount!: (error: Error) => void;
+    outboxCount.mockReturnValue(new Promise<number>((_resolve, reject) => { rejectCount = reject; }));
+    const view = render(<OnlineProvider><Probe /></OnlineProvider>);
+    await act(async () => {});
+    view.unmount();
+    await act(async () => { rejectCount(new Error('架空の取得失敗')); });
+    expect(vi.getTimerCount()).toBe(0);
+    const calls = outboxCount.mock.calls.length;
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(outboxCount).toHaveBeenCalledTimes(calls);
+  });
+
   it('件数取得中に画面を破棄したら、取得後に送信を始めない', async () => {
     let resolveCount!: (count: number) => void;
     outboxCount.mockReturnValue(new Promise<number>((resolve) => { resolveCount = resolve; }));

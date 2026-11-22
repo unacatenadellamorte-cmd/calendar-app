@@ -15,6 +15,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
   const [flushing, setFlushing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const runningRef = useRef(false);
+  const activeRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttemptRef = useRef(0);
   const scheduleRetryRef = useRef<((immediate?: boolean) => void) | null>(null);
@@ -28,7 +29,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     const generation = generationRef.current;
     try {
       const count = await outboxCount();
-      if (generation === generationRef.current) setPendingCount(count);
+      if (activeRef.current && generation === generationRef.current) setPendingCount(count);
       return count;
     } catch {
       // IndexedDB が使えない環境では未送信件数は 0 のまま。
@@ -39,6 +40,7 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
   const runFlush = useCallback(async () => {
     const generation = generationRef.current;
     if (
+      !activeRef.current ||
       runningRef.current ||
       isAccountDataBlocked() ||
       !foregroundRef.current ||
@@ -65,15 +67,17 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       // ネットワーク障害など。オンライン中も段階的に再試行する。
-      if (foregroundRef.current) scheduleRetryRef.current?.();
+      if (activeRef.current && generation === generationRef.current && foregroundRef.current) scheduleRetryRef.current?.();
     } finally {
-      if (generation === generationRef.current) setFlushing(false);
-      runningRef.current = false;
+      if (generation === generationRef.current) {
+        if (activeRef.current) setFlushing(false);
+        runningRef.current = false;
+      }
     }
   }, [refreshPending]);
 
   const scheduleRetry = useCallback((immediate = false) => {
-    if (retryTimerRef.current || typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (!activeRef.current || retryTimerRef.current || typeof navigator !== 'undefined' && !navigator.onLine) return;
     const delays = [250, 1000, 5000, 15000, 30000];
     const delay = immediate ? 0 : delays[Math.min(retryAttemptRef.current, delays.length - 1)]!;
     if (!immediate) retryAttemptRef.current += 1;
@@ -85,6 +89,8 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
   scheduleRetryRef.current = scheduleRetry;
 
   useEffect(() => {
+    activeRef.current = true;
+    foregroundRef.current = document.visibilityState === 'visible';
     const goOnline = () => {
       setOnline(true);
       retryAttemptRef.current = 0;
@@ -112,7 +118,10 @@ export function OnlineProvider({ children }: { children: ReactNode }) {
     // 起動時にオンラインなら、前回の取りこぼしを流す。
     if (typeof navigator !== 'undefined' && navigator.onLine) void runFlush();
     return () => {
+      activeRef.current = false;
+      foregroundRef.current = false;
       generationRef.current += 1;
+      runningRef.current = false;
       unsubscribeOutbox();
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
