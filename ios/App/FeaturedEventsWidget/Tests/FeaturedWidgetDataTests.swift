@@ -21,6 +21,19 @@ final class FeaturedWidgetDataTests: XCTestCase {
         XCTAssertEqual(value.rgb(\.primaryTextColor, fallback: 0x35232c), 0x35232c)
         XCTAssertNil(WidgetAppearanceData.decode(##"{"schemaVersion":2}"##))
         XCTAssertNil(WidgetAppearanceData.decode("壊れたJSON"))
+        // 透過度: 欠損・型違いは既定値35%、範囲外は端へ丸める。
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"theme":"glass"}"##)?.glassTransparency, 0.35)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"theme":"glass","widgetTransparency":"70"}"##)?.theme, "glass")
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetTransparency":"70"}"##)?.glassTransparency, 0.35)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetTransparency":80}"##)?.glassTransparency, 0.8)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetTransparency":250}"##)?.glassTransparency, 1)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetTransparency":-5}"##)?.glassTransparency, 0)
+        // 屈折の強さ: 旧ペイロード(欠損)・型違いは既定50%、範囲外は端へ丸める。
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"theme":"glass"}"##)?.glassRefraction, 0.5)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetRefraction":"80"}"##)?.glassRefraction, 0.5)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetRefraction":82}"##)?.glassRefraction, 0.82)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetRefraction":180}"##)?.glassRefraction, 1)
+        XCTAssertEqual(WidgetAppearanceData.decode(##"{"schemaVersion":1,"widgetRefraction":-3}"##)?.glassRefraction, 0)
     }
 
     func testWidgetAppearanceReadsSameAppGroupKey() throws {

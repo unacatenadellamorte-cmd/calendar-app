@@ -166,6 +166,85 @@ class WidgetRenderingTest {
         }
     }
 
+    /** ガラスの透過度・屈折の強さが月/週/日の背景描画に反映され、旧形式(屈折なし)は既定50と同じに描く。 */
+    @Test
+    fun glassOpticsFollowTransparencyAndRefraction() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 6)
+        val ids = mutableListOf<Int>()
+        val day = todayWidgetDay().toKey()
+        // (名前, 透過度, 屈折の強さ)。nullは旧ペイロード(項目なし)。
+        val cases = listOf(
+            Triple("clear-r0", 100, 0), Triple("clear-r100", 100, 100), Triple("mid-r50", 50, 50),
+            Triple("matte-r100", 0, 100), Triple("legacy", 35, null), Triple("default-r50", 35, 50),
+        )
+        try {
+            val event = JSONObject().put("id", "optics-sample").put("title", "朝シフト")
+                .put("calendarName", "シフト").put("colorHex", "#327caa")
+                .put("startDate", day).put("endDate", day).put("allDay", true)
+            prefs.edit().putInt(WEEK_OFFSET_KEY, 0).putInt(MONTH_OFFSET_KEY, 0)
+                .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja")
+                    .put("events", JSONArray().put(event)).toString()).commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            val pixels = mutableMapOf<String, IntArray>()
+            cases.forEach { (name, transparency, refraction) ->
+                val appearance = JSONObject().put("schemaVersion", 1).put("theme", "glass")
+                    .put("backgroundColor", "#eef6fb").put("primaryTextColor", "#14283a")
+                    .put("secondaryTextColor", "#3e576b").put("accentColor", "#0a6fa5")
+                    .put("todayColor", "#d2eaf7").put("todayTextColor", "#0a6fa5").put("appFontScale", 1)
+                    .put("widgetTransparency", transparency)
+                if (refraction != null) appearance.put("widgetRefraction", refraction)
+                prefs.edit().putString(WIDGET_APPEARANCE_KEY, appearance.toString()).commit()
+                val read = readWidgetAppearance(context)
+                assertEquals((refraction ?: 50) / 100f, read.glassRefraction, 0.0001f)
+                listOf(
+                    Triple(FeaturedEventsWidgetReceiver::class.java, "day", 190),
+                    Triple(WeekEventsWidgetReceiver::class.java, "week", 180),
+                    Triple(MonthEventsWidgetReceiver::class.java, "month", 330),
+                ).forEach { (receiver, kind, height) ->
+                    val view = renderProvider(host, ComponentName(context, receiver), 380, height, ids, "朝シフト")
+                    waitUntil("$name $kind の予定描画") {
+                        layoutForAssertions(view, 380, height)
+                        findText(view, "朝シフト")
+                    }
+                    // 文字色は外観設定に関係なく維持する。
+                    assertEquals(android.graphics.Color.parseColor("#14283a"), findTextColor(view, "朝シフト"))
+                    saveBitmap(view, "widget-optics-$name-$kind.png", 380, height)
+                    pixels["$name-$kind"] = readPixels("widget-optics-$name-$kind.png")
+                }
+            }
+            listOf("day", "week", "month").forEach { kind ->
+                fun diff(a: String, b: String): Int {
+                    val x = pixels.getValue("$a-$kind"); val y = pixels.getValue("$b-$kind")
+                    return x.indices.count { x[it] != y[it] }
+                }
+                assertTrue("$kind: 屈折の強さで縁が変わる", diff("clear-r0", "clear-r100") > 200)
+                assertTrue("$kind: 透明とマットで面が変わる", diff("clear-r100", "matte-r100") > 2000)
+                assertEquals("$kind: 旧形式は既定50と同じ描画", 0, diff("legacy", "default-r50"))
+            }
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
+            }
+            listOf(WEEK_OFFSET_KEY, MONTH_OFFSET_KEY).forEach { key ->
+                (previous[key] as? Int)?.let { edit.putInt(key, it) } ?: edit.remove(key)
+            }
+            edit.commit()
+        }
+    }
+
+    private fun readPixels(name: String): IntArray {
+        val bitmap = android.graphics.BitmapFactory.decodeFile(File(context.cacheDir, name).path)
+        return IntArray(bitmap.width * bitmap.height).also { bitmap.getPixels(it, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height) }
+    }
+
     @Test
     fun monthNavigationRendersEventsWithinOneSecond() {
         org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))

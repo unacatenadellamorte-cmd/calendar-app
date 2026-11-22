@@ -21,7 +21,31 @@ internal data class WidgetAppearance(
     val appFontScale: Float = 1f,
     /** テーマ「ガラス」。透明寄りの面と反射・厚みのある縁で描く。 */
     val glass: Boolean = false,
+    /** ガラス面の透過度(0=不透明、1=面が透明)。文字・予定・縁の反射には適用しない。 */
+    val glassTransparency: Float = DEFAULT_WIDGET_GLASS_TRANSPARENCY,
+    /** アプリ設定「屈折の強さ」(0〜1、調整値でIORではない)。縁の厚み・反射・色分散の強さに使う。 */
+    val glassRefraction: Float = DEFAULT_WIDGET_GLASS_REFRACTION,
 )
+
+/** アプリ設定の既定値35%と一致させる。壁紙が不明でも濃紺文字が読める範囲に留める。 */
+internal const val DEFAULT_WIDGET_GLASS_TRANSPARENCY = 0.35f
+
+/** アプリ設定の既定値50と一致させる。旧形式(項目なし)もこの値で描く。 */
+internal const val DEFAULT_WIDGET_GLASS_REFRACTION = 0.5f
+
+/** 0〜100の保存値を0〜1へ変換する。欠損・数値以外・非有限値は既定値、範囲外は端へ丸める。 */
+internal fun parseWidgetGlassTransparency(value: Any?): Float {
+    val number = (value as? Number)?.toDouble() ?: return DEFAULT_WIDGET_GLASS_TRANSPARENCY
+    if (!number.isFinite()) return DEFAULT_WIDGET_GLASS_TRANSPARENCY
+    return (number.coerceIn(0.0, 100.0) / 100.0).toFloat()
+}
+
+/** 屈折の強さ0〜100を0〜1へ。欠損(旧ペイロード)・数値以外・非有限値は既定値、範囲外は端へ丸める。 */
+internal fun parseWidgetGlassRefraction(value: Any?): Float {
+    val number = (value as? Number)?.toDouble() ?: return DEFAULT_WIDGET_GLASS_REFRACTION
+    if (!number.isFinite()) return DEFAULT_WIDGET_GLASS_REFRACTION
+    return (number.coerceIn(0.0, 100.0) / 100.0).toFloat()
+}
 
 private fun JSONObject.safeColor(key: String, fallback: Color): Color {
     val value = optString(key, "")
@@ -57,6 +81,8 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
             todayColor = if (savedTheme == "system") defaults.todayColor else json.safeColor("todayColor", defaults.todayColor),
             todayTextColor = if (savedTheme == "system") defaults.todayTextColor else json.safeColor("todayTextColor", defaults.todayTextColor),
             glass = savedTheme == "glass",
+            glassTransparency = parseWidgetGlassTransparency(json.opt("widgetTransparency")),
+            glassRefraction = parseWidgetGlassRefraction(json.opt("widgetRefraction")),
             appFontScale = json.optDouble("appFontScale", 1.0).toFloat().let { if (it.isFinite()) it.coerceIn(0.8f, 1.2f) else 1f },
         )
     } catch (_: Exception) { WidgetAppearance() }

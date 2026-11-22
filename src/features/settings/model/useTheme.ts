@@ -2,6 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { paletteTokens, themePalettes, type PaletteName } from './themePalettes';
 import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents';
+import {
+  applyAppGlassTransparency,
+  applyGlassRefraction,
+  readStoredAppGlassTransparency,
+  readStoredGlassRefraction,
+} from './glassAppearance';
+import { syncGlassRefraction } from './glassRefraction';
 
 /** テーマの選択肢。'system' は端末設定に追従する。 */
 export type ThemePreference = 'system' | 'light' | 'dark' | PaletteName;
@@ -58,6 +65,8 @@ export function applyTheme(preference: ThemePreference): void {
   } else {
     root.setAttribute('data-theme', preference);
   }
+  // ガラスの屈折はテーマがガラスの間だけ動かす(他テーマでは停止して後片付けする)。
+  syncGlassRefraction();
   notifyWidgetAppearanceChanged();
 }
 
@@ -66,6 +75,9 @@ export function applyTheme(preference: ThemePreference): void {
  * React のレンダリング前に効かせたい場合は main.tsx から直接呼ぶ。
  */
 export function initTheme(): void {
+  // ガラスの透過度も起動時に復元する(テーマ切替前でもCSS変数を持たせ、再起動後も保持する)。
+  applyAppGlassTransparency(readStoredAppGlassTransparency());
+  applyGlassRefraction(readStoredGlassRefraction());
   applyTheme(readStoredTheme());
 }
 

@@ -1,6 +1,7 @@
 import { t, useLanguage } from '@/i18n';
 import { BackgroundSection } from './BackgroundSection';
 import { AdsPrivacySection } from './AdsPrivacySection';
+import { GlassTransparencyControls } from './GlassTransparencyControls';
 import { themePalettes, type PaletteName } from '../model/themePalettes';
 import { Link, useLocation } from 'react-router-dom';
 import { Screen } from '@/ui/Screen';
@@ -126,6 +127,7 @@ export function SettingsScreen() {
             );
           })}
         </div>
+        {theme === 'glass' && <GlassTransparencyControls />}
       </section>
 
       <BackgroundSection />

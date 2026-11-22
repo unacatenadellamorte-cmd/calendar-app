@@ -49,4 +49,14 @@ describe('buildWidgetAppearance', () => {
       backgroundColor: '#0f1b31', primaryTextColor: '#e9f0fa', accentColor: '#5cc4e6',
     });
   });
+
+  it('屈折の強さを0〜100の整数で送り、欠損・不正・範囲外は安全な値にする', () => {
+    expect(buildWidgetAppearance().widgetRefraction).toBe(50);
+    localStorage.setItem('calendar-app.glass-refraction', '82');
+    expect(buildWidgetAppearance().widgetRefraction).toBe(82);
+    localStorage.setItem('calendar-app.glass-refraction', 'broken');
+    expect(buildWidgetAppearance().widgetRefraction).toBe(50);
+    expect(buildWidgetAppearance('glass', 'medium', 35, 250).widgetRefraction).toBe(100);
+    expect(buildWidgetAppearance('glass', 'medium', 35, -4).widgetRefraction).toBe(0);
+  });
 });

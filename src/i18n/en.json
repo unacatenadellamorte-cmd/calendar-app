@@ -606,5 +606,10 @@
   "プラン変更時の旧契約の扱いと請求時期は、ストアの確認画面と購読管理で確認してください。": "When changing plans, check the store confirmation screen and subscription management for how your existing subscription will be handled and when you will be charged.",
   "写真表示のプランを見る": "View photo plans",
   "Googleへの予定反映にはログインと書き込み許可が必要です。": "Signing in and granting write permission are required to sync events to Google.",
-  "Googleへの反映設定を確認してください。接続と書き込み許可が必要です。": "Check your Google sync settings. A connection and write permission are required."
+  "Googleへの反映設定を確認してください。接続と書き込み許可が必要です。": "Check your Google sync settings. A connection and write permission are required.",
+  "アプリの透過度": "App transparency",
+  "ウィジェットの透過度": "Widget transparency",
+  "屈折の強さ": "Refraction strength",
+  "透過度を下げるほど背景がぼけた、すりガラスになります。屈折の強さは縁で背景が曲がる量で、0で歪みません。文字・予定・入力欄は曲げずに残ります。": "Lower transparency gives a frosted glass that blurs the background. Refraction strength sets how much the background bends at the edges; 0 means no distortion. Text, events, and input fields are never bent.",
+  "この端末では背景の屈折を表示できないため、すりガラスと縁の反射で表現します。": "This device can’t show background refraction, so frosted glass and edge highlights are used instead."
 }

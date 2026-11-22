@@ -10,6 +10,28 @@ struct WidgetAppearanceData: Decodable {
     var accentColor: String?
     var todayColor: String?
     var todayTextColor: String?
+    /// ガラス面の透過度(0〜100)。古いペイロードでは欠損するため既定値で補う。
+    var widgetTransparency: Double?
+    /// 屈折の強さ(0〜100、見た目の調整値でIORではない)。古いペイロードでは欠損するため既定値で補う。
+    var widgetRefraction: Double?
+
+    /// アプリ側の既定値35%と一致させる。
+    static let defaultGlassTransparency = 0.35
+
+    /// 0〜1の透過度。欠損・非有限値は既定値、範囲外は端へ丸める。
+    var glassTransparency: Double {
+        guard let value = widgetTransparency, value.isFinite else { return Self.defaultGlassTransparency }
+        return min(max(value, 0), 100) / 100
+    }
+
+    /// アプリ側の既定値50と一致させる。
+    static let defaultGlassRefraction = 0.5
+
+    /// 0〜1の屈折の強さ。縁の厚み・反射・色分散に使う。欠損・非有限値は既定値、範囲外は端へ丸める。
+    var glassRefraction: Double {
+        guard let value = widgetRefraction, value.isFinite else { return Self.defaultGlassRefraction }
+        return min(max(value, 0), 100) / 100
+    }
 
     static func read(defaults: UserDefaults? = UserDefaults(suiteName: FeaturedWidgetData.group)) -> Self? {
         decode(defaults?.string(forKey: "widgetAppearance"))
@@ -20,6 +42,26 @@ struct WidgetAppearanceData: Decodable {
               let value = try? JSONDecoder().decode(Self.self, from: data),
               value.schemaVersion == 1 else { return nil }
         return value
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, theme, backgroundColor, primaryTextColor, secondaryTextColor,
+             accentColor, todayColor, todayTextColor, widgetTransparency, widgetRefraction
+    }
+
+    /// 項目ごとに型違いを許容し、一つの不正値で全体の外観が既定へ戻らないようにする。
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try? c.decodeIfPresent(Int.self, forKey: .schemaVersion)
+        theme = try? c.decodeIfPresent(String.self, forKey: .theme)
+        backgroundColor = try? c.decodeIfPresent(String.self, forKey: .backgroundColor)
+        primaryTextColor = try? c.decodeIfPresent(String.self, forKey: .primaryTextColor)
+        secondaryTextColor = try? c.decodeIfPresent(String.self, forKey: .secondaryTextColor)
+        accentColor = try? c.decodeIfPresent(String.self, forKey: .accentColor)
+        todayColor = try? c.decodeIfPresent(String.self, forKey: .todayColor)
+        todayTextColor = try? c.decodeIfPresent(String.self, forKey: .todayTextColor)
+        widgetTransparency = try? c.decodeIfPresent(Double.self, forKey: .widgetTransparency)
+        widgetRefraction = try? c.decodeIfPresent(Double.self, forKey: .widgetRefraction)
     }
 
     func rgb(_ key: KeyPath<Self, String?>, fallback: UInt32) -> UInt32 {

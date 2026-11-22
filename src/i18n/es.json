@@ -606,5 +606,10 @@
   "プラン変更時の旧契約の扱いと請求時期は、ストアの確認画面と購読管理で確認してください。": "Al cambiar de plan, consulte la pantalla de confirmación de la tienda y la gestión de suscripciones para saber cómo se tratará la suscripción anterior y cuándo se efectuará el cobro.",
   "写真表示のプランを見る": "Ver planes con visualización de fotos",
   "Googleへの予定反映にはログインと書き込み許可が必要です。": "Para sincronizar eventos con Google, es necesario iniciar sesión y conceder permiso de escritura.",
-  "Googleへの反映設定を確認してください。接続と書き込み許可が必要です。": "Verifique la configuración de sincronización con Google. Se necesitan una conexión y permiso de escritura."
+  "Googleへの反映設定を確認してください。接続と書き込み許可が必要です。": "Verifique la configuración de sincronización con Google. Se necesitan una conexión y permiso de escritura.",
+  "アプリの透過度": "Transparencia de la app",
+  "ウィジェットの透過度": "Transparencia del widget",
+  "屈折の強さ": "Intensidad de refracción",
+  "透過度を下げるほど背景がぼけた、すりガラスになります。屈折の強さは縁で背景が曲がる量で、0で歪みません。文字・予定・入力欄は曲げずに残ります。": "Cuanta menos transparencia, más se difumina el fondo como un vidrio esmerilado. La intensidad de refracción indica cuánto se curva el fondo en los bordes; con 0 no hay distorsión. El texto, los eventos y los campos de entrada nunca se curvan.",
+  "この端末では背景の屈折を表示できないため、すりガラスと縁の反射で表現します。": "Este dispositivo no puede mostrar la refracción del fondo, así que se usa vidrio esmerilado y reflejos en los bordes."
 }
