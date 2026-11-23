@@ -42,10 +42,12 @@ final class FeaturedWidgetDataTests: XCTestCase {
         XCTAssertEqual(clear.rimWidth, 1, accuracy: 0.0001)
         XCTAssertEqual(clear.dispersion, 0, accuracy: 0.0001)
         XCTAssertEqual(clear.frostVeil, 0, accuracy: 0.0001)
+        XCTAssertEqual(clear.grain, 0, accuracy: 0.0001)
         let strong = WidgetGlassOptics(transparency: 0, refraction: 1)
         XCTAssertEqual(strong.rimWidth, 1.5, accuracy: 0.0001)
         XCTAssertEqual(strong.rim, 0.9, accuracy: 0.0001)
         XCTAssertEqual(strong.frostVeil, 0.18, accuracy: 0.0001)
+        XCTAssertEqual(strong.grain, 0.16, accuracy: 0.0001)
         XCTAssertGreaterThan(strong.shade, clear.shade)
         // 透過100%でも面を30%残す(文字の保護面)。
         XCTAssertEqual(1 - WidgetGlassOptics.clearRange, 0.3, accuracy: 0.0001)

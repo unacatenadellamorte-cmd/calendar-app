@@ -1,6 +1,7 @@
 package jp.ryo.multicalendar.widget
 
 import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
@@ -70,6 +71,11 @@ internal data class WidgetGlassOptics(
     val frostVeil: Float,
     /** 左上の縁の細い影と内側の暗部の濃さ。 */
     val shadeAlpha: Float,
+    /**
+     * マット面の表面の粗さ(細かな明暗の粒)の濃さ。透明側0、マット側で最大。
+     * 壁紙はぼかせないため、Blenderのすりガラス板(粗さ0.5)の粒状の散乱を面の質感として描く。
+     */
+    val grainAlpha: Float = 0f,
 )
 
 internal fun widgetGlassOptics(appearance: WidgetAppearance): WidgetGlassOptics {
@@ -82,6 +88,7 @@ internal fun widgetGlassOptics(appearance: WidgetAppearance): WidgetGlassOptics 
         dispersionAlpha = 0.42f * refraction,
         frostVeil = 0.18f * frost,
         shadeAlpha = 0.10f + 0.10f * refraction,
+        grainAlpha = 0.16f * frost,
     )
 }
 
@@ -184,6 +191,13 @@ private fun drawGlassLayers(canvas: Canvas, bounds: RectF, radius: Float, width:
             null, Shader.TileMode.CLAMP)
         canvas.drawRoundRect(bounds, radius, radius, paint)
     }
+    if (optics.grainAlpha > 0.005f) {
+        // すりガラスの表面の粗さ: 固定の粒模様を繰り返して面に重ねる(毎回同じ模様・軽量)。
+        paint.shader = BitmapShader(widgetGrainTile(density), Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+        paint.alpha = (255 * optics.grainAlpha).roundToInt().coerceIn(0, 255)
+        canvas.drawRoundRect(bounds, radius, radius, paint)
+        paint.alpha = 255
+    }
     // 面の下側をわずかに沈める(接地側)。
     paint.shader = LinearGradient(0f, 0f, 0f, h,
         intArrayOf(Color.Transparent.toArgb(), Color.Transparent.toArgb(), shadeColor.copy(alpha = widgetGlassBottomShade(appearance)).toArgb()),
@@ -250,4 +264,24 @@ private fun drawGlassLayers(canvas: Canvas, bounds: RectF, radius: Float, width:
         streak.shader = LinearGradient(w * 0.62f, 0f, w * 0.36f, 0f, colors, stops, Shader.TileMode.CLAMP)
         canvas.drawLine(w * 0.36f, bottomY, w * 0.62f, bottomY, streak)
     }
+}
+
+/** 粒模様の一片(48dp角)。固定の擬似乱数で白と影の点を置き、どの描画でも同じ模様にする。 */
+private fun widgetGrainTile(density: Float): Bitmap {
+    val size = (48f * density).roundToInt().coerceIn(16, 256)
+    val tile = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(tile)
+    val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+    var seed = 0x2F6E2B1
+    val r = 0.55f * density
+    repeat((size * size) / (9f * density * density).roundToInt().coerceAtLeast(1)) {
+        seed = seed * 1103515245 + 12345
+        val x = ((seed ushr 8) and 0xffff) / 65535f * size
+        seed = seed * 1103515245 + 12345
+        val y = ((seed ushr 8) and 0xffff) / 65535f * size
+        // 明るい粒(光の散乱)を多め、暗い粒(影)を少なめにして面の明るさを保つ。
+        dot.color = if (((seed ushr 4) and 3) == 0) Color.Black.copy(alpha = 0.55f).toArgb() else Color.White.toArgb()
+        canvas.drawCircle(x, y, r, dot)
+    }
+    return tile
 }

@@ -73,6 +73,9 @@ class WidgetGlassTransparencyTest {
         val matte = widgetGlassOptics(WidgetAppearance(glass = true, glassTransparency = 0f))
         assertEquals(0f, clear.frostVeil, 0f)
         assert(matte.frostVeil > 0.1f)
+        // マット側だけ表面の粗さ(粒)が付き、透明側は粒で下地を濁さない。
+        assertEquals(0f, clear.grainAlpha, 0f)
+        assert(matte.grainAlpha > 0.1f)
     }
 
     @Test fun `屈折の強さが変わると描画キャッシュのキーも変わる`() {

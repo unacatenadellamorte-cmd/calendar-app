@@ -62,6 +62,7 @@ struct WidgetGlassSurface: View {
                                           colors.background.opacity(min(faceOpacity + 0.02, 1))],
                                  startPoint: .topLeading, endPoint: .bottomTrailing))
             .overlay(frostVeil)
+            .overlay(grain)
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(LinearGradient(stops: [.init(color: .clear, location: 0.6),
@@ -98,6 +99,23 @@ struct WidgetGlassSurface: View {
                 .fill(RadialGradient(colors: [.white.opacity(optics.frostVeil), .white.opacity(optics.frostVeil * 0.45)],
                                      center: UnitPoint(x: 0.3, y: 0.2), startRadius: 0, endRadius: 300))
                 .allowsHitTesting(false)
+        }
+    }
+
+    /** すりガラスの表面の粗さ: 固定の擬似乱数の粒(白多め・影少なめ)を面で切り抜いて重ねる。 */
+    @ViewBuilder
+    private var grain: some View {
+        if glassActive && optics.grain > 0.005 {
+            GeometryReader { geo in
+                ZStack {
+                    WidgetGrainShape(dark: false).fill(Color.white)
+                    WidgetGrainShape(dark: true).fill(Color.black.opacity(0.55))
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+            }
+            .opacity(optics.grain)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .allowsHitTesting(false)
         }
     }
 
@@ -278,5 +296,36 @@ struct FeaturedEventsWidget: Widget {
         .configurationDisplayName("Multi calendar")
         .description("優先度の高い予定を最大3件表示します。")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
+/** ガラス面の粒模様(48pt角を敷き詰め)。Android の widgetGrainTile と同じ擬似乱数列。 */
+struct WidgetGrainShape: Shape {
+    let dark: Bool
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let tile: CGFloat = 48
+        var points: [CGPoint] = []
+        var seed: Int32 = 0x2F6E2B1
+        for _ in 0..<256 {
+            seed = seed &* 1103515245 &+ 12345
+            let x = CGFloat((UInt32(bitPattern: seed) >> 8) & 0xffff) / 65535 * tile
+            seed = seed &* 1103515245 &+ 12345
+            let y = CGFloat((UInt32(bitPattern: seed) >> 8) & 0xffff) / 65535 * tile
+            if ((UInt32(bitPattern: seed) >> 4) & 3 == 0) == dark { points.append(CGPoint(x: x, y: y)) }
+        }
+        let r: CGFloat = 0.55
+        var oy: CGFloat = 0
+        while oy < rect.height {
+            var ox: CGFloat = 0
+            while ox < rect.width {
+                for p in points {
+                    path.addEllipse(in: CGRect(x: rect.minX + ox + p.x - r, y: rect.minY + oy + p.y - r, width: 2 * r, height: 2 * r))
+                }
+                ox += tile
+            }
+            oy += tile
+        }
+        return path
     }
 }

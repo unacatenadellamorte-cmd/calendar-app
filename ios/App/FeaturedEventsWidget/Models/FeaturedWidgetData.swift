@@ -180,6 +180,8 @@ struct WidgetGlassOptics: Equatable {
     let dispersion: Double
     let frostVeil: Double
     let shade: Double
+    /// マット面の表面の粗さ(粒)の濃さ。透明側0〜マット側0.16(Android の grainAlpha と同じ)。
+    let grain: Double
 
     init(transparency: Double, refraction rawRefraction: Double) {
         let r = rawRefraction.isFinite ? min(max(rawRefraction, 0), 1) : WidgetAppearanceData.defaultGlassRefraction
@@ -191,5 +193,6 @@ struct WidgetGlassOptics: Equatable {
         dispersion = 0.42 * r
         frostVeil = 0.18 * frost
         shade = 0.10 + 0.10 * r
+        grain = 0.16 * frost
     }
 }
