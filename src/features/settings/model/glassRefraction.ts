@@ -1,5 +1,5 @@
 /**
- * テーマ「ガラス」の屈折描画(背後だけを曲げる)。
+ * ガラスの面の屈折描画(背後だけを曲げる)。全テーマ共通(:root[data-glass])。
  *
  * 方式: 要素サイズごとに小さな変位マップ(角丸矩形の縁ほど強い凸レンズ形)をcanvasで一度だけ作り、
  * SVGの feImage + feDisplacementMap を `backdrop-filter: url(#id)` として各ガラス面へ割り当てる。
@@ -71,7 +71,7 @@ function reducedTransparency(): boolean {
 
 /** 現在の描画方式。報告・CSSの切替用に :root[data-glass-optics] へも出す。 */
 export function currentGlassOpticsMode(): GlassOpticsMode {
-  if (typeof document === 'undefined' || document.documentElement.getAttribute('data-theme') !== 'glass') return 'off';
+  if (typeof document === 'undefined' || !document.documentElement.hasAttribute('data-glass')) return 'off';
   if (strength > 0 && canRefractBackdrop() && !reducedTransparency()) return 'refract';
   return 'frost';
 }

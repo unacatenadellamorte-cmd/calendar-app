@@ -53,8 +53,8 @@ internal fun WidgetEventRow(
         val canvas = Canvas(bitmap).apply { scale(density, density) }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val cellWidth = width / 7f
-        val labelHeight = 12f * fontScale
-        val top = 1f + 16f * fontScale
+        val labelHeight = WIDGET_EVENT_LINE_DP * fontScale
+        val top = 1f + WIDGET_DATE_ROW_DP * fontScale
         // 同じ色でも別の予定は合流させない。重複IDも列内の位置で照合する。
         rows.flatten().distinctBy { it.id }.forEach { event ->
             val path = Path()

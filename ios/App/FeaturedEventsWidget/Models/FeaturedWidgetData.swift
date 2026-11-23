@@ -167,3 +167,29 @@ enum FeaturedWidgetData {
         return components.url!
     }
 }
+
+
+/** 描画とFoundation単体テストで共有するガラスの光学値。 */
+struct WidgetGlassOptics: Equatable {
+    /// 透過100%で消える面の割合(残り30%は文字の保護面)。
+    static let clearRange = 0.7
+    let refraction: Double
+    let rimWidth: Double
+    let rim: Double
+    let sheen: Double
+    let dispersion: Double
+    let frostVeil: Double
+    let shade: Double
+
+    init(transparency: Double, refraction rawRefraction: Double) {
+        let r = rawRefraction.isFinite ? min(max(rawRefraction, 0), 1) : WidgetAppearanceData.defaultGlassRefraction
+        let frost = 1 - (transparency.isFinite ? min(max(transparency, 0), 1) : WidgetAppearanceData.defaultGlassTransparency)
+        refraction = r
+        rimWidth = 1 + 0.5 * r
+        rim = 0.55 + 0.35 * r
+        sheen = 0.22 + 0.26 * r
+        dispersion = 0.42 * r
+        frostVeil = 0.18 * frost
+        shade = 0.10 + 0.10 * r
+    }
+}

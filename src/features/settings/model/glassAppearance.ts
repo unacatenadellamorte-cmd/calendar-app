@@ -3,8 +3,8 @@ import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents
 import { syncGlassRefraction } from './glassRefraction';
 
 /**
- * テーマ「ガラス」の透過度(0〜100%)。
- * - 0% は面が不透明、100% は面そのものが透明(背景がそのまま見える)。
+ * 全テーマ共通のガラス透過度(0〜100%)。
+ * - 0% は面が不透明、100% は最も透明な設定。文字の可読性を守る最小保護面は残す。
  * - 文字・入力欄・予定ラベル・反射縁は読みやすさのため透過度に連動させない。
  * - 不正値・欠損・範囲外は既定値へ戻す(範囲外の数値は端に丸める)。
  */

@@ -202,11 +202,31 @@ internal fun monthCellHeightDp(totalHeightDp: Float, rowCount: Int, fontScale: F
     return ((totalHeightDp - 12f - 36f * scale - 16f * scale) / rowCount.coerceAtLeast(1)).coerceAtLeast(0f)
 }
 
+/** 月・週セルの日付行の高さ(dp、文字倍率前)。予定行へ高さを回すため日付は12spで収める。 */
+internal const val WIDGET_DATE_ROW_DP = 14f
+/**
+ * 月・週セルの予定1行の高さ(dp、文字倍率前)。日本語の上下が切れない余白を含む。
+ * 最小サイズの月ウィジェット(セル高 約42dp)でも1日2件+超過件数を描ける13dpに留める。
+ */
+internal const val WIDGET_EVENT_LINE_DP = 13f
+/** 月・週セルの予定タイトルの上限(sp、アプリの文字サイズ倍率前)。13dp行の上下に収まる最大。 */
+internal const val WIDGET_EVENT_TITLE_MAX_SP = 11f
+
+/**
+ * セル幅から予定タイトルの文字サイズ(sp)を決める。先頭3文字と省略記号を目安に、可読性を優先する。
+ * 旧版は余白と係数(5/6文字分)に余裕を取りすぎて380dp幅で実質7〜9spだったため、
+ * 余白を2dp詰め、係数を実測の3文字+省略記号(枠ラベルは先頭の目印を含む)へ合わせた。
+ */
+internal fun widgetEventTitleSp(titleWidthDp: Float, filledLabel: Boolean, appFontScale: Float, systemFontScale: Float): Float =
+    minOf(
+        WIDGET_EVENT_TITLE_MAX_SP * appFontScale,
+        titleWidthDp / ((if (filledLabel) 3.8f else 4.2f) * systemFontScale.coerceAtLeast(0.5f)),
+    ).coerceAtLeast(1f)
+
 /** 日付行と上下余白を除き、セル内に収まるテキスト行数を求める。 */
 internal fun monthEventLineCapacity(cellHeightDp: Float, fontScale: Float = 1f): Int {
     val scale = fontScale.coerceAtLeast(0.5f)
-    // 日付行・上下余白を含む保守的な12dp行高。本文は8spに抑え、日本語フォントの上下に余白を残す。
-    return floor((cellHeightDp - 2f - 16f * scale) / (12f * scale)).toInt().coerceAtLeast(0)
+    return floor((cellHeightDp - 2f - WIDGET_DATE_ROW_DP * scale) / (WIDGET_EVENT_LINE_DP * scale)).toInt().coerceAtLeast(0)
 }
 
 /** 超過件数は日付行に表示するため、イベント行の実容量までタイトルを描く。 */

@@ -65,7 +65,8 @@ export function applyTheme(preference: ThemePreference): void {
   } else {
     root.setAttribute('data-theme', preference);
   }
-  // ガラスの屈折はテーマがガラスの間だけ動かす(他テーマでは停止して後片付けする)。
+  // ガラスの面(透過度・屈折・縁)は全テーマ共通。テーマ色は theme-glass.css が面の着色として使う。
+  root.setAttribute('data-glass', 'on');
   syncGlassRefraction();
   notifyWidgetAppearanceChanged();
 }

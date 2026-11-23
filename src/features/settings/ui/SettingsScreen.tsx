@@ -127,7 +127,7 @@ export function SettingsScreen() {
             );
           })}
         </div>
-        {theme === 'glass' && <GlassTransparencyControls />}
+        <GlassTransparencyControls />
       </section>
 
       <BackgroundSection />

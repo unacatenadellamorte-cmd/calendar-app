@@ -166,6 +166,70 @@ class WidgetRenderingTest {
         }
     }
 
+    /** 月・週の予定タイトルを読める大きさで描き、テーマ(明/暗/色)ごとに同じ条件で撮影する。拡大前後の比較用。 */
+    @Test
+    fun monthAndWeekEventTitlesRenderLargeEnough() {
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        val prefs = context.getSharedPreferences(WIDGET_GROUP, Context.MODE_PRIVATE)
+        val previous = prefs.all
+        val host = AppWidgetHost(context, hostId + 8)
+        val ids = mutableListOf<Int>()
+        val today = todayWidgetDay()
+        val themes = listOf(
+            listOf("light", "#ffffff", "#1a1c1e", "#585f68", "#2563eb", "#eaf1ff"),
+            listOf("dark", "#0f1b31", "#e9f0fa", "#a3b4cc", "#5cc4e6", "#123350"),
+            listOf("sakura", "#fff8fa", "#35232c", "#72505f", "#a52c62", "#fbe1ed"),
+        )
+        try {
+            // 架空の予定: 1日に3件(色ラベル・枠ラベル・長い名前)。
+            val events = JSONArray()
+            listOf("朝シフト" to "#327caa", "定例会議の準備" to "", "歯医者" to "#c2410c").forEachIndexed { index, (title, color) ->
+                events.put(JSONObject().put("id", "text-$index").put("title", title)
+                    .put("calendarName", "テスト").put("colorHex", color.ifEmpty { "#7042a8" })
+                    .put("startDate", today.toKey()).put("endDate", today.toKey()).put("allDay", color.isNotEmpty()))
+            }
+            prefs.edit().putInt(WEEK_OFFSET_KEY, 0).putInt(MONTH_OFFSET_KEY, 0)
+                .putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString()).commit()
+            instrumentation.uiAutomation.adoptShellPermissionIdentity("android.permission.BIND_APPWIDGET")
+            runOnMain { host.startListening() }
+            themes.forEach { theme ->
+                val appearance = JSONObject().put("schemaVersion", 1).put("theme", theme[0])
+                    .put("backgroundColor", theme[1]).put("primaryTextColor", theme[2])
+                    .put("secondaryTextColor", theme[3]).put("accentColor", theme[4])
+                    .put("todayColor", theme[5]).put("todayTextColor", theme[4]).put("appFontScale", 1)
+                    .put("widgetTransparency", 35).put("widgetRefraction", 50)
+                prefs.edit().putString(WIDGET_APPEARANCE_KEY, appearance.toString()).commit()
+                listOf(
+                    Triple(MonthEventsWidgetReceiver::class.java, "month", 330),
+                    Triple(WeekEventsWidgetReceiver::class.java, "week", 180),
+                ).forEach { (receiver, kind, height) ->
+                    val view = renderProvider(host, ComponentName(context, receiver), 380, height, ids, "朝シフト")
+                    waitUntil("${theme[0]} $kind の予定描画") {
+                        layoutForAssertions(view, 380, height)
+                        findText(view, "朝シフト")
+                    }
+                    saveBitmap(view, "widget-text-${theme[0]}-$kind.png", 380, height)
+                }
+            }
+            // 380dp幅の月セルで、予定タイトルが旧版(色ラベル8.8sp・枠ラベル7.4sp)より大きくなる。
+            val titleWidth = (380f - 15f) / 7f - 6f
+            assertTrue(widgetEventTitleSp(titleWidth, true, 1f, 1f) >= 10.5f)
+            assertTrue(widgetEventTitleSp(titleWidth - 3f, false, 1f, 1f) >= 10f)
+        } finally {
+            ids.forEach { host.deleteAppWidgetId(it) }
+            runOnMain { host.stopListening() }
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+            val edit = prefs.edit()
+            listOf(CALENDAR_OVERVIEW_KEY, WIDGET_APPEARANCE_KEY).forEach { key ->
+                (previous[key] as? String)?.let { edit.putString(key, it) } ?: edit.remove(key)
+            }
+            listOf(WEEK_OFFSET_KEY, MONTH_OFFSET_KEY).forEach { key ->
+                (previous[key] as? Int)?.let { edit.putInt(key, it) } ?: edit.remove(key)
+            }
+            edit.commit()
+        }
+    }
+
     /** ガラスの透過度・屈折の強さが月/週/日の背景描画に反映され、旧形式(屈折なし)は既定50と同じに描く。 */
     @Test
     fun glassOpticsFollowTransparencyAndRefraction() {
@@ -773,13 +837,13 @@ class WidgetRenderingTest {
             saveBitmap(week, "widget-label-week.png", 380, 180)
             saveBitmap(month, "widget-label-month.png", 380, 515)
             saveBitmap(day, "widget-label-day.png", 380, 270)
-            // 狭い7列でも、日本語の先頭4文字とフォントの上下が予定行へ収まる。
+            // 狭い7列でも、日本語の先頭3文字とフォントの上下が予定行へ収まる。
             listOf(Triple(WeekEventsWidgetReceiver::class.java, 320, 180), Triple(MonthEventsWidgetReceiver::class.java, 320, 515),
                 Triple(WeekEventsWidgetReceiver::class.java, 180, 180), Triple(MonthEventsWidgetReceiver::class.java, 250, 515)).forEach { (receiver, width, height) ->
                 val narrow = renderProvider(host, ComponentName(context, receiver), width, height, boundIds, "確認予定")
                 layoutForAssertions(narrow, width, height)
-                assertFourTitleCharactersFit(narrow, "会議予定")
-                assertFourTitleCharactersFit(narrow, "確認予定")
+                assertTitleCharactersFit(narrow, "会議予定")
+                assertTitleCharactersFit(narrow, "確認予定")
             }
             repeat(events.length()) { index -> events.getJSONObject(index).put("filledLabel", true) }
             prefs.edit().putString(CALENDAR_OVERVIEW_KEY, JSONObject().put("language", "ja").put("events", events).toString()).commit()
@@ -811,14 +875,14 @@ class WidgetRenderingTest {
         }
     }
 
-    private fun assertFourTitleCharactersFit(root: View, title: String) {
+    private fun assertTitleCharactersFit(root: View, title: String) {
         val view = findTextView(root, title) ?: error("予定の文字がない: $title")
         val layout = view.layout ?: error("予定のレイアウトがない: $title")
         assertTrue("$title が親領域からはみ出している", findBoundedText(root, title))
         val contentHeight = view.height - view.totalPaddingTop - view.totalPaddingBottom
         assertTrue("$title の文字下端が切れる: ${layout.height} > $contentHeight", layout.height <= contentHeight)
         val prefixLength = view.text.toString().indexOf(title)
-        assertTrue("$title の4文字目が省略された", layout.getEllipsisCount(0) == 0 || layout.getEllipsisStart(0) >= prefixLength + 4)
+        assertTrue("$title の3文字目が省略された", layout.getEllipsisCount(0) == 0 || layout.getEllipsisStart(0) >= prefixLength + 3)
     }
 
     private fun assertLabelRendering(root: View, title: String, filled: Boolean, backgroundColor: Int, externalTextColor: Int = backgroundColor) {

@@ -36,8 +36,8 @@ internal fun CalendarWidgetDayCell(
     previousVisibleIds: Set<String> = emptySet(),
     nextVisibleIds: Set<String> = emptySet(),
 ) {
-    // 外側15dp・7列・セルとラベルの余白を引き、4文字と省略記号の幅を確保する(上限9sp)。
-    val titleWidthDp = ((LocalSize.current.width.value - 15f) / 7f - 8f).coerceAtLeast(1f)
+    // 外側15dp・7列・セル(左右2dp)とラベル(左右1dp)の余白を引いた幅。文字サイズは widgetEventTitleSp で決める。
+    val titleWidthDp = ((LocalSize.current.width.value - 15f) / 7f - 6f).coerceAtLeast(1f)
     val systemFontScale = context.resources.configuration.fontScale.coerceAtLeast(0.5f)
     val events = eventsForWidgetDay(overview.events, day)
     val visibleEvents = events.take(monthVisibleEventCount(cellHeightDp, events.size, fontScale).coerceAtMost(4))
@@ -50,12 +50,12 @@ internal fun CalendarWidgetDayCell(
                 .widgetClickable(actionStartActivity(dayWidgetIntent(context, day)), appearance)
                 .padding(horizontal = 2.dp, vertical = 1.dp),
         ) {
-            Row(modifier = GlanceModifier.fillMaxWidth().height((16f * fontScale).dp)
+            Row(modifier = GlanceModifier.fillMaxWidth().height((WIDGET_DATE_ROW_DP * fontScale).dp)
                 .background(if (isToday) appearance.todayColor else Color.Transparent).cornerRadius(6.dp)) {
                 Text(
                     text = day.day.toString(),
                     style = TextStyle(
-                        fontSize = scaledSp(13f, appearance),
+                        fontSize = scaledSp(12f, appearance),
                         fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                         color = ColorProvider(
                             when {
@@ -72,7 +72,7 @@ internal fun CalendarWidgetDayCell(
                         text = widgetOverflowCountText(overflowCount),
                         style = TextStyle(fontSize = scaledSp(8f, appearance), fontWeight = FontWeight.Bold, color = ColorProvider(appearance.secondaryTextColor)),
                         maxLines = 1,
-                        // 13spの日付行(16dp)の中へ収め、拡大した件数が下へはみ出さないようにする。
+                        // 12spの日付行(WIDGET_DATE_ROW_DP)の中へ収め、拡大した件数が下へはみ出さないようにする。
                         modifier = GlanceModifier.fillMaxHeight(),
                     )
                 }
@@ -83,17 +83,17 @@ internal fun CalendarWidgetDayCell(
                     text = (if (event.filledLabel || connectedLabels) "" else "▎") + widgetContinuationTitle(event, day,
                         event.id.isNotBlank() && event.id in previousVisibleIds,
                         event.id.isNotBlank() && event.id in nextVisibleIds),
-                    modifier = GlanceModifier.fillMaxWidth().height((12f * fontScale).dp).let { modifier ->
+                    modifier = GlanceModifier.fillMaxWidth().height((WIDGET_EVENT_LINE_DP * fontScale).dp).let { modifier ->
                         if (event.filledLabel && !connectedLabels) modifier
                             .background(widgetEventColor(event.colorHex, appearance.primaryTextColor)).cornerRadius(2.dp)
                             .padding(horizontal = 1.dp)
                         else if (!event.filledLabel && connectedLabels) modifier.padding(start = 5.dp)
                         else modifier.padding(start = 2.dp)
                     },
-                    style = TextStyle(fontSize = minOf(
-                        9f * appearance.appFontScale,
-                        titleWidthDp / ((if (event.filledLabel) 5f else 6f) * systemFontScale),
-                    ).sp, color = ColorProvider(
+                    style = TextStyle(fontSize = widgetEventTitleSp(
+                        if (!event.filledLabel && connectedLabels) titleWidthDp - 3f else titleWidthDp,
+                        event.filledLabel, appearance.appFontScale, systemFontScale,
+                    ).sp, fontWeight = FontWeight.Medium, color = ColorProvider(
                         if (event.filledLabel) widgetFilledLabelTextColor(widgetEventColor(event.colorHex, appearance.primaryTextColor))
                         else appearance.primaryTextColor,
                     )),

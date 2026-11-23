@@ -19,7 +19,8 @@ struct WidgetThemeColors {
         let saved = WidgetAppearanceData.read()
         let requestedTheme = saved?.theme ?? "system"
         let theme = ["light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass"].contains(requestedTheme) ? requestedTheme : "system"
-        glass = theme == "glass"
+        // ガラス(透過度・屈折・縁)は全テーマ共通。アプリから外観を受け取っていない旧データだけ従来の面。
+        glass = saved != nil
         glassTransparency = saved?.glassTransparency ?? WidgetAppearanceData.defaultGlassTransparency
         glassRefraction = saved?.glassRefraction ?? WidgetAppearanceData.defaultGlassRefraction
         let dark = theme == "dark" || (theme == "system" && scheme == .dark)
@@ -56,49 +57,37 @@ struct WidgetGlassSurface: View {
     let colors: WidgetThemeColors
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(colors.background.opacity(faceOpacity))
+            .fill(LinearGradient(colors: [colors.background.opacity(min(faceOpacity + 0.05, 1)),
+                                          colors.background.opacity(faceOpacity),
+                                          colors.background.opacity(min(faceOpacity + 0.02, 1))],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing))
             .overlay(frostVeil)
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(LinearGradient(colors: [.white.opacity(glassActive ? optics.sheen : 0.14), .clear, colors.accent.opacity(0.05)],
-                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(LinearGradient(stops: [.init(color: .clear, location: 0.55),
-                                                 .init(color: .black.opacity(bottomShade), location: 1)],
+                    .fill(LinearGradient(stops: [.init(color: .clear, location: 0.6),
+                                                 .init(color: shade.opacity(bottomShade), location: 1)],
                                          startPoint: .top, endPoint: .bottom))
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: colors.glass ? [.white.opacity(optics.rim), .white.opacity(optics.rim * 0.55), .white.opacity(optics.rim * 0.95)]
-                                                          : [.white.opacity(0.62), colors.accent.opacity(0.22)],
-                                                 startPoint: colors.glass ? .topTrailing : .topLeading,
-                                                 endPoint: colors.glass ? .bottomLeading : .bottomTrailing), lineWidth: colors.glass ? optics.rimWidth : 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.22), .clear, colors.accent.opacity(0.16)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.7)
-                    .padding(2)
-            )
-            .overlay(glassRim)
+            .overlay(innerLight)
+            .overlay(rim)
             .overlay(dispersion)
     }
 
     private var glassActive: Bool { colors.glass && !reduceTransparency }
     private var optics: WidgetGlassOptics { WidgetGlassOptics(transparency: colors.glassTransparency, refraction: colors.glassRefraction) }
+    /// 影色: テーマの文字色を暗くした色(Android の shadeColor と同じ)。
+    private var shade: Color { colors.glass ? colors.primary.opacity(0.6) : .black }
 
-    /// 透過度を減らす設定では不透明。ガラス以外は従来値を保つ。
+    /// 透過度を減らす設定では不透明。透過100%でも30%の保護面を残す(Android の WIDGET_GLASS_CLEAR_RANGE)。
     private var faceOpacity: Double {
         if reduceTransparency { return 1 }
         guard colors.glass else { return 0.96 }
-        return 1 - min(max(colors.glassTransparency, 0), 1)
+        return 1 - WidgetGlassOptics.clearRange * min(max(colors.glassTransparency, 0), 1)
     }
 
     /// 透明になるほど下側の陰影を弱め、壁紙を濁さない。
     private var bottomShade: Double {
-        colors.glass && !reduceTransparency ? 0.10 * (1 - 0.6 * min(max(colors.glassTransparency, 0), 1)) : 0.10
+        colors.glass && !reduceTransparency ? 0.08 * (1 - 0.5 * min(max(colors.glassTransparency, 0), 1)) : 0.10
     }
 
     /** すりガラスの散乱光(マット側ほど強い淡い白)。壁紙そのものはぼかせない。 */
@@ -106,30 +95,51 @@ struct WidgetGlassSurface: View {
     private var frostVeil: some View {
         if glassActive && optics.frostVeil > 0.005 {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(RadialGradient(colors: [.white.opacity(optics.frostVeil), .white.opacity(optics.frostVeil * 0.55)],
-                                     center: UnitPoint(x: 0.42, y: 0.38), startRadius: 0, endRadius: 260))
+                .fill(RadialGradient(colors: [.white.opacity(optics.frostVeil), .white.opacity(optics.frostVeil * 0.45)],
+                                     center: UnitPoint(x: 0.3, y: 0.2), startRadius: 0, endRadius: 300))
                 .allowsHitTesting(false)
         }
     }
 
-    /** ガラスの厚い縁の内側に、屈折で色が分かれたような細い線を重ねる(物理屈折ではない近似)。 */
+    /** 内側の柔らかな明暗: 右下の縁沿いに明部、左上の内側に暗部(丸みと厚み)。太い線をぼかして面で切り抜く。 */
     @ViewBuilder
-    private var glassRim: some View {
+    private var innerLight: some View {
         if glassActive {
-            let inset = optics.rimWidth + 0.8
-            RoundedRectangle(cornerRadius: max(22 - inset, 0), style: .continuous)
-                .strokeBorder(Color(red: 0.56, green: 0.85, blue: 1).opacity(0.18 + 0.3 * optics.refraction), lineWidth: 1.1)
-                .padding(inset)
-                .overlay(
-                    RoundedRectangle(cornerRadius: max(22 - inset - 1.2, 0), style: .continuous)
-                        .strokeBorder(Color(red: 1, green: 0.69, blue: 0.88).opacity(0.1 + 0.16 * optics.refraction), lineWidth: 1)
-                        .padding(inset + 1.2)
-                )
+            let spread = 5 + 5 * optics.refraction
+            ZStack {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(LinearGradient(stops: [.init(color: .clear, location: 0.5), .init(color: .white.opacity(optics.sheen), location: 1)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: spread)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(LinearGradient(stops: [.init(color: shade.opacity(optics.shade * 0.7), location: 0), .init(color: .clear, location: 0.45)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: spread)
+            }
+            .blur(radius: spread * 0.45)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .allowsHitTesting(false)
+        }
+    }
+
+    /** 縁: 1本の細い線。左上は影、中間は薄れ、右下は明るい反射。均一な白枠・二重線は使わない。 */
+    @ViewBuilder
+    private var rim: some View {
+        if glassActive {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(LinearGradient(stops: [.init(color: shade.opacity(optics.shade), location: 0),
+                                                     .init(color: .white.opacity(0.12), location: 0.4),
+                                                     .init(color: .white.opacity(optics.rim * 0.5), location: 0.7),
+                                                     .init(color: .white.opacity(optics.rim), location: 1)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: optics.rimWidth)
+                .allowsHitTesting(false)
+        } else {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.62), colors.accent.opacity(0.22)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
                 .allowsHitTesting(false)
         }
     }
 
-    /** 上下の縁に沿う色分散(赤→黄→緑→青)。屈折の強さ0では描かない。 */
+    /** 上下の縁の中央だけに細い色分散(赤→黄→緑→青)。屈折の強さ0では描かない。 */
     @ViewBuilder
     private var dispersion: some View {
         if glassActive && optics.dispersion > 0.01 {
@@ -139,10 +149,10 @@ struct WidgetGlassSurface: View {
                                       startPoint: .leading, endPoint: .trailing)
             GeometryReader { proxy in
                 let w = proxy.size.width, h = proxy.size.height
-                let y = optics.rimWidth + 0.6, line = 0.8 + 0.6 * optics.refraction
+                let y = optics.rimWidth, line = 0.9
                 ZStack(alignment: .topLeading) {
-                    Rectangle().fill(band).frame(width: w * 0.28, height: line).offset(x: w * 0.42, y: y)
-                    Rectangle().fill(band).frame(width: w * 0.28, height: line).offset(x: w * 0.18, y: h - y - line)
+                    Rectangle().fill(band).frame(width: w * 0.26, height: line).offset(x: w * 0.40, y: y)
+                    Rectangle().fill(band).frame(width: w * 0.26, height: line).scaleEffect(x: -1).offset(x: w * 0.36, y: h - y - line)
                 }
             }
             .allowsHitTesting(false)
@@ -151,25 +161,6 @@ struct WidgetGlassSurface: View {
 }
 
 /** ウィジェットのガラスの強さ。Android(WidgetGlass.kt の widgetGlassOptics)と同じ式。 */
-struct WidgetGlassOptics: Equatable {
-    let refraction: Double
-    let rimWidth: Double
-    let rim: Double
-    let sheen: Double
-    let dispersion: Double
-    let frostVeil: Double
-
-    init(transparency: Double, refraction rawRefraction: Double) {
-        let r = rawRefraction.isFinite ? min(max(rawRefraction, 0), 1) : WidgetAppearanceData.defaultGlassRefraction
-        let frost = 1 - (transparency.isFinite ? min(max(transparency, 0), 1) : WidgetAppearanceData.defaultGlassTransparency)
-        refraction = r
-        rimWidth = 1.6 + 2 * r
-        rim = 0.72 + 0.26 * r
-        sheen = 0.30 + 0.28 * r
-        dispersion = 0.48 * r
-        frostVeil = 0.22 * frost
-    }
-}
 
 extension View {
     /** 更新箇所だけ短く切り替え、動きを減らす設定ではOSの暗黙アニメーションも止める。 */

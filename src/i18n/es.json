@@ -611,5 +611,6 @@
   "ウィジェットの透過度": "Transparencia del widget",
   "屈折の強さ": "Intensidad de refracción",
   "透過度を下げるほど背景がぼけた、すりガラスになります。屈折の強さは縁で背景が曲がる量で、0で歪みません。文字・予定・入力欄は曲げずに残ります。": "Cuanta menos transparencia, más se difumina el fondo como un vidrio esmerilado. La intensidad de refracción indica cuánto se curva el fondo en los bordes; con 0 no hay distorsión. El texto, los eventos y los campos de entrada nunca se curvan.",
+  "どのテーマでも使え、テーマの色がガラスに色付きます。透過度を上げても文字が読めるよう、ガラス面の背後の明暗を整えます。": "Funciona con todos los temas y el color del tema tiñe el cristal. Con mucha transparencia, se suavizan las luces y sombras detrás del cristal para que el texto siga siendo legible.",
   "この端末では背景の屈折を表示できないため、すりガラスと縁の反射で表現します。": "Este dispositivo no puede mostrar la refracción del fondo, así que se usa vidrio esmerilado y reflejos en los bordes."
 }

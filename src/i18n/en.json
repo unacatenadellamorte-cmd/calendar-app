@@ -611,5 +611,6 @@
   "ウィジェットの透過度": "Widget transparency",
   "屈折の強さ": "Refraction strength",
   "透過度を下げるほど背景がぼけた、すりガラスになります。屈折の強さは縁で背景が曲がる量で、0で歪みません。文字・予定・入力欄は曲げずに残ります。": "Lower transparency gives a frosted glass that blurs the background. Refraction strength sets how much the background bends at the edges; 0 means no distortion. Text, events, and input fields are never bent.",
+  "どのテーマでも使え、テーマの色がガラスに色付きます。透過度を上げても文字が読めるよう、ガラス面の背後の明暗を整えます。": "Works with every theme, and the theme color tints the glass. At high transparency, the light and dark behind the glass are evened out so text stays readable.",
   "この端末では背景の屈折を表示できないため、すりガラスと縁の反射で表現します。": "This device can’t show background refraction, so frosted glass and edge highlights are used instead."
 }

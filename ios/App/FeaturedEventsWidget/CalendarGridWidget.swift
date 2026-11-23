@@ -89,7 +89,9 @@ struct CalendarGridWidgetEntryView: View {
     }
 
     private func weekRow(_ week: [CalendarGridDay], height: CGFloat) -> some View {
-        let pitch: CGFloat = isLarge ? 11 : 9
+        // 予定タイトルは従来7〜8ptで小さすぎたため9〜10.5ptへ拡大し、行の高さもそれに合わせる。
+        // 入りきらない件数は日付行の「+n」へ回す(Android の WIDGET_EVENT_LINE_DP と同じ考え方)。
+        let pitch: CGFloat = isLarge ? 13 : 11
         let dateHeight: CGFloat = isLarge ? 14 : 11
         let capacity = min(4, max(0, Int((height - dateHeight - 2) / pitch)))
         let shown = week.map { Array($0.events.prefix(capacity)) }
@@ -149,7 +151,7 @@ struct CalendarGridWidgetEntryView: View {
                     HStack(spacing: 2) {
                         if !event.filledLabel { Rectangle().fill(dayColor(event)).frame(width: 2) }
                         Text(title)
-                            .font(.system(size: isLarge ? 8 : 7))
+                            .font(.system(size: isLarge ? 11 : 10, weight: .medium))
                             .lineLimit(1)
                             .foregroundColor(event.filledLabel ? labelInk(event) : colors.primary)
                             .widgetUpdate(title, reduceMotion: reduceMotion)

@@ -19,7 +19,7 @@ internal data class WidgetAppearance(
     val todayColor: Color = Color(0xFFEAF1FF),
     val todayTextColor: Color = Color(0xFF2563EB),
     val appFontScale: Float = 1f,
-    /** テーマ「ガラス」。透明寄りの面と反射・厚みのある縁で描く。 */
+    /** ガラスの面(全テーマ共通)。アプリから外観を受け取ると有効。未受信の旧データは従来の面。 */
     val glass: Boolean = false,
     /** ガラス面の透過度(0=不透明、1=面が透明)。文字・予定・縁の反射には適用しない。 */
     val glassTransparency: Float = DEFAULT_WIDGET_GLASS_TRANSPARENCY,
@@ -80,7 +80,8 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
             accentColor = if (savedTheme == "system") defaults.accentColor else json.safeColor("accentColor", defaults.accentColor),
             todayColor = if (savedTheme == "system") defaults.todayColor else json.safeColor("todayColor", defaults.todayColor),
             todayTextColor = if (savedTheme == "system") defaults.todayTextColor else json.safeColor("todayTextColor", defaults.todayTextColor),
-            glass = savedTheme == "glass",
+            // ガラス(透過度・屈折・縁)は全テーマ共通。テーマ色が面の着色になる。
+            glass = true,
             glassTransparency = parseWidgetGlassTransparency(json.opt("widgetTransparency")),
             glassRefraction = parseWidgetGlassRefraction(json.opt("widgetRefraction")),
             appFontScale = json.optDouble("appFontScale", 1.0).toFloat().let { if (it.isFinite()) it.coerceIn(0.8f, 1.2f) else 1f },
