@@ -430,6 +430,8 @@ export function CalendarScreen({
         <p className="mt-2 text-meta text-ink-secondary">{t('読み込み中…')}</p>
       ) : view === 'month' ? (
         <>
+          {/* 月の表は一枚の厚いガラス面(屈折・反射・接地はこの外枠1つだけ。セルには掛けない)。 */}
+          <div className="calendar-glass-panel" data-calendar-surface="month">
           <MonthView
             stampedEventIds={stampedEventIds}
             cursor={cursor}
@@ -446,6 +448,7 @@ export function CalendarScreen({
             onSwipeLeft={selectedDay ? () => shiftSelectedDay(7) : goNext}
             onSwipeRight={selectedDay ? () => shiftSelectedDay(-7) : goPrev}
           />
+          </div>
           {selectedDay && (
             <DayEventPanel
               contentVersion={pageContentVersion}

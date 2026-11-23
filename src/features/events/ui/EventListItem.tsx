@@ -58,7 +58,7 @@ export function EventListItem({
         <span className="min-w-0 flex-1">
           <span className="block text-meta text-ink-secondary tabular">{when}</span>
           <span
-            className="flex items-center gap-1 truncate rounded-sm text-body text-ink-primary"
+            className={`flex items-center gap-1 truncate rounded-sm text-body text-ink-primary ${filled ? 'calendar-label' : ''}`}
             style={
               filled
                 ? {

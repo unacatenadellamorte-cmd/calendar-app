@@ -45,8 +45,8 @@ function TransparencySlider({ label, value, onChange, unit = '%' }: SliderProps)
 }
 
 /** 全テーマ共通のガラス設定(アプリ/ウィジェットの透過度・屈折の強さ)。テーマ色がガラスの着色になる。 */
-export function GlassTransparencyControls() {
-  const { appTransparency, widgetTransparency, setAppTransparency, setWidgetTransparency, refraction, setRefraction } =
+export function GlassTransparencyControls({ showMetalGloss = false }: { showMetalGloss?: boolean }) {
+  const { appTransparency, widgetTransparency, setAppTransparency, setWidgetTransparency, refraction, setRefraction, metalGloss, setMetalGloss } =
     useGlassTransparency();
   const refracts = canRefractBackdrop();
   return (
@@ -65,8 +65,13 @@ export function GlassTransparencyControls() {
       <div className="border-t border-border-hairline">
         <TransparencySlider label={t('屈折の強さ')} value={refraction} onChange={setRefraction} unit="" />
       </div>
+      {showMetalGloss && (
+        <div className="border-t border-border-hairline">
+          <TransparencySlider label={t('アプリの光沢')} value={metalGloss} onChange={setMetalGloss} />
+        </div>
+      )}
       <p className="border-t border-border-hairline px-4 py-3 text-meta text-ink-secondary">
-        {t('透過度を下げるほど背景がぼけた、すりガラスになります。屈折の強さは縁で背景が曲がる量で、0で歪みません。文字・予定・入力欄は曲げずに残ります。')}
+        {t('アプリの透過度は、0%と100%でクリア、中間で薄いすりガラスになります。屈折の強さは背景が縁で曲がる量です。文字・予定・入力欄は曲がりません。')}
         {' '}
         {t('どのテーマでも使え、テーマの色がガラスに色付きます。透過度を上げても文字が読めるよう、ガラス面の背後の明暗を整えます。')}
         {refracts ? null : (

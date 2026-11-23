@@ -171,11 +171,21 @@ textarea { font-size: max(16px, 1rem); }
 }
 
 /* 写真の上にテーマ色を重ね、文字の読みやすさを保つ。 */
-:root[data-background='custom'][data-background-screen='photo'] body {
+/* 写真とテーマ背景はビューポートに固定し、前面のコンテンツだけを動かす。 */
+body {
+  isolation: isolate;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+:root[data-background='custom'][data-background-screen='photo'] body::before {
   background-image: var(--app-background-image);
   background-position: center;
   background-size: cover;
-  background-attachment: scroll;
 }
 :root[data-background='custom'][data-background-screen='photo'] .app-shell {
   background-color: transparent;

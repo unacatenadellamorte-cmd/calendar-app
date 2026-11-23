@@ -14,11 +14,14 @@ struct WidgetThemeColors {
     let glassTransparency: Double
     /// 屈折の強さ(0〜1)。WidgetKitはホーム壁紙を曲げられないため、縁の厚み・反射・色分散に使う。
     let glassRefraction: Double
+    /// 金属テーマ(ゴールド/シルバー)。静的な反射として面取りと広い明暗を描く。
+    let metal: WidgetMetalKind
 
     init(scheme: ColorScheme) {
         let saved = WidgetAppearanceData.read()
         let requestedTheme = saved?.theme ?? "system"
-        let theme = ["light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass"].contains(requestedTheme) ? requestedTheme : "system"
+        let theme = WidgetThemeNames.normalized(requestedTheme)
+        metal = WidgetMetalKind(theme: theme)
         // ガラス(透過度・屈折・縁)は全テーマ共通。アプリから外観を受け取っていない旧データだけ従来の面。
         glass = saved != nil
         glassTransparency = saved?.glassTransparency ?? WidgetAppearanceData.defaultGlassTransparency
@@ -72,6 +75,51 @@ struct WidgetGlassSurface: View {
             .overlay(innerLight)
             .overlay(rim)
             .overlay(dispersion)
+            .overlay(metalLayers)
+    }
+
+    private func metalColor(_ value: UInt32) -> Color {
+        Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
+    }
+
+    /**
+     * 磨いた金属(ゴールド/シルバー): 左上と右下の照り返しの間に暗部を置く。
+     * 面が透明でも縁の面取りに材質を残す。透過を減らす設定では明暗だけ残し、ぼかしは使わない。
+     */
+    @ViewBuilder
+    private var metalLayers: some View {
+        if colors.glass, let tones = colors.metal.tones {
+            let face = reduceTransparency ? 1 : 1 - min(max(colors.glassTransparency, 0), 1)
+            let hi = metalColor(tones.highlight), body = metalColor(tones.body), deep = metalColor(tones.deep)
+            let spread = 6 + 6 * optics.refraction
+            ZStack {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(LinearGradient(stops: [.init(color: hi.opacity(0.09 + 0.28 * face), location: 0),
+                                                 .init(color: body.opacity(0.06 + 0.10 * face), location: 0.105),
+                                                 .init(color: deep.opacity(0.12 * face), location: 0.145),
+                                                 .init(color: .clear, location: 0.62),
+                                                 .init(color: deep.opacity(0.14 * face), location: 0.86),
+                                                 .init(color: hi.opacity(0.07 + 0.24 * face), location: 1)],
+                                         startPoint: UnitPoint(x: 0, y: 0), endPoint: UnitPoint(x: 0.18, y: 1)))
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(LinearGradient(stops: [.init(color: deep.opacity(0.55), location: 0),
+                                                   .init(color: body.opacity(0.30), location: 0.35),
+                                                   .init(color: body.opacity(0.45), location: 0.7),
+                                                   .init(color: hi.opacity(0.85), location: 1)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: spread)
+                    .blur(radius: reduceTransparency ? 0 : spread * 0.4)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(LinearGradient(stops: [.init(color: hi, location: 0),
+                                                         .init(color: body, location: 0.19),
+                                                         .init(color: deep, location: 0.34),
+                                                         .init(color: deep, location: 0.62),
+                                                         .init(color: hi, location: 0.88),
+                                                         .init(color: body, location: 1)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: optics.rimWidth)
+            }
+            .allowsHitTesting(false)
+        }
     }
 
     private var glassActive: Bool { colors.glass && !reduceTransparency }
@@ -160,7 +208,7 @@ struct WidgetGlassSurface: View {
     /** 上下の縁の中央だけに細い色分散(赤→黄→緑→青)。屈折の強さ0では描かない。 */
     @ViewBuilder
     private var dispersion: some View {
-        if glassActive && optics.dispersion > 0.01 {
+        if glassActive && colors.metal == .none && optics.dispersion > 0.01 {
             let a = optics.dispersion
             let band = LinearGradient(colors: [.clear, Color(red: 1, green: 0.42, blue: 0.42).opacity(a), Color(red: 1, green: 0.85, blue: 0.29).opacity(a),
                                                Color(red: 0.36, green: 0.89, blue: 0.63).opacity(a * 0.9), Color(red: 0.42, green: 0.72, blue: 1).opacity(a * 0.75), .clear],

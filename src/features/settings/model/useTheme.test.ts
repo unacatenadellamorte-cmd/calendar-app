@@ -35,7 +35,7 @@ describe('readStoredTheme', () => {
 
 describe('applyTheme', () => {
   it('追加配色を保存値から復元し、標準テーマへ戻すと配色を解除する', () => {
-    for (const theme of ['sakura', 'leaf', 'ocean', 'lavender', 'glass'] as const) {
+    for (const theme of ['sakura', 'leaf', 'ocean', 'lavender', 'glass', 'gold', 'silver'] as const) {
       window.localStorage.setItem('calendar-app.theme', theme);
       applyTheme(readStoredTheme());
       expect(document.documentElement.dataset.theme).toBe(theme);
@@ -66,5 +66,25 @@ describe('applyTheme', () => {
     expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Light });
     expect(document.documentElement.style.getPropertyValue('--color-chrome-ink')).toBe('#14283a');
     expect(Capacitor.isNativePlatform).toHaveBeenCalled();
+  });
+  it('ゴールドは黒っぽいブロンズの帯に白文字、シルバーは明るい銀の帯に濃い文字', () => {
+    const setStyle = vi.mocked(SystemBars.setStyle);
+    applyTheme('gold');
+    expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Dark });
+    expect(document.documentElement.style.getPropertyValue('--color-chrome-surface')).toBe('#3a2911');
+    expect(document.documentElement.style.getPropertyValue('--color-chrome-ink')).toBe('#fff4dc');
+    expect(document.documentElement.style.colorScheme).toBe('light');
+    applyTheme('silver');
+    expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Light });
+    expect(document.documentElement.style.getPropertyValue('--color-chrome-surface')).toBe('#d3d7dd');
+    expect(document.documentElement.style.getPropertyValue('--color-chrome-ink')).toBe('#16191e');
+    // 既存テーマの値は変えない。
+    applyTheme('sakura');
+    expect(setStyle).toHaveBeenLastCalledWith({ style: SystemBarsStyle.Dark });
+    expect(document.documentElement.style.getPropertyValue('--color-chrome-ink')).toBe('#ffffff');
+  });
+  it('不明な保存値(例: 旧版にない名前)はsystemへ戻す', () => {
+    window.localStorage.setItem('calendar-app.theme', 'platinum');
+    expect(readStoredTheme()).toBe('system');
   });
 });

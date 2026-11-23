@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canRefractBackdrop, displacementScale, refractionBand } from './glassRefraction';
+import { MAX_SHIFT_RATIO, canRefractBackdrop, displacementScale, maxVisualShift, refractionBand } from './glassRefraction';
 
 const supportsAll = () => true;
 const ANDROID_WEBVIEW =
@@ -27,18 +27,30 @@ describe('canRefractBackdrop', () => {
 });
 
 describe('変位量', () => {
-  it('強さ0で変位なし、最大でも縁の帯幅未満に抑えて背景が折り返さない', () => {
+  it('強さ0で変位なし、中間は連続、最大でも断面の傾きで背景が折り返さない', () => {
     const band = refractionBand(340, 120);
     expect(displacementScale(0, band)).toBe(0);
-    expect(displacementScale(1, band)).toBeLessThan(band);
     expect(displacementScale(0.5, band)).toBeGreaterThan(0);
+    expect(displacementScale(0.5, band)).toBeCloseTo(displacementScale(1, band) / 2, 0);
     expect(displacementScale(Number.NaN, band)).toBe(0);
     expect(displacementScale(3, band)).toBe(displacementScale(1, band));
+    // 断面 (1+cos πt)/2 の最大傾き π/2 × 変位/帯幅 < 1 なら単調(折り返さない)。
+    expect((Math.PI / 2) * (maxVisualShift(displacementScale(1, band)) / band)).toBeLessThan(1);
+    expect(MAX_SHIFT_RATIO).toBeLessThan(2 / Math.PI);
+  });
+
+  it('強さ100の見た目の変位は旧版(帯幅最大30px・0.45倍)より明確に大きい', () => {
+    // 旧版: band=min(30,max(8,短辺×0.24))、最大変位≒0.448×band。
+    const oldShift = (w: number, h: number) => 0.448 * Math.round(Math.min(30, Math.max(8, Math.min(w, h) * 0.24)));
+    for (const [w, h] of [[358, 420], [340, 120], [64, 44]] as const) {
+      const now = maxVisualShift(displacementScale(1, refractionBand(w, h)));
+      expect(now).toBeGreaterThan(oldShift(w, h) * 1.6);
+    }
   });
 
   it('小さな面ほど縁の帯を細くし、中央の平らな読みやすい部分を残す', () => {
     expect(refractionBand(340, 44)).toBeLessThan(refractionBand(340, 200));
     expect(refractionBand(340, 44) * 2).toBeLessThan(44);
-    expect(refractionBand(2000, 2000)).toBe(30);
+    expect(refractionBand(2000, 2000)).toBe(48);
   });
 });

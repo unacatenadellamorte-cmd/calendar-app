@@ -194,4 +194,28 @@ final class FeaturedWidgetDataTests: XCTestCase {
         XCTAssertEqual(CalendarGridData.addEventLabel(language: "es"), "Añadir evento")
     }
 
+
+    func testGoldAndSilverAreSupportedThemesAndOthersFallBack() {
+        XCTAssertEqual(WidgetThemeNames.normalized("gold"), "gold")
+        XCTAssertEqual(WidgetThemeNames.normalized("silver"), "silver")
+        XCTAssertEqual(WidgetThemeNames.normalized("glass"), "glass")
+        XCTAssertEqual(WidgetThemeNames.normalized("platinum"), "system")
+        XCTAssertEqual(WidgetThemeNames.normalized(nil), "system")
+    }
+
+    func testMetalKindOnlyForGoldAndSilver() {
+        XCTAssertEqual(WidgetMetalKind(theme: "gold"), .gold)
+        XCTAssertEqual(WidgetMetalKind(theme: "silver"), .silver)
+        for theme in ["system", "light", "dark", "sakura", "leaf", "ocean", "lavender", "glass", nil] {
+            XCTAssertEqual(WidgetMetalKind(theme: theme), WidgetMetalKind.none)
+        }
+        XCTAssertNil(WidgetMetalKind.none.tones)
+        // シルバーは無彩色(R=G=Bに近い)、ゴールドは暖色。
+        let silver = WidgetMetalKind.silver.tones!
+        for v in [silver.highlight, silver.body, silver.deep] {
+            XCTAssertLessThan(abs(Int((v >> 16) & 255) - Int(v & 255)), 16)
+        }
+        let gold = WidgetMetalKind.gold.tones!
+        XCTAssertGreaterThan(Int((gold.body >> 16) & 255) - Int(gold.body & 255), 100)
+    }
 }

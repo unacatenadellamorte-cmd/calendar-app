@@ -196,3 +196,38 @@ struct WidgetGlassOptics: Equatable {
         grain = 0.16 * frost
     }
 }
+
+
+/** ウィジェットが受け付けるテーマ名(アプリの ThemePreference と同じ)。不明値は端末追従へ戻す。 */
+enum WidgetThemeNames {
+    static let supported: Set<String> = ["light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass", "gold", "silver"]
+    static func normalized(_ requested: String?) -> String {
+        guard let requested, supported.contains(requested) else { return "system" }
+        return requested
+    }
+}
+
+/**
+ * 金属テーマ(ゴールド/シルバー)の静的な反射の明暗。Foundationだけで持ち、SwiftUIの色へは描画側で変換する。
+ * 実際の壁紙を映す鏡ではなく、Blenderの磨いた金/銀の板(固定照明)を基にした一度だけの明暗。
+ */
+enum WidgetMetalKind: Equatable {
+    case none, gold, silver
+
+    init(theme: String?) {
+        switch theme {
+        case "gold": self = .gold
+        case "silver": self = .silver
+        default: self = .none
+        }
+    }
+
+    /// (白寄りの反射, 材質の明部, 陰) の 0xRRGGBB。
+    var tones: (highlight: UInt32, body: UInt32, deep: UInt32)? {
+        switch self {
+        case .gold: return (0xfff1d2, 0xd6a23e, 0x52340e)
+        case .silver: return (0xffffff, 0xbabfc7, 0x3a3f48)
+        case .none: return nil
+        }
+    }
+}

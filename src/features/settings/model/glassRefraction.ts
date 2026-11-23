@@ -21,6 +21,10 @@ export const GLASS_REFRACTION_SELECTOR = [
   '.app-shell .upcoming-card',
   '.app-shell .pay-summary',
   '.app-shell .quick-shift-panel',
+  // カレンダー面(月の表・週表示)は一枚のガラスとして1つのフィルター。月のセルごとには掛けない。
+  '.app-shell .calendar-glass-panel',
+  // 登録シフトの前/次/削除ボタン(ガラス面の外に置かれるので背後を直接曲げられる)。
+  '.app-shell .shift-control',
 ].join(',');
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -30,8 +34,15 @@ const FILTER_VAR = '--glass-refraction-filter';
 const MAX_CACHED_FILTERS = 16;
 /** マップは滑らかなので縮小して作り、feImageで引き伸ばす(転送量とメモリを抑える)。 */
 const MAP_MAX_SIDE = 160;
-/** 分散: 赤は少し強く、青は少し弱く曲げる。 */
-const DISPERSION = 0.07;
+/** 分散: 赤は少し強く、青は少し弱く曲げる(縁の細い青/琥珀の映り込み)。 */
+const DISPERSION = 0.05;
+/**
+ * 強さ1での最大の見た目の変位(縁の帯幅に対する比)。厚いガラスの面取りとして、帯の中ほどで背後が大きく曲がる。
+ * 断面は (1+cos(πt))/2 なので変位の傾きは最大 π/2・比。背後を折り返さない(単調)よう 1/(π/2)≒0.64 未満にする。
+ */
+export const MAX_SHIFT_RATIO = 0.6;
+/** feDisplacementMap の変位 = scale × (C/255 − 0.5)。マップ値 128∓127k の最大は約0.498×scale。 */
+const MAP_GAIN = 127 / 255;
 
 export type GlassOpticsMode = 'refract' | 'frost' | 'off';
 
@@ -116,8 +127,8 @@ export function buildDisplacementMap(width: number, height: number, radius: numb
       } else if (qx > qy) nx = Math.sign(x);
       else ny = Math.sign(y);
       const t = Math.min(1, Math.max(0, inside / band));
-      // (1-t)^2: 縁で最大、band より内側は0。単調な写像になるよう強さ側で上限を設ける。
-      const k = (1 - t) * (1 - t);
+      // 厚い面取りの断面: 縁で最大、帯の内側の端で0。両端で滑らか(内側に折れ目の線が出ない)。
+      const k = (1 + Math.cos(Math.PI * t)) / 2;
       const p = (j * w + i) * 4;
       image.data[p] = Math.round(128 - 127 * k * nx);
       image.data[p + 1] = Math.round(128 - 127 * k * ny);
@@ -130,17 +141,22 @@ export function buildDisplacementMap(width: number, height: number, radius: numb
 }
 
 /**
- * 強さ(0〜1)と縁の帯幅(px)から feDisplacementMap の scale を求める。
- * 最大でも帯幅の0.9倍に抑え、縁で背景が折り返さない(単調な拡大に留める)ようにする。
+ * 強さ(0〜1)と縁の帯幅(px)から feDisplacementMap の scale を求める。0で変位なし、強さに比例して連続。
+ * 見た目の最大変位は MAX_SHIFT_RATIO×帯幅(単調な範囲)。物理の屈折率ではなく画面上の変位の調整値。
  */
 export function displacementScale(strengthUnit: number, band: number): number {
   const s = Number.isFinite(strengthUnit) ? Math.min(1, Math.max(0, strengthUnit)) : 0;
-  return Math.round(0.9 * band * s * 10) / 10;
+  return Math.round(((MAX_SHIFT_RATIO * band) / MAP_GAIN) * s * 10) / 10;
 }
 
-/** 縁の帯幅。小さな面ほど細くし、中央の平らな部分を残す。 */
+/** scale から求めた、背景の見た目の最大変位(px)。 */
+export function maxVisualShift(scale: number): number {
+  return scale * MAP_GAIN;
+}
+
+/** 縁の帯幅(厚み)。小さな面ほど細くし、中央の平らな読みやすい部分を残す。 */
 export function refractionBand(width: number, height: number): number {
-  return Math.round(Math.min(30, Math.max(8, Math.min(width, height) * 0.24)));
+  return Math.round(Math.min(48, Math.max(10, Math.min(width, height) * 0.32)));
 }
 
 function defsRoot(): SVGSVGElement {

@@ -104,6 +104,8 @@ internal fun widgetRippleResource(appearance: WidgetAppearance): Int = when (app
     0x086d9e -> R.drawable.widget_touch_feedback_ocean
     0x7042a8 -> R.drawable.widget_touch_feedback_lavender
     0x0a6fa5 -> R.drawable.widget_touch_feedback_glass
+    0x8a6110 -> R.drawable.widget_touch_feedback_gold
+    0x3f4754 -> R.drawable.widget_touch_feedback_silver
     else -> R.drawable.widget_touch_feedback
 }
 
@@ -246,6 +248,10 @@ private fun drawGlassLayers(canvas: Canvas, bounds: RectF, radius: Float, width:
         canvas.drawLine(bounds.left + radius, bounds.top + 0.8f * density, bounds.right - radius, bounds.top + 0.8f * density, paint)
     }
     paint.shader = null
+    if (appearance.metal != WidgetMetal.NONE) {
+        drawMetalLayers(canvas, bounds, radius, width, height, density, appearance)
+        return
+    }
     if (optics.dispersionAlpha > 0.01f && width > 40f * density && height > 24f * density) {
         // 上下の縁の中央だけに細い色分散(赤→黄→緑→青)。屈折の強さに比例し、描画は一度だけ。
         val streak = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -284,4 +290,67 @@ private fun widgetGrainTile(density: Float): Bitmap {
         canvas.drawCircle(x, y, r, dot)
     }
     return tile
+}
+
+/** 金属の明暗(Blenderの磨いた金/銀の板を同じ固定照明で描いた比較に基づく近似)。 */
+internal data class WidgetMetalTones(val highlight: Color, val body: Color, val deep: Color)
+
+internal fun widgetMetalTones(metal: WidgetMetal): WidgetMetalTones? = when (metal) {
+    // 白寄りの反射 / 温かい黄金色の明部 / 黒っぽいブロンズの陰。
+    WidgetMetal.GOLD -> WidgetMetalTones(Color(0xFFFFF1D2), Color(0xFFD6A23E), Color(0xFF52340E))
+    // 白 / 明るいグレー / チャコール(無彩色)。
+    WidgetMetal.SILVER -> WidgetMetalTones(Color(0xFFFFFFFF), Color(0xFFBABFC7), Color(0xFF3A3F48))
+    WidgetMetal.NONE -> null
+}
+
+/**
+ * 磨いた金属の面と面取り。面が透明(透過100)でも縁の面取りに材質を残す。
+ * 面: 左上と右下の面光源の間に暗部を置く(透過が上がるほど弱める)。
+ * 面取り: 左上は暗い段差、右下は材質色→白寄りの反射の幅のある照り返し。虹色の分散は描かない。
+ */
+private fun drawMetalLayers(canvas: Canvas, bounds: RectF, radius: Float, width: Int, height: Int, density: Float, appearance: WidgetAppearance) {
+    val tones = widgetMetalTones(appearance.metal) ?: return
+    val w = width.toFloat()
+    val h = height.toFloat()
+    val face = 1f - appearance.glassTransparency.let { if (it.isFinite()) it.coerceIn(0f, 1f) else DEFAULT_WIDGET_GLASS_TRANSPARENCY }
+    val refraction = appearance.glassRefraction.let { if (it.isFinite()) it.coerceIn(0f, 1f) else DEFAULT_WIDGET_GLASS_REFRACTION }
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    // 明部と暗部の境を絞って照明の輪郭を出す。中央の文字にかかる濃さは控えめにする。
+    paint.shader = LinearGradient(0f, 0f, w * 0.18f, h,
+        intArrayOf(tones.highlight.copy(alpha = 0.09f + 0.28f * face).toArgb(),
+            tones.body.copy(alpha = 0.06f + 0.10f * face).toArgb(),
+            tones.deep.copy(alpha = 0.12f * face).toArgb(),
+            Color.Transparent.toArgb(),
+            tones.deep.copy(alpha = 0.14f * face).toArgb(),
+            tones.highlight.copy(alpha = 0.07f + 0.24f * face).toArgb()),
+        floatArrayOf(0f, 0.105f, 0.145f, 0.62f, 0.86f, 1f), Shader.TileMode.CLAMP)
+    canvas.drawRoundRect(bounds, radius, radius, paint)
+    paint.shader = null
+    if (minOf(width, height) <= 14f * density) return
+    val save = canvas.save()
+    canvas.clipPath(Path().apply { addRoundRect(bounds, radius, radius, Path.Direction.CW) })
+    val bevel = Paint(Paint.ANTI_ALIAS_FLAG)
+    bevel.style = Paint.Style.STROKE
+    val spread = (6f + 6f * refraction) * density
+    bevel.strokeWidth = spread
+    bevel.maskFilter = BlurMaskFilter(spread * 0.8f, BlurMaskFilter.Blur.NORMAL)
+    // 面取りの陰(左上)と照り返し(右下)。透過に関係なく縁に材質を残す。
+    bevel.shader = LinearGradient(0f, 0f, w, h,
+        intArrayOf(tones.deep.copy(alpha = 0.55f).toArgb(),
+            tones.body.copy(alpha = 0.30f).toArgb(),
+            tones.body.copy(alpha = 0.45f).toArgb(),
+            tones.highlight.copy(alpha = 0.85f).toArgb()),
+        floatArrayOf(0f, 0.35f, 0.7f, 1f), Shader.TileMode.CLAMP)
+    canvas.drawRoundRect(bounds, radius, radius, bevel)
+    canvas.restoreToCount(save)
+    // 外縁: 材質色の細い縁(白枠にしない)。
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = (1f + 0.5f * refraction) * density
+    val rim = RectF(bounds).apply { inset(paint.strokeWidth / 2f, paint.strokeWidth / 2f) }
+    val rimRadius = (radius - paint.strokeWidth / 2f).coerceAtLeast(0f)
+    paint.shader = LinearGradient(0f, 0f, w, h,
+        intArrayOf(tones.highlight.toArgb(), tones.body.toArgb(), tones.deep.toArgb(),
+            tones.deep.toArgb(), tones.highlight.toArgb(), tones.body.toArgb()),
+        floatArrayOf(0f, 0.19f, 0.34f, 0.62f, 0.88f, 1f), Shader.TileMode.CLAMP)
+    canvas.drawRoundRect(rim, rimRadius, rimRadius, paint)
 }

@@ -5,8 +5,10 @@ import { notifyWidgetAppearanceChanged } from '@/platform/widgetAppearanceEvents
 import {
   applyAppGlassTransparency,
   applyGlassRefraction,
+  applyMetalGloss,
   readStoredAppGlassTransparency,
   readStoredGlassRefraction,
+  readStoredMetalGloss,
 } from './glassAppearance';
 import { syncGlassRefraction } from './glassRefraction';
 
@@ -14,7 +16,7 @@ import { syncGlassRefraction } from './glassRefraction';
 export type ThemePreference = 'system' | 'light' | 'dark' | PaletteName;
 
 const STORAGE_KEY = 'calendar-app.theme';
-const VALID: readonly ThemePreference[] = ['system', 'light', 'dark', 'sakura', 'leaf', 'ocean', 'lavender', 'glass'];
+const VALID: readonly ThemePreference[] = ['system', 'light', 'dark', 'sakura', 'leaf', 'ocean', 'lavender', 'glass', 'gold', 'silver'];
 
 function isThemePreference(value: unknown): value is ThemePreference {
   return typeof value === 'string' && (VALID as readonly string[]).includes(value);
@@ -47,15 +49,24 @@ export function applyTheme(preference: ThemePreference): void {
   } else if (preference === 'glass') {
     // ガラスは上部・下部の面も明るい曇りガラスにし、濃い文字で可読性を保つ。
     root.style.setProperty('--color-chrome-surface', '#e4f0f8');
+  } else if (preference === 'gold') {
+    // ゴールドは黒っぽいブロンズの帯に、温かい白の文字を載せる(磨いた金の陰側)。
+    root.style.setProperty('--color-chrome-surface', '#3a2911');
+  } else if (preference === 'silver') {
+    // シルバーは明るい鏡面の帯にチャコールの文字を載せる。
+    root.style.setProperty('--color-chrome-surface', '#d3d7dd');
   } else {
     root.style.setProperty('--color-chrome-surface', 'color-mix(in srgb, var(--color-ink-primary) 90%, #000)');
   }
-  root.style.setProperty('--color-chrome-ink', preference === 'glass' ? '#14283a' : '#ffffff');
+  root.style.setProperty(
+    '--color-chrome-ink',
+    preference === 'glass' ? '#14283a' : preference === 'silver' ? '#16191e' : preference === 'gold' ? '#fff4dc' : '#ffffff',
+  );
   // v8 の SystemBars.Dark は「暗い面に明るいアイコン」を意味する。
   // Web 実行時は未実装なので失敗を握りつぶし、CSS 面だけで継続する。
   // chrome面は system 選択時も常に濃色なので、OS設定に任せず白アイコンを指定する。
-  // ガラスだけは明るい面なので、濃いアイコン(LIGHT)を指定する。
-  const systemBarStyle = preference === 'glass' ? SystemBarsStyle.Light : SystemBarsStyle.Dark;
+  // ガラスとシルバーは明るい面なので、濃いアイコン(LIGHT)を指定する。
+  const systemBarStyle = preference === 'glass' || preference === 'silver' ? SystemBarsStyle.Light : SystemBarsStyle.Dark;
   if (Capacitor.isNativePlatform() && SystemBars && typeof SystemBars.setStyle === 'function') {
     void Promise.resolve(SystemBars.setStyle({ style: systemBarStyle })).catch(() => undefined);
   }
@@ -79,6 +90,7 @@ export function initTheme(): void {
   // ガラスの透過度も起動時に復元する(テーマ切替前でもCSS変数を持たせ、再起動後も保持する)。
   applyAppGlassTransparency(readStoredAppGlassTransparency());
   applyGlassRefraction(readStoredGlassRefraction());
+  applyMetalGloss(readStoredMetalGloss());
   applyTheme(readStoredTheme());
 }
 

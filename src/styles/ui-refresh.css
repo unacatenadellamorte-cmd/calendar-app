@@ -55,10 +55,9 @@
 }
 
 /* 画面全体 — darkは淡い光だまりを背景に敷き、面の透過が見えるようにする */
-:root[data-theme='dark']:not([data-background='custom']) body,
-:root:not([data-theme]):not([data-background='custom']) body {
+:root[data-theme='dark']:not([data-background='custom']) body::before,
+:root:not([data-theme]):not([data-background='custom']) body::before {
   background-image: var(--ui-backdrop, none);
-  background-attachment: scroll;
 }
 :root[data-theme='dark'],
 :root:not([data-theme]) {
@@ -270,8 +269,7 @@
 
 /* 背景の光は実際の画面の背後へ置く。写真背景の設定はそのまま優先する。 */
 :root[data-theme='dark']:not([data-background='custom']) .app-shell {
-  background-image: var(--ui-backdrop);
-  background-attachment: scroll;
+  background-color: transparent;
 }
 :root[data-theme='dark']:not([data-background='custom']) .app-shell .app-screen {
   background-color: transparent;
@@ -608,6 +606,21 @@
   .app-shell input[role='switch']::before {
     display: none;
   }
+}
+
+/* 選択した日付は枠と数字の両方で示し、予定の色は既存のまま保つ。 */
+.month-cell [data-day-button][aria-pressed='true'] {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 700;
+}
+.calendar-date-nav h2 {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.month-cell [data-day-button]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* ガラス面は上縁の反射と薄い奥行きで表す。文字のある面は十分な濃さを保つ。 */

@@ -127,7 +127,7 @@ export function SettingsScreen() {
             );
           })}
         </div>
-        <GlassTransparencyControls />
+        <GlassTransparencyControls showMetalGloss={theme === 'gold' || theme === 'silver'} />
       </section>
 
       <BackgroundSection />

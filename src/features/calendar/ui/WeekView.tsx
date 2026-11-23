@@ -83,7 +83,8 @@ export function WeekView({
   const shiftDay = (delta: 1 | -1) => onDateChange?.(addDays(cursor, delta));
   const shiftWeek = (delta: 1 | -1) => onDateChange?.(addDays(cursor, delta * 7));
   const content = (
-    <>
+    // 週の時間表は一枚の厚いガラス面(屈折はこの外枠1つだけ)。
+    <div className="calendar-glass-panel" data-calendar-surface="week">
       <div className="mb-2 flex items-start gap-2 border-b border-border-hairline pb-2">
         <span className="mt-0.5 flex-none text-meta text-ink-secondary">{t('終日')}</span>
         <div className="flex flex-1 flex-wrap gap-1">
@@ -159,13 +160,13 @@ export function WeekView({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
   const photos = <DayPhotoSection date={cursor} suspended={photosSuspended} userId={userId} />;
   if (!onDateChange) return <div>{content}{photos}</div>;
   return (
     <div>
-      <SwipeSurface onSwipe={shiftWeek} className="mb-2" pageKey={weekDays[0]}>
+      <SwipeSurface onSwipe={shiftWeek} className="calendar-glass-panel mb-2" pageKey={weekDays[0]}>
         <div className="grid grid-cols-7 text-center" data-testid="week-strip">
           {weekDays.map((date, i) => (
             <button

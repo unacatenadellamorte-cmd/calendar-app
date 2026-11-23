@@ -129,7 +129,7 @@ export function EventChip({
             : event.title
       }
       className={[
-        'flex w-full items-baseline gap-1 overflow-hidden rounded-sm border-l-[3px]',
+        'calendar-label flex w-full items-baseline gap-1 overflow-hidden rounded-sm border-l-[3px]',
         stampAnimation ? 'shift-stamp-arrival' : '',
         month
           ? 'month-event-chip bg-surface-raised px-0 py-0 text-left text-[0.5rem] leading-tight text-ink-primary'

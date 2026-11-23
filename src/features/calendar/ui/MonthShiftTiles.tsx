@@ -326,7 +326,7 @@ export function MonthShiftTiles({
               }}
               onContextMenu={(event) => event.preventDefault()}
               aria-label={t('{0}を{1}に追加', [template.name, date])}
-              className={`touch-manipulation flex aspect-square min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-border-hairline border-t-2 bg-surface-raised p-1 disabled:opacity-50 ${pressedTemplateId === template.id ? 'shift-stamp-press' : ''}`}
+              className={`calendar-label touch-manipulation flex aspect-square min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-border-hairline border-t-2 bg-surface-raised p-1 disabled:opacity-50 ${pressedTemplateId === template.id ? 'shift-stamp-press' : ''}`}
               style={{ borderTopColor: template.color }}
             >
               <span className="line-clamp-2 max-w-full break-words text-xs font-semibold">

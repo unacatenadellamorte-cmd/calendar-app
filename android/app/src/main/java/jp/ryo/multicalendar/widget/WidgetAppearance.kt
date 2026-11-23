@@ -25,6 +25,8 @@ internal data class WidgetAppearance(
     val glassTransparency: Float = DEFAULT_WIDGET_GLASS_TRANSPARENCY,
     /** アプリ設定「屈折の強さ」(0〜1、調整値でIORではない)。縁の厚み・反射・色分散の強さに使う。 */
     val glassRefraction: Float = DEFAULT_WIDGET_GLASS_REFRACTION,
+    /** 磨いた金属の材質(ゴールド/シルバーのテーマ)。NONEは従来のガラス。 */
+    val metal: WidgetMetal = WidgetMetal.NONE,
 )
 
 /** アプリ設定の既定値35%と一致させる。壁紙が不明でも濃紺文字が読める範囲に留める。 */
@@ -60,7 +62,7 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
         val json = JSONObject(raw)
         if (json.optInt("schemaVersion", 0) != 1) return WidgetAppearance()
         val savedTheme = when (json.optString("theme", "system")) {
-            "light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass" -> json.optString("theme", "system")
+            "light", "dark", "system", "sakura", "leaf", "ocean", "lavender", "glass", "gold", "silver" -> json.optString("theme", "system")
             else -> "system"
         }
         val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -84,6 +86,7 @@ internal fun readWidgetAppearance(context: Context): WidgetAppearance {
             glass = true,
             glassTransparency = parseWidgetGlassTransparency(json.opt("widgetTransparency")),
             glassRefraction = parseWidgetGlassRefraction(json.opt("widgetRefraction")),
+            metal = widgetMetalFor(savedTheme),
             appFontScale = json.optDouble("appFontScale", 1.0).toFloat().let { if (it.isFinite()) it.coerceIn(0.8f, 1.2f) else 1f },
         )
     } catch (_: Exception) { WidgetAppearance() }
@@ -113,3 +116,12 @@ internal fun widgetFilledLabelTextColor(background: Color): Color {
     return if (darkContrast > whiteContrast) Color(0xFF111827) else Color.White
 }
 
+
+/** 金属テーマの種類。ウィジェットでは静的な反射(一度だけ描く明暗)として表す。実際の壁紙を映す鏡ではない。 */
+internal enum class WidgetMetal { NONE, GOLD, SILVER }
+
+internal fun widgetMetalFor(theme: String): WidgetMetal = when (theme) {
+    "gold" -> WidgetMetal.GOLD
+    "silver" -> WidgetMetal.SILVER
+    else -> WidgetMetal.NONE
+}

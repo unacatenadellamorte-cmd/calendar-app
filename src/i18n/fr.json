@@ -196,6 +196,8 @@
   "ライト": "lumière",
   "ラベンダー": "lavande",
   "ガラス": "Verre",
+  "ゴールド": "Or",
+  "シルバー": "Argent",
   "リスト": "liste",
   "リマインダー": "rappel",
   "リマインダーなし": "Aucun rappel",
@@ -610,7 +612,8 @@
   "アプリの透過度": "Transparence de l’app",
   "ウィジェットの透過度": "Transparence du widget",
   "屈折の強さ": "Intensité de réfraction",
-  "透過度を下げるほど背景がぼけた、すりガラスになります。屈折の強さは縁で背景が曲がる量で、0で歪みません。文字・予定・入力欄は曲げずに残ります。": "Plus la transparence est basse, plus l’arrière-plan est flouté comme un verre dépoli. L’intensité de réfraction règle la courbure de l’arrière-plan sur les bords ; à 0, aucune distorsion. Le texte, les événements et les champs de saisie ne sont jamais déformés.",
+  "アプリの透過度は、0%と100%でクリア、中間で薄いすりガラスになります。屈折の強さは背景が縁で曲がる量です。文字・予定・入力欄は曲がりません。": "Dans l’application, 0 % et 100 % donnent un verre clair. Les valeurs intermédiaires donnent un léger effet dépoli. La force de réfraction règle la déformation du fond aux bords. Le texte, les événements et les champs restent nets.",
   "どのテーマでも使え、テーマの色がガラスに色付きます。透過度を上げても文字が読めるよう、ガラス面の背後の明暗を整えます。": "Fonctionne avec tous les thèmes : la couleur du thème teinte le verre. En forte transparence, les clairs et les sombres derrière le verre sont atténués pour que le texte reste lisible.",
-  "この端末では背景の屈折を表示できないため、すりガラスと縁の反射で表現します。": "Cet appareil ne peut pas afficher la réfraction de l’arrière-plan ; le verre dépoli et les reflets des bords sont utilisés à la place."
+  "この端末では背景の屈折を表示できないため、すりガラスと縁の反射で表現します。": "Cet appareil ne peut pas afficher la réfraction de l’arrière-plan ; le verre dépoli et les reflets des bords sont utilisés à la place.",
+  "アプリの光沢": "Brillance de l’application"
 }

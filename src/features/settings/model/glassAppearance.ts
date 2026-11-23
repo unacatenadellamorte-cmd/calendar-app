@@ -4,7 +4,7 @@ import { syncGlassRefraction } from './glassRefraction';
 
 /**
  * 全テーマ共通のガラス透過度(0〜100%)。
- * - 0% は面が不透明、100% は最も透明な設定。文字の可読性を守る最小保護面は残す。
+ * - アプリは0%と100%でクリア。ウィジェットは独立した設定で面の濃さを変える。
  * - 文字・入力欄・予定ラベル・反射縁は読みやすさのため透過度に連動させない。
  * - 不正値・欠損・範囲外は既定値へ戻す(範囲外の数値は端に丸める)。
  */
@@ -20,8 +20,10 @@ export const DEFAULT_WIDGET_GLASS_TRANSPARENCY = 35;
  * 見た目の調整値であり、実測の屈折率(IOR)ではない。アプリとウィジェットで共通。
  */
 export const DEFAULT_GLASS_REFRACTION = 50;
+const DEFAULT_METAL_GLOSS = 85;
 
 const APP_KEY = 'calendar-app.glass-app-transparency';
+const METAL_GLOSS_KEY = 'calendar-app.metal-gloss';
 const REFRACTION_KEY = 'calendar-app.glass-refraction';
 const WIDGET_KEY = 'calendar-app.glass-widget-transparency';
 /** ウィジェット更新は予定の再取得も伴うため、操作が止まってから送る。 */
@@ -63,6 +65,18 @@ export function readStoredGlassRefraction(): number {
   return readStored(REFRACTION_KEY, DEFAULT_GLASS_REFRACTION);
 }
 
+export function readStoredMetalGloss(): number {
+  return readStored(METAL_GLOSS_KEY, DEFAULT_METAL_GLOSS);
+}
+
+export function applyMetalGloss(value: number): void {
+  if (typeof document === 'undefined') return;
+  const normalized = normalizeGlassTransparency(value, DEFAULT_METAL_GLOSS);
+  const root = document.documentElement;
+  root.style.setProperty('--metal-gloss', String(normalized / 100));
+  root.dataset.metalFinish = normalized < 34 ? 'brushed' : normalized < 67 ? 'satin' : 'mirror';
+}
+
 /**
  * 屈折の強さを反映する。CSSは --glass-refraction(0〜1)で縁の厚み・反射を変え、
  * 背景の実変位は対応する描画系だけ glassRefraction.ts が行う。
@@ -89,14 +103,18 @@ export function useGlassTransparency(): {
   setWidgetTransparency: (next: number) => void;
   refraction: number;
   setRefraction: (next: number) => void;
+  metalGloss: number;
+  setMetalGloss: (next: number) => void;
 } {
   const [appTransparency, setAppState] = useState(() => readStoredAppGlassTransparency());
   const [widgetTransparency, setWidgetState] = useState(() => readStoredWidgetGlassTransparency());
   const [refraction, setRefractionState] = useState(() => readStoredGlassRefraction());
+  const [metalGloss, setMetalGlossState] = useState(readStoredMetalGloss);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => applyAppGlassTransparency(appTransparency), [appTransparency]);
   useEffect(() => applyGlassRefraction(refraction), [refraction]);
+  useEffect(() => applyMetalGloss(metalGloss), [metalGloss]);
   useEffect(
     () => () => {
       if (timer.current !== null) {
@@ -143,5 +161,11 @@ export function useGlassTransparency(): {
     [notifyWidgetLater],
   );
 
-  return { appTransparency, widgetTransparency, setAppTransparency, setWidgetTransparency, refraction, setRefraction };
+  const setMetalGloss = useCallback((next: number) => {
+    const value = normalizeGlassTransparency(next, DEFAULT_METAL_GLOSS);
+    setMetalGlossState(value);
+    writeStored(METAL_GLOSS_KEY, value);
+  }, []);
+
+  return { appTransparency, widgetTransparency, setAppTransparency, setWidgetTransparency, refraction, setRefraction, metalGloss, setMetalGloss };
 }
