@@ -238,7 +238,7 @@ jobs:
   upload:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload && !inputs.release && !inputs.capture }}
     name: 検証済みIPAをAppleへ送信
-    runs-on: macos-26-intel
+    runs-on: macos-15
     timeout-minutes: 25
     environment: ios-app-store
     permissions:
